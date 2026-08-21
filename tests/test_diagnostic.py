@@ -199,3 +199,60 @@ def test_real_report_has_no_holdout_and_fits_budget(real_bundle_path):
         assert h not in txt, f"홀드아웃 형상 {h} 이 리포트에 들어갔다"
     # 사례마다 σ 와 사용여부가 있다
     assert "노이즈 바닥의" in txt and "미사용" in txt
+
+
+# ---------------------------------------------------------------------------
+# 집계도 홀드아웃을 넘지 않는다 (§12.3 / D-28)
+# ---------------------------------------------------------------------------
+# `build_report` 는 train 분할만 받는데, `table_facts` 가 자유 문자열이라
+# 그 검사를 **완전히 우회했다**. 첫 실제 실행의 블록 3.5 가 전수 표에서
+# 계산된 값이었다. 우회 경로 자체를 없앴고, 그것을 여기서 고정한다.
+
+def _facts_table():
+    return make_table({(1024, 4096, 4096): [1.0, 2.0, 3.0],
+                       (512, 4096, 4096): [1.0, 1.5],
+                       (2048, 4096, 4096): [2.0, 2.2, 9.0]})
+
+
+def test_table_facts_rejects_holdout_splits():
+    from kernelrule.report.table_facts import TableFacts
+    t = _facts_table()
+    shapes = tuple(t.shapes())
+    TableFacts.compute(t, Split("train", shapes))       # train 은 통과
+    for role in ("val", "test"):
+        with pytest.raises(SplitError, match="12.3"):
+            TableFacts.compute(t, Split(role, shapes))
+
+
+def test_table_facts_only_sees_the_train_shapes():
+    """★ 학습 분할에 없는 형상이 집계에 섞이면 안 된다."""
+    from kernelrule.report.table_facts import TableFacts
+    t = _facts_table()
+    shapes = list(t.shapes())
+    part = TableFacts.compute(t, Split("train", tuple(shapes[:2])))
+    whole = TableFacts.compute(t, Split("train", tuple(shapes)))
+    assert part.n_shapes == 2
+    assert whole.n_shapes == len(shapes)
+    assert "학습 분할 2형상" in part.lines[0]
+    assert part.lines != whole.lines
+
+
+def test_build_report_refuses_raw_strings():
+    """자유 문자열을 받으면 분할 검사가 아무 일도 하지 않는다."""
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import Feature, FeatureRegistry
+
+    reg = FeatureRegistry("t3")
+    reg.add(Feature(name="idx", fn=lambda p, hw, c: 0.0, unit="dimensionless",
+                    expected_range=(0.0, 10.0), direction="neutral",
+                    vec=lambda df, hw, p: np.arange(len(df), dtype=float),
+                    code_hash="x"))
+    t = make_table({(1024, 4096, 4096): [1.0, 2.0]})
+    m = FeatureMatrix(t, reg)
+    with pytest.raises(SplitError, match="TableFacts.compute"):
+        D.build_report(run_id="x", table=t, matrix=m,
+                       score_fn=lambda f, p, hw, w: f.idx * w[0],
+                       weights=[1.0],
+                       code="def score(f, p, hw, w):\n    return f.idx * w[0]\n",
+                       train=Split("train", tuple(t.shapes())),
+                       table_facts=["전수 표에서 계산한 문장"])

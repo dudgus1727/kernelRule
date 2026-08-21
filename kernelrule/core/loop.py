@@ -103,14 +103,17 @@ class RoundResult:
 
 class RoundLoop:
     def __init__(self, *, cfg: LoopConfig, table: PerfTable,
-                 matrix: FeatureMatrix, splits: SplitSet, llm,
-                 table_facts: list[str] | None = None) -> None:
+                 matrix: FeatureMatrix, splits: SplitSet, llm) -> None:
         self.cfg = cfg
         self.table = table
         self.matrix = matrix
         self.splits = splits
         self.llm = llm
-        self.table_facts = list(table_facts or [])
+        # ★ 주입받지 않고 **여기서 학습 분할로부터 계산한다** (§12.3 / D-28).
+        #   호출자가 전수 표에서 계산한 문장을 넘길 수 있으면 리포트의 분할
+        #   검사가 아무 일도 하지 않는다 — 첫 실제 실행이 그렇게 오염됐다.
+        from kernelrule.report.table_facts import TableFacts
+        self.table_facts = TableFacts.compute(table, splits.train)
         self.rng = np.random.default_rng(cfg.seed)
         self.archive = Archive(noise_tol=0.0)
         self.rounds: list[RoundResult] = []

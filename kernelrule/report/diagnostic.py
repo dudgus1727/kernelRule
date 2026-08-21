@@ -57,6 +57,7 @@ from kernelrule.core.scoring import Evaluation, evaluate_scores, geomean
 from kernelrule.core.splits import Split, SplitError
 from kernelrule.core.table import PerfTable
 from kernelrule.core.types import Problem
+from kernelrule.report.table_facts import TableFacts
 
 __all__ = ["DiagnosticReport", "Case", "Regime", "build_report"]
 
@@ -114,7 +115,7 @@ class DiagnosticReport:
     rule_weights: list[float]
     overall: dict
     regimes: list[Regime]
-    table_facts: list[str]
+    table_facts: TableFacts | None
     cases: list[Case]
     failures: list[dict] = field(default_factory=list)
     hypotheses_applied: list[str] = field(default_factory=list)
@@ -334,7 +335,7 @@ def _select_cases(table, matrix, order_of, ev, masks, shapes,
 # ---------------------------------------------------------------------------
 def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
                  score_fn, weights, code: str, train: Split,
-                 table_facts: list[str] | None = None,
+                 table_facts: TableFacts | None = None,
                  failures: list[dict] | None = None,
                  hypotheses_applied: list[str] | None = None,
                  notes: list[str] | None = None) -> DiagnosticReport:
@@ -347,6 +348,14 @@ def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
         raise SplitError(
             "진단 리포트는 학습 분할만 받는다 (§10.2). 홀드아웃 점수가 "
             "프롬프트에 들어가는 경로를 만들지 않는다.")
+    # ★ 전에는 여기가 자유 문자열 리스트였고 위 검사를 **완전히 우회했다**
+    #   — 첫 실제 실행의 블록 3.5 가 전수 표에서 계산됐다. §12.3 은 "점수"
+    #   만 막았고 집계가 빠져나갔다 (D-28).
+    if table_facts is not None and not isinstance(table_facts, TableFacts):
+        raise SplitError(
+            "table_facts 는 TableFacts.compute(table, train) 로만 만든다 "
+            "(§12.3). 자유 문자열을 받으면 학습 분할 검사를 우회한다 — "
+            "집계도 홀드아웃을 넘지 않는다.")
 
     shapes = list(train.shapes)
     # ★ 규칙 소스에서 `f.<이름>` 을 AST 로 뽑는다 (A-1 의 검사기 재사용).
@@ -379,7 +388,7 @@ def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
         hw_block=hardware_block(table.hw, table.noise),
         rule_code=code.strip(), rule_weights=[float(x) for x in weights],
         overall=overall, regimes=_regimes(ev, masks, shapes),
-        table_facts=list(table_facts or []),
+        table_facts=table_facts,
         cases=_select_cases(table, matrix, order_of, ev, masks, shapes,
                             used_features=used),
         failures=list(failures or []),
@@ -448,12 +457,13 @@ def _render(r: DiagnosticReport) -> str:
             f"{g.worst_shape} ({g.worst_regret:.3f})")
     add("```")
 
-    if r.table_facts:
+    if r.table_facts is not None:
         add("")
         add("## 블록 3.5 — 표 구조 관찰")
-        add("개별 사례로는 보이지 않는 패턴이다.")
+        add("개별 사례로는 보이지 않는 패턴이다. "
+            "**학습 분할에서만 계산했다** (§12.3).")
         add("```")
-        for f in r.table_facts:
+        for f in r.table_facts.lines:
             add(f)
         add("```")
 
