@@ -38,6 +38,7 @@ __all__ = [
     "REGISTRY",
     "feature",
     "shape_feature",
+    "render_features",
 ]
 
 Direction = str   # "higher_is_worse" | "higher_is_better" | "neutral"
@@ -53,6 +54,24 @@ class Feature:
     expected_range: tuple[float, float]
     direction: Direction
     doc: str = ""
+    # ------------------------------------------------------------------
+    # ★ 설명을 두 층으로 나눈다 (§8.2 / Architect A 조건)
+    # ------------------------------------------------------------------
+    # 전이 주장을 시험하려면 "표를 안 보고 규칙을 쓸 수 있는가" 를 물어야
+    # 하는데, 피처 설명에 표에서 나온 문장이 섞여 있으면 그 시험이 성립하지
+    # 않는다. 두 층을 **필드로** 갈라 놓아야 프롬프트를 조립할 때 섞이지
+    # 않는다 — 주석으로 구분하면 반드시 섞인다.
+    #
+    #   physical_meaning  "마지막 wave 에서 노는 SM 슬롯의 비율"
+    #                     새 GPU 에서도 그대로. A 조건에 넣는다.
+    #   observed          "A6000 에서 스필 커널은 최적을 낸 적이 없다"
+    #                     ★ 표에서 나왔다. A 조건에서 뺀다.
+    #
+    #: 비면 `doc` 을 쓴다.
+    physical_meaning: str = ""
+    #: 표에서 관측된 성질. **반드시 학습 분할에서만** 나온 것이어야 한다
+    #: (§12.3 / D-28) — 전수 표에서 계산하면 홀드아웃이 프롬프트로 샌다.
+    observed: tuple[str, ...] = ()
     #: 형상 수준인가 (Config 무관). True 면 `ShapeInfo` 에 스칼라로 들어간다.
     shape_level: bool = False
     #: 선택적 벡터화 구현. `(df, hw, info) -> np.ndarray`.
@@ -67,6 +86,23 @@ class Feature:
     @property
     def active(self) -> bool:
         return self.deprecated_at_round is None
+
+    @property
+    def physics(self) -> str:
+        """★ 아키텍처 무관한 정의. A 조건 프롬프트가 쓰는 유일한 설명."""
+        return self.physical_meaning or self.doc
+
+    def describe(self, *, include_observed: bool) -> str:
+        """프롬프트 한 줄. `include_observed=False` 가 A 조건이다."""
+        return self.describe_with(include_observed=include_observed)
+
+    def describe_with(self, *, include_observed: bool,
+                      extra: tuple[str, ...] = ()) -> str:
+        head = f"{self.name:26s} {self.physics}"
+        if include_observed:
+            for o in (*self.observed, *extra):
+                head += f"\n{'':26s}   [관측] {o}"
+        return head
 
 
 class FeatureRegistry:
@@ -151,7 +187,9 @@ def feature(*, unit: str = "dimensionless",
             direction: Direction = "higher_is_worse",
             vec: Callable | None = None,
             registry: FeatureRegistry | None = None,
-            shape_level: bool = False):
+            shape_level: bool = False,
+            physical_meaning: str = "",
+            observed: tuple[str, ...] = ()):
     """config 수준 피처를 등록한다. 배열로 계산되어 `Feats.<name>` 이 된다."""
 
     def deco(fn: Callable) -> Callable:
@@ -159,6 +197,8 @@ def feature(*, unit: str = "dimensionless",
                     expected_range=tuple(expected_range), direction=direction,
                     doc=(fn.__doc__ or "").strip().split("\n")[0],
                     shape_level=shape_level, vec=vec,
+                    physical_meaning=physical_meaning,
+                    observed=tuple(observed),
                     code_hash=_hash_fn(fn))
         # ★ `registry or REGISTRY` 를 쓰면 안 된다 — `__len__` 이 있어서
         # **빈 레지스트리가 falsy** 이고, 그러면 첫 피처가 조용히 전역
@@ -181,6 +221,43 @@ def shape_feature(**kw):
     kw.setdefault("shape_level", True)
     kw["shape_level"] = True
     return feature(**kw)
+
+
+def render_features(registry: FeatureRegistry | None = None, *,
+                    include_observed: bool, active_only: bool = True,
+                    extra_observed: dict[str, list[str]] | None = None) -> str:
+    """프롬프트에 넣을 피처 목록.
+
+    ★ `include_observed=False` 가 **A 조건**이다 — 표에서 나온 문장이 하나도
+    들어가지 않는다. 그래야 "표를 안 보고 물리만으로 규칙을 쓸 수 있는가" 를
+    실제로 물은 것이 된다.
+
+    호출부에서 문자열을 이어붙이지 말고 **반드시 이 함수를 쓴다.** 조립을
+    손으로 하면 섞인다 — 블록 3.5 가 그렇게 오염됐다 (D-28).
+
+    `extra_observed` 는 **학습 분할에서 계산한** 관측을 피처별로 붙인다
+    (`report/table_facts.py` 가 만든다). 정적 `Feature.observed` 필드에
+    표에서 나온 수치를 넣지 않는 이유가 이것이다 — 그 값은 분할마다 다르고,
+    소스에 박아 두면 어느 분할에서 나왔는지 알 수 없게 된다.
+
+    ⚠️ `include_observed=False` 면 `extra_observed` 도 **무시된다.**
+    """
+    extra = extra_observed or {}
+    reg = REGISTRY if registry is None else registry
+    items = [reg[n] for n in sorted(reg._items)]
+    if active_only:
+        items = [f for f in items if f.active]
+    shape, cfg = [f for f in items if f.shape_level], [
+        f for f in items if not f.shape_level]
+    def line(f: Feature) -> str:
+        return f.describe_with(include_observed=include_observed,
+                               extra=tuple(extra.get(f.name, ())))
+
+    out = ["## 형상 수준 (스칼라. `if p.<name>:` 로 분기 가능)"]
+    out += [line(f) for f in shape]
+    out += ["", "## config 수준 (배열. `if` 금지 — ValueError 가 난다)"]
+    out += [line(f) for f in cfg]
+    return "\n".join(out)
 
 
 def verify_vectorized(f: Feature, df, hw, info, *, n: int = 256,

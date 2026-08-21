@@ -53,6 +53,9 @@ class TableFacts:
 
     lines: tuple[str, ...]
     n_shapes: int
+    #: 피처 이름 -> 그 피처에 붙일 관측. `features.render_features` 가 쓴다.
+    #: ★ 학습 분할에서 나왔으므로 A 조건 프롬프트에서는 빠진다.
+    by_feature: dict[str, list[str]] = field(default_factory=dict)
     #: 지지 형상이 모자라 빼야 했던 관찰. **조용히 빠지지 않는다.**
     withheld: tuple[str, ...] = field(default_factory=tuple)
 
@@ -91,8 +94,15 @@ class TableFacts:
             for col, pred, _ in present:
                 if bool(pred(win[col]).any()):
                     counts[col] = counts.get(col, 0) + 1
+        by_feature: dict[str, list[str]] = {}
+        feat_of = {"has_spill": "has_spill", "ext_stages": "is_two_stage",
+                   "split_k_mode": "split_k_cost"}
         for col, _, label in present:
-            emit(f"{label}이 정답 집합에 든 형상: {counts.get(col, 0)}/{n}개", n)
+            c = counts.get(col, 0)
+            emit(f"{label}이 정답 집합에 든 형상: {c}/{n}개", n)
+            if (fname := feat_of.get(col)) and n >= MIN_SUPPORT:
+                by_feature.setdefault(fname, []).append(
+                    f"학습 {n}형상 중 {label}이 정답 집합에 든 것 {c}개")
         for col, _, label in axes:
             if col not in cols:
                 withheld.append(f"{label}: 표에 {col!r} 컬럼이 없어 못 쟀다")
@@ -129,4 +139,5 @@ class TableFacts:
                          f"(지지 형상 {MIN_SUPPORT}개 미만이거나 컬럼 부재). "
                          "조용히 빠지지 않는다 (§26.4).")
 
-        return cls(lines=tuple(lines), n_shapes=n, withheld=tuple(withheld))
+        return cls(lines=tuple(lines), n_shapes=n, by_feature=by_feature,
+                   withheld=tuple(withheld))
