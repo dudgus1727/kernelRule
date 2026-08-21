@@ -142,7 +142,8 @@ class OpenAILLM:
     """`MockLLM` 과 같은 인터페이스. 루프는 둘을 구분하지 않는다."""
 
     def __init__(self, cfg: LLMConfig, *, feature_names, shape_values,
-                 budget: Budget | None = None, cache: bool = True) -> None:
+                 budget: Budget | None = None, cache: bool = True,
+                 registry=None) -> None:
         if not os.environ.get("OPENAI_API_KEY"):
             raise MissingAPIKey(
                 "OPENAI_API_KEY 가 없다. 실제 LLM 실행을 중단한다.\n"
@@ -151,6 +152,9 @@ class OpenAILLM:
         self.cfg = cfg
         self.features = list(feature_names)
         self.shape_values = list(shape_values)
+        # ★ Architect 는 이름 목록이 아니라 **물리적 정의**를 넣어야 한다.
+        #   `feature_names` 로는 physical_meaning 을 못 읽는다.
+        self.registry = registry
         self.budget = budget or Budget()
         self.calls: list[LLMCall] = []
         self._seq = 0
@@ -189,7 +193,8 @@ class OpenAILLM:
 
         from kernelrule.agents.schemas import DiagnosisOutput, RuleOutput
 
-        out = {"diagnose": DiagnosisOutput, "optimize": RuleOutput}[role]
+        out = {"diagnose": DiagnosisOutput, "optimize": RuleOutput,
+               "architect": RuleOutput}[role]
         role_md = load_prompt(f"{role}.md")
         # ★ 두 층으로 나뉜다: [고정] 역할·제약  +  [주입] 하드웨어 사실
         instructions = f"{self._common}\n\n---\n\n{self._hw}\n\n---\n\n{role_md}"
@@ -209,6 +214,8 @@ class OpenAILLM:
 
     def _user_prompt(self, role: str, prompt: str, **kw) -> str:
         fl, sl = self._feature_block()
+        if role == "architect":
+            return self._architect_prompt(**kw)
         if role == "diagnose":
             return (prompt + "\n\n---\n\n## 등록된 피처\n\n"
                     f"### config 수준 (`f.<이름>`)\n\n{fl}\n\n"
@@ -240,6 +247,51 @@ class OpenAILLM:
             parent_code=(parent.code if parent else
                          "(부모 없음 — 처음부터 만들어라)"),
             parent_w=(list(parent.w0) if parent else "-"))
+
+
+    # -- Architect (§11.8) — 부모도 사례도 점수도 받지 않는다 ---------------
+    def _architect_prompt(self, *, condition: str = "A",
+                          table_facts=None, **_kw) -> str:
+        """★ 조건 A 는 **표에서 나온 문장이 하나도 없다.**
+
+        전이 시나리오와의 정합성이 이 조건의 존재 이유다:
+
+            완전 이식 §29.5(a)   표 0      구조+가중치 그대로
+            재적합   §29.5(b)   표본 5%   구조 고정, 가중치만
+            재생성   §29.5(c)   전수      구조부터 새로
+
+        표를 봐야 **구조**가 나오면 그것은 (c) 다. 그런데 전수를 잴 거면
+        표를 직접 쓰면 되므로 이 시스템을 쓸 이유가 없다. 그래서 A 가
+        관문이고, B 와의 격차가 곧 "표의 값어치" 다.
+
+        조립을 손으로 하지 않는다 — `render_features` 를 통과시킨다 (D-28).
+        """
+        from kernelrule.features import render_features
+
+        if condition not in ("A", "B"):
+            raise ValueError(f"알 수 없는 Architect 조건: {condition!r}. "
+                             "A(물리만) 또는 B(물리+학습분할 집계)")
+        if condition == "B" and table_facts is None:
+            raise ValueError(
+                "조건 B 는 학습 분할 집계가 필요하다. "
+                "TableFacts.compute(table, splits.train) 을 넘겨라 (§12.3).")
+
+        extra = getattr(table_facts, "by_feature", None) if table_facts else None
+        block = render_features(self.registry, include_observed=condition == "B",
+                                extra_observed=extra)
+        if condition == "A":
+            note = "당신은 이 GPU 의 측정 표를 보지 않습니다"
+            agg = ("## 표 집계\n\n**없습니다.** 이것이 조건 A 입니다 — "
+                   "물리만 보고 쓰세요.")
+        else:
+            lines = "\n".join(table_facts.lines)
+            note = "학습 분할의 **집계**만 봅니다. 형상별 답은 보지 않습니다"
+            agg = ("## 표 집계 (학습 분할에서만 — §12.3)\n\n"
+                   "개별 형상의 답이 아니라 전체에서 나온 패턴입니다. "
+                   "**형상을 식별할 수 있는 것은 없습니다.**\n\n"
+                   f"```\n{lines}\n```")
+        return load_prompt("architect.md").format(
+            table_note=note, feature_block=block, aggregate_block=agg)
 
     # -- 진입점 -----------------------------------------------------------
     def complete(self, role: str, prompt: str, **kw):

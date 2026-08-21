@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 
 from kernelrule.agents.openai_client import (
@@ -242,3 +244,58 @@ def test_violation_report_detects_useless_retries(client):
 def test_retries_raised_to_three():
     """(d) 임시. 거부율이 높을 때 '배우는 중' 과 '구조적 불가능' 을 구분한다."""
     assert LLMConfig().max_retries == 3
+
+
+# ---------------------------------------------------------------------------
+# Architect — A 조건은 표에서 나온 것을 하나도 보지 않는다 (§11.8)
+# ---------------------------------------------------------------------------
+# 전이가 성립하려면 새 아키텍처에서 **표 없이** 구조가 나와야 한다. 표를
+# 봐야 구조가 나오면 §29.5(c) 재생성이고, 전수를 잴 거면 표를 직접 쓰면
+# 되므로 이 시스템을 쓸 이유가 없다. 그래서 A 가 관문이다.
+
+def _arch_client():
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.features import REGISTRY
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    return OpenAILLM(LLMConfig(model="m"), feature_names=[], shape_values=[],
+                     registry=REGISTRY, cache=False)
+
+
+class _Facts:
+    lines = ("스필 커널이 정답 집합에 든 형상: 0/51개",
+             "고정 config 하나로 얼마나 가는가:  top-1 1.116")
+    by_feature = {"has_spill": ["학습 51형상 중 정답 집합에 든 것 0개"]}
+
+
+def test_architect_condition_a_contains_no_table_derived_line():
+    """★ 관문. 표에서 나온 문장이 한 줄도 들어가면 안 된다."""
+    c = _arch_client()
+    a = c._architect_prompt(condition="A", table_facts=_Facts())
+    for line in (*_Facts.lines, *_Facts.by_feature["has_spill"]):
+        assert line not in a, f"A 조건에 표 문장이 샜다: {line}"
+    assert "이 조건 A" in a or "조건 A" in a
+
+
+def test_architect_condition_b_carries_the_aggregates():
+    c = _arch_client()
+    b = c._architect_prompt(condition="B", table_facts=_Facts())
+    for line in (*_Facts.lines, *_Facts.by_feature["has_spill"]):
+        assert line in b
+
+
+def test_architect_condition_b_refuses_without_facts():
+    """집계 없이 B 라고 부르면 A 와 같아진다 — 조용히 그렇게 되지 않는다."""
+    c = _arch_client()
+    with pytest.raises(ValueError, match="학습 분할 집계"):
+        c._architect_prompt(condition="B")
+    with pytest.raises(ValueError, match="알 수 없는 Architect 조건"):
+        c._architect_prompt(condition="C")
+
+
+def test_architect_prompt_has_no_parent_or_case_slots():
+    """부모·사례·점수를 받지 않는 것이 이 역할의 정의다."""
+    c = _arch_client()
+    a = c._architect_prompt(condition="A")
+    for banned in ("부모 규칙:", "### 사례 #", "regret 1.", "val "):
+        assert banned not in a
