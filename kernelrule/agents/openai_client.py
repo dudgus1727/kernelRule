@@ -364,28 +364,40 @@ class OpenAILLM:
         프레임워크가 validator 실패를 모델에 되먹여 재시도하는데, 그 내역이
         밖에서 안 보인다. 결과 메시지에서 되짚어 회차별로 남긴다.
         """
-        try:
-            res = await agent.run(user)
-        except Exception as e:                            # noqa: BLE001
-            self.violations.append(
-                {"round": self.round, "seq": seq, "role": role, "attempt": -1,
-                 "code": classify_violation(f"{type(e).__name__}: {e}"),
-                 "msg": f"{type(e).__name__}: {e}"[:200]})
-            raise
-        # 성공했더라도 중간 재시도가 있었으면 그것도 기록한다.
-        try:
-            for i, m in enumerate(res.all_messages()):
+        # ★ `capture_run_messages` 로 감싼다. 그러지 않으면 **실패했을 때**
+        #   회차별 메시지를 볼 수 없다 — 예외만 남고 `res` 가 없다.
+        #   Architect A 조건에서 10회 중 8회가 재시도 소진으로 죽었는데
+        #   무엇이 걸렸는지 알 수 없었다. 그러면 프롬프트를 어디를 고칠지
+        #   모른다 (§26.4 — 실패가 정보를 남겨야 한다).
+        from pydantic_ai import capture_run_messages
+
+        def _harvest(msgs, seq_: int) -> None:
+            for i, m in enumerate(msgs or []):
                 for part in getattr(m, "parts", []):
-                    content = getattr(part, "content", "")
-                    if isinstance(content, str) and (
-                            "validation error" in content.lower()
+                    # ★ `RetryPromptPart.content` 는 **dict 리스트**다.
+                    #   str 만 보면 되먹임 내역이 통째로 안 잡힌다 —
+                    #   실제로 재시도 소진의 이유를 못 읽고 있었다.
+                    raw = getattr(part, "content", "")
+                    content = raw if isinstance(raw, str) else str(raw)
+                    if ("validation error" in content.lower()
                             or "Value error" in content):
                         self.violations.append(
-                            {"round": self.round, "seq": seq, "role": role,
+                            {"round": self.round, "seq": seq_, "role": role,
                              "attempt": i, "code": classify_violation(content),
-                             "msg": content[:200]})
-        except Exception:                                 # noqa: BLE001
-            pass          # 추적 실패가 실행을 막으면 안 된다
+                             "msg": content[:300]})
+
+        with capture_run_messages() as msgs:
+            try:
+                res = await agent.run(user)
+            except Exception as e:                        # noqa: BLE001
+                _harvest(msgs, seq)
+                self.violations.append(
+                    {"round": self.round, "seq": seq, "role": role,
+                     "attempt": -1,
+                     "code": classify_violation(f"{type(e).__name__}: {e}"),
+                     "msg": f"{type(e).__name__}: {e}"[:200]})
+                raise
+            _harvest(msgs, seq)
         return res
 
     def violation_report(self) -> dict:

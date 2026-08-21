@@ -14,7 +14,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from kernelrule.rules.checks import LIMITS
+from kernelrule.rules.checks import (
+    LIMITS,
+    literal_budget_message,
+    noop_term_message,
+    weight_reuse_message,
+)
 
 __all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "AuditVerdict",
            "RuleProposal", "SchemaViolation", "validate_rule_proposal",
@@ -22,7 +27,7 @@ __all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "AuditVerdict",
            "N_HYP_MIN", "N_HYP_MAX"]
 
 try:
-    from pydantic import BaseModel, Field, field_validator
+    from pydantic import BaseModel, Field, field_validator, model_validator
     HAVE_PYDANTIC = True
 except ImportError:                                # pragma: no cover
     HAVE_PYDANTIC = False
@@ -289,6 +294,18 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         hypothesis_id: str = Field(
             default="", description="반영한 가설 id")
 
+        @model_validator(mode="after")
+        def _budget(self):
+            """★ 리터럴과 가중치를 **함께** 봐야 한다.
+
+            둘을 따로 검사하면 "가중치 8개" 와 "리터럴 1개" 가 각각
+            통과하고 합이 9가 된다. 실제로 Architect 제안 3개가 연속으로
+            여기서 폐기됐고 모델은 이유를 듣지 못했다.
+            """
+            if (m := literal_budget_message(self.code, len(self.w0))):
+                raise ValueError(m)
+            return self
+
         @field_validator("code")
         @classmethod
         def _clean(cls, v: str) -> str:
@@ -302,6 +319,15 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
                 raise ValueError(
                     f"금지된 참조: {b!r}. 규칙은 표를 볼 수 없고 "
                     "import 도 못 한다 (§3)")
+            # ★ 재사용은 정적 검사에만 있어서 **재시도가 안 걸렸다** —
+            #   제안이 조용히 폐기되고 모델은 무엇이 틀렸는지 못 들었다.
+            #   여기로 올리면 Pydantic AI 가 메시지를 되먹여 고치게 한다.
+            if (m := weight_reuse_message(v)) is not None:
+                raise ValueError(m)
+            # ★ 조용히 아무 일도 하지 않는 항 — 예외도 안 나고 실행도 된다.
+            #   여기서 막지 않으면 예산 하나가 그냥 버려진다 (§26.4).
+            if (m := noop_term_message(v)) is not None:
+                raise ValueError(m)
             return v
 
         @field_validator("w0")

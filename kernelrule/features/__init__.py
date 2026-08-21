@@ -98,10 +98,19 @@ class Feature:
 
     def describe_with(self, *, include_observed: bool,
                       extra: tuple[str, ...] = ()) -> str:
-        head = f"{self.name:26s} {self.physics}"
+        # ★ 접근 형태를 그대로 보여준다. 이름만 주면 config 수준 피처를
+        #   `p.` 로 쓰는 규칙이 나온다 — 실제로 첫 Architect 호출이 그랬다.
+        ref = f"{'p' if self.shape_level else 'f'}.{self.name}"
+        # ★ 범위와 단위는 **피처의 물리적 정의의 일부**다 (표가 아니다).
+        #   없으면 상대 가중치를 세울 수 없다 — 자릿수가 다른 항을 그냥
+        #   더하게 되고, 수치 최적화기도 그 지점에서 못 빠져나온다.
+        #   실제로 Architect A 첫 시도가 regret 8.4 를 냈다.
+        lo, hi = self.expected_range
+        rng = f"[{lo:g}, {hi:g}]"
+        head = f"{ref:28s} {rng:>14s}  {self.physics}"
         if include_observed:
             for o in (*self.observed, *extra):
-                head += f"\n{'':26s}   [관측] {o}"
+                head += f"\n{'':28s}   [관측] {o}"
         return head
 
 
@@ -253,10 +262,14 @@ def render_features(registry: FeatureRegistry | None = None, *,
         return f.describe_with(include_observed=include_observed,
                                extra=tuple(extra.get(f.name, ())))
 
-    out = ["## 형상 수준 (스칼라. `if p.<name>:` 로 분기 가능)"]
-    out += [line(f) for f in shape]
-    out += ["", "## config 수준 (배열. `if` 금지 — ValueError 가 난다)"]
-    out += [line(f) for f in cfg]
+    h_shape = ("## 형상 수준 — `p.<이름>` 으로만 접근한다. "
+               "스칼라라서 `if p.<이름>:` 분기 가능")
+    h_cfg = ("## config 수준 — `f.<이름>` 으로만 접근한다. "
+             "**배열이다** (`if` 금지, ValueError)")
+    tail = ("★ 접두사를 바꿔 쓰면 즉시 거부된다. `p.` 목록에 없는 이름을 "
+            "`p.` 로 쓰거나 그 반대도 마찬가지다.")
+    out = [h_shape, *(line(f) for f in shape),
+           "", h_cfg, *(line(f) for f in cfg), "", tail]
     return "\n".join(out)
 
 

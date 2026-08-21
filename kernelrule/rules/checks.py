@@ -26,7 +26,124 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 
-__all__ = ["CheckReport", "RuleCheckError", "check_rule", "LIMITS"]
+__all__ = ["CheckReport", "RuleCheckError", "check_rule", "LIMITS",
+           "weight_reuse_message", "literal_budget_message",
+           "noop_term_message"]
+
+
+def noop_term_message(code: str) -> str | None:
+    """누적 점수에 형상 상수만 더하는 항을 찾는다. 순위가 안 바뀐다.
+
+    ★ 규칙은 **형상마다 독립적으로 정렬**되므로 형상 수준 스칼라를 점수
+    전체에 더하거나 곱하는 것은 단조 변환이고 순서를 하나도 바꾸지 않는다.
+    그런 항은 예산 하나를 그냥 버린다.
+
+    문법적으로 합법이라 실행도 되고 예외도 없다 — **조용히 아무 일도
+    하지 않는다.** 그래서 이 검사가 필요하다 (§26.4). Architect A 조건
+    첫 성공 규칙이 `p.log_sol_ms * w[0]` 으로 항 하나를 버렸다.
+
+    형상 수준 값이 **`f.*` 와 곱해지면** 의미가 있다 — 그때는 config 수준
+    항의 가중치를 형상에 따라 바꾸는 것이므로 순위가 바뀐다.
+    """
+    try:
+        tree = ast.parse(code.strip())
+    except SyntaxError:
+        return None
+    bad_terms: list[str] = []
+
+    def walk(body):
+        for st in body:
+            if isinstance(st, ast.If):
+                walk(st.body)
+                walk(st.orelse)
+                continue
+            if not isinstance(st, (ast.Assign, ast.AugAssign)):
+                continue
+            val = st.value
+            # `s = s + <expr>` 또는 `s += <expr>` 의 <expr> 만 본다
+            if isinstance(st, ast.Assign) and isinstance(val, ast.BinOp) \
+                    and isinstance(val.op, ast.Add):
+                expr = val.right
+            elif isinstance(st, ast.AugAssign) and isinstance(st.op, ast.Add):
+                expr = val
+            else:
+                continue
+            if not _uses_weight(expr):
+                continue
+            if not _touches_features(expr):
+                bad_terms.append(ast.unparse(expr))
+
+    walk(tree.body[0].body)
+    if not bad_terms:
+        return None
+    return (f"순위에 아무 효과가 없는 항이 있다: {bad_terms}. 규칙은 형상마다 "
+            "독립적으로 정렬되므로 **형상 수준 값을 점수 전체에 더하면 "
+            "순서가 하나도 바뀌지 않는다** — 가중치 하나를 버리는 것이다. "
+            "형상 수준 값은 `if p.<이름>:` 으로 분기해 config 수준 항의 "
+            "가중치를 바꾸는 데 쓰거나, `f.*` 와 곱해서 써라")
+
+
+def _uses_weight(node) -> bool:
+    return any(isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
+               and n.value.id == "w" for n in ast.walk(node))
+
+
+def literal_budget_message(code: str, n_weights: int) -> str | None:
+    """숫자 리터럴 + 가중치가 예산을 넘으면 메시지를, 아니면 `None`.
+
+    ★ `weight_reuse_message` 와 같은 이유로 따로 뺐다 — LLM 경계에서
+    재시도를 걸어야 모델이 무엇이 틀렸는지 듣는다. 이 검사가 정적 단계에만
+    있었을 때 Architect 제안 3개가 연속으로 같은 이유로 폐기됐고, 모델은
+    "가중치 8개면 리터럴을 쓸 수 없다" 를 끝내 알지 못했다.
+    """
+    try:
+        tree = ast.parse(code.strip())
+    except SyntaxError:
+        return None
+    skip = {id(n.slice) for n in ast.walk(tree)
+            if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
+            and n.value.id == "w"}
+    n_lit = sum(1 for n in ast.walk(tree)
+                if isinstance(n, ast.Constant)
+                and isinstance(n.value, (int, float))
+                and not isinstance(n.value, bool) and id(n) not in skip)
+    total = n_lit + n_weights
+    if total <= LIMITS["literal_budget"]:
+        return None
+    return (f"숫자 리터럴 {n_lit}개 + 가중치 {n_weights}개 = {total} > "
+            f"{LIMITS['literal_budget']} (§29.4). 리터럴과 가중치는 **같은 "
+            f"예산**을 쓴다 — 상수를 하나 쓰면 가중치를 하나 줄여야 한다. "
+            f"리터럴을 빼고 그 자리를 가중치로 바꾸거나, 항을 줄여라")
+
+
+def weight_reuse_message(code: str) -> str | None:
+    """`w[i]` 를 여러 항에 재사용했으면 그 메시지를, 아니면 `None`.
+
+    ★ 이것만 따로 뺀 이유는 **LLM 경계에서 재시도를 걸기 위해서**다.
+    전체 검사는 AST 순회가 무겁고 등록된 피처 목록이 필요한데, 재사용은
+    코드만 보면 알 수 있다. 스키마 validator 가 이걸 부르면 Pydantic AI 가
+    메시지를 모델에 되먹여 **고쳐서 다시 내게** 한다.
+
+    이 검사가 `checks.py` 에만 있었을 때는 Architect 제안이 조용히 폐기됐다
+    — 모델은 무엇이 틀렸는지 듣지 못하고 같은 실수를 반복했다.
+    """
+    uses: dict[int, int] = {}
+    try:
+        tree = ast.parse(code.strip())
+    except SyntaxError:
+        return None                     # 문법 오류는 다른 검사가 잡는다
+    for n in ast.walk(tree):
+        if (isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
+                and n.value.id == "w" and isinstance(n.slice, ast.Constant)
+                and isinstance(n.slice.value, int)):
+            uses[n.slice.value] = uses.get(n.slice.value, 0) + 1
+    dup = sorted(i for i, c in uses.items() if c > 1)
+    if not dup:
+        return None
+    return (f"가중치를 여러 항에 재사용했다: "
+            f"{[f'w[{i}]x{uses[i]}' for i in dup]}. 항 {sum(uses.values())}개를 "
+            f"가중치 {len(uses)}개로 만들었다 — 리터럴 예산(§29.4)을 우회한다. "
+            "항마다 **다른** 가중치를 써라. 항이 예산을 넘으면 항을 지워라")
 
 LIMITS = {
     #: 숫자 리터럴 + len(W0). 가중치를 예산에 넣는 이유는 §29.4 —
