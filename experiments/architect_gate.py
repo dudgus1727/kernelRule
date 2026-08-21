@@ -84,6 +84,19 @@ def main(condition: str, n_tries: int,
     print(f"  학습 {len(train.shapes)}형상 / 검증 {len(val.shapes)}형상")
     print("  A 조건이면 프롬프트에 표에서 나온 문장이 **하나도** 없다\n")
 
+    # ★ 시도마다 즉시 append 한다 (D-33). 끝에서 한 번 쓰면 중간에 죽을 때
+    #   그때까지의 LLM 호출이 통째로 날아간다 — 실제로 RoundLoop 에서
+    #   78분치를 잃었다. 오래 걸리는 실행일수록 죽을 확률이 높다.
+    d = OUT / f"architect-{condition}-{model}"
+    d.mkdir(parents=True, exist_ok=True)
+    out_path = d / "tries.jsonl"
+    out_path.write_text("")
+
+    def record(row: dict) -> None:
+        rows.append(row)
+        with out_path.open("a") as fh:
+            fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
     rows = []
     t0 = time.perf_counter()
     for i in range(n_tries):
@@ -103,16 +116,16 @@ def main(condition: str, n_tries: int,
             tr = evaluate_scores(so, table, train.shapes, ks=(1,)).at(1)
             va = evaluate_scores(so, table, val.shapes, ks=(1,)).at(1)
             n_terms = prop.code.count("s = s +") + 1
-            rows.append({"i": i, "train": tr, "val": va, "n_terms": n_terms,
-                         "n_w": len(prop.w0), "code": prop.code,
-                         "w": list(fit.w), "changes": prop.changes})
+            record({"i": i, "train": tr, "val": va, "n_terms": n_terms,
+                    "n_w": len(prop.w0), "code": prop.code,
+                    "w": list(fit.w), "changes": prop.changes})
             print(f"  #{i:02d}  train {tr:.4f}  val {va:.4f}  "
                   f"{n_terms}항/{len(prop.w0)}w")
         except (SchemaViolation, RuleCheckError) as e:
-            rows.append({"i": i, "error": f"{type(e).__name__}: {e}"})
+            record({"i": i, "error": f"{type(e).__name__}: {e}"})
             print(f"  #{i:02d}  거부  {type(e).__name__}: {str(e)[:60]}")
         except Exception as e:                              # noqa: BLE001
-            rows.append({"i": i, "error": f"{type(e).__name__}: {e}"})
+            record({"i": i, "error": f"{type(e).__name__}: {e}"})
             print(f"  #{i:02d}  실패  {type(e).__name__}: {str(e)[:70]}")
 
     ok = [r for r in rows if "train" in r]
@@ -148,10 +161,6 @@ def main(condition: str, n_tries: int,
         print(f"  w = {[round(x, 3) for x in best['w']]}")
         print(f"  물리 설명: {best['changes'][:300]}")
 
-    d = OUT / f"architect-{condition}-{model}"
-    d.mkdir(parents=True, exist_ok=True)
-    (d / "tries.jsonl").write_text(
-        "\n".join(json.dumps(r, ensure_ascii=False) for r in rows))
     print(f"\n  -> {d}")
 
 

@@ -1201,3 +1201,17 @@ finally:
 "부르면 저장된다" 는 API 는 언젠가 안 불린다. §26.4 가 "조용히 나쁜
 상태로 굴러가지 마라" 였다면 이것은 **"비싸게 얻은 것을 조용히 버리지
 마라"** 다.
+
+kernelTab 에서 같은 교훈을 먼저 겪었다 — 33시간 측정에 백업 절차를
+못박은 것(그쪽 `decisions.md`). **두 저장소가 각각 비싼 계산을 돌리고,
+둘 다 같은 자리에서 넘어졌다.**
+
+**같은 부류 훑기 (지시대로 전수 확인).** `RoundLoop` 사용처는
+`experiments/seed_ablation.py` 하나이고 위 수정으로 덮인다. 그런데
+**`experiments/architect_gate.py` 에 같은 구멍이 있었다** — LLM 을 부르면서
+`tries.jsonl` 을 **끝에서 한 번만** 썼다. 시도마다 append 하도록 고쳤다.
+
+나머지 러너(`rescore_canonical` · `regime_count` · `score_ablation` ·
+`regime_transfer` · `proxy_dispatch`)는 **기존 데이터에서 계산만** 하므로
+잃어도 다시 돌리면 된다. 구분선은 "다시 만들 수 있는가" 다 —
+**LLM 호출과 GPU 측정은 다시 만들 수 없다.**

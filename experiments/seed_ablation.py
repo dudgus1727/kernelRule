@@ -117,6 +117,7 @@ def main(rounds: int = 12, n_seeds: int = 3) -> None:
             print(f"\n  --- {run_id} ---")
             try:
                 loop.run(rounds)
+                loop.dump()
             except Exception as e:                          # noqa: BLE001
                 print(f"  ★ 중단: {type(e).__name__}: {str(e)[:100]}")
             print(f"  누적 호출 {budget.calls} (실패 {budget.failed_calls}) "
