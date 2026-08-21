@@ -46,11 +46,12 @@ from kernelrule.rules.checks import RuleCheckError, check_rule
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
-MODEL = "gpt-5.4-mini-2026-03-17"
+DEFAULT_MODEL = "gpt-5.4-mini-2026-03-17"
 OUT = Path("runs")
 
 
-def main(condition: str, n_tries: int) -> None:
+def main(condition: str, n_tries: int,
+         model: str = DEFAULT_MODEL) -> None:
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
 
@@ -72,13 +73,13 @@ def main(condition: str, n_tries: int) -> None:
     check_balance(train, table.hw)
     facts = TableFacts.compute(table, train)
 
-    llm = OpenAILLM(LLMConfig(model=MODEL, temperature=1.0, concurrency=5),
+    llm = OpenAILLM(LLMConfig(model=model, temperature=1.0, concurrency=5),
                     feature_names=matrix.feature_names(),
                     shape_values=matrix.shape_value_names(),
                     registry=REGISTRY, budget=Budget(), cache=False)
 
     print("=" * 76)
-    print(f"7. Architect 조건 {condition} — {n_tries}회")
+    print(f"7. Architect 조건 {condition} — {n_tries}회  [{model}]")
     print("=" * 76)
     print(f"  학습 {len(train.shapes)}형상 / 검증 {len(val.shapes)}형상")
     print("  A 조건이면 프롬프트에 표에서 나온 문장이 **하나도** 없다\n")
@@ -147,7 +148,7 @@ def main(condition: str, n_tries: int) -> None:
         print(f"  w = {[round(x, 3) for x in best['w']]}")
         print(f"  물리 설명: {best['changes'][:300]}")
 
-    d = OUT / f"architect-{condition}-{MODEL}"
+    d = OUT / f"architect-{condition}-{model}"
     d.mkdir(parents=True, exist_ok=True)
     (d / "tries.jsonl").write_text(
         "\n".join(json.dumps(r, ensure_ascii=False) for r in rows))
@@ -156,4 +157,5 @@ def main(condition: str, n_tries: int) -> None:
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1 else "A",
-         int(sys.argv[2]) if len(sys.argv) > 2 else 10)
+         int(sys.argv[2]) if len(sys.argv) > 2 else 10,
+         sys.argv[3] if len(sys.argv) > 3 else DEFAULT_MODEL)
