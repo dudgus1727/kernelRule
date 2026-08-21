@@ -14,9 +14,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from kernelrule.rules.checks import LIMITS
+
 __all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "AuditVerdict",
            "RuleProposal", "SchemaViolation", "validate_rule_proposal",
-           "HAVE_PYDANTIC"]
+           "HAVE_PYDANTIC", "check_banned", "MAX_WEIGHTS",
+           "N_HYP_MIN", "N_HYP_MAX"]
 
 try:
     from pydantic import BaseModel, Field, field_validator
@@ -33,11 +36,83 @@ class SchemaViolation(ValueError):
     """
 
 
+class _NoPydantic:
+    """Pydantic 부재를 **쓰려는 순간** 알린다 (§26.4 / 4-5).
+
+    전에는 `DiagnosisOutput = None` 이었다. `output_type=None` 을 Pydantic AI
+    에 넘기면 저 아래에서 `AttributeError` 가 나고, 그 메시지만 보고는
+    **검증이 통째로 꺼졌다는 사실을 못 읽는다.** 조용히 나쁜 상태로 굴러가지
+    않는다.
+
+    ★ Pydantic 이 **있어도** 정의된다 — 그래야 이 동작을 시험할 수 있다.
+    """
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    def _die(self, *_a, **_k):
+        raise ImportError(
+            f"{self._name} 를 쓰려면 Pydantic 이 필요하다. LLM 경계의 검증이 "
+            "**비활성화된 상태**다 — 스키마 위반이 걸러지지 않는다. "
+            "`pip install -e '.[llm]'` 로 설치하라 (§26.4)")
+
+    __call__ = _die
+    __getattr__ = _die
+
+
 #: 규칙 코드에 나타나면 즉시 거부. `rules/checks.py` 가 AST 로 다시 본다.
 #: **문자열 검사는 우회 가능하므로 구조적 방어와 병행한다** (§11.7).
 BANNED_SUBSTRINGS = ("time_ms", "cublas_ms", "difficulty", "tflops",
                      "distinct_time_frac", "import ", "open(", "TABLE",
                      "__globals__", "eval(", "exec(", "np.random")
+
+
+def _code_only(src: str) -> str:
+    """주석과 문자열 리터럴을 뺀 토큰만 잇는다 (D-27).
+
+    ★ 부분 문자열 매칭이 **주석을 잡는 것**을 막는다. LLM 이 "이 형상은
+    난이도(difficulty)가 높으니" 라고 주석에 쓰면 코드가 멀쩡한데도
+    거부됐다 — 그러면 재시도만 소진하고 무엇이 틀렸는지도 알려주지
+    못한다.
+
+    ★ 검사를 **약화시키는 것이 아니다**. `rules/checks.py` 가 AST 로
+    이름·호출·import 를 다시 보고, 샌드박스가 실행을 격리한다 (§11.7).
+    주석 안의 `import ` 는 실행되지 않으므로 여기서 잡을 이유가 없다.
+
+    토큰화가 실패하면(문법 오류) **원본을 그대로 돌려준다** — 검사를
+    건너뛰지 않는다 (§26.4).
+    """
+    import io
+    import tokenize
+    try:
+        toks = list(tokenize.generate_tokens(io.StringIO(src).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return src                      # 파싱 불가 -> 보수적으로 원본 검사
+    return " ".join(t.string for t in toks
+                    if t.type not in (tokenize.COMMENT, tokenize.STRING))
+
+
+def check_banned(code: str) -> str | None:
+    """금지어를 찾으면 그 문자열을, 없으면 `None`. **두 경로가 공유한다.**"""
+    probe = _code_only(code)
+    for b in BANNED_SUBSTRINGS:
+        if b in probe:
+            return b
+    return None
+
+
+#: ★ 가설 개수의 **유일한 출처** (§30.8 / D-26).
+#:
+#: 설명·검증·에러 메시지가 셋 다 달랐다 — 설명은 "3~5", 검증은 `1 <= n <= 8`,
+#: 에러는 다시 "3~5". 1개만 내도 통과했고, 그러면 그 라운드의 규칙이 **전부
+#: 같은 가설**을 반영해 §14.2 의 다양성이 무너진다.
+#:
+#: 하한 2 — 1개면 다양성이 없고, 3개를 강제하면 억지 가설이 나온다.
+N_HYP_MIN, N_HYP_MAX = 2, 8
+
+#: 가중치 상한. **`rules.checks.LIMITS` 가 유일한 출처다** (D-26) —
+#: 스키마와 정적 검사가 어긋나면 한쪽만 통과하는 규칙이 생긴다.
+MAX_WEIGHTS = LIMITS["literal_budget"]
 
 
 @dataclass
@@ -111,9 +186,8 @@ def validate_rule_proposal(obj: Any) -> RuleProposal:
     code = d.get("code")
     if not isinstance(code, str) or "def score" not in code:
         raise SchemaViolation("code 에 `def score(f, p, hw, w)` 가 없다")
-    for b in BANNED_SUBSTRINGS:
-        if b in code:
-            raise SchemaViolation(f"금지된 참조: {b!r}")
+    if (b := check_banned(code)) is not None:
+        raise SchemaViolation(f"금지된 참조: {b!r}")
     w0 = d.get("w0")
     if not isinstance(w0, (list, tuple)) or not w0:
         raise SchemaViolation("w0 가 비어 있거나 리스트가 아니다")
@@ -121,6 +195,12 @@ def validate_rule_proposal(obj: Any) -> RuleProposal:
         w0 = [float(x) for x in w0]
     except (TypeError, ValueError) as e:
         raise SchemaViolation(f"w0 에 숫자가 아닌 값: {e}") from None
+    # ★ Pydantic validator 와 **같은 조건**이어야 한다 (§24 / D-26). 여기에
+    #   없으면 MockLLM 경로에서만 예산 초과가 통과해 ablation 이 깨진다.
+    if len(w0) > MAX_WEIGHTS:
+        raise SchemaViolation(
+            f"가중치 {len(w0)}개. 리터럴 예산이 {MAX_WEIGHTS}개다 — 숫자 "
+            "리터럴과 합산된다 (§29.4)")
     if not all(abs(x) < 1e6 for x in w0):
         raise SchemaViolation("w0 값이 비정상적으로 크다")
     return RuleProposal(code=code, w0=w0, changes=str(d.get("changes", "")),
@@ -176,13 +256,15 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
 
     class DiagnosisOutput(BaseModel):
         hypotheses: list[HypothesisOut] = Field(
-            description="3~5개. 서로 다른 실패 모드를 다뤄라")
+            description=f"{N_HYP_MIN}~{N_HYP_MAX}개. 서로 다른 실패 모드를 "
+                        "다뤄라")
 
         @field_validator("hypotheses")
         @classmethod
         def _count(cls, v: list) -> list:
-            if not 1 <= len(v) <= 8:
-                raise ValueError(f"가설이 {len(v)}개다. 3~5개를 내라")
+            if not N_HYP_MIN <= len(v) <= N_HYP_MAX:
+                raise ValueError(
+                    f"가설이 {len(v)}개다. {N_HYP_MIN}~{N_HYP_MAX}개를 내라")
             return v
 
     class RuleOutput(BaseModel):
@@ -200,8 +282,10 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
                         "최적화기가 맞춘다. 길이는 코드가 참조하는 최대 "
                         "인덱스 + 1 이어야 한다. ★ 최대 8개. 숫자 리터럴과 "
                         "합산되므로 리터럴을 쓰면 그만큼 줄어든다")
+        # ★ 계보 추적용이다. **비었다고 규칙을 버리지 않는다** — 필수
+        #   필드가 많을수록 재시도 소진 확률만 올라간다. 비면 경고를 남긴다.
         changes: str = Field(
-            description="부모에서 무엇을 바꿨는가. 한 문장")
+            default="", description="부모에서 무엇을 바꿨는가. 한 문장")
         hypothesis_id: str = Field(
             default="", description="반영한 가설 id")
 
@@ -214,11 +298,10 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
                               if not ln.strip().startswith("```"))
             if "def score" not in v:
                 raise ValueError("`def score(f, p, hw, w):` 가 없다")
-            for b in BANNED_SUBSTRINGS:
-                if b in v:
-                    raise ValueError(
-                        f"금지된 참조: {b!r}. 규칙은 표를 볼 수 없고 "
-                        "import 도 못 한다 (§3)")
+            if (b := check_banned(v)) is not None:
+                raise ValueError(
+                    f"금지된 참조: {b!r}. 규칙은 표를 볼 수 없고 "
+                    "import 도 못 한다 (§3)")
             return v
 
         @field_validator("w0")
@@ -226,10 +309,10 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         def _w0(cls, v: list[float]) -> list[float]:
             if not v:
                 raise ValueError("w0 가 비었다")
-            if len(v) > 8:
+            if len(v) > MAX_WEIGHTS:
                 raise ValueError(
-                    f"가중치 {len(v)}개. 리터럴 예산이 8개다 — 숫자 리터럴과 "
-                    "합산된다 (§29.4)")
+                    f"가중치 {len(v)}개. 리터럴 예산이 {MAX_WEIGHTS}개다 — "
+                    "숫자 리터럴과 합산된다 (§29.4)")
             if not all(abs(x) < 1e6 for x in v):
                 raise ValueError("w0 값이 비정상적으로 크다")
             return v
@@ -251,8 +334,11 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         confidence: float = 0.5
 
 else:                                               # pragma: no cover
-    DiagnosisOutput = RuleOutput = FeatureOutput = AuditOutput = None
-    HypothesisOut = None
+    DiagnosisOutput = _NoPydantic("DiagnosisOutput")
+    RuleOutput = _NoPydantic("RuleOutput")
+    FeatureOutput = _NoPydantic("FeatureOutput")
+    AuditOutput = _NoPydantic("AuditOutput")
+    HypothesisOut = _NoPydantic("HypothesisOut")
 
 
 def rule_output_to_proposal(out) -> RuleProposal:

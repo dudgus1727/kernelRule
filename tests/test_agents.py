@@ -183,3 +183,103 @@ def test_deterministic_across_instances():
     b = MockLLM("mutate", seed=9, feature_names=FEATS)
     assert ([a.complete("optimize", "x") for _ in range(5)]
             == [b.complete("optimize", "x") for _ in range(5)])
+
+
+# ---------------------------------------------------------------------------
+# 강제 장치의 세 곳이 일치하는가 (D-26) — §30.8 패턴
+# ---------------------------------------------------------------------------
+# 설명 / validator / 에러 메시지가 셋 다 다른 채로 굴러갔다. 셋을 상수 하나로
+# 묶었으므로 **그 사실을 테스트가 고정한다** — 나중에 한 곳만 고치는 것을
+# 막는 것이 목적이다.
+
+def test_hypothesis_count_desc_and_validator_share_one_constant():
+    from kernelrule.agents import schemas as S
+    if not S.HAVE_PYDANTIC:
+        pytest.skip("pydantic 없음")
+    desc = S.DiagnosisOutput.model_fields["hypotheses"].description
+    assert f"{S.N_HYP_MIN}~{S.N_HYP_MAX}" in desc
+
+    def mk(n):
+        return S.DiagnosisOutput(hypotheses=[{"claim": f"가설 {i}"}
+                                             for i in range(n)])
+
+    mk(S.N_HYP_MIN)                                   # 하한은 통과
+    for n in (S.N_HYP_MIN - 1, S.N_HYP_MAX + 1):      # 밖은 거부
+        with pytest.raises(Exception) as ei:
+            mk(n)
+        # 에러 메시지도 같은 상수를 말해야 한다
+        assert f"{S.N_HYP_MIN}~{S.N_HYP_MAX}" in str(ei.value)
+
+
+def test_weight_cap_has_one_source_of_truth():
+    from kernelrule.agents.schemas import MAX_WEIGHTS
+    from kernelrule.rules.checks import LIMITS
+    assert LIMITS["literal_budget"] == MAX_WEIGHTS
+
+
+def test_mock_and_real_paths_enforce_the_same_budget():
+    """§24 — `validate_rule_proposal` 에만 w0 길이 검사가 없었다.
+
+    목으로 개발하면 예산 초과가 안 잡히고 실제 LLM 에서만 잡혔다.
+    """
+    from kernelrule.agents.schemas import (
+        MAX_WEIGHTS,
+        SchemaViolation,
+        validate_rule_proposal,
+    )
+    code = "def score(f, p, hw, w):\n    return f.waves * w[0]\n"
+    validate_rule_proposal({"code": code, "w0": [1.0] * MAX_WEIGHTS})
+    with pytest.raises(SchemaViolation, match="예산"):
+        validate_rule_proposal({"code": code, "w0": [1.0] * (MAX_WEIGHTS + 1)})
+
+
+# ---------------------------------------------------------------------------
+# 금지어 부분 매칭이 주석을 잡지 않는가 (D-27)
+# ---------------------------------------------------------------------------
+
+_HDR = "def score(f, p, hw, w):\n"
+
+
+@pytest.mark.parametrize("code,banned", [
+    # 주석/문자열 안의 것은 실행되지 않는다 -> 잡지 않는다
+    (_HDR + "    # 난이도(difficulty)가 높은 형상이다\n"
+            "    return f.tail_waste * w[0]\n", None),
+    (_HDR + "    note = 'import os 는 금지다'\n"
+            "    return f.waves * w[0]\n", None),
+    # 실제 코드는 여전히 잡는다
+    (_HDR + "    return f.difficulty * w[0]\n", "difficulty"),
+    ("import os\n" + _HDR + "    return f.waves * w[0]\n", "import "),
+    (_HDR + "    return TABLE.time_ms * w[0]\n", "time_ms"),
+])
+def test_banned_check_ignores_comments_and_strings(code, banned):
+    from kernelrule.agents.schemas import check_banned
+    assert check_banned(code) == banned
+
+
+def test_banned_check_never_skips_on_tokenize_failure():
+    """문법 오류면 **원본을 보수적으로 검사한다** (§26.4)."""
+    from kernelrule.agents.schemas import check_banned
+    assert check_banned("def score(  # 안 닫힘\n  import os") == "import "
+
+
+# ---------------------------------------------------------------------------
+# Pydantic 부재를 쓰려는 순간 알리는가 (4-5)
+# ---------------------------------------------------------------------------
+
+def test_missing_pydantic_fails_loudly():
+    from kernelrule.agents.schemas import _NoPydantic
+    stub = _NoPydantic("DiagnosisOutput")
+    with pytest.raises(ImportError, match="비활성화된 상태"):
+        stub()
+    with pytest.raises(ImportError, match="비활성화된 상태"):
+        _ = stub.model_validate       # 속성 접근만으로도 알린다
+
+
+def test_changes_is_optional():
+    """계보 추적용이다. 비었다고 규칙을 버리면 재시도만 소진한다 (4-4)."""
+    from kernelrule.agents import schemas as S
+    if not S.HAVE_PYDANTIC:
+        pytest.skip("pydantic 없음")
+    out = S.RuleOutput(code="def score(f, p, hw, w):\n    return f.waves*w[0]",
+                       w0=[1.0])
+    assert out.changes == ""
