@@ -360,15 +360,15 @@ class Comparison:
 
     def report(self) -> str:
         n = len(self.shapes)
-        w, l, t = (int(self.a_wins.sum()), int(self.a_loses.sum()),
-                   int(self.tied.sum()))
-        worst = int(np.argmax(self.sigma)) if n else 0
-        best = int(np.argmin(self.sigma)) if n else 0
+        n_win = int(self.a_wins.sum())
+        n_lose = int(self.a_loses.sum())
+        n_tie = int(self.tied.sum())
         lines = [
-            f"{self.name_a} {self.geo_a:.4f}  vs  {self.name_b} "
-            f"{self.geo_b:.4f}   (차이 {self.geo_a - self.geo_b:+.4f})",
-            f"  {n}형상 중 — {self.name_a} 가 유의하게 이긴 것 {w}, "
-            f"진 것 {l}, 구분 불가 {t}   ({self.k_sigma}시그마 기준)",
+            (f"{self.name_a} {self.geo_a:.4f}  vs  {self.name_b} "
+             f"{self.geo_b:.4f}   (차이 {self.geo_a - self.geo_b:+.4f})"),
+            (f"  {n}형상 중 — {self.name_a} 가 유의하게 이긴 것 {n_win}, "
+             f"진 것 {n_lose}, 구분 불가 {n_tie}   "
+             f"({self.k_sigma}시그마 기준)"),
         ]
         if n:
             # ★ 시그마는 "실재하는가" 이지 "얼마나 큰가" 가 아니다.
@@ -377,12 +377,12 @@ class Comparison:
             mw = int(np.argmin(self.delta))
             ml = int(np.argmax(self.delta))
             pw, pl = self.shapes[mw], self.shapes[ml]
-            lines.append(
-                f"  최대 이득 {pw.M}x{pw.N}x{pw.K} "
-                f"regret {self.delta[mw]:+.3f} ({-self.sigma[mw]:.0f}시그마)")
-            lines.append(
-                f"  최대 손실 {pl.M}x{pl.N}x{pl.K} "
-                f"regret {self.delta[ml]:+.3f} ({self.sigma[ml]:.0f}시그마)")
+            lines.append(f"  최대 이득 {pw.M}x{pw.N}x{pw.K} "
+                         f"regret {self.delta[mw]:+.3f} "
+                         f"({-self.sigma[mw]:.0f}시그마)")
+            lines.append(f"  최대 손실 {pl.M}x{pl.N}x{pl.K} "
+                         f"regret {self.delta[ml]:+.3f} "
+                         f"({self.sigma[ml]:.0f}시그마)")
             big = int((self.delta > 0.05).sum())
             if big:
                 lines.append(
