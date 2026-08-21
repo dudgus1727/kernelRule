@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kernelrule"
+version = "0.1.0"
+description = "성능 표에서 GEMM config 선택 규칙을 자동으로 만들어내는 파이프라인"
+requires-python = ">=3.10"
+
+# GPU 도 CUDA 도 쓰지 않는다. CPU + Python + (나중에) LLM API 만으로 돈다.
+dependencies = [
+    "kerneltab>=0.2",   # 표 로더 / 정답 격리 / 노이즈 모델. 재구현 금지
+    "numpy>=1.26",
+    "pandas>=2",
+    "pyarrow>=15",
+    "scipy>=1.11",      # optimize.minimize — 가중치 적합 (§29.2)
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+llm = ["pydantic>=2"]   # LLM 경계 전용. 채점 뜨거운 경로에는 쓰지 않는다 (§11.7)
+
+[tool.setuptools.packages.find]
+include = ["kernelrule*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# 조용한 스킵을 막는다 (§26.3). conftest.py 의 스킵 감지와 짝이다.
+addopts = "-ra --strict-markers"
+markers = [
+    "needs_bundle: 실제 번들이 있어야 도는 테스트. 없으면 스킵되며 그 사실이 보고된다",
+]

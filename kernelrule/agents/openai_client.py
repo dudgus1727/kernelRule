@@ -1,0 +1,298 @@
+"""실제 LLM 클라이언트 — Pydantic AI + OpenAI (§4-0).
+
+## `LLMClient` Protocol 뒤에 둔다
+
+`MockLLM` 과 **교체 가능**해야 ablation 과 `replay` 가 성립한다.
+`pydantic_ai.Agent` 를 호출부에 노출하지 않는다 — 루프는 `complete(role,
+prompt, **kw)` 만 안다.
+
+## 스키마 위반은 재시도 후 **폐기**다
+
+Pydantic AI 가 validator 실패를 모델에 되먹여 재시도한다. 상한(`retries`)
+을 넘으면 그 후보를 버린다. **부분 수용하지 않는다** (§26.4) — 반쯤 맞는
+규칙을 고쳐서 쓰면 그 규칙이 무엇을 시험한 것인지 알 수 없어진다.
+
+## 키
+
+`OPENAI_API_KEY` 환경변수에서만 읽는다. **코드에 넣지 않고, 저장하지도
+않는다.** 없으면 명확한 에러로 중단한다 — `MockLLM` 으로 조용히
+폴백하지 않는다 (§26.4).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import hashlib
+import json
+import os
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from kernelrule.agents.mock import LLMCall
+
+__all__ = ["OpenAILLM", "LLMConfig", "Budget", "BudgetExceeded",
+           "MissingAPIKey", "load_prompt"]
+
+_PROMPTS = Path(__file__).parent / "prompts"
+
+
+class MissingAPIKey(RuntimeError):
+    """API 키가 없다. **`MockLLM` 으로 폴백하지 않는다** (§26.4)."""
+
+
+class BudgetExceeded(RuntimeError):
+    """예산 상한을 넘었다. 실행을 멈춘다."""
+
+
+def load_prompt(name: str) -> str:
+    p = _PROMPTS / name
+    if not p.exists():
+        raise FileNotFoundError(f"프롬프트가 없다: {p}")
+    return p.read_text()
+
+
+@dataclass
+class LLMConfig:
+    """`config.json` 에 그대로 기록된다 (§15.4 재현성)."""
+
+    model: str = "gpt-5.4-mini-2026-03-17"
+    #: ★ 규칙 생성은 다양성이 필요하므로 0 으로 두지 않는다.
+    #:   값을 기록하고 run 간 고정한다.
+    temperature: float = 0.7
+    seed: int | None = 20260821
+    max_retries: int = 2
+    #: 동시 호출 상한. rate limit 에 걸리면 줄이되 **로그에 남긴다.**
+    concurrency: int = 6
+    arch_prompt: str = "hw/sm_86.md"
+
+    def to_dict(self) -> dict:
+        return dict(self.__dict__)
+
+
+@dataclass
+class Budget:
+    """호출 수와 토큰 상한. **넘으면 멈춘다** (§4-1)."""
+
+    max_calls: int = 400
+    max_input_tokens: int = 3_000_000
+    max_output_tokens: int = 600_000
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_hits: int = 0
+    #: ★ 실패한 호출도 토큰을 쓴다. 안 세면 예산 감시에 구멍이 생긴다.
+    failed_calls: int = 0
+
+    def charge(self, n_in: int, n_out: int) -> None:
+        self.calls += 1
+        self.input_tokens += n_in
+        self.output_tokens += n_out
+        if self.calls > self.max_calls:
+            raise BudgetExceeded(
+                f"호출 {self.calls} > 상한 {self.max_calls}")
+        if self.input_tokens > self.max_input_tokens:
+            raise BudgetExceeded(
+                f"입력 토큰 {self.input_tokens:,} > 상한 "
+                f"{self.max_input_tokens:,}")
+        if self.output_tokens > self.max_output_tokens:
+            raise BudgetExceeded(
+                f"출력 토큰 {self.output_tokens:,} > 상한 "
+                f"{self.max_output_tokens:,}")
+
+    def line(self) -> str:
+        return (f"호출 {self.calls}+{self.failed_calls}실패 "
+                f"(캐시 {self.cached_hits})  "
+                f"입력 {self.input_tokens:,}  출력 {self.output_tokens:,}")
+
+
+class OpenAILLM:
+    """`MockLLM` 과 같은 인터페이스. 루프는 둘을 구분하지 않는다."""
+
+    def __init__(self, cfg: LLMConfig, *, feature_names, shape_values,
+                 budget: Budget | None = None, cache: bool = True) -> None:
+        if not os.environ.get("OPENAI_API_KEY"):
+            raise MissingAPIKey(
+                "OPENAI_API_KEY 가 없다. 실제 LLM 실행을 중단한다.\n"
+                "  MockLLM 으로 조용히 폴백하지 않는다 — 그러면 'LLM 이 "
+                "규칙을 만들었다' 를 거짓으로 믿게 된다 (§26.4).")
+        self.cfg = cfg
+        self.features = list(feature_names)
+        self.shape_values = list(shape_values)
+        self.budget = budget or Budget()
+        self.calls: list[LLMCall] = []
+        self._seq = 0
+        #: 프롬프트 해시 -> 응답. 초반에 같은 프롬프트가 자주 반복된다 (§15.4)
+        self._cache: dict[str, object] = {} if cache else None
+        self._agents: dict[str, object] = {}
+        self._common = load_prompt("_common.md")
+        self._hw = load_prompt(cfg.arch_prompt)
+        # ⚠️ `asyncio.Semaphore` 를 여기서 만들면 **첫 이벤트 루프에
+        #    바인딩된다.** 루프는 라운드마다 `asyncio.run()` 을 새로 부르므로
+        #    두 번째 라운드부터 "bound to a different event loop" 로 죽는다.
+        #    실제로 밟았고, 그 예외가 후보 폐기로 처리돼 **조용히 호출을
+        #    잃었다.** 루프마다 새로 만든다.
+        self._sems: dict[int, asyncio.Semaphore] = {}
+        self.rate_limit_events = 0
+
+    def _semaphore(self) -> asyncio.Semaphore:
+        loop = asyncio.get_running_loop()
+        sem = self._sems.get(id(loop))
+        if sem is None:
+            sem = self._sems[id(loop)] = asyncio.Semaphore(
+                self.cfg.concurrency)
+        return sem
+
+    # -- Agent 구성 (§11.2 — 고정 역할 + 주입 도메인 사실) ------------------
+    def _agent(self, role: str):
+        if role in self._agents:
+            return self._agents[role]
+        from pydantic_ai import Agent
+        from pydantic_ai.models.openai import OpenAIChatModel
+
+        from kernelrule.agents.schemas import DiagnosisOutput, RuleOutput
+
+        out = {"diagnose": DiagnosisOutput, "optimize": RuleOutput}[role]
+        role_md = load_prompt(f"{role}.md")
+        # ★ 두 층으로 나뉜다: [고정] 역할·제약  +  [주입] 하드웨어 사실
+        instructions = f"{self._common}\n\n---\n\n{self._hw}\n\n---\n\n{role_md}"
+        model = OpenAIChatModel(self.cfg.model)
+        a = Agent(model, output_type=out, instructions=instructions,
+                  retries=self.cfg.max_retries,
+                  model_settings={"temperature": self.cfg.temperature,
+                                  **({"seed": self.cfg.seed}
+                                     if self.cfg.seed is not None else {})})
+        self._agents[role] = a
+        return a
+
+    # -- 프롬프트 조립 ----------------------------------------------------
+    def _feature_block(self) -> tuple[str, str]:
+        return ("\n".join(f"- `{n}`" for n in self.features),
+                "\n".join(f"- `{n}`" for n in self.shape_values))
+
+    def _user_prompt(self, role: str, prompt: str, **kw) -> str:
+        fl, sl = self._feature_block()
+        if role == "diagnose":
+            return (prompt + "\n\n---\n\n## 등록된 피처\n\n"
+                    f"### config 수준 (`f.<이름>`)\n\n{fl}\n\n"
+                    f"### 형상 수준 (`p.<이름>`)\n\n{sl}\n")
+        parent = kw.get("parent")
+        hyp = kw.get("hypothesis") or {}
+        applied = kw.get("hypotheses_applied") or []
+        body = load_prompt("optimize.md")
+        return body.format(
+            feature_list=fl, shape_value_list=sl,
+            hypotheses_applied=("\n".join(f"- {h}" for h in applied)
+                                or "(아직 없음 — 첫 라운드다)"),
+            hypothesis=(json.dumps(hyp, ensure_ascii=False, indent=1)
+                        if hyp else "(가설 없음. 부모를 개선할 방향을 "
+                                    "스스로 찾아라)"),
+            parent_code=(parent.code if parent else
+                         "(부모 없음 — 처음부터 만들어라)"),
+            parent_w=(list(parent.w0) if parent else "-"))
+
+    # -- 진입점 -----------------------------------------------------------
+    def complete(self, role: str, prompt: str, **kw):
+        return asyncio.run(self.acomplete(role, prompt, **kw))
+
+    async def acomplete(self, role: str, prompt: str, **kw):
+        user = self._user_prompt(role, prompt, **kw)
+        h = hashlib.sha256((role + "\x00" + user).encode()).hexdigest()[:16]
+        seq = self._seq
+        self._seq += 1
+        if self._cache is not None and h in self._cache:
+            self.budget.cached_hits += 1
+            return self._cache[h]
+
+        agent = self._agent(role)
+        async with self._semaphore():
+            t0 = time.perf_counter()
+            try:
+                res = await agent.run(user)
+            except Exception as e:                       # noqa: BLE001
+                name = type(e).__name__
+                if "RateLimit" in name or "429" in str(e):
+                    self.rate_limit_events += 1
+                    # ★ 조용히 줄이지 않는다. 로그에 남기고 한 번 물러선다.
+                    await asyncio.sleep(20.0)
+                    res = await agent.run(user)
+                else:
+                    # ★ 실패해도 토큰은 이미 소모됐다. 호출 수만이라도 센다 —
+                    #   안 세면 재시도가 폭주해도 예산 감시가 안 걸린다.
+                    self.budget.failed_calls += 1
+                    if (self.budget.calls + self.budget.failed_calls
+                            > self.budget.max_calls):
+                        raise BudgetExceeded(
+                            f"호출 {self.budget.calls}+"
+                            f"{self.budget.failed_calls}실패 > 상한 "
+                            f"{self.budget.max_calls}") from e
+                    raise
+            dt = time.perf_counter() - t0
+
+        # pydantic-ai 2.x 는 속성, 1.x 는 메서드다. 조용히 0 으로 떨어지면
+        # 예산 감시가 무력해지므로 **둘 다 시도하고 실패하면 에러**다.
+        u = res.usage
+        if callable(u):
+            u = u()
+        n_in = (getattr(u, "input_tokens", None)
+                or getattr(u, "request_tokens", None))
+        n_out = (getattr(u, "output_tokens", None)
+                 or getattr(u, "response_tokens", None))
+        if n_in is None or n_out is None:
+            raise RuntimeError(
+                f"토큰 사용량을 읽을 수 없다: {type(u).__name__} "
+                f"{[a for a in dir(u) if 'token' in a]}. "
+                "0 으로 떨어지면 예산 감시가 무력해진다 (§26.4).")
+        self.budget.charge(n_in, n_out)
+        out = res.output
+        payload = out.model_dump() if hasattr(out, "model_dump") else out
+        self.calls.append(LLMCall(role=role, prompt_hash=h, response=payload,
+                                  seq=seq, mode=self.cfg.model))
+        # 원본을 남긴다. ★ 키나 인증 헤더는 저장하지 않는다.
+        self._last = {"prompt": user, "seconds": dt,
+                      "input_tokens": n_in, "output_tokens": n_out}
+        self.calls[-1].__dict__["_meta"] = self._last
+        if self._cache is not None:
+            self._cache[h] = payload
+        return payload
+
+    async def many(self, role: str, items: list[dict]):
+        """규칙 12개를 **병렬로** 부른다 (§4-0)."""
+        return await asyncio.gather(
+            *(self.acomplete(role, it.pop("prompt", ""), **it)
+              for it in items), return_exceptions=True)
+
+    # -- 기록 -------------------------------------------------------------
+    def dump(self, out: str | Path) -> None:
+        out = Path(out)
+        out.mkdir(parents=True, exist_ok=True)
+        for c in self.calls:
+            meta = c.__dict__.get("_meta", {})
+            (out / f"{c.seq:05d}-{c.role}.json").write_text(json.dumps(
+                {"role": c.role, "prompt_hash": c.prompt_hash, "seq": c.seq,
+                 "model": c.mode, "response": c.response,
+                 "prompt": meta.get("prompt", ""),
+                 "input_tokens": meta.get("input_tokens"),
+                 "output_tokens": meta.get("output_tokens"),
+                 "seconds": meta.get("seconds")},
+                ensure_ascii=False, indent=1))
+
+
+def estimate_and_confirm(*, n_rounds: int, n_rules: int, report_chars: int,
+                         cfg: LLMConfig, yes: bool = False) -> dict:
+    """예상 호출 수와 토큰을 출력하고 확인을 요구한다 (§4-1)."""
+    per_round = 1 + n_rules
+    calls = per_round * n_rounds
+    tok_in = int(report_chars / 3) * n_rounds + int(report_chars / 6) * \
+        n_rules * n_rounds
+    est = {"model": cfg.model, "calls": calls,
+           "est_input_tokens": tok_in, "per_round": per_round}
+    print("=" * 62)
+    print(f"실제 LLM 실행 예상  모델 {cfg.model}  온도 {cfg.temperature}")
+    print(f"  라운드 {n_rounds} x (진단 1 + 규칙 {n_rules}) = 호출 {calls}")
+    print(f"  입력 토큰 대략 {tok_in:,}")
+    print("=" * 62)
+    if not yes:
+        raise BudgetExceeded(
+            "확인이 필요하다. `--yes` 로 진행하거나 예산을 조정하라.")
+    return est

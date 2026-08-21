@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+
+# 데이터 — 재생성 가능하거나 릴리스에서 받는다.
+# ★ `datasets/` 가 아니라 `datasets/*` 여야 한다 — 디렉토리를 통째로 제외하면
+#   git 이 그 안으로 내려가지 않아 아래 부정(!)이 안 먹는다.
+datasets/*
+# 예외: 벤더 추출 산출물은 작고 재현에 필요하다. 없으면 재채점할 때마다
+# 별도 venv 와 네트워크가 필요하다 (kernelTab pending_fixes C-2).
+!datasets/baselines/
+datasets/baselines/*
+!datasets/baselines/*.json
+
+# 실행 산출물 (§25). 핵심 결과는 docs/artifacts/ 에 따로 남긴다.
+runs/

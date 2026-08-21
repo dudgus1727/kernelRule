@@ -1,0 +1,28 @@
+{
+ "llm": {
+  "model": "gpt-5.4-mini-2026-03-17",
+  "temperature": 0.7,
+  "seed": 20260821,
+  "max_retries": 2,
+  "concurrency": 6,
+  "arch_prompt": "hw/sm_86.md"
+ },
+ "loop": {
+  "run_id": "real-gpt-5.4-mini-2026-03-17",
+  "n_rules_per_round": 12,
+  "max_rounds": 20,
+  "max_evals": 200,
+  "patience": 10,
+  "seed": 7,
+  "sandbox_first_seen": true,
+  "out_dir": "runs"
+ },
+ "split": "nk11008",
+ "seed_rule": "handwritten",
+ "agents": [
+  "diagnose",
+  "optimize"
+ ],
+ "data_source": "real",
+ "bundle": "rtx-a6000-sm_86-c63710df"
+}
