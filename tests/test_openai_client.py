@@ -188,3 +188,57 @@ def test_prompt_shows_rejected_examples():
     assert "실제로 거부된 것들" in c
     assert "w[0] 재사용" in c
     assert "한 번만 쓴다" in c
+
+
+# ---------------------------------------------------------------------------
+# 거부 사유 세분화 (1-4c) — `llm 132건` 으로 뭉뚱그리면 고칠 곳을 모른다
+# ---------------------------------------------------------------------------
+VIOLATIONS = [
+    ("가중치 9개. 리터럴 예산이 8개다 (§29.4)", "w0_too_long"),
+    ("가중치를 여러 항에 재사용했다: ['w[0]x4']", "weight_reuse"),
+    ("W0 길이 3 != 참조한 최대 인덱스 + 1", "w0_length_mismatch"),
+    ("금지된 참조: 'time_ms'", "banned_substring"),
+    ("`def score(f, p, hw, w):` 가 없다", "no_def_score"),
+    ("가설에 코드를 쓰지 마라", "hypothesis_has_code"),
+    ("w0 가 비었다", "w0_empty"),
+    ("Exceeded maximum output retries (2)", "retries_exhausted"),
+    ("Semaphore is bound to a different event loop", "event_loop_bug"),
+    ("완전히 새로운 무엇", "other"),
+]
+
+
+@pytest.mark.parametrize("msg,code", VIOLATIONS,
+                         ids=[c for _, c in VIOLATIONS])
+def test_violation_is_classified(msg, code):
+    """★ 패턴은 **실제 validator 메시지**와 맞아야 한다.
+
+    "가중치 8개" 로 뒀다가 "가중치 9개..." 를 못 잡아 other 로 샜다.
+    분류가 틀리면 프롬프트의 어디를 고쳐야 할지 알 수 없다.
+    """
+    from kernelrule.agents.openai_client import classify_violation
+
+    assert classify_violation(msg) == code
+
+
+def test_violation_report_detects_useless_retries(client):
+    """1회차에 걸린 것이 2회차에도 **같은 이유**로 걸리면 되먹임이 안 된다.
+
+    그러면 재시도 상한을 올릴 것이 아니라 프롬프트를 고쳐야 한다.
+    """
+    client.violations = [
+        {"round": 0, "seq": 1, "role": "optimize", "attempt": 0,
+         "code": "w0_too_long", "msg": "x"},
+        {"round": 0, "seq": 1, "role": "optimize", "attempt": 2,
+         "code": "w0_too_long", "msg": "x"},          # 같은 코드 반복
+        {"round": 0, "seq": 2, "role": "optimize", "attempt": 0,
+         "code": "banned_substring", "msg": "y"},
+    ]
+    r = client.violation_report()
+    assert r["total"] == 3
+    assert r["by_code"]["w0_too_long"] == 2
+    assert r["same_code_repeated"] == 1, "되먹임 실패를 못 잡았다"
+
+
+def test_retries_raised_to_three():
+    """(d) 임시. 거부율이 높을 때 '배우는 중' 과 '구조적 불가능' 을 구분한다."""
+    assert LLMConfig().max_retries == 3

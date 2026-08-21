@@ -122,3 +122,66 @@ def test_answer_mask_uses_noise_floor_not_one_percent():
     # 4ms 형상: 바닥이 0.053% 이므로 1% 차이는 명백한 오답
     t2 = make_table({(4096, 4096, 4096): [4.0, 4.04]}, noise=m)
     assert t2.answer_mask(t2.shapes()[0]).tolist() == [True, False]
+
+
+# ---------------------------------------------------------------------------
+# ★ 두 방법 비교 — geomean 차이만으로 이겼다/졌다 하지 않는다 (§7.4)
+# ---------------------------------------------------------------------------
+def test_comparison_uses_shape_noise_not_geomean():
+    """★ `1.085 > 1.080 이니 졌다` 는 부정확하다.
+
+    61형상 geomean 에서 0.5% 면 형상 몇 개가 눈금 하나 차이로 갈려도 나온다.
+    **"유의하게 진 형상이 N개" 가 정확한 서술이다.**
+    """
+    from kernelrule.core.noise import NoiseModel
+    from kernelrule.core.scoring import compare
+
+    m = NoiseModel.a6000_reference()
+    t = make_table({
+        # 4ms 형상: 바닥 0.053%. 1% 차이는 명백하다
+        (4096, 4096, 4096): [4.0, 4.04],
+        # 11us 형상: 바닥 9.1%. 6% 차이도 구분 불가다
+        (512, 512, 512): [0.0113, 0.0120],
+    }, noise=m)
+    a = evaluate(order_by_index([1, 0]), t, ks=(1,), label="A")
+    b = evaluate(order_by_index([0, 1]), t, ks=(1,), label="B")
+    c = compare(a, b, t, name_a="A", name_b="B")
+    assert int(c.a_loses.sum()) == 1        # 큰 형상만
+    assert int(c.tied.sum()) == 1           # 작은 형상은 구분 불가
+    assert "유의하게" in c.report()
+
+
+def test_comparison_reports_magnitude_not_just_significance():
+    """★ 시그마는 "실재하는가" 이지 "얼마나 큰가" 가 아니다.
+
+    긴 형상은 노이즈 바닥이 0.05% 라 작은 차이도 수백 시그마다.
+    크기(regret 차이)를 함께 보여야 오독하지 않는다.
+    """
+    from kernelrule.core.noise import NoiseModel
+    from kernelrule.core.scoring import compare
+
+    # 4ms 형상, 바닥 0.053%. 1% 차이 -> 약 19시그마인데 regret 차이는 0.01 뿐.
+    # (0.1% 로 잡았다가 1.87시그마가 나왔다 — 유의하지 않은 것이 맞다.
+    #  기대가 틀렸지 코드가 틀린 것이 아니었다.)
+    t = make_table({(4096, 4096, 4096): [4.0, 4.04]},
+                   noise=NoiseModel.a6000_reference())
+    a = evaluate(order_by_index([1, 0]), t, ks=(1,))
+    b = evaluate(order_by_index([0, 1]), t, ks=(1,))
+    c = compare(a, b, t)
+    assert c.sigma[0] > 10, "1% 차이가 큰 형상에서는 유의해야 한다"
+    assert abs(c.delta[0]) < 0.02, "그런데 크기는 작다"
+    rep = c.report()
+    assert "regret" in rep and "시그마" in rep
+
+
+def test_comparison_refuses_mismatched_shape_sets():
+    """같은 형상 집합에서 잰 것이어야 비교가 성립한다 (§30.8)."""
+    from kernelrule.core.scoring import compare
+
+    t = make_table({(1024, 4096, 4096): [1.0, 2.0],
+                    (2048, 4096, 4096): [1.0, 2.0]})
+    sh = t.shapes()
+    a = evaluate(order_by_index([0, 1]), t, sh, ks=(1,))
+    b = evaluate(order_by_index([0, 1]), t, sh[:1], ks=(1,))
+    with pytest.raises(ValueError, match="형상 집합이 다르다"):
+        compare(a, b, t)

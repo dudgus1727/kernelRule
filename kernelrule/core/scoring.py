@@ -49,6 +49,8 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.types import CandidateSet, Problem
 
 __all__ = [
+    "Comparison",
+    "compare",
     "Evaluation",
     "OrderFn",
     "ScoreOf",
@@ -317,3 +319,99 @@ def is_significant(delta: float, ev: Evaluation, *,
     if tol.size == 0 or not np.all(np.isfinite(tol)):
         return False
     return abs(float(delta)) > geomean(tol)
+
+
+# ---------------------------------------------------------------------------
+# ★ 두 방법의 비교 — geomean 차이만으로 이겼다/졌다 하지 않는다 (§7.4)
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class Comparison:
+    """A 와 B 를 **형상별로** 비교한 결과.
+
+    `1.085 > 1.080 이니 졌다` 는 부정확하다. 61형상 geomean 에서 0.5% 면
+    형상 몇 개가 눈금 하나 차이로 갈려도 나올 수 있는 크기다.
+
+    **"유의하게 진 형상이 N개" 가 정확한 서술이다.**
+    """
+
+    name_a: str
+    name_b: str
+    geo_a: float
+    geo_b: float
+    #: 형상별 (t_A - t_B) / (t_best * noise_floor(t_best)). A 가 크면 A 가 나쁨
+    sigma: np.ndarray
+    #: 형상별 regret 차이 (A - B). 시그마는 "실재하는가", 이것은 "얼마나 큰가".
+    delta: np.ndarray
+    shapes: tuple[Problem, ...]
+    k_sigma: float = 2.0
+
+    @property
+    def a_loses(self) -> np.ndarray:
+        """A 가 B 에 **유의하게** 진 형상."""
+        return self.sigma > self.k_sigma
+
+    @property
+    def a_wins(self) -> np.ndarray:
+        return self.sigma < -self.k_sigma
+
+    @property
+    def tied(self) -> np.ndarray:
+        return np.abs(self.sigma) <= self.k_sigma
+
+    def report(self) -> str:
+        n = len(self.shapes)
+        w, l, t = (int(self.a_wins.sum()), int(self.a_loses.sum()),
+                   int(self.tied.sum()))
+        worst = int(np.argmax(self.sigma)) if n else 0
+        best = int(np.argmin(self.sigma)) if n else 0
+        lines = [
+            f"{self.name_a} {self.geo_a:.4f}  vs  {self.name_b} "
+            f"{self.geo_b:.4f}   (차이 {self.geo_a - self.geo_b:+.4f})",
+            f"  {n}형상 중 — {self.name_a} 가 유의하게 이긴 것 {w}, "
+            f"진 것 {l}, 구분 불가 {t}   ({self.k_sigma}시그마 기준)",
+        ]
+        if n:
+            # ★ 시그마는 "실재하는가" 이지 "얼마나 큰가" 가 아니다.
+            #   긴 형상은 노이즈 바닥이 0.05% 라 작은 차이도 수백 시그마다.
+            #   크기(regret 차이)를 함께 보여야 오독하지 않는다.
+            mw = int(np.argmin(self.delta))
+            ml = int(np.argmax(self.delta))
+            pw, pl = self.shapes[mw], self.shapes[ml]
+            lines.append(
+                f"  최대 이득 {pw.M}x{pw.N}x{pw.K} "
+                f"regret {self.delta[mw]:+.3f} ({-self.sigma[mw]:.0f}시그마)")
+            lines.append(
+                f"  최대 손실 {pl.M}x{pl.N}x{pl.K} "
+                f"regret {self.delta[ml]:+.3f} ({self.sigma[ml]:.0f}시그마)")
+            big = int((self.delta > 0.05).sum())
+            if big:
+                lines.append(
+                    f"  regret 을 0.05 넘게 잃은 형상 {big}개 — geomean 은 "
+                    "이런 소수 형상에 끌린다")
+        return "\n".join(lines)
+
+
+def compare(a: Evaluation, b: Evaluation, table: PerfTable, *,
+            name_a: str = "A", name_b: str = "B", k: int = 1,
+            k_sigma: float = 2.0) -> Comparison:
+    """두 채점 결과를 **형상별 노이즈 바닥 단위**로 비교한다.
+
+    ⚠️ 같은 형상 집합에서 잰 것이어야 한다 (§30.8 — 같은 절차/분모/집계).
+    """
+    if tuple(p.key for p in a.shapes) != tuple(p.key for p in b.shapes):
+        raise ValueError(
+            "두 평가의 형상 집합이 다르다. 같은 집합에서 재야 비교가 "
+            "성립한다 (§30.8).")
+    ci = a.ks.index(k), b.ks.index(k)
+    sig = np.empty(len(a.shapes), dtype=np.float64)
+    dlt = np.empty(len(a.shapes), dtype=np.float64)
+    for i, p in enumerate(a.shapes):
+        st = table.stats(p)
+        r_a, r_b = a.regret[i, ci[0]], b.regret[i, ci[1]]
+        dlt[i] = r_a - r_b
+        # regret 은 t/best 이므로 t 로 되돌린다
+        denom = st.best_ms * st.noise_floor
+        sig[i] = ((r_a - r_b) * st.best_ms / denom) if denom > 0 else 0.0
+    return Comparison(name_a=name_a, name_b=name_b, geo_a=a.at(k),
+                      geo_b=b.at(k), sigma=sig, delta=dlt, shapes=a.shapes,
+                      k_sigma=k_sigma)

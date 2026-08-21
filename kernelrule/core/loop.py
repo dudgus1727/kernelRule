@@ -256,12 +256,17 @@ class RoundLoop:
                    for h in self.hypotheses[-4:]]
         reqs = []
         for i, (kind, ps) in enumerate(parents):
-            parent = None
+            parent, n_terms = None, 0
             if ps:
                 from kernelrule.agents.schemas import RuleProposal
                 parent = RuleProposal(code=ps[0].code, w0=ps[0].w)
+                # 부모의 항 수를 세어 프롬프트에 넣는다 (교체 프레임)
+                pr = check_rule(ps[0].code, feature_names=self._feats,
+                                shape_value_names=self._shape_vals,
+                                n_weights=len(ps[0].w))
+                n_terms = pr.n_terms
             reqs.append({"prompt": f"round={r} parent={kind}",
-                         "parent": parent,
+                         "parent": parent, "parent_n_terms": n_terms,
                          "hypothesis": hyps[i % len(hyps)] if hyps else None,
                          "hypotheses_applied": applied})
         raws = self._call_optimizers(reqs)

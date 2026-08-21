@@ -32,7 +32,7 @@ from pathlib import Path
 from kernelrule.agents.mock import LLMCall
 
 __all__ = ["OpenAILLM", "LLMConfig", "Budget", "BudgetExceeded",
-           "MissingAPIKey", "load_prompt"]
+           "MissingAPIKey", "load_prompt", "classify_violation"]
 
 _PROMPTS = Path(__file__).parent / "prompts"
 
@@ -43,6 +43,35 @@ class MissingAPIKey(RuntimeError):
 
 class BudgetExceeded(RuntimeError):
     """예산 상한을 넘었다. 실행을 멈춘다."""
+
+
+#: validator 메시지 -> 짧은 사유 코드. `llm 132건` 으로 뭉뚱그리면
+#: 무엇이 걸렸는지 모르고, 프롬프트를 어디를 고쳐야 할지도 모른다.
+_VIOLATION_PATTERNS: tuple[tuple[str, str], ...] = (
+    # ⚠️ 패턴은 **실제 validator 메시지**와 맞춰야 한다.
+    #    "가중치 8개" 로 뒀다가 "가중치 9개..." 를 못 잡아 other 로 샜다.
+    ("리터럴 예산이", "w0_too_long"),
+    ("최대 8개", "w0_too_long"),
+    ("재사용", "weight_reuse"),
+    ("최대 인덱스", "w0_length_mismatch"),
+    ("w0 가 비었다", "w0_empty"),
+    ("비정상적으로 크다", "w0_huge"),
+    ("금지된 참조", "banned_substring"),
+    ("def score", "no_def_score"),
+    ("가설에 코드", "hypothesis_has_code"),
+    ("가설이", "hypothesis_count"),
+    ("Exceeded maximum", "retries_exhausted"),
+    ("event loop", "event_loop_bug"),
+    ("rate limit", "rate_limit"),
+)
+
+
+def classify_violation(msg: str) -> str:
+    """예외/validator 메시지를 사유 코드로 분류한다."""
+    for pat, code in _VIOLATION_PATTERNS:
+        if pat.lower() in msg.lower():
+            return code
+    return "other"
 
 
 def load_prompt(name: str) -> str:
@@ -61,7 +90,10 @@ class LLMConfig:
     #:   값을 기록하고 run 간 고정한다.
     temperature: float = 0.7
     seed: int | None = 20260821
-    max_retries: int = 2
+    #: 스키마 위반 시 재시도 상한. 2 -> 3 (임시).
+    #: 지시 모순이 해소되면 필요 없지만, 거부율이 여전히 높을 때
+    #: "모델이 배우는 중" 과 "구조적으로 불가능" 을 구분해 준다.
+    max_retries: int = 3
     #: 동시 호출 상한. rate limit 에 걸리면 줄이되 **로그에 남긴다.**
     concurrency: int = 6
     arch_prompt: str = "hw/sm_86.md"
@@ -134,6 +166,11 @@ class OpenAILLM:
         #    잃었다.** 루프마다 새로 만든다.
         self._sems: dict[int, asyncio.Semaphore] = {}
         self.rate_limit_events = 0
+        #: (라운드, 시도 회차, 사유 코드, 메시지). 되먹임이 작동하는지 본다 —
+        #: 1회차에 걸린 것이 2회차에도 **같은 이유**로 걸리면 재시도 상한을
+        #: 올릴 것이 아니라 프롬프트를 고쳐야 한다.
+        self.violations: list[dict] = []
+        self.round = -1
 
     def _semaphore(self) -> asyncio.Semaphore:
         loop = asyncio.get_running_loop()
@@ -179,8 +216,21 @@ class OpenAILLM:
         parent = kw.get("parent")
         hyp = kw.get("hypothesis") or {}
         applied = kw.get("hypotheses_applied") or []
+        # ★ 부모의 현재 항 수를 주입하고, 포화 시 **교체를 지시**한다.
+        #   "버려도 된다" 는 선택지이고 "버리고 넣어라" 는 지시다.
+        #   예산이 `_common.md`(시스템)에만 있으면 긴 컨텍스트에서 희석된다.
+        n_terms = int(kw.get("parent_n_terms") or 0)
+        n_w = len(parent.w0) if parent else 0
+        if n_terms >= 8:
+            note = ("\n★ 예산이 찼습니다. 항을 추가하지 마세요.\n"
+                    "  이번 가설을 반영하려면 **가장 덜 중요한 항 하나를 "
+                    "지우고**\n  그 자리에 넣으세요. 무엇을 지웠고 왜 그것을 "
+                    "골랐는지\n  `changes` 에 쓰세요.")
+        else:
+            note = f"남은 예산: {8 - n_terms}항"
         body = load_prompt("optimize.md")
         return body.format(
+            n_terms=n_terms, n_weights=n_w, budget_note=note,
             feature_list=fl, shape_value_list=sl,
             hypotheses_applied=("\n".join(f"- {h}" for h in applied)
                                 or "(아직 없음 — 첫 라운드다)"),
@@ -208,7 +258,7 @@ class OpenAILLM:
         async with self._semaphore():
             t0 = time.perf_counter()
             try:
-                res = await agent.run(user)
+                res = await self._run_traced(agent, user, role, seq)
             except Exception as e:                       # noqa: BLE001
                 name = type(e).__name__
                 if "RateLimit" in name or "429" in str(e):
@@ -255,6 +305,53 @@ class OpenAILLM:
         if self._cache is not None:
             self._cache[h] = payload
         return payload
+
+    async def _run_traced(self, agent, user: str, role: str, seq: int):
+        """Pydantic AI 재시도의 **회차별 위반**을 기록한다.
+
+        프레임워크가 validator 실패를 모델에 되먹여 재시도하는데, 그 내역이
+        밖에서 안 보인다. 결과 메시지에서 되짚어 회차별로 남긴다.
+        """
+        try:
+            res = await agent.run(user)
+        except Exception as e:                            # noqa: BLE001
+            self.violations.append(
+                {"round": self.round, "seq": seq, "role": role, "attempt": -1,
+                 "code": classify_violation(f"{type(e).__name__}: {e}"),
+                 "msg": f"{type(e).__name__}: {e}"[:200]})
+            raise
+        # 성공했더라도 중간 재시도가 있었으면 그것도 기록한다.
+        try:
+            for i, m in enumerate(res.all_messages()):
+                for part in getattr(m, "parts", []):
+                    content = getattr(part, "content", "")
+                    if isinstance(content, str) and (
+                            "validation error" in content.lower()
+                            or "Value error" in content):
+                        self.violations.append(
+                            {"round": self.round, "seq": seq, "role": role,
+                             "attempt": i, "code": classify_violation(content),
+                             "msg": content[:200]})
+        except Exception:                                 # noqa: BLE001
+            pass          # 추적 실패가 실행을 막으면 안 된다
+        return res
+
+    def violation_report(self) -> dict:
+        """사유 코드 x 회차 분포. 되먹임이 작동하는지 본다."""
+        from collections import Counter
+
+        by_code = Counter(v["code"] for v in self.violations)
+        by_attempt = Counter(v["attempt"] for v in self.violations)
+        # 같은 호출(seq)에서 같은 코드가 두 번 이상 나왔는가
+        seen: dict[int, list[str]] = {}
+        for v in self.violations:
+            seen.setdefault(v["seq"], []).append(v["code"])
+        repeated = sum(1 for codes in seen.values()
+                       if len(codes) > 1 and len(set(codes)) == 1)
+        return {"total": len(self.violations), "by_code": dict(by_code),
+                "by_attempt": dict(by_attempt),
+                "same_code_repeated": repeated,
+                "n_calls_with_violation": len(seen)}
 
     async def many(self, role: str, items: list[dict]):
         """규칙 12개를 **병렬로** 부른다 (§4-0)."""
