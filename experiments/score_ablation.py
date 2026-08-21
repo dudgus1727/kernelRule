@@ -112,7 +112,11 @@ def main() -> None:
             with f.open() as fh:
                 arc = [json.loads(ln) for ln in fh if ln.strip()]
             best = min(arc, key=lambda e: e["regret"])
-            n_r = len({e.get("round", -1) for e in arc})
+            # ★ 아카이브는 **엘리트 집합**이지 라운드별 시계열이 아니다.
+            #   라운드 수와 궤적은 rounds.jsonl 에서 읽어야 한다.
+            with (d / "rounds.jsonl").open() as fh:
+                rds = [json.loads(ln) for ln in fh if ln.strip()]
+            n_r = len(rds)
             try:
                 g_in, g_ho, ho = canonical(best["code"], best["w"])
             except Exception as exc:                        # noqa: BLE001
@@ -120,7 +124,7 @@ def main() -> None:
                 continue
             rows.setdefault(label, []).append((g_in, g_ho, ho))
             trajectories.setdefault(label, []).append(
-                [e["regret"] for e in sorted(arc, key=lambda e: e.get("round", 0))])
+                [r["best_regret"] for r in sorted(rds, key=lambda r: r["round"])])
             print(f"  {label:16s} {s:4d} {best['regret']:10.4f} "
                   f"{g_in:9.4f} {g_ho:10.4f} {n_r:6d}")
 
@@ -159,10 +163,13 @@ def main() -> None:
     print(f"\n{'=' * 78}")
     print("라운드별 학습 최고 (시드 중앙값) — 씨앗이 출발점만 올리는가")
     print("=" * 78)
+    print(f"  {'':16s} " + " ".join(f"r{i:<5d}" for i in range(12)))
     for label, trs in trajectories.items():
         n = min(len(t) for t in trs)
-        med = [float(np.median([t[i] for t in trs])) for i in range(min(n, 13))]
+        med = [float(np.median([t[i] for t in trs])) for i in range(n)]
+        wor = [float(np.max([t[i] for t in trs])) for i in range(n)]
         print(f"  {label:16s} " + " ".join(f"{x:6.3f}" for x in med))
+        print(f"  {'  (최악)':16s} " + " ".join(f"{x:6.3f}" for x in wor))
 
 
 if __name__ == "__main__":
