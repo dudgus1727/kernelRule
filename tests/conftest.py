@@ -18,8 +18,18 @@ import sys
 import warnings
 from pathlib import Path
 
-import numpy as np
 import pytest
+
+#: 중요 모듈이 이 비율 넘게 스킵되면 경고한다.
+#:
+#: kernelTab R-1 은 **모듈 전체**가 스킵되는 것을 잡았다. 그런데 한 층
+#: 아래가 남아 있었다 — `ran == 0` 조건이라 4개가 돌고 11개가 스킵되면
+#: 그냥 통과한다. `datasets/` 가 `.gitignore` 되어 있으므로 **새로 클론한
+#: 사람은 이 상태가 기본**인데 아무 신호도 없었다.
+#:
+#: 실측: 번들 없이 `test_leakage.py` 는 4 passed / 11 skipped (73% 스킵)다.
+#: 누출 방지 검증의 1/4 만 돌면서 초록불이 뜬다.
+MAX_SKIP_FRAC = 0.5
 
 #: 이 모듈들이 안 돌면 **실패**다.
 CRITICAL_MODULES = {
@@ -53,6 +63,7 @@ def pytest_runtest_logreport(report):
 
 
 def _bad_modules() -> list[str]:
+    """세션을 **실패시켜야** 하는 것."""
     bad = []
     for mod in sorted(CRITICAL_MODULES):
         d = _seen.get(mod)
@@ -61,6 +72,24 @@ def _bad_modules() -> list[str]:
         elif d["ran"] == 0:
             bad.append(f"{mod}: {d['skipped']}개가 전부 스킵됐다 — 실제로 돈 것 0개")
     return bad
+
+
+def _partial_skips() -> list[str]:
+    """실패까지는 아니지만 **보증할 수 없는** 것 (§26.3 한 층 아래).
+
+    거부하지 않는 이유: 번들 없이 개발하는 것은 정상 경로다. 다만 그
+    실행으로 누출 방지를 보증해서는 안 되고, 그 사실이 **보여야** 한다.
+    """
+    out = []
+    for mod in sorted(CRITICAL_MODULES):
+        d = _seen.get(mod)
+        if not d:
+            continue
+        total = d["ran"] + d["skipped"]
+        if total and d["ran"] and d["skipped"] / total > MAX_SKIP_FRAC:
+            out.append(f"{mod}: {d['skipped']}/{total} "
+                       f"({d['skipped'] / total:.0%}) 스킵")
+    return out
 
 
 class _SkipGuardItem(pytest.Item):
@@ -72,6 +101,19 @@ class _SkipGuardItem(pytest.Item):
     """
 
     def runtest(self):
+        # ★ 먼저 부분 스킵을 보고한다. 실패는 아니지만 조용히 넘어가면
+        #   "누출 방지 검증됨" 을 거짓으로 믿게 된다.
+        partial = _partial_skips()
+        if partial:
+            self._warn_loudly(
+                "중요 모듈이 절반 넘게 스킵됐다\n"
+                + "\n".join("  - " + x for x in partial) + "\n\n"
+                "★ 이 실행 결과로 누출 방지를 보증하지 마라.\n"
+                "  대부분 `datasets/` 아래 번들이 없어서다. 받는 법:\n"
+                "    docs/kernelrule_design_addendum.md 의 데이터 절 참조\n"
+                "  번들 없이 개발하는 것은 정상이지만, 그때는 합성 표만\n"
+                "  검증된 것이다.")
+
         bad = _bad_modules()
         if not bad:
             return
@@ -82,18 +124,43 @@ class _SkipGuardItem(pytest.Item):
                "  고치는 법:            pip install -e '.[test]'\n"
                f"  의도적으로 넘기려면:  {ALLOW_SKIP_ENV}=1 pytest")
         if os.environ.get(ALLOW_SKIP_ENV) == "1":
-            # ★ `print` 는 안 된다 — 스킵된 항목의 캡처된 출력은 표시되지
-            #   않아서 우회가 **조용히** 일어난다. 메타 테스트가 이걸 잡았다.
-            #   터미널 리포터에 직접 쓴다.
-            tr = self.config.pluginmanager.get_plugin("terminalreporter")
-            for line in ("[경고] " + msg.replace("\n", "\n[경고] ")).split("\n"):
+            self._warn_loudly(msg)
+            pytest.skip(f"{ALLOW_SKIP_ENV}=1 로 우회 — 이 실행 결과로 "
+                        "누출 방지를 보증하지 마라")
+        raise AssertionError(msg)
+
+    def _warn_loudly(self, msg: str) -> None:
+        """우회 경고를 **반드시 보이게** 쓴다.
+
+        두 번 틀렸다.
+
+        1. `print` — 스킵된 항목의 캡처 출력은 표시되지 않는다.
+        2. `terminalreporter.write_line` — pytest 버전에 따라 `runtest`
+           안에서 **전역 캡처에 삼켜진다.** 이 환경(9.1.1)에서는 통과했지만
+           다른 버전에서는 실패했다. **감시의 보장이 pytest 버전에
+           의존하면 안 된다.**
+
+        `capturemanager` 로 캡처를 명시적으로 끄고 쓴다.
+        """
+        lines = ("[경고] " + msg.replace("\n", "\n[경고] ")).split("\n")
+        tr = self.config.pluginmanager.get_plugin("terminalreporter")
+        cm = self.config.pluginmanager.get_plugin("capturemanager")
+
+        def _emit() -> None:
+            for line in lines:
                 if tr is not None:
                     tr.write_line(line, red=True, bold=True)
                 else:                                    # pragma: no cover
                     print(line, file=sys.stderr, flush=True)
-            pytest.skip(f"{ALLOW_SKIP_ENV}=1 로 우회 — 이 실행 결과로 "
-                        "누출 방지를 보증하지 마라")
-        raise AssertionError(msg)
+
+        if cm is not None and hasattr(cm, "global_and_fixture_disabled"):
+            with cm.global_and_fixture_disabled():
+                _emit()
+        else:                                            # pragma: no cover
+            _emit()
+        # 스킵 사유에도 남긴다 — 터미널 출력이 어떤 이유로든 안 보여도
+        # `-rs` 요약에는 뜬다. 한 겹 더 둔다.
+        self.user_properties.append(("allow_skip_bypass", msg[:200]))
 
     def repr_failure(self, excinfo, style=None):
         return str(excinfo.value)
@@ -125,6 +192,14 @@ def _config_filtered(config) -> bool:
         if path.is_file() or path.suffix == ".py":
             return True
     return False
+
+
+def pytest_report_header(config):
+    """번들 유무를 **헤더에 항상 표시한다.** 없으면 무엇이 안 도는지 알린다."""
+    if _have_real_bundle():
+        return f"kernelRule: 실제 번들 있음 ({REAL_BUNDLE.name})"
+    return ("kernelRule: ⚠️ 실제 번들 없음 — 계약/누출 검증의 상당수가 "
+            "스킵된다. 이 실행으로 누출 방지를 보증하지 마라")
 
 
 def pytest_collection_modifyitems(session, config, items):
