@@ -40,8 +40,8 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 from kernelrule.features.physical import log_sol_ms
-from kernelrule.rules.handwritten import CODE as HW
-from kernelrule.rules.handwritten import W0 as HW_W0
+from kernelrule.rules.physics_seeded import CODE as HW
+from kernelrule.rules.physics_seeded import W0 as HW_W0
 
 #: 지목된 세 항. `K/tile_k` 가 작을 때만 의미가 있다는 것이 주장의 근거였다.
 REGIME_SPECIFIC = frozenset({"is_two_stage", "pipeline_warmup_frac",

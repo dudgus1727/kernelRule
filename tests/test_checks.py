@@ -138,14 +138,14 @@ def test_shape_level_if_is_allowed():
     assert chk(code, 2).ok
 
 
-def test_handwritten_rule_obeys_the_same_constraints():
+def test_physics_seeded_rule_obeys_the_same_constraints():
     """★ 사람 기준선도 규칙과 **동일한 제약**을 받는다 (§9.4).
 
     같은 조건이어야 비교가 공정하다.
     """
     import kernelrule.features.physical  # noqa: F401  등록
     from kernelrule.features import REGISTRY
-    from kernelrule.rules.handwritten import CODE, W0
+    from kernelrule.rules.physics_seeded import CODE, W0
 
     r = check_rule(CODE, feature_names=REGISTRY.names(shape_level=False),
                    shape_value_names=REGISTRY.names(shape_level=True),
@@ -286,11 +286,11 @@ def test_the_actual_evasive_rule_is_now_rejected():
     assert not r.ok and any("재사용" in v for v in r.violations)
 
 
-def test_handwritten_rule_uses_one_weight_per_term():
+def test_physics_seeded_rule_uses_one_weight_per_term():
     """사람 기준선이 새 규칙을 만족하는지 회귀로 고정한다."""
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.features import REGISTRY
-    from kernelrule.rules.handwritten import CODE, W0
+    from kernelrule.rules.physics_seeded import CODE, W0
 
     r = check_rule(CODE, feature_names=REGISTRY.names(shape_level=False),
                    shape_value_names=REGISTRY.names(shape_level=True),

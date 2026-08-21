@@ -182,7 +182,7 @@ def test_real_report_has_no_holdout_and_fits_budget(real_bundle_path):
     from kernelrule.core.splits import split_by_M_range
     from kernelrule.core.table import PerfTable
     from kernelrule.features import REGISTRY
-    from kernelrule.rules.handwritten import CODE, W0, score
+    from kernelrule.rules.physics_seeded import CODE, W0, score
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
