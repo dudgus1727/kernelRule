@@ -26,18 +26,24 @@
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from kernelrule.core.adapter import SchemaError, normalize
+from kernelrule.core.adapter import normalize
 from kernelrule.core.noise import NoiseModel
-from kernelrule.core.types import (CandidateSet, Config, Hardware, Problem,
-                                   ShapeKey, config_from_row,
-                                   hardware_from_env, make_tiebreak)
+from kernelrule.core.types import (
+    CandidateSet,
+    Config,
+    Hardware,
+    Problem,
+    ShapeKey,
+    config_from_row,
+    hardware_from_env,
+    make_tiebreak,
+)
 
 __all__ = ["PerfTable", "TableError"]
 

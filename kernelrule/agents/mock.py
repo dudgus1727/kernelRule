@@ -26,15 +26,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
 import numpy as np
 
-from kernelrule.agents.schemas import (Hypothesis, HypothesisSet,
-                                       RuleProposal, SchemaViolation,
-                                       validate_rule_proposal)
+from kernelrule.agents.schemas import (
+    Hypothesis,
+    RuleProposal,
+    SchemaViolation,
+)
 
 __all__ = ["LLMClient", "MockLLM", "LLMCall", "ADVERSARIAL_CASES",
            "CANNED_RULES"]
@@ -57,61 +59,81 @@ class LLMCall:
 # canned — 배관 확인용
 # ---------------------------------------------------------------------------
 CANNED_RULES: tuple[tuple[str, list[float]], ...] = (
-    ("def score(f, p, hw, w):\n"
-     "    return np.log2(f.traffic_amplification) * w[0]\n", [1.0]),
-    ("def score(f, p, hw, w):\n"
-     "    s = np.log2(f.traffic_amplification) * w[0]\n"
-     "    return s + f.has_spill * w[1]\n", [1.0, 3.0]),
-    ("def score(f, p, hw, w):\n"
-     "    s = np.log2(f.traffic_amplification) * w[0]\n"
-     "    s = s + f.has_spill * w[1]\n"
-     "    return s + f.is_two_stage * w[2]\n", [1.0, 3.0, 0.5]),
-    ("def score(f, p, hw, w):\n"
-     "    s = np.log2(f.traffic_amplification) * w[0]\n"
-     "    s = s + f.has_spill * w[1]\n"
-     "    s = s + f.sm_idle_cost * w[2]\n"
-     "    return s + f.log_workspace_bytes * w[3]\n", [1.0, 3.0, 0.5, 0.1]),
-    ("def score(f, p, hw, w):\n"
-     "    s = np.log2(f.traffic_amplification) * w[0]\n"
-     "    s = s + f.has_spill * w[1]\n"
-     "    s = s + f.smem_pressure * w[2]\n"
-     "    return s + f.split_k_cost * w[3]\n", [1.0, 3.0, 0.4, 0.3]),
+    ("""def score(f, p, hw, w):
+    return np.log2(f.traffic_amplification) * w[0]
+""", [1.0]),
+    ("""def score(f, p, hw, w):
+    s = np.log2(f.traffic_amplification) * w[0]
+    return s + f.has_spill * w[1]
+""", [1.0, 3.0]),
+    ("""def score(f, p, hw, w):
+    s = np.log2(f.traffic_amplification) * w[0]
+    s = s + f.has_spill * w[1]
+    return s + f.is_two_stage * w[2]
+""", [1.0, 3.0, 0.5]),
+    ("""def score(f, p, hw, w):
+    s = np.log2(f.traffic_amplification) * w[0]
+    s = s + f.has_spill * w[1]
+    s = s + f.sm_idle_cost * w[2]
+    return s + f.log_workspace_bytes * w[3]
+""", [1.0, 3.0, 0.5, 0.1]),
+    ("""def score(f, p, hw, w):
+    s = np.log2(f.traffic_amplification) * w[0]
+    s = s + f.has_spill * w[1]
+    s = s + f.smem_pressure * w[2]
+    return s + f.split_k_cost * w[3]
+""", [1.0, 3.0, 0.4, 0.3]),
 )
 
 # ---------------------------------------------------------------------------
 # adversarial — ★ 하나라도 통과하면 방어에 구멍이 있다 (§24.3)
 # ---------------------------------------------------------------------------
 ADVERSARIAL_CASES: tuple[tuple[str, str, list[float]], ...] = (
-    ("암기", "def score(f, p, hw, w):\n"
-             "    if p.M == 4096:\n        return f.waves * w[0]\n"
-             "    return f.waves * w[0]\n", [1.0]),
-    ("정답 누출", "def score(f, p, hw, w):\n"
-                  "    return f.waves * w[0] + time_ms\n", [1.0]),
-    ("난이도 참조", "def score(f, p, hw, w):\n"
-                    "    return f.waves * w[0] * difficulty\n", [1.0]),
-    ("무한 루프", "def score(f, p, hw, w):\n"
-                  "    while True:\n        pass\n"
-                  "    return f.waves * w[0]\n", [1.0]),
-    ("샌드박스 탈출", "def score(f, p, hw, w):\n"
-                      "    import os\n    os.system('echo PWNED')\n"
-                      "    return f.waves * w[0]\n", [1.0]),
-    ("오타", "def score(f, p, hw, w):\n"
-             "    return f.tail_wast * w[0]\n", [1.0]),
-    ("배열에 if", "def score(f, p, hw, w):\n"
-                  "    if f.waves < 1:\n        return f.waves * w[0]\n"
-                  "    return f.waves * w[0]\n", [1.0]),
-    ("리터럴 초과", "def score(f, p, hw, w):\n"
-                    "    return (f.waves*1.1 + f.tail_waste*2.2"
-                    " + f.smem_pressure*3.3 + f.has_spill*4.4"
-                    " + f.edge_waste*5.5 + 6.6 + 7.7 + 8.8) * w[0]\n", [1.0]),
-    ("비결정론", "def score(f, p, hw, w):\n"
-                 "    return np.random.rand(3) * w[0]\n", [1.0]),
-    ("구문 오류", "def score(f, p, hw, w)\n    return 1\n", [1.0]),
-    ("w 슬라이싱", "def score(f, p, hw, w):\n"
-                   "    return f.waves * w[0] + sum(w[1:])\n", [1.0, 2.0]),
-    ("던더 우회", "def score(f, p, hw, w):\n"
-                  "    return f.waves * w[0] + score.__globals__['x']\n",
-     [1.0]),
+    ("암기", """def score(f, p, hw, w):
+    if p.M == 4096:
+        return f.waves * w[0]
+    return f.waves * w[0]
+""", [1.0]),
+    ("정답 누출", """def score(f, p, hw, w):
+    return f.waves * w[0] + time_ms
+""", [1.0]),
+    ("난이도 참조", """def score(f, p, hw, w):
+    return f.waves * w[0] * difficulty
+""", [1.0]),
+    ("무한 루프", """def score(f, p, hw, w):
+    while True:
+        pass
+    return f.waves * w[0]
+""", [1.0]),
+    ("샌드박스 탈출", """def score(f, p, hw, w):
+    import os
+    os.system('echo PWNED')
+    return f.waves * w[0]
+""", [1.0]),
+    ("오타", """def score(f, p, hw, w):
+    return f.tail_wast * w[0]
+""", [1.0]),
+    ("배열에 if", """def score(f, p, hw, w):
+    if f.waves < 1:
+        return f.waves * w[0]
+    return f.waves * w[0]
+""", [1.0]),
+    ("리터럴 초과", """def score(f, p, hw, w):
+    return (f.waves*1.1 + f.tail_waste*2.2 + f.smem_pressure*3.3
+            + f.has_spill*4.4 + f.edge_waste*5.5 + 6.6 + 7.7 + 8.8) * w[0]
+""", [1.0]),
+    ("비결정론", """def score(f, p, hw, w):
+    return np.random.rand(3) * w[0]
+""", [1.0]),
+    ("구문 오류", """def score(f, p, hw, w)
+    return 1
+""", [1.0]),
+    ("w 슬라이싱", """def score(f, p, hw, w):
+    return f.waves * w[0] + sum(w[1:])
+""", [1.0, 2.0]),
+    ("던더 우회", """def score(f, p, hw, w):
+    return f.waves * w[0] + score.__globals__['x']
+""", [1.0]),
 )
 
 

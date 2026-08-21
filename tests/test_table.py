@@ -5,9 +5,9 @@ import warnings
 
 import numpy as np
 import pytest
+from toy import make_table
 
 from kernelrule.core.table import PerfTable, TableError
-from toy import make_table
 
 
 def test_join_mismatch_is_an_error():

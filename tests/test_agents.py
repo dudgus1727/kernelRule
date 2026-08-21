@@ -1,15 +1,20 @@
 """MockLLM 과 스키마 경계 (§24, §11.7)."""
 from __future__ import annotations
 
-import json
-
 import numpy as np
 import pytest
 
-from kernelrule.agents.mock import (ADVERSARIAL_CASES, CANNED_RULES, MockLLM,
-                                    _parse_terms, _render_rule)
-from kernelrule.agents.schemas import (RuleProposal, SchemaViolation,
-                                       validate_rule_proposal)
+from kernelrule.agents.mock import (
+    ADVERSARIAL_CASES,
+    MockLLM,
+    _parse_terms,
+    _render_rule,
+)
+from kernelrule.agents.schemas import (
+    RuleProposal,
+    SchemaViolation,
+    validate_rule_proposal,
+)
 
 FEATS = ["traffic_amplification", "has_spill", "is_two_stage",
          "log_workspace_bytes", "sm_idle_cost", "split_k_cost",

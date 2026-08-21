@@ -4,8 +4,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from kernelrule.core.types import (CandidateSet, Hardware, Problem,
-                                   hardware_from_env, make_tiebreak)
+from kernelrule.core.types import (
+    CandidateSet,
+    Hardware,
+    Problem,
+    hardware_from_env,
+    make_tiebreak,
+)
 
 
 def _cand(n=5):
@@ -44,9 +49,14 @@ def test_candidate_set_length_mismatch_is_an_error():
 
 
 def test_problem_and_config_are_frozen():
+    """`pytest.raises(Exception)` 은 안 된다 — 오타로 AttributeError 가 나도
+    통과한다. frozen dataclass 가 내는 예외로 좁혀야 실제로 검증된다."""
+    import dataclasses
+
     p = Problem(1024, 4096, 4096)
-    with pytest.raises(Exception):
+    with pytest.raises((dataclasses.FrozenInstanceError, AttributeError)) as e:
         p.M = 2048
+    assert "M" in str(e.value) or "frozen" in str(e.value).lower()
 
 
 def test_ridge_point_uses_effective_values():

@@ -170,16 +170,12 @@ def _context():
         return mp.get_context("spawn")
 
 
-_PREFLIGHT: bool | None = None
-
-
 def _preflight() -> None:
     """자식 프로세스를 띄울 수 있는지 **한 번** 확인한다.
 
     실패하면 `BrokenPipeError` 대신 무엇을 고쳐야 하는지 말한다.
     """
-    global _PREFLIGHT
-    if _PREFLIGHT:
+    if getattr(_preflight, "done", False):
         return
     ctx = _context()
     q = ctx.Queue(maxsize=1)
@@ -208,14 +204,15 @@ def _preflight() -> None:
         if proc.is_alive():                          # pragma: no cover
             proc.kill()
             proc.join(1.0)
-    _PREFLIGHT = True
+    _preflight.done = True
 
 
 def _ping(q) -> None:                                # pragma: no cover
-    try:
+    """preflight 자식. 실패해도 부모가 타임아웃으로 판정하므로 삼켜도 된다."""
+    import contextlib
+
+    with contextlib.suppress(Exception):
         q.put("ok")
-    except Exception:                                # noqa: BLE001, S110
-        pass
 
 
 def run_isolated(code: str, args: tuple, *, name: str = "score",

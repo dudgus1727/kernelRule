@@ -229,8 +229,6 @@ def check_rule(code: str, *, feature_names, shape_value_names,
             else:
                 bad("w 는 상수 인덱스로만 접근한다 (w[0], w[1] ...). "
                     "슬라이싱/변수 인덱스 금지")
-        if isinstance(node, ast.Name) and node.id == "w":
-            parent_ok = True   # 아래 두 번째 순회에서 검사
         # 지역 변수 추적 — f.* 가 대입되면 그 변수도 배열이다
         if isinstance(node, ast.Assign) and len(node.targets) == 1 \
                 and isinstance(node.targets[0], ast.Name):
@@ -243,10 +241,10 @@ def check_rule(code: str, *, feature_names, shape_value_names,
             for a, b_ in ((node.left, node.right), (node.right, node.left)):
                 if (isinstance(a, ast.Subscript)
                         and isinstance(a.value, ast.Name) and a.value.id == "w"):
-                    try:
+                    import contextlib
+
+                    with contextlib.suppress(Exception):
                         term_sigs.append(ast.dump(b_))
-                    except Exception:                    # noqa: BLE001, S110
-                        pass
 
     # `w` 를 인덱스 없이 통째로 쓰는 것 금지 (w.sum(), w * f 등)
     for node in ast.walk(tree):

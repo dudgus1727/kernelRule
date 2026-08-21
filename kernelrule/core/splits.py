@@ -139,14 +139,14 @@ def split_by_M_range(shapes: Sequence[Problem], *, m_threshold: int = 2048
     어려운가**의 척도다 — 5-fold 는 M=1024 가 학습에, M=1000 이 검증에
     들어가는 사실상 보간이다.
     """
-    return by_predicate(shapes, lambda p: p.M > m_threshold,
+    return by_predicate(shapes, lambda p: m_threshold < p.M,
                         name=f"M>{m_threshold}")
 
 
 def split_by_K_range(shapes: Sequence[Problem], *, k_threshold: int = 8192
                      ) -> SplitSet:
     """층 B 의 K 구간 홀드아웃. mainloop 깊이 외삽."""
-    return by_predicate(shapes, lambda p: p.K > k_threshold,
+    return by_predicate(shapes, lambda p: k_threshold < p.K,
                         name=f"K>{k_threshold}")
 
 
@@ -172,8 +172,9 @@ def split_by_size(shapes: Sequence[Problem], hw, *, ms: float = 0.5
     ⚠️ 경계를 `best_ms`(정답)가 아니라 **roofline 하한**으로 잡는다.
     `best_ms` 는 `ANSWER_COLS` 라 분할 정의에 쓰면 정답이 새어 들어간다.
     """
-    from kernelrule.features.physical import log_sol_ms
     import math
+
+    from kernelrule.features.physical import log_sol_ms
 
     thresh = math.log2(ms)
 

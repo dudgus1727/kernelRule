@@ -42,12 +42,12 @@ from kernelrule.agents.schemas import SchemaViolation, validate_rule_proposal
 from kernelrule.core.archive import Archive, Elite
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import SandboxError, compile_rule, run_isolated
-from kernelrule.core.scoring import evaluate_scores, geomean, is_significant
-from kernelrule.core.splits import Split, SplitSet
+from kernelrule.core.scoring import evaluate_scores, is_significant
+from kernelrule.core.splits import SplitSet
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import FitError, fit_weights, make_score_of
 from kernelrule.report.diagnostic import build_report
-from kernelrule.rules.checks import RuleCheckError, check_rule
+from kernelrule.rules.checks import check_rule
 
 __all__ = ["RoundLoop", "RoundResult", "LoopConfig"]
 
@@ -274,8 +274,8 @@ class RoundLoop:
             if isinstance(raw, BaseException):
                 # ★ 재시도 상한을 넘은 것은 **폐기**다. 부분 수용 금지 (§26.4)
                 res.n_rejected_schema += 1
-                res.rejections.append(("llm", f"{type(raw).__name__}: "
-                                              f"{str(raw)[:70]}"))
+                res.rejections.append(("llm", (f"{type(raw).__name__}: "
+                                              f"{str(raw)[:70]}")))
                 continue
             try:
                 prop = validate_rule_proposal(raw)

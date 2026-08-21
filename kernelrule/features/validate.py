@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from kernelrule.core.types import Config, Hardware, Problem, config_from_row
+from kernelrule.core.types import Hardware, config_from_row
 from kernelrule.features import Feature, FeatureRegistry
 
 __all__ = ["Check", "ValidationReport", "validate_feature", "validate_registry"]

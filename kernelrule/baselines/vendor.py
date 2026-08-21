@@ -27,7 +27,6 @@ kernelTab 의 원 계산은 `status == "ok"` 만 썼다 (`baseline_vendor.py:143
 from __future__ import annotations
 
 import json
-import math
 import re
 from pathlib import Path
 

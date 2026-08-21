@@ -5,14 +5,17 @@
 """
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 import pytest
 
-from kernelrule.agents.openai_client import (Budget, BudgetExceeded, LLMConfig,
-                                             MissingAPIKey, OpenAILLM,
-                                             estimate_and_confirm, load_prompt)
+from kernelrule.agents.openai_client import (
+    Budget,
+    BudgetExceeded,
+    LLMConfig,
+    MissingAPIKey,
+    OpenAILLM,
+    estimate_and_confirm,
+    load_prompt,
+)
 
 FEATS = ["traffic_amplification", "has_spill", "waves"]
 SHAPE = ["is_memory_bound", "log_sol_ms"]

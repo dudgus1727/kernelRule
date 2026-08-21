@@ -73,11 +73,11 @@ class TopKResult:
 
     def report(self) -> str:
         lines = [f"[{self.procedure}] {self.description}",
-                 f"    형상 {self.n_shapes}, 후보 config "
+                 (f"    형상 {self.n_shapes}, 후보 config "
                  f"{self.n_configs_considered}/{self.n_configs_total} "
-                 f"({100 * self.n_configs_considered / max(1, self.n_configs_total):.2f}%)",
-                 f"    {'k':>3} {'전체':>7} {'>=0.5ms':>8} {'<0.5ms':>8} "
-                 f"{'어려움':>7} {'쉬움':>7} {'덮개':>7}"]
+                 f"({100 * self.n_configs_considered / max(1, self.n_configs_total):.2f}%)"),
+                 (f"    {'k':>3} {'전체':>7} {'>=0.5ms':>8} {'<0.5ms':>8} "
+                 f"{'어려움':>7} {'쉬움':>7} {'덮개':>7}")]
         for k in self.ks:
             d = self.by_k[k]
             lines.append(

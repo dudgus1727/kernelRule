@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 
 from kernelrule.core.table import PerfTable
-from kernelrule.core.types import Config, Hardware, Problem, config_from_row
+from kernelrule.core.types import Hardware, Problem, config_from_row
 from kernelrule.features import FeatureRegistry
 
 __all__ = ["FeatureMatrix", "Feats", "ShapeInfo"]

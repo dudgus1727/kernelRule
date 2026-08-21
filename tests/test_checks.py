@@ -42,54 +42,54 @@ def test_weight_indices_do_not_eat_the_literal_budget():
 # §24.3 의 adversarial 케이스 — 하나라도 통과하면 방어에 구멍이 있다
 # ---------------------------------------------------------------------------
 ADVERSARIAL = [
-    ("암기", "def score(f, p, hw, w):\n"
+    ("암기", ("def score(f, p, hw, w):\n"
              "    if p.M == 4096:\n"
              "        return f.waves * w[0]\n"
-             "    return f.waves * w[0]\n", 1, "직접 비교"),
-    ("정답 누출", "def score(f, p, hw, w):\n"
-                  "    return f.waves * w[0] + time_ms\n", 1, "금지된 이름"),
-    ("난이도 참조", "def score(f, p, hw, w):\n"
-                    "    return f.waves * w[0] * difficulty\n", 1, "금지된 이름"),
-    ("표 접근", "def score(f, p, hw, w):\n"
-                "    return TABLE[0] * w[0]\n", 1, "금지된 이름"),
-    ("무한 루프 소스", "def score(f, p, hw, w):\n"
+             "    return f.waves * w[0]\n"), 1, "직접 비교"),
+    ("정답 누출", ("def score(f, p, hw, w):\n"
+                  "    return f.waves * w[0] + time_ms\n"), 1, "금지된 이름"),
+    ("난이도 참조", ("def score(f, p, hw, w):\n"
+                    "    return f.waves * w[0] * difficulty\n"), 1, "금지된 이름"),
+    ("표 접근", ("def score(f, p, hw, w):\n"
+                "    return TABLE[0] * w[0]\n"), 1, "금지된 이름"),
+    ("무한 루프 소스", ("def score(f, p, hw, w):\n"
                        "    while f.waves > 0:\n"
                        "        pass\n"
-                       "    return f.waves * w[0]\n", 1, "config 수준"),
-    ("샌드박스 탈출", "def score(f, p, hw, w):\n"
+                       "    return f.waves * w[0]\n"), 1, "config 수준"),
+    ("샌드박스 탈출", ("def score(f, p, hw, w):\n"
                       "    import os\n"
-                      "    return f.waves * w[0]\n", 1, "import"),
-    ("오타", "def score(f, p, hw, w):\n"
-             "    return f.tail_wast * w[0]\n", 1, "등록되지 않은 피처"),
-    ("배열에 if", "def score(f, p, hw, w):\n"
+                      "    return f.waves * w[0]\n"), 1, "import"),
+    ("오타", ("def score(f, p, hw, w):\n"
+             "    return f.tail_wast * w[0]\n"), 1, "등록되지 않은 피처"),
+    ("배열에 if", ("def score(f, p, hw, w):\n"
                   "    if f.waves < 1:\n"
                   "        return f.waves * w[0]\n"
-                  "    return f.waves * w[0]\n", 1, "config 수준"),
-    ("배열에 삼항", "def score(f, p, hw, w):\n"
-                    "    return (w[0] if f.waves < 1 else w[0]) * f.waves\n",
+                  "    return f.waves * w[0]\n"), 1, "config 수준"),
+    ("배열에 삼항", ("def score(f, p, hw, w):\n"
+                    "    return (w[0] if f.waves < 1 else w[0]) * f.waves\n"),
      1, "config 수준"),
-    ("비결정론", "def score(f, p, hw, w):\n"
-                 "    return np.random.rand(3) * w[0]\n", 1, "numpy"),
-    ("던더 우회", "def score(f, p, hw, w):\n"
-                  "    return f.waves * w[0] + score.__globals__['x']\n",
+    ("비결정론", ("def score(f, p, hw, w):\n"
+                 "    return np.random.rand(3) * w[0]\n"), 1, "numpy"),
+    ("던더 우회", ("def score(f, p, hw, w):\n"
+                  "    return f.waves * w[0] + score.__globals__['x']\n"),
      1, "던더"),
-    ("w 슬라이싱", "def score(f, p, hw, w):\n"
-                   "    return f.waves * w[0] + sum(w[1:])\n", 2, "상수 인덱스"),
-    ("w 통째로", "def score(f, p, hw, w):\n"
-                 "    return f.waves * len(w)\n", 1, "통째로"),
+    ("w 슬라이싱", ("def score(f, p, hw, w):\n"
+                   "    return f.waves * w[0] + sum(w[1:])\n"), 2, "상수 인덱스"),
+    ("w 통째로", ("def score(f, p, hw, w):\n"
+                 "    return f.waves * len(w)\n"), 1, "통째로"),
     ("구문 오류", "def score(f, p, hw, w)\n    return 1\n", 1, "파싱 실패"),
-    ("함수 여러 개", "def helper():\n    return 1\n"
+    ("함수 여러 개", ("def helper():\n    return 1\n"
                      "def score(f, p, hw, w):\n"
-                     "    return f.waves * w[0]\n", 1, "하나만"),
-    ("시그니처 변경", "def score(problem, hw, candidates):\n"
-                      "    return 0.0\n", 1, "시그니처"),
-    ("컴프리헨션", "def score(f, p, hw, w):\n"
-                   "    return sum([x for x in f.waves]) * w[0]\n",
+                     "    return f.waves * w[0]\n"), 1, "하나만"),
+    ("시그니처 변경", ("def score(problem, hw, candidates):\n"
+                      "    return 0.0\n"), 1, "시그니처"),
+    ("컴프리헨션", ("def score(f, p, hw, w):\n"
+                   "    return sum([x for x in f.waves]) * w[0]\n"),
      1, "컴프리헨션"),
-    ("미등록 형상값", "def score(f, p, hw, w):\n"
+    ("미등록 형상값", ("def score(f, p, hw, w):\n"
                       "    if p.secret_difficulty:\n"
                       "        return f.waves * w[0]\n"
-                      "    return f.waves * w[0]\n", 1, "형상 수준"),
+                      "    return f.waves * w[0]\n"), 1, "형상 수준"),
 ]
 
 
@@ -158,21 +158,24 @@ def test_handwritten_rule_obeys_the_same_constraints():
 # A-1 — 형상 수준 분기 no-op 경고 (거부가 아니다)
 # ---------------------------------------------------------------------------
 NOOP = [
-    ("스칼라 곱", "def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+    ("스칼라 곱", ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
                   "    if p.is_memory_bound:\n        s = s * w[1]\n"
-                  "    return s\n", 2),
-    ("스칼라 덧셈", "def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+                  "    return s\n"), 2),
+    ("스칼라 덧셈", ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
                     "    if p.is_memory_bound:\n        s = s + w[1]\n"
-                    "    return s\n", 2),
-    ("리터럴 곱", "def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+                    "    return s\n"), 2),
+    ("리터럴 곱", ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
                   "    if p.is_memory_bound:\n        s = s * 2.0\n"
-                  "    return s\n", 1),
-    ("hw 상수", "def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+                  "    return s\n"), 1),
+    ("hw 상수", ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
                 "    if p.is_memory_bound:\n        s = s / hw.sm_count\n"
-                "    return s\n", 1),
-    ("AugAssign", "def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
-                  "    if p.is_memory_bound:\n        s *= w[1]\n"
-                  "    return s\n", 2),
+                "    return s\n"), 1),
+    ("AugAssign", """def score(f, p, hw, w):
+    s = f.waves * w[0]
+    if p.is_memory_bound:
+        s *= w[1]
+    return s
+""", 2),
 ]
 
 
@@ -190,12 +193,12 @@ def test_noop_shape_branch_warns_but_passes(name, code, nw):
 
 
 VALID_BRANCH = [
-    ("항 재가중", "def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+    ("항 재가중", ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
                   "    if p.is_memory_bound:\n"
-                  "        s = s + f.edge_waste * w[1]\n    return s\n", 2),
-    ("AugAssign 항", "def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+                  "        s = s + f.edge_waste * w[1]\n    return s\n"), 2),
+    ("AugAssign 항", ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
                      "    if p.is_memory_bound:\n"
-                     "        s += f.edge_waste * w[1]\n    return s\n", 2),
+                     "        s += f.edge_waste * w[1]\n    return s\n"), 2),
     ("분기 없음", "def score(f, p, hw, w):\n    return f.waves * w[0]\n", 1),
 ]
 

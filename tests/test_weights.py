@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from toy import make_table
 
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.scoring import evaluate
 from kernelrule.core.splits import Split, SplitError, SplitSet, by_predicate
 from kernelrule.core.weights import FitError, fit_weights, make_order_fn
 from kernelrule.features import FeatureRegistry, feature
-from toy import make_table
 
 #: 생성 계수를 **알고 있는** 표를 만든다. 시간 = exp(w_true . f).
 W_TRUE = np.array([2.0, 0.5, 1.5])

@@ -41,8 +41,6 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
-
 __all__ = ["Archive", "Elite", "CELL_AXES", "cell_of"]
 
 CELL_AXES: dict[str, list[float]] = {

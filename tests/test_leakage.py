@@ -10,10 +10,10 @@ import warnings
 
 import numpy as np
 import pytest
+from toy import constant_score_order
 
-from kernelrule.core.scoring import evaluate, geomean
+from kernelrule.core.scoring import evaluate
 from kernelrule.core.types import CandidateSet, Config, Hardware, Problem
-from toy import constant_score_order, make_table, order_by_index
 
 ANSWERISH = ("time", "ms", "difficulty", "cublas", "tflops", "regret",
              "outlier", "distinct", "peak", "elapsed")

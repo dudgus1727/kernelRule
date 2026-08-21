@@ -2,16 +2,15 @@
 from __future__ import annotations
 
 import ast
-import inspect
 import warnings
 from pathlib import Path
 
 import numpy as np
 import pytest
+from toy import make_table
 
 import kernelrule.report.diagnostic as D
 from kernelrule.core.splits import Split, SplitError
-from toy import make_table
 
 #: 계산 없이 쓰면 안 되는 비교어. 이 데이터가 아니라 **다른 데이터의 결론**을
 #: 템플릿에 박아 두는 것이 이 프로젝트가 밟은 함정이다.

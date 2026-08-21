@@ -5,8 +5,12 @@ import numpy as np
 import pytest
 
 from kernelrule.core.matrix import Feats, ShapeInfo
-from kernelrule.core.sandbox import (SandboxError, compile_rule, run_isolated,
-                                     safe_namespace)
+from kernelrule.core.sandbox import (
+    SandboxError,
+    compile_rule,
+    run_isolated,
+    safe_namespace,
+)
 
 
 @pytest.fixture
@@ -27,22 +31,27 @@ def test_good_rule_runs(args):
 ESCAPES = [
     ("무한 루프", "def score(f, p, hw, w):\n    while True:\n        pass\n",
      "timeout"),
-    ("import", "def score(f, p, hw, w):\n    import os\n"
-               "    os.system('echo PWNED')\n    return f.waves * w[0]\n",
+    ("import", """def score(f, p, hw, w):
+    import os
+    os.system('echo PWNED')
+    return f.waves * w[0]
+""",
      "error"),
-    ("파일 열기", "def score(f, p, hw, w):\n"
-                  "    open('/etc/passwd').read()\n    return f.waves * w[0]\n",
+    ("파일 열기", ("def score(f, p, hw, w):\n"
+                  "    open('/etc/passwd').read()\n    return f.waves * w[0]\n"),
      "error"),
-    ("eval", "def score(f, p, hw, w):\n"
-             "    return eval('1') * f.waves * w[0]\n", "error"),
+    ("eval", """def score(f, p, hw, w):
+    return eval('1') * f.waves * w[0]
+""", "error"),
     ("np.random", "def score(f, p, hw, w):\n    return np.random.rand(5)\n",
      "error"),
-    ("nan", "def score(f, p, hw, w):\n"
-            "    return f.waves * w[0] + np.log(-1.0)\n", "error"),
+    ("nan", """def score(f, p, hw, w):
+    return f.waves * w[0] + np.log(-1.0)
+""", "error"),
     ("inf", "def score(f, p, hw, w):\n    return f.waves * w[0] / 0.0\n",
      "error"),
-    ("오타 크래시", "def score(f, p, hw, w):\n"
-                    "    return f.nope * w[0]\n", "error"),
+    ("오타 크래시", ("def score(f, p, hw, w):\n"
+                    "    return f.nope * w[0]\n"), "error"),
 ]
 
 

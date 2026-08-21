@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from toy import make_table, order_by_index
 
 from kernelrule.core.scoring import Strata, evaluate, geomean, is_significant
-from toy import EXACT, make_table, order_by_index
 
 
 @pytest.fixture

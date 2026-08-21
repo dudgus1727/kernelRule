@@ -207,7 +207,7 @@ def normalize(df: pd.DataFrame, *, unexpected: str = "warn") -> pd.DataFrame:
     if renames:
         out = out.rename(columns=renames)
 
-    for name, sources in DERIVED.items():
+    for name in DERIVED:
         if name in out.columns:
             continue
         if name == "spill_bytes":

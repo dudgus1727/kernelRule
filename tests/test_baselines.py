@@ -3,14 +3,16 @@ from __future__ import annotations
 
 import warnings
 
-import numpy as np
 import pytest
+from toy import make_table
 
 from kernelrule.baselines.static_topk import PROCEDURES, StaticTopK
-from kernelrule.core.scoring import evaluate
-from kernelrule.core.splits import (split_by_M_range, split_by_alignment,
-                                    split_by_size, split_by_waves)
-from toy import make_table
+from kernelrule.core.splits import (
+    split_by_alignment,
+    split_by_M_range,
+    split_by_size,
+    split_by_waves,
+)
 
 
 def test_greedy_finds_known_optimum():

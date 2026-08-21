@@ -192,8 +192,8 @@ class Evaluation:
     def report(self) -> str:
         """★ 크기 층화를 먼저 찍는다 (§30.5)."""
         st = self.strata
-        lines = [f"== {self.label or 'evaluation'} =="
-                 f"  ({len(st.shapes)}형상, <0.5ms {int(st.small.sum())}개)"]
+        lines = [(f"== {self.label or 'evaluation'} =="
+                 f"  ({len(st.shapes)}형상, <0.5ms {int(st.small.sum())}개)")]
         for k in self.ks:
             s = self.stratified(k)
             lines.append(

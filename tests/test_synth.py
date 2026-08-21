@@ -9,8 +9,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import kernelrule.tools.synth as synth
-from kernelrule.tools.synth import PRESETS, self_check, synth_times
+from kernelrule.tools import synth
+from kernelrule.tools.synth import self_check, synth_times
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +47,6 @@ def test_timer_quantization_is_applied(tiny_grid):
     q = t / synth._TICK_MS
     assert np.allclose(q, np.round(q)), "시간이 눈금의 정수배가 아니다"
     # 짧은 형상에서 동점이 실제로 대량 발생하는가
-    M = tiny_grid.df.M.to_numpy()
     short = t < 0.05
     if short.sum() > 50:
         vals, cnt = np.unique(t[short], return_counts=True)
@@ -131,6 +130,7 @@ def test_synthetic_env_hash_cannot_collide_with_real(synth_bundles):
 def test_bundle_loads_through_the_real_loaders(synth_bundles):
     """합성 표도 진짜 표와 같은 형식이어야 로더/어댑터가 검증된다 (§22.3)."""
     import warnings
+
     from kerneltab.core.bundle import load_bundle
     from kerneltab.core.table import assert_no_answers
 

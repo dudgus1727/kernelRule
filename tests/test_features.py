@@ -4,7 +4,6 @@ from __future__ import annotations
 import inspect
 import warnings
 
-import numpy as np
 import pytest
 
 import kernelrule.features.physical  # noqa: F401  등록
@@ -48,6 +47,7 @@ def test_no_feature_references_answers():
     포함해서 오탐이 난다. 토큰 경계로 본다.
     """
     import re
+
     from kerneltab.core.table import ANSWER_COLS
 
     bad = []

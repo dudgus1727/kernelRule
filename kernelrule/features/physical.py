@@ -397,7 +397,7 @@ def log_sol_ms(p: Problem, hw: Hardware, cfg: Config) -> float:
     t_c = 2.0 * p.M * p.N * p.K / (hw.peak_tflops_f16 * 1e12) * 1e3
     t_m = eb * (p.M * p.K + p.K * p.N + p.M * p.N) / (hw.bandwidth_gbps
                                                       * 1e9) * 1e3
-    return math.log2(max(1e-6, max(t_c, t_m)))
+    return math.log2(max(1e-6, t_c, t_m))
 
 
 @shape_feature(expected_range=(0.0, 1.0), direction="neutral")

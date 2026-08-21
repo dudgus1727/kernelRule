@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from kernelrule.agents.mock import MockLLM
-from kernelrule.core.archive import CELL_AXES, Archive, Elite, cell_of
+from kernelrule.core.archive import CELL_AXES, Archive, Elite
 from kernelrule.core.loop import LoopConfig, RoundLoop
 from kernelrule.core.splits import Split, SplitSet
 
@@ -215,8 +215,8 @@ def test_val_blowup_is_reported_not_hidden(loop):
 
     선택 규칙은 그대로 두되(검증을 쓰면 홀드아웃이 오염된다) **경보를 낸다.**
     """
-    from kernelrule.core.loop import VAL_GAP_ALARM
     from kernelrule.core.archive import Elite
+    from kernelrule.core.loop import VAL_GAP_ALARM
 
     loop.run(1, verbose=False)
     # 진단 리포트가 최고 규칙을 컴파일하므로 유효한 코드여야 한다
@@ -243,8 +243,7 @@ def test_regime_balance_flags_a_lopsided_train_split(real_bundle_path):
     import warnings
 
     import kernelrule.features.physical  # noqa: F401
-    from kernelrule.core.splits import (MIN_REGIME_FRAC, check_balance,
-                                        split_by_M_range)
+    from kernelrule.core.splits import MIN_REGIME_FRAC, check_balance, split_by_M_range
     from kernelrule.core.table import PerfTable
 
     with warnings.catch_warnings():

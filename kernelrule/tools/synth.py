@@ -59,7 +59,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -150,12 +149,12 @@ class Grid:
         if max_configs_per_shape:
             rng = np.random.default_rng(seed)
             parts = []
-            for _, g in df.groupby(["M", "N", "K"], sort=False):
-                if len(g) > max_configs_per_shape:
-                    idx = np.sort(rng.choice(len(g), max_configs_per_shape,
+            for _, grp in df.groupby(["M", "N", "K"], sort=False):
+                if len(grp) > max_configs_per_shape:
+                    idx = np.sort(rng.choice(len(grp), max_configs_per_shape,
                                              replace=False))
-                    g = g.iloc[idx]
-                parts.append(g)
+                    grp = grp.iloc[idx]     # noqa: PLW2901 — 의도된 축소
+                parts.append(grp)
             df = pd.concat(parts, ignore_index=True)
         df = df.reset_index(drop=True)
         if df.empty:
@@ -534,7 +533,7 @@ def self_check(path: str | Path) -> dict:
 
     # 동점 밀집도 — 짧은 형상에서 눈금이 지배하는지 (§22.3)
     short = best.to_numpy() < 0.05
-    out = {
+    return {
         "preset": preset,
         "n_shapes": int(len(best)),
         "n_rows": int(len(y)),
@@ -548,4 +547,3 @@ def self_check(path: str | Path) -> dict:
             float(np.median((n_distinct / n_cand)[short])) if short.any()
             else float("nan")),
     }
-    return out

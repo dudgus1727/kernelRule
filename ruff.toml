@@ -1,0 +1,34 @@
+line-length = 88
+target-version = "py310"
+
+[lint]
+select = [
+    "E", "F", "W",      # pycodestyle / pyflakes
+    "I",                # import 정렬
+    "B",                # bugbear
+    "ISC",              # ★ 암묵 문자열 연결 — 컬렉션 안에서 쉼표를 빠뜨리면
+                        #   조용히 합쳐진다. mock.py 의 규칙 템플릿이 그 위험에
+                        #   그대로 노출돼 있었다 (49건).
+    "UP", "SIM", "RET", "C4", "PIE", "PL",
+]
+ignore = [
+    "E501",     # line-length 는 formatter 가 본다
+    # ★ 함수 안 import 는 이 저장소에서 **의도**다.
+    #   (1) pandas/pyarrow 를 채점 뜨거운 경로 밖에 둔다
+    #   (2) core <-> features <-> rules 순환 의존을 끊는다
+    #   (3) 선택 의존성(pydantic/lightgbm/nvMatmulHeuristics)을 격리한다
+    "PLC0415",
+    "PLR0912", "PLR0913", "PLR0915", "PLR2004",  # 복잡도/매직넘버는 리뷰로
+    "SIM108",   # 삼항 강요는 가독성을 해칠 때가 있다
+    "C408",     # dict(a=1) 이 키워드 인자로 읽혀 이 코드베이스에서 더 낫다
+    "PLR0917",  # 위치 인자 수는 키워드 전용(*)으로 이미 통제한다
+    "PLC3002",  # 피처의 벡터화 람다에서 즉시 호출이 가장 짧고 명확하다
+]
+
+[lint.per-file-ignores]
+# 정적 검사는 "무엇을 왜 거부하는가" 가 한 줄씩 읽혀야 한다.
+# 중첩 if 를 합치면 어느 조건이 걸렸는지 메시지와 대응이 안 되고,
+# 이른 return 10개는 검사 항목이 10개라는 뜻이다.
+"kernelrule/rules/checks.py" = ["SIM102", "PLR0911"]
+# 테스트는 assert 와 긴 픽스처가 정상이다
+"tests/*" = ["PLR0915", "B011"]

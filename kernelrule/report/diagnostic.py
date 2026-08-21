@@ -47,7 +47,6 @@ LLM 이 기존 최적화 알고리즘을 이길 수 있는 유일한 지점이�
 
 from __future__ import annotations
 
-import json
 import textwrap
 from dataclasses import dataclass, field
 
@@ -299,8 +298,8 @@ def _select_cases(table, matrix, order_of, ev, masks, shapes,
         if not m.any():
             continue
         idx = np.argsort(np.where(m, -r1, np.inf))[:per_regime]
-        for i in idx:
-            i = int(i)
+        for raw_i in idx:
+            i = int(raw_i)
             if not m[i] or i in used or r1[i] <= 1.0 + 1e-9:
                 continue
             used.add(i)
@@ -312,10 +311,10 @@ def _select_cases(table, matrix, order_of, ev, masks, shapes,
             seen_modes.add(sig)
             cases.append(c)
     n_added = 0
-    for i in np.argsort(r1):
+    for raw_i in np.argsort(r1):
         if n_added >= n_best:
             break
-        i = int(i)
+        i = int(raw_i)
         if i in used:
             continue
         c = _make_case(table, matrix, shapes[i], order_of(shapes[i]),
@@ -424,8 +423,8 @@ def _render(r: DiagnosticReport) -> str:
     # ★ regret 과 hit 을 나란히 본다. 둘이 갈리면 오류의 성격이 다르다.
     add(f"정답 적중 hit@1 {o['hit@1']:.3f}  hit@3 {o['hit@3']:.3f}  "
         f"(정답 = 최적 대비 노이즈 바닥 2시그마 이내)")
-    add(f"  regret 은 낮은데 hit 이 0 이면 **아깝게 빗나가는 것이 아니라")
-    add(f"  구조적으로 다른 곳을 짚는 것**이다 — 가중치 조정이 아니라 항이 필요하다.")
+    add("  regret 은 낮은데 hit 이 0 이면 **아깝게 빗나가는 것이 아니라")
+    add("  구조적으로 다른 곳을 짚는 것**이다 — 가중치 조정이 아니라 항이 필요하다.")
     add("")
     # ★ 결론을 미리 적어 두면 안 된다. 이 리포트의 숫자가 반대일 수 있고,
     #   그러면 LLM 이 데이터가 아니라 문장을 믿는다. **재서 쓴다.**

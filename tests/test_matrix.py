@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from kernelrule.core.matrix import Feats, FeatureMatrix, ShapeInfo
+from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.features import FeatureRegistry, feature, shape_feature
 
 

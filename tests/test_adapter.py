@@ -4,12 +4,16 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from kernelrule.core.adapter import (REQUIRED_COLUMNS, SchemaError, check_schema,
-                                     normalize)
+from kernelrule.core.adapter import (
+    REQUIRED_COLUMNS,
+    SchemaError,
+    check_schema,
+    normalize,
+)
 
 
 def _minimal() -> pd.DataFrame:
-    row = {c: 1 for c in REQUIRED_COLUMNS}
+    row = dict.fromkeys(REQUIRED_COLUMNS, 1)
     row.update({"dtype": "f16", "split_k_mode": "serial", "kernel_id": "k0",
                 "arch": "sm_86", "pipeline_kind": "multistage",
                 "smem_dynamic": 32768, "spill_stores": 0, "spill_loads": 0})
@@ -84,6 +88,7 @@ def test_normalize_refuses_difficulty():
 def test_real_bundle_matches_contract(real_bundle_path):
     """실제 번들이 계약을 만족한다 (§23.4). 번들이 없으면 스킵되며 표시된다."""
     import warnings
+
     from kerneltab.core.bundle import load_bundle
 
     with warnings.catch_warnings():
@@ -99,6 +104,7 @@ def test_real_bundle_matches_contract(real_bundle_path):
 def test_synthetic_table_matches_contract(synth_bundles):
     """합성 표도 같은 계약을 만족해야 로더/어댑터가 검증된다 (§22.3)."""
     import warnings
+
     from kerneltab.core.bundle import load_bundle
 
     with warnings.catch_warnings():

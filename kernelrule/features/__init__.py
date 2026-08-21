@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 

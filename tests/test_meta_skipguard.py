@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -50,7 +49,8 @@ def _run(tmp: Path, *args, env_extra=None) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
          *args, str(tmp)],
-        capture_output=True, text=True, cwd=tmp, env=env, timeout=180)
+        capture_output=True, text=True, cwd=tmp, env=env, timeout=180,
+        check=False)      # 반환 코드 자체가 검사 대상이다
 
 
 @pytest.fixture
