@@ -371,17 +371,36 @@ class RoundLoop:
         return True, (f"{n}라운드 연속 검증 개선이 노이즈 바닥 이하"
                       f"({improved:+.5f}) 이고 새 셀도 없다")
 
-    def run(self, n_rounds: int | None = None, *, verbose: bool = True):
+    def run(self, n_rounds: int | None = None, *, verbose: bool = True,
+            dump_each_round: bool = True):
+        """라운드를 돌린다. ★ **끝날 때 반드시 저장한다** (D-33).
+
+        전에는 `dump()` 를 호출자가 불러야 했고, 부르지 않은 러너가 78분
+        1400호출의 결과를 통째로 잃었다. 규칙 코드가 메모리에만 있었으므로
+        재채점이 불가능했다 — 표준출력의 요약만 남았다.
+
+        `finally` 로 감싼 이유는 **중간에 죽어도 거기까지는 남아야** 하기
+        때문이다. 예산 초과·rate limit·Ctrl-C 가 전부 여기 걸린다.
+        `dump_each_round` 는 라운드마다 덮어써 장시간 실행의 보험이 된다
+        (아카이브가 작아 비용이 무시할 만하다).
+        """
         n = n_rounds or self.cfg.max_rounds
-        for _ in range(n):
-            res = self.run_round()
-            if verbose:
-                print(res.line(), flush=True)
-            stop, why = self.should_stop()
-            if stop:
+        try:
+            for _ in range(n):
+                res = self.run_round()
                 if verbose:
-                    print(f"조기 종료: {why}")
-                break
+                    print(res.line(), flush=True)
+                if dump_each_round:
+                    self.dump()
+                stop, why = self.should_stop()
+                if stop:
+                    if verbose:
+                        print(f"조기 종료: {why}")
+                    break
+        finally:
+            path = self.dump()
+            if verbose:
+                print(f"  -> {path}", flush=True)
         return self.rounds
 
     def dump(self, out: str | Path | None = None) -> Path:
