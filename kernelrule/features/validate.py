@@ -291,12 +291,25 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
 
 
 def _uses_hardware(f: Feature) -> bool:
-    """소스에 `hw.` 참조가 있는가. 스케일 검사의 해석에 쓴다."""
+    """소스에 `hw.` 참조가 있는가. 스케일 검사의 해석에 쓴다.
+
+    ★ `f.source` 를 먼저 본다. `exec` 로 만든 피처는 `inspect.getsource` 가
+    `OSError` 를 내는데, 그때 `True` 로 떨어지면 **하드웨어를 안 쓰는 정상
+    피처가 전부 기각된다** — 스케일 검사는 `uses_hw` 일 때만 fail 이기
+    때문이다. F1 첫 실행에서 실제로 그렇게 버려졌다 (D-37).
+    """
+    if f.source:
+        return "hw." in f.source
     import inspect
     try:
         src = inspect.getsource(f.fn)
-    except (OSError, TypeError):                 # pragma: no cover
-        return True
+    except (OSError, TypeError):
+        # 소스를 못 읽으면 **판단하지 않는다**. `True` 는 "hw 를 쓴다" 는
+        # 주장이고, 그 주장이 틀리면 정상 피처를 기각한다 (§26.4).
+        raise ValueError(
+            f"{f.name}: 소스를 읽을 수 없어 하드웨어 사용 여부를 판정할 수 "
+            "없다. `Feature(source=...)` 에 코드를 넣어라 — 추측하면 "
+            "하드웨어 무관 피처를 기각한다 (D-37)") from None
     return "hw." in src
 
 

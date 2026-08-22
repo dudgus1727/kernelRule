@@ -82,6 +82,11 @@ class Feature:
     deprecation_reason: str = ""
     #: 소스 해시. `features.lock` 과 FeatureMatrix 캐시 키에 쓴다 (§25).
     code_hash: str = ""
+    #: ★ 소스 코드. **`exec` 로 만든 피처는 `inspect.getsource` 가 실패한다**
+    #: (OSError). §8.3 의 스케일 불변성 검사가 "hw 를 쓰는가" 를 소스에서
+    #: 읽으므로, 없으면 하드웨어 무관 피처를 전부 기각한다 — 실제로 F1
+    #: 첫 실행에서 정상 피처가 그렇게 버려졌다 (D-37).
+    source: str = ""
 
     @property
     def active(self) -> bool:

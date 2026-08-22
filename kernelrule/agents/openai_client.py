@@ -191,10 +191,10 @@ class OpenAILLM:
         from pydantic_ai import Agent
         from pydantic_ai.models.openai import OpenAIChatModel
 
-        from kernelrule.agents.schemas import AnalysisOutput, RuleOutput
+        from kernelrule.agents.schemas import AnalysisOutput, FeatureOutput, RuleOutput
 
         out = {"analyze": AnalysisOutput, "optimize": RuleOutput,
-               "architect": RuleOutput}[role]
+               "architect": RuleOutput, "feature": FeatureOutput}[role]
         role_md = load_prompt(f"{role}.md")
         # ★ 두 층으로 나뉜다: [고정] 역할·제약  +  [주입] 하드웨어 사실
         instructions = f"{self._common}\n\n---\n\n{self._hw}\n\n---\n\n{role_md}"
@@ -237,6 +237,8 @@ class OpenAILLM:
         fl = self._feature_block()
         if role == "architect":
             return self._architect_prompt(**kw)
+        if role == "feature":
+            return self._feature_prompt(**kw)
         if role == "analyze":
             return prompt + "\n\n---\n\n## 등록된 피처\n\n" + fl + "\n"
         parent = kw.get("parent")
@@ -311,6 +313,42 @@ class OpenAILLM:
                    f"```\n{lines}\n```")
         return load_prompt("architect.md").format(
             table_note=note, feature_block=block, aggregate_block=agg)
+
+
+    # -- FeatureWriter (§11.4) — 없는 축을 만든다 ---------------------------
+    def _feature_prompt(self, *, condition: str = "F1", task: str = "",
+                        registry=None, **_kw) -> str:
+        """F0~F3 — **피처를 얼마나 주느냐**가 조건이다.
+
+            F0  없음        물리를 처음부터 코드로 옮길 수 있나
+            F1  원시 값만    파생 물리량을 만들 수 있나   ★ 근본 질문
+            F2  기초 5개     그 위에 쌓을 수 있나
+            F3  전부        조합만 (= 지금까지의 모든 실행)
+
+        ⚠️ 형태 예시는 **이 문제와 무관한 것**을 쓴다. `optimize.md` 의
+        출력 예시가 `physics_seeded` 축약판이라 "씨앗 없음" 조건에 씨앗이
+        들어간 일이 있다 (D-35).
+        """
+        from kernelrule.features import render_features
+        from kernelrule.features.generated import field_block
+
+        if condition not in ("F0", "F1", "F2", "F3"):
+            raise ValueError(f"알 수 없는 조건: {condition!r}. F0~F3")
+        reg = registry if registry is not None else self.registry
+        if condition == "F0":
+            block = ("## 이미 있는 피처\n\n**없습니다.** 처음부터 만드세요.")
+        elif condition == "F1":
+            block = ("## 이미 있는 피처\n\n**없습니다.** 위 원시 값만으로 "
+                     "물리량을 유도하세요.\n\n★ 이것이 이 조건의 요점입니다 "
+                     "— 파생량을 스스로 만들 수 있는지를 봅니다.")
+        else:
+            if reg is None:
+                raise ValueError(f"조건 {condition} 은 레지스트리가 필요하다")
+            block = ("## 이미 있는 피처 — **중복되면 폐기됩니다**\n\n"
+                     + render_features(reg, include_observed=False))
+        return load_prompt("feature.md").format(
+            field_block=field_block(), feature_block=block,
+            task_block=task or ("## 이번에 만들 것\n\n피처 하나를 제안하세요."))
 
     # -- 진입점 -----------------------------------------------------------
     def complete(self, role: str, prompt: str, **kw):

@@ -146,3 +146,50 @@ def test_shape_features_ignore_config(synth_table, matrix):
     for f in REGISTRY.items(shape_level=True):
         vals = {float(f.fn(p, matrix.hw, c)) for c in cfgs[:40]}
         assert len(vals) == 1, f"{f.name} 이 config 마다 다른 값을 낸다: {vals}"
+
+
+# ---------------------------------------------------------------------------
+# 생성 피처의 하드웨어 사용 판정 (D-37)
+# ---------------------------------------------------------------------------
+# `exec` 로 만든 함수는 `inspect.getsource` 가 OSError 를 낸다. 그때 "hw 를
+# 쓴다" 로 떨어지면 스케일 불변성 검사가 **하드웨어 무관 정상 피처를 전부
+# 기각한다.** F1 첫 실행에서 실제로 그렇게 버려졌다.
+
+_NO_HW = ("def tile_aspect(p, hw, cfg) -> float:\n"
+          "    a = float(cfg.tile_m)\n"
+          "    b = max(1.0, float(cfg.tile_n))\n"
+          "    return abs(a - b) / (a + b)\n")
+_USES_HW = ("def per_sm(p, hw, cfg) -> float:\n"
+            "    return float(p.M) / max(1.0, float(hw.sm_count))\n")
+
+
+def _gen(code):
+    from kernelrule.features import Feature
+    from kernelrule.features.generated import compile_feature
+    name, fn = compile_feature(code, known=frozenset())
+    return Feature(name=name, fn=fn, unit="dimensionless",
+                   expected_range=(0.0, 1.0), direction="neutral",
+                   source=code)
+
+
+@pytest.mark.parametrize("code,expected", [(_NO_HW, False), (_USES_HW, True)])
+def test_generated_feature_hardware_usage_is_read_from_source(code, expected):
+    from kernelrule.features.validate import _uses_hardware
+    assert _uses_hardware(_gen(code)) is expected
+
+
+def test_unreadable_source_raises_instead_of_guessing():
+    """★ 소스를 못 읽으면 **판단하지 않는다** (§26.4).
+
+    `True` 로 떨어지는 것은 "hw 를 쓴다" 는 주장이고, 그 주장이 틀리면
+    정상 피처를 기각한다.
+    """
+    from kernelrule.features import Feature
+    from kernelrule.features.generated import compile_feature
+    from kernelrule.features.validate import _uses_hardware
+
+    name, fn = compile_feature(_NO_HW, known=frozenset())
+    f = Feature(name=name, fn=fn, unit="dimensionless",
+                expected_range=(0.0, 1.0), direction="neutral")  # source 없음
+    with pytest.raises(ValueError, match="소스를 읽을 수 없어"):
+        _uses_hardware(f)

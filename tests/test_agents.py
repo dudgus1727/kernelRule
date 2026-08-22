@@ -1,6 +1,8 @@
 """MockLLM 과 스키마 경계 (§24, §11.7)."""
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pytest
 
@@ -283,3 +285,51 @@ def test_changes_is_optional():
     out = S.RuleOutput(code="def score(f, p, hw, w):\n    return f.waves*w[0]",
                        w0=[1.0])
     assert out.changes == ""
+
+
+# ---------------------------------------------------------------------------
+# FeatureWriter — F0~F3 조건 (§11.4)
+# ---------------------------------------------------------------------------
+# 근본 질문은 "LLM 이 물리량을 **만들** 수 있나" 다. 그러려면 조건마다
+# 무엇을 주는지가 엄밀해야 한다 — F1 에 기존 피처 이름이 하나라도 새면
+# 그 실험은 "조합만 했나" 를 다시 물은 것이 된다.
+
+def _feat_client():
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.features import REGISTRY
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    return OpenAILLM(LLMConfig(model="m"), feature_names=[], shape_values=[],
+                     registry=REGISTRY, cache=False), REGISTRY
+
+
+@pytest.mark.parametrize("cond", ["F0", "F1"])
+def test_f0_f1_leak_no_existing_feature_name(cond):
+    """★ 원시 값 조건에 기존 피처 이름이 들어가면 안 된다."""
+    c, reg = _feat_client()
+    text = c._feature_prompt(condition=cond)
+    leaked = [n for n in reg._items if n in text]
+    assert not leaked, f"{cond} 프롬프트에 기존 피처가 샜다: {leaked}"
+
+
+def test_f3_shows_the_existing_features():
+    c, reg = _feat_client()
+    text = c._feature_prompt(condition="F3")
+    assert "tail_waste" in text and "has_spill" in text
+
+
+def test_unknown_condition_is_rejected():
+    c, _ = _feat_client()
+    with pytest.raises(ValueError, match="F0~F3"):
+        c._feature_prompt(condition="F9")
+
+
+def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
+    """D-35 — 형태 예시가 실제 피처를 건네주면 안 된다."""
+    from kernelrule.agents.openai_client import load_prompt
+    from kernelrule.features import REGISTRY
+    body = load_prompt("feature.md")
+    start = body.index("```python")
+    example = body[start:body.index("```", start + 3)]
+    leaked = [n for n in REGISTRY._items if n in example]
+    assert not leaked, f"형태 예시가 실제 피처를 담고 있다: {leaked}"
