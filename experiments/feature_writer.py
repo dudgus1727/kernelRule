@@ -64,9 +64,16 @@ RHO = 0.95
 
 
 def _alt_hw(hw):
-    """스케일 불변성 검사용 가짜 하드웨어. 상수를 하드코딩한 피처를 잡는다."""
+    """스케일 불변성 검사용 가짜 하드웨어.
+
+    ★ **모든 수치 필드를 바꾼다.** 하나라도 그대로 두면 그것에 물린 피처가
+    "hw 를 안 쓴다" 로 오판된다. 실제로 `max_threads_per_sm` 을 안 바꿔서
+    occupancy 피처가 16회 연속 기각됐다 — `min(by_threads, ...)` 이 그
+    항에 물려 값이 안 변했기 때문이다 (D-38).
+    """
     return replace(hw, sm_count=hw.sm_count * 2 + 3,
                    smem_per_block=int(hw.smem_per_block * 0.7),
+                   max_threads_per_sm=int(hw.max_threads_per_sm * 1.33),
                    peak_tflops_f16=hw.peak_tflops_f16 * 1.6,
                    bandwidth_gbps=hw.bandwidth_gbps * 0.8,
                    regs_per_sm=int(hw.regs_per_sm * 1.5),
@@ -113,11 +120,21 @@ def main(n_proposals: int = 20, condition: str = "F1",
     ref_cols = _reference_columns(table, matrix, FeatureRegistry("empty"))
 
     t0 = time.perf_counter()
+    failures: list[tuple[str, str]] = []
     for i in range(n_proposals):
         made = sorted(gen._items)
+        # ★ 실패를 되먹인다. 안 주면 **같은 제안을 반복한다** — 첫 실행에서
+        #   20회 중 16회가 같은 피처였다 (D-38). 132/240 재시도 소진과 같은
+        #   병이다: 무엇이 틀렸는지 모르면 고칠 수 없다.
+        recent = ""
+        if failures:
+            lines = "\n".join(f"- `{n}` — {e}" for n, e in failures[-5:])
+            recent = ("\n\n## ★ 방금 거부된 것들 — 같은 것을 다시 내지 "
+                      f"마세요\n\n{lines}\n\n거부 사유를 읽고 **다른 축**을 "
+                      "찾거나, 같은 축이면 그 사유를 고쳐서 내세요.")
         task = ("## 이번에 만들 것\n\n피처 하나를 제안하세요."
                 + (f"\n\n지금까지 만든 것: {made}\n**이것들과 다른 축**을 "
-                   "찾으세요." if made else ""))
+                   "찾으세요." if made else "") + recent)
         row: dict = {"i": i}
         try:
             out = llm.complete("feature", "", condition=condition, task=task,
@@ -131,10 +148,11 @@ def main(n_proposals: int = 20, condition: str = "F1",
                 others=ref_cols | _reference_columns(
                     table, matrix, gen) if gen._items else ref_cols)
             row["accepted"] = True
-            print(f"  #{i:02d}  ✓ {f.name:28s} {f.expected_range}")
+            print(f"  #{i:02d}  ✓ {f.name:28s} {f.expected_range}", flush=True)
         except FeatureRejected as e:
             row |= {"accepted": False, "error": str(e)}
-            print(f"  #{i:02d}  ✗ {str(e)[:80]}")
+            failures.append((str(row.get("name") or "?"), str(e)[:180]))
+            print(f"  #{i:02d}  ✗ {str(e)[:80]}", flush=True)
         except Exception as e:                              # noqa: BLE001
             row |= {"accepted": False, "error": f"{type(e).__name__}: {e}"}
             print(f"  #{i:02d}  ! {type(e).__name__}: {str(e)[:70]}")
