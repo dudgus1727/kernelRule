@@ -91,7 +91,12 @@ def main() -> None:
             ranks = np.zeros(len(cand.tiebreak), dtype=float)
             for fn, ws in fitted:
                 sc = make_score_of(fn, matrix, ws[reg])(p, cand)
-                ranks += np.argsort(np.argsort(sc)).astype(float)
+                # ★ **동률을 보존하는** 순위여야 한다. `argsort(argsort(x))`
+                #   는 같은 점수에 서로 다른 순위를 주고, 그 순서는 배열
+                #   인덱스가 정한다 — 그러면 `top_k` 의 정준 tie-break 이
+                #   무력화된다 (§30.7: 29/66 형상이 최적에서 동률이다).
+                #   실제로 k=1 앙상블이 단일 규칙과 0.009 달라졌다.
+                ranks += np.unique(sc, return_inverse=True)[1].astype(float)
             pick = cand.top_k(ranks, 1)[0]
             t = table.times_of(p)
             regs.append(float(t[pick] / t.min()))
