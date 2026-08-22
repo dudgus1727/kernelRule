@@ -67,7 +67,8 @@ def _arch_seed():
     return best["code"], best["w"]
 
 
-def main(rounds: int = 12, n_seeds: int = 3) -> None:
+def main(rounds: int = 12, n_seeds: int = 3, *, only: str = "",
+         tag: str = "") -> None:
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
 
@@ -98,9 +99,13 @@ def main(rounds: int = 12, n_seeds: int = 3) -> None:
     print("  ★ 리포트는 전부 정화판 (TableFacts, 학습 분할에서만) — D-28\n")
 
     t0 = time.perf_counter()
+    if only:
+        conditions = [c for c in conditions if c[0] == only]
+        if not conditions:
+            raise SystemExit(f"알 수 없는 조건: {only!r}")
     for name, code, w0 in conditions:
         for s in range(n_seeds):
-            run_id = f"seedabl-{name}-s{s}"
+            run_id = f"seedabl{tag}-{name}-s{s}"
             if (Path("runs") / run_id / "archive.jsonl").exists():
                 print(f"  [{run_id}] 이미 있다. 건너뛴다")
                 continue
@@ -132,4 +137,6 @@ def main(rounds: int = 12, n_seeds: int = 3) -> None:
 
 if __name__ == "__main__":
     main(int(sys.argv[1]) if len(sys.argv) > 1 else 12,
-         int(sys.argv[2]) if len(sys.argv) > 2 else 3)
+         int(sys.argv[2]) if len(sys.argv) > 2 else 3,
+         only=sys.argv[3] if len(sys.argv) > 3 else "",
+         tag=sys.argv[4] if len(sys.argv) > 4 else "")
