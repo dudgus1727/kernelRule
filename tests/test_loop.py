@@ -98,7 +98,7 @@ def test_llm_call_budget_matches_the_design(loop):
     for i, r in enumerate(loop.rounds):
         assert r.llm_calls["optimize"] == loop.cfg.n_rules_per_round
         # 1라운드는 아카이브가 비어 진단을 건너뛴다
-        assert r.llm_calls["diagnose"] == (0 if i == 0 else 1)
+        assert r.llm_calls["analyze"] == (0 if i == 0 else 1)
 
 
 def test_adversarial_mode_scores_nothing(synth_table, tmp_path):

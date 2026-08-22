@@ -191,9 +191,9 @@ class OpenAILLM:
         from pydantic_ai import Agent
         from pydantic_ai.models.openai import OpenAIChatModel
 
-        from kernelrule.agents.schemas import DiagnosisOutput, RuleOutput
+        from kernelrule.agents.schemas import AnalysisOutput, RuleOutput
 
-        out = {"diagnose": DiagnosisOutput, "optimize": RuleOutput,
+        out = {"analyze": AnalysisOutput, "optimize": RuleOutput,
                "architect": RuleOutput}[role]
         role_md = load_prompt(f"{role}.md")
         # ★ 두 층으로 나뉜다: [고정] 역할·제약  +  [주입] 하드웨어 사실
@@ -216,7 +216,7 @@ class OpenAILLM:
         fl, sl = self._feature_block()
         if role == "architect":
             return self._architect_prompt(**kw)
-        if role == "diagnose":
+        if role == "analyze":
             return (prompt + "\n\n---\n\n## 등록된 피처\n\n"
                     f"### config 수준 (`f.<이름>`)\n\n{fl}\n\n"
                     f"### 형상 수준 (`p.<이름>`)\n\n{sl}\n")

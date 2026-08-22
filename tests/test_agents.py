@@ -140,7 +140,7 @@ def test_diagnose_reads_the_unused_column():
     report = ("is_two_stage       1.0   0.0  ★ 미사용\n"
               "log_workspace_bytes 22.0 0.0  ★ 미사용\n"
               "split_k_cost       0.5   0.0  사용 중\n")
-    out = m.complete("diagnose", report)
+    out = m.complete("analyze", report)
     names = [h["measurable_with"][0] for h in out["hypotheses"]]
     assert "is_two_stage" in names and "log_workspace_bytes" in names
     assert "split_k_cost" not in names
@@ -196,11 +196,11 @@ def test_hypothesis_count_desc_and_validator_share_one_constant():
     from kernelrule.agents import schemas as S
     if not S.HAVE_PYDANTIC:
         pytest.skip("pydantic 없음")
-    desc = S.DiagnosisOutput.model_fields["hypotheses"].description
+    desc = S.AnalysisOutput.model_fields["hypotheses"].description
     assert f"{S.N_HYP_MIN}~{S.N_HYP_MAX}" in desc
 
     def mk(n):
-        return S.DiagnosisOutput(hypotheses=[{"claim": f"가설 {i}"}
+        return S.AnalysisOutput(hypotheses=[{"claim": f"가설 {i}"}
                                              for i in range(n)])
 
     mk(S.N_HYP_MIN)                                   # 하한은 통과
@@ -268,7 +268,7 @@ def test_banned_check_never_skips_on_tokenize_failure():
 
 def test_missing_pydantic_fails_loudly():
     from kernelrule.agents.schemas import _NoPydantic
-    stub = _NoPydantic("DiagnosisOutput")
+    stub = _NoPydantic("AnalysisOutput")
     with pytest.raises(ImportError, match="비활성화된 상태"):
         stub()
     with pytest.raises(ImportError, match="비활성화된 상태"):

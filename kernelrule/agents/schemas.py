@@ -21,7 +21,7 @@ from kernelrule.rules.checks import (
     weight_reuse_message,
 )
 
-__all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "AuditVerdict",
+__all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "CritiqueOutput",
            "RuleProposal", "SchemaViolation", "validate_rule_proposal",
            "HAVE_PYDANTIC", "check_banned", "MAX_WEIGHTS",
            "N_HYP_MIN", "N_HYP_MAX"]
@@ -44,7 +44,7 @@ class SchemaViolation(ValueError):
 class _NoPydantic:
     """Pydantic 부재를 **쓰려는 순간** 알린다 (§26.4 / 4-5).
 
-    전에는 `DiagnosisOutput = None` 이었다. `output_type=None` 을 Pydantic AI
+    전에는 `AnalysisOutput = None` 이었다. `output_type=None` 을 Pydantic AI
     에 넘기면 저 아래에서 `AttributeError` 가 나고, 그 메시지만 보고는
     **검증이 통째로 꺼졌다는 사실을 못 읽는다.** 조용히 나쁜 상태로 굴러가지
     않는다.
@@ -150,7 +150,7 @@ class FeatureProposal:
 
 
 @dataclass
-class AuditVerdict:
+class CritiqueOutput:
     """★ 결함을 못 찾으면 **물리량을 한 문장으로** 쓰게 한다 (§11.5).
 
     설명을 못 쓰면 그 자체가 거부 신호다.
@@ -259,7 +259,7 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
                     "가설에 코드를 쓰지 마라. 자연어 문장이어야 한다 (§11.3)")
             return v
 
-    class DiagnosisOutput(BaseModel):
+    class AnalysisOutput(BaseModel):
         hypotheses: list[HypothesisOut] = Field(
             description=f"{N_HYP_MIN}~{N_HYP_MAX}개. 서로 다른 실패 모드를 "
                         "다뤄라")
@@ -351,7 +351,7 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         expected_range: tuple[float, float] = (0.0, 1.0)
         direction: str = "higher_is_worse"
 
-    class AuditOutput(BaseModel):
+    class CritiqueOutput(BaseModel):
         has_defect: bool
         defects: list[str] = Field(default_factory=list)
         measures_what: str = Field(
@@ -360,10 +360,10 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         confidence: float = 0.5
 
 else:                                               # pragma: no cover
-    DiagnosisOutput = _NoPydantic("DiagnosisOutput")
+    AnalysisOutput = _NoPydantic("AnalysisOutput")
     RuleOutput = _NoPydantic("RuleOutput")
     FeatureOutput = _NoPydantic("FeatureOutput")
-    AuditOutput = _NoPydantic("AuditOutput")
+    CritiqueOutput = _NoPydantic("CritiqueOutput")
     HypothesisOut = _NoPydantic("HypothesisOut")
 
 

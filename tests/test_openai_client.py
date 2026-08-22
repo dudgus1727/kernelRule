@@ -76,7 +76,7 @@ def test_estimate_requires_confirmation():
 # 프롬프트 — 두 층 (§11.2)
 # ---------------------------------------------------------------------------
 def test_prompts_exist():
-    for n in ("_common.md", "diagnose.md", "optimize.md", "hw/sm_86.md"):
+    for n in ("_common.md", "analyze.md", "optimize.md", "hw/sm_86.md"):
         assert load_prompt(n).strip()
 
 
@@ -116,7 +116,7 @@ def test_optimize_prompt_formats(client):
 
 
 def test_diagnose_prompt_carries_the_report(client):
-    p = client._user_prompt("diagnose", "REPORT-BODY-MARKER")
+    p = client._user_prompt("analyze", "REPORT-BODY-MARKER")
     assert "REPORT-BODY-MARKER" in p
     assert "traffic_amplification" in p
 

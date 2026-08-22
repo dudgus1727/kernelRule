@@ -231,7 +231,7 @@ class RoundLoop:
         t0 = time.perf_counter()
         r = len(self.rounds)
         res = RoundResult(round=r)
-        calls = {"diagnose": 0, "optimize": 0, "instrument": 0, "audit": 0}
+        calls = {"analyze": 0, "optimize": 0, "feature": 0, "critique": 0}
 
         # 1~2. 진단 리포트 -> 가설
         hyps: list[dict] = []
@@ -244,8 +244,8 @@ class RoundLoop:
                 table_facts=self.table_facts, failures=self.failures[-20:],
                 hypotheses_applied=[h["claim"][:70]
                                     for h in self.hypotheses[-3:]])
-            out = self.llm.complete("diagnose", rep.render())
-            calls["diagnose"] += 1
+            out = self.llm.complete("analyze", rep.render())
+            calls["analyze"] += 1
             hyps = list((out or {}).get("hypotheses", []))
             # 가설에 id 를 붙인다. Optimizer 프롬프트와 계보 추적에 쓰인다.
             for j, h in enumerate(hyps):

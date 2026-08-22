@@ -44,7 +44,10 @@ from kernelrule.rules.physics_seeded import W0 as PS_W0
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
 CONDS = [("가-architect", "Architect 씨앗"), ("나-physics", "physics 씨앗"),
-         ("다-noseed", "씨앗 없음")]
+         ("다-noseed", "씨앗 없음"),
+         # (나') — 프롬프트 상수를 뺀 뒤 같은 조건 (§12.3b). 차이가 곧
+         # "그 누출이 얼마나 도움이 됐는가" 다.
+         ("clean-나-physics", "physics 씨앗(정화)")]
 
 
 def main() -> None:

@@ -241,13 +241,13 @@ class MockLLM:
         return resp
 
     def _generate(self, role: str, prompt: str, **kw) -> Any:
-        if role == "diagnose":
+        if role == "analyze":
             return self._diagnose(prompt)
         if role == "optimize":
             return self._optimize(prompt, **kw)
-        if role == "instrument":
+        if role == "feature":
             return None          # 이 목은 피처를 만들지 않는다
-        if role == "audit":
+        if role == "critique":
             return {"has_defect": False, "measures_what": "(mock)",
                     "confidence": 0.5}
         raise ValueError(f"알 수 없는 역할: {role!r}")
