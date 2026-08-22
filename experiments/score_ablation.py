@@ -47,7 +47,10 @@ CONDS = [("가-architect", "Architect 씨앗"), ("나-physics", "physics 씨앗"
          ("다-noseed", "씨앗 없음"),
          # (나') — 프롬프트 상수를 뺀 뒤 같은 조건 (§12.3b). 차이가 곧
          # "그 누출이 얼마나 도움이 됐는가" 다.
-         ("clean-나-physics", "physics 씨앗(정화)")]
+         ("clean-나-physics", "physics 씨앗(정화)"),
+         # 피처의 물리적 정의를 Optimizer 에게도 준 뒤 (D-34). (다)와의
+         # 차이가 "설명이 실제로 기여했나" 의 측정이다.
+         ("desc-다-noseed", "씨앗 없음(설명)")]
 
 
 def main() -> None:
