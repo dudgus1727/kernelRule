@@ -208,18 +208,37 @@ class OpenAILLM:
         return a
 
     # -- 프롬프트 조립 ----------------------------------------------------
-    def _feature_block(self) -> tuple[str, str]:
-        return ("\n".join(f"- `{n}`" for n in self.features),
-                "\n".join(f"- `{n}`" for n in self.shape_values))
+    def _feature_block(self) -> str:
+        """★ **모든 역할이 같은 렌더러를 쓴다** (§11.2 / D-34).
+
+        전에는 Architect 만 `render_features()` 로 범위와 물리적 정의를 받고,
+        Optimizer 와 Analyst 는 **이름 목록**만 받았다. 진화 루프의 LLM 이
+        `has_spill` 이 무엇을 재는지 모르는 채로 항을 골랐고, 그래서 비용
+        없는 가지치기를 놓쳤다 (`artifacts/spill-term.md`).
+
+        두 경로를 남겨두면 다시 갈린다. `_feature_block` 을 이쪽으로 흡수해
+        **출처를 하나로** 만든다.
+
+        ⚠️ 하드웨어 상수(SM 84, smem 99KB, ridge)는 주지 않는다. 피처가 이미
+        흡수했고, 안 보면 이 프롬프트가 **GPU 무관**해져 새 GPU 에 그대로
+        쓸 수 있다 (§16.2).
+        """
+        from kernelrule.features import render_features
+
+        if self.registry is None:
+            # 레지스트리가 없으면 이름만 — 그리고 **그 사실을 말한다** (§26.4)
+            names = "\n".join(f"- `{n}`" for n in self.features)
+            svals = "\n".join(f"- `{n}`" for n in self.shape_values)
+            return ("⚠️ 피처의 물리적 정의를 불러오지 못했다 (registry 없음). "
+                    f"이름만 있다.\n\n{names}\n\n{svals}")
+        return render_features(self.registry, include_observed=False)
 
     def _user_prompt(self, role: str, prompt: str, **kw) -> str:
-        fl, sl = self._feature_block()
+        fl = self._feature_block()
         if role == "architect":
             return self._architect_prompt(**kw)
         if role == "analyze":
-            return (prompt + "\n\n---\n\n## 등록된 피처\n\n"
-                    f"### config 수준 (`f.<이름>`)\n\n{fl}\n\n"
-                    f"### 형상 수준 (`p.<이름>`)\n\n{sl}\n")
+            return prompt + "\n\n---\n\n## 등록된 피처\n\n" + fl + "\n"
         parent = kw.get("parent")
         hyp = kw.get("hypothesis") or {}
         applied = kw.get("hypotheses_applied") or []
@@ -238,7 +257,7 @@ class OpenAILLM:
         body = load_prompt("optimize.md")
         return body.format(
             n_terms=n_terms, n_weights=n_w, budget_note=note,
-            feature_list=fl, shape_value_list=sl,
+            feature_block=fl,
             hypotheses_applied=("\n".join(f"- {h}" for h in applied)
                                 or "(아직 없음 — 첫 라운드다)"),
             hypothesis=(json.dumps(hyp, ensure_ascii=False, indent=1)

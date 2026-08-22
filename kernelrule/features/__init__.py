@@ -129,6 +129,25 @@ class FeatureRegistry:
         self._items[f.name] = f
         return f
 
+    def annotate(self, name: str, *, physical_meaning: str = "",
+                 expected_range: tuple[float, float] | None = None) -> None:
+        """설명과 범위를 **나중에** 붙인다. 데코레이터를 어지럽히지 않는다.
+
+        24개 피처의 "왜 성능을 좌우하는가" 를 한 곳에서 검토할 수 있어야
+        빠진 것이 보인다. 데코레이터에 흩어 놓으면 `has_spill` 만 고치고
+        나머지를 놓친다 — 실제로 그렇게 됐다.
+
+        ⚠️ **표에서 관측한 것을 여기 넣지 마라** (§12.3b). "왜 느린가" 는
+        물리이고 "이 표에서 몇 번" 은 관측이다.
+        """
+        f = self[name]
+        d = dict(f.__dict__)
+        if physical_meaning:
+            d["physical_meaning"] = physical_meaning
+        if expected_range is not None:
+            d["expected_range"] = tuple(expected_range)
+        self._items[name] = Feature(**d)
+
     def deprecate(self, name: str, *, at_round: int, reason: str) -> None:
         f = self[name]
         self._items[name] = Feature(**{**f.__dict__,

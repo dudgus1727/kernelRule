@@ -1215,3 +1215,69 @@ kernelTab 에서 같은 교훈을 먼저 겪었다 — 33시간 측정에 백업
 `regime_transfer` · `proxy_dispatch`)는 **기존 데이터에서 계산만** 하므로
 잃어도 다시 돌리면 된다. 구분선은 "다시 만들 수 있는가" 다 —
 **LLM 호출과 GPU 측정은 다시 만들 수 없다.**
+
+## D-34  프롬프트가 갈리면 역할마다 다른 세계를 본다
+
+`render_features()` 는 Architect 만 썼다. Optimizer 와 Analyst 는
+`_feature_block()` 으로 **이름 목록**만 받았다.
+
+```
+Architect   f.has_spill    [0, 1]    레지스터 스필이 있는가. 0 또는 1.
+Optimizer   - `has_spill`
+```
+
+진화 루프의 LLM 이 **어느 피처가 무엇을 재는지 모르는 채로** 항을 골랐다.
+Architect 에 범위를 안 줬을 때 regret 8.4 가 나온 것과 같은 종류의 구멍이다
+(`artifacts/architect-gate.md`).
+
+**고침.** `_feature_block()` 을 `render_features()` 로 흡수해 출처를 하나로
+만들었다. 두 경로를 남기면 다시 갈린다 — `is_reference()` 통합과 같은 원칙.
+하드웨어 상수는 여전히 안 준다: 피처가 이미 흡수했고, 안 보면 그 프롬프트가
+**GPU 무관**해져 새 GPU 에 그대로 쓸 수 있다 (§16.2).
+
+그리고 `Feature.physical_meaning` 에 **"왜 성능을 좌우하는가"** 를 24개
+전부 넣었다 (`features/physical.py::_PHYSICS`). 데코레이터에 흩어 놓으면
+`has_spill` 만 고치고 나머지를 놓친다.
+
+**선언 범위 두 개가 실제로 틀렸다** (표가 아니라 식에서 나온 정정):
+
+```
+log_grid_tiles  [1, 1e7] -> [0, 24]    log2 를 반환하는데 선형 범위를 선언
+sm_idle_cost    [0, 10]  -> [0, 999]   1/max(1e-3, 1-x)-1 이라 실측이 선언을 넘었다
+```
+
+## D-35  "씨앗 없음" 조건에 씨앗이 들어 있었다 — 출력 형식 예시
+
+`optimize.md` 의 출력 형식 예시가 이것이었다.
+
+```python
+def score(f, p, hw, w):
+    s = np.log2(f.traffic_amplification) * w[0]
+    s = s + f.sm_idle_cost * w[1]
+    s = s + f.has_spill * w[2]
+    if p.is_memory_bound:
+        s = s + np.log2(f.traffic_amplification) * w[3]
+```
+
+**`physics_seeded` 의 축약판이다.** 형식을 보여주려던 것인데 **구조를
+건네준다.**
+
+증거: 아카이브 규칙 중 `has_spill` 을 쓰는 비율
+
+```
+(다) 씨앗 없음        38/38   100%   ← 씨앗이 없는데 전부 쓴다
+(나) physics 씨앗     22/23
+(가) Architect 씨앗    0/17   ← 부모에 없으면 국소 수정으로 되살아나지 않는다
+```
+
+(다)가 100% 인 것은 예시를 베낀 것으로 보인다. **그러면 (다)는 "씨앗
+없음" 이 아니라 "약한 씨앗" 이고**, `artifacts/seed-ablation.md` 의
+(다) 1.1113 은 그 전제로 다시 읽어야 한다.
+
+그리고 (가)의 0/17 이 더 선명해진다 — Optimizer 는 부모를 국소 수정하므로
+**부모에 없는 고가치 항을 새로 들여오지 못한다.** 예시가 있어도 그렇다.
+
+**일반화.** 형식 예시에 실제 이름을 쓰면 그것이 씨앗이 된다. 자리표시자
+(`f.<이름>`)를 쓰거나, 예시가 씨앗임을 인정하고 조건에 넣어라.
+**미적용** — (다) 재실행이 피처 설명 하나만 바꾸는 실험이라 지금 같이
+바꾸면 변수가 둘이 된다.
