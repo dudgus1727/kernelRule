@@ -66,6 +66,16 @@ def main() -> None:
     fast = [p for p in shapes if regime_of(p, table.hw) == "short"]
     slow = [p for p in shapes if regime_of(p, table.hw) == "long"]
 
+    # ★ 진짜 구조 홀드아웃 = 루프가 **한 번도 못 본** 형상 (nk11008 val).
+    #   아래 `thirds` 홀드아웃은 61형상 전체에서 뽑으므로 19 중 11 이 루프의
+    #   학습 형상이다 — 구조는 그것들을 보고 진화했다. **가중치만**
+    #   홀드아웃인 셈이다. 두 숫자를 함께 낸다.
+    held = [p for p in shapes if 11008 in (p.N, p.K)]
+    loop_train = [p for p in shapes if p not in held]
+    st_fit = ([p for p in loop_train if p in fast],
+              [p for p in loop_train if p in slow])
+    st_ev = ([p for p in held if p in fast], [p for p in held if p in slow])
+
     def thirds(g):
         g = sorted(g, key=lambda p: table.frame_for(p).index[0])
         return ([p for i, p in enumerate(g) if i % 3 != 2],
@@ -79,7 +89,8 @@ def main() -> None:
         """체제별 적합 -> (표본내61, 홀드아웃19, 홀드아웃 regret/tol)."""
         out = {}
         for tag, fits, evals in (("in", [fast, slow], [fast, slow]),
-                                 ("ho", [f_fit, s_fit], [f_ho, s_ho])):
+                                 ("ho", [f_fit, s_fit], [f_ho, s_ho]),
+                                 ("st", list(st_fit), list(st_ev))):
             reg, tol = {}, {}
             for grp, ev_grp in zip(fits, evals, strict=True):
                 fit = fit_weights(compile_rule(code), matrix, table,
@@ -92,19 +103,20 @@ def main() -> None:
             out[tag] = (reg, tol)
         g_in = geomean(np.array([out["in"][0][p] for p in shapes]))
         g_ho = geomean(np.array([out["ho"][0][p] for p in holdout]))
-        return g_in, g_ho, out["ho"]
+        g_st = geomean(np.array([out["st"][0][p] for p in held]))
+        return g_in, g_ho, g_st, out["st"]
 
     vendor = load_vendor(VENDOR)
     v_all = evaluate(vendor_order_fn(table, vendor, mapping="nearest"),
                      table, shapes, ks=(1,))
     v_ho = evaluate(vendor_order_fn(table, vendor, mapping="nearest"),
-                    table, holdout, ks=(1,))
+                    table, held, ks=(1,))
 
     print("=" * 78)
     print("씨앗 절제 — 정준 절차 채점 (체제별 적합, 61형상 결합)")
     print("=" * 78)
-    print(f"  {'조건':16s} {'시드':>4} {'train(41)':>10} {'표본내61':>9} "
-          f"{'★홀드아웃':>10} {'라운드':>6}")
+    print(f"  {'조건':16s} {'시드':>4} {'표본내61':>9} {'가중치HO':>10} "
+          f"{'★구조HO(20)':>12} {'라운드':>6}")
 
     rows: dict[str, list] = {}
     trajectories: dict[str, list] = {}
@@ -124,42 +136,42 @@ def main() -> None:
                 rds = [json.loads(ln) for ln in fh if ln.strip()]
             n_r = len(rds)
             try:
-                g_in, g_ho, ho = canonical(best["code"], best["w"])
+                g_in, g_ho, g_st, ho = canonical(best["code"], best["w"])
             except Exception as exc:                        # noqa: BLE001
                 print(f"  {label:16s} {s:4d}  실패 {type(exc).__name__}")
                 continue
-            rows.setdefault(label, []).append((g_in, g_ho, ho))
+            rows.setdefault(label, []).append((g_in, g_ho, g_st, ho))
             trajectories.setdefault(label, []).append(
                 [r["best_regret"] for r in sorted(rds, key=lambda r: r["round"])])
-            print(f"  {label:16s} {s:4d} {best['regret']:10.4f} "
-                  f"{g_in:9.4f} {g_ho:10.4f} {n_r:6d}")
+            print(f"  {label:16s} {s:4d} {g_in:9.4f} {g_ho:10.4f} "
+                  f"{g_st:12.4f} {n_r:6d}")
 
-    print(f"\n  {'조건':16s} {'표본내61 중앙':>13} {'최악':>8}   "
-          f"{'★홀드아웃 중앙':>14} {'최악':>8}")
+    print(f"\n  {'조건':16s} {'표본내61':>9} {'최악':>8}  "
+          f"{'★구조HO(20)':>11} {'최악':>8}")
     for label, rs in rows.items():
         ins = sorted(r[0] for r in rs)
-        hos = sorted(r[1] for r in rs)
-        print(f"  {label:16s} {ins[len(ins) // 2]:13.4f} {ins[-1]:8.4f}   "
-              f"{hos[len(hos) // 2]:14.4f} {hos[-1]:8.4f}")
-    print(f"  {'벤더 nearest':16s} {v_all.at(1):13.4f} {'':8s}   "
-          f"{v_ho.at(1):14.4f}")
-    g_ps, h_ps, _ = canonical(PS, PS_W0)
-    print(f"  {'physics_seeded':16s} {g_ps:13.4f} {'':8s}   {h_ps:14.4f}")
-    print("  ★ 기존 evolved (오염 리포트, mini)  표본내 1.0652 / 홀드아웃 1.0628")
+        sts = sorted(r[2] for r in rs)
+        print(f"  {label:16s} {ins[len(ins) // 2]:9.4f} {ins[-1]:8.4f}  "
+              f"{sts[len(sts) // 2]:11.4f} {sts[-1]:8.4f}")
+    print(f"  {'벤더 nearest':16s} {v_all.at(1):9.4f} {'':8s}  "
+          f"{v_ho.at(1):11.4f}")
+    g_ps, _, h_ps, _ = canonical(PS, PS_W0)
+    print(f"  {'physics_seeded':16s} {g_ps:9.4f} {'':8s}  {h_ps:11.4f}")
+    print("  ※ 기존 evolved(오염,mini)는 분할이 달라 여기 넣지 않는다 (D-31)")
 
     # -- 유의성 — 조건별 중앙 시드 -----------------------------------------
     print(f"\n{'=' * 78}")
-    print("유의성 — 홀드아웃 19형상, 조건별 **중앙** 시드")
+    print("유의성 — ★ 구조 홀드아웃 20형상(nk11008), 조건별 **중앙** 시드")
     print("=" * 78)
     base = evaluate_scores(make_score_of(compile_rule(PS), matrix,
                                          np.ones(len(PS_W0))),
-                           table, holdout, ks=(1,))
+                           table, held, ks=(1,))
     for label, rs in rows.items():
-        mid = sorted(rs, key=lambda r: r[1])[len(rs) // 2]
-        reg, tol = mid[2]
+        mid = sorted(rs, key=lambda r: r[2])[len(rs) // 2]
+        reg, tol = mid[3]
         ev = replace(base,
-                     regret=np.array([reg[p] for p in holdout]).reshape(-1, 1),
-                     tol=np.array([tol[p] for p in holdout]), label=label)
+                     regret=np.array([reg[p] for p in held]).reshape(-1, 1),
+                     tol=np.array([tol[p] for p in held]), label=label)
         c = compare(ev, v_ho, table, name_a="A", name_b="벤더")
         print(f"  {label:16s} {c.geo_a:.4f} vs {c.geo_b:.4f}   "
               f"이김 {int(c.a_wins.sum()):2d} / 짐 {int(c.a_loses.sum()):2d}"
