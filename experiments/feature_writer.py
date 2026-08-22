@@ -116,8 +116,16 @@ def main(n_proposals: int = 20, condition: str = "F1",
           if condition in ("F0", "F1") else "  기존 피처를 보여준다")
     print()
 
-    # ★ 사람이 쓴 24개의 기준 열은 바뀌지 않는다. 한 번만 만든다.
+    # ★ 기준 열을 **누적**한다. 전에는 채택할 때마다 생성 레지스트리 전체로
+    #   FeatureMatrix 를 다시 만들어서 제안당 40초 -> 4분이 됐다 (O(n²)).
+    #   새 피처의 열만 한 번 계산해 합친다.
     ref_cols = _reference_columns(table, matrix, FeatureRegistry("empty"))
+
+    def _add_columns(f) -> None:
+        one = FeatureRegistry(f"col-{f.name}")
+        one.add(f)
+        ref_cols.update(_reference_columns(table, FeatureMatrix(table, one),
+                                           FeatureRegistry("empty")))
 
     t0 = time.perf_counter()
     failures: list[tuple[str, str]] = []
@@ -142,11 +150,10 @@ def main(n_proposals: int = 20, condition: str = "F1",
             row |= {k: out.get(k) for k in
                     ("name", "code", "rationale", "unit", "expected_range",
                      "direction")}
-            f = register_generated(
-                out["code"], registry=gen, meta=out, table=table,
-                matrix=matrix, hw_alt=hw_alt,
-                others=ref_cols | _reference_columns(
-                    table, matrix, gen) if gen._items else ref_cols)
+            f = register_generated(out["code"], registry=gen, meta=out,
+                                   table=table, matrix=matrix, hw_alt=hw_alt,
+                                   others=ref_cols)
+            _add_columns(f)
             row["accepted"] = True
             print(f"  #{i:02d}  ✓ {f.name:28s} {f.expected_range}", flush=True)
         except FeatureRejected as e:
