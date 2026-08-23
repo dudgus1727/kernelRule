@@ -337,3 +337,45 @@ def test_loop_warns_when_train_has_one_regime(synth_table, tmp_path):
     with pytest.warns(UserWarning, match="한 크기 체제"):
         RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
                   llm=llm)
+
+
+# ---------------------------------------------------------------------------
+# LLM 전송 실패를 스키마 거부와 가른다 (D-43)
+# ---------------------------------------------------------------------------
+# HTTP 429(크레딧 소진)가 "거부 스키마 144건" 으로 집계됐다. 인프라 실패가
+# 로그에서 **모델의 실패로 보인다** — D-39 와 같은 부류다.
+
+@pytest.mark.parametrize("exc,transport", [
+    (RuntimeError("status_code: 429, body: You have no credits remaining"), True),
+    (RuntimeError("invalid_api_key"), True),
+    (ConnectionError("connection reset"), False),
+    (ValueError("Exceeded maximum output retries (3)"), False),
+    (ValueError("가중치를 여러 항에 재사용했다"), False),
+])
+def test_transport_errors_are_told_apart(exc, transport):
+    from kernelrule.core.loop import _is_transport_error
+    assert _is_transport_error(exc) is transport
+
+
+def test_named_transport_exceptions_are_caught():
+    from kernelrule.core.loop import _is_transport_error
+
+    class ModelHTTPError(Exception):
+        pass
+
+    class APIConnectionError(Exception):
+        pass
+
+    for cls in (ModelHTTPError, APIConnectionError):
+        assert _is_transport_error(cls("무관한 본문"))
+
+
+def test_round_of_total_transport_failure_stops_the_run():
+    """★ 크레딧 문제는 저절로 낫지 않는다. 남은 라운드를 태우지 않는다."""
+    from kernelrule.core.loop import LLMUnreachable, RoundResult
+
+    res = RoundResult(round=0, n_proposed=12, n_llm_error=12)
+    res.rejections.append(("llm-transport", "429 no credits"))
+    assert res.n_llm_error == res.n_proposed
+    assert "★LLM오류 12" in res.line()
+    assert issubclass(LLMUnreachable, RuntimeError)

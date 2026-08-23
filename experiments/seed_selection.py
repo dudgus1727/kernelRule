@@ -118,6 +118,11 @@ def main(n_seeds: int = 6, seed_base: int = 20260823,
             return None
         with f.open() as fh:
             arc = [json.loads(ln) for ln in fh if ln.strip()]
+        if not arc:
+            # ★ 빈 아카이브는 "나쁜 실행" 이 아니라 **실행이 안 된 것**이다.
+            #   채점에서 조용히 0 으로 넣으면 분포가 오염된다 (§26.4).
+            print(f"  {run_id:16s} ⚠️ 아카이브가 비었다 — 채점에서 제외")
+            return None
         best = min(arc, key=lambda e: e["regret"])
         return canonical_score(best["code"], best["w"], table=table,
                                matrix=matrix, splits=splits)

@@ -49,7 +49,7 @@ from kernelrule.core.weights import FitError, fit_weights, make_score_of
 from kernelrule.report.diagnostic import build_report
 from kernelrule.rules.checks import check_rule
 
-__all__ = ["RoundLoop", "RoundResult", "LoopConfig"]
+__all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 
 
 @dataclass
@@ -65,6 +65,35 @@ class LoopConfig:
     out_dir: str = "runs"
 
 
+class LLMUnreachable(RuntimeError):
+    """LLM 에 닿지 못했다. **모델의 실패가 아니라 우리 문제다** (D-43)."""
+
+
+#: LLM 에 닿지 못한 것을 알아보는 이름들. 크레딧·인증·네트워크 문제이지
+#: 모델의 실패가 아니다 (D-43).
+_TRANSPORT_HINTS = ("HTTPError", "APIError", "APIConnection", "APIStatus",
+                    "Timeout", "RateLimit", "Authentication", "Permission",
+                    "ConnectError", "ReadError", "ServiceUnavailable")
+#: 본문에 이것이 있으면 확실하다.
+_TRANSPORT_BODY = ("no credits", "insufficient_quota", "invalid_api_key",
+                   "401", "402", "403", "429", "500", "502", "503")
+
+
+def _is_transport_error(exc: BaseException) -> bool:
+    """LLM 에 **닿지 못한** 것인가, 모델이 스키마를 못 맞춘 것인가."""
+    name = type(exc).__name__
+    if any(h in name for h in _TRANSPORT_HINTS):
+        return True
+    text = str(exc).lower()
+    return any(h in text for h in _TRANSPORT_BODY)
+
+
+#: 한 라운드의 제안이 **전부** 전송 실패면 멈춘다. 크레딧이나 인증 문제는
+#: 저절로 낫지 않고, 남은 라운드를 태워도 빈 아카이브만 남는다.
+#: 실제로 12라운드 x 48초를 그렇게 썼다.
+STOP_ON_TOTAL_LLM_FAILURE = True
+
+
 #: 검증 격차가 이보다 크면 **체제 전이 실패**로 본다.
 #: 과적합과 다르다 — 항이 3개뿐인 규칙도 이 값을 넘는다 (실측 +4.99).
 VAL_GAP_ALARM = 0.5
@@ -77,6 +106,11 @@ class RoundResult:
     n_rejected_static: int = 0
     n_rejected_sandbox: int = 0
     n_rejected_schema: int = 0
+    #: ★ LLM 에 **닿지 못한** 횟수. 스키마 거부와 섞으면 안 된다 —
+    #: 크레딧 소진·인증 실패·네트워크 오류가 "모델이 나쁜 규칙을 냈다" 로
+    #: 보인다 (D-43). 실제로 429 를 12라운드 동안 "스키마 거부 144건" 으로
+    #: 읽었다.
+    n_llm_error: int = 0
     n_rejected_fit: int = 0
     n_scored: int = 0
     n_accepted: int = 0
@@ -90,15 +124,18 @@ class RoundResult:
     rejections: list[tuple] = field(default_factory=list)
 
     def line(self) -> str:
-        return (f"r{self.round:<3d} 제안 {self.n_proposed:2d} | "
-                f"거부 스키마 {self.n_rejected_schema} 정적 "
-                f"{self.n_rejected_static} 샌드박스 {self.n_rejected_sandbox} "
-                f"적합 {self.n_rejected_fit} | 채점 {self.n_scored:2d} "
-                f"채택 {self.n_accepted:2d} | best {self.best_regret:.4f} "
-                f"val {self.best_val_regret:.4f}"
-                f"({self.val_gap:+.3f}{'!' if self.val_gap > VAL_GAP_ALARM else ' '})"
-                f"| 셀 {self.n_cells:2d} 폭발 {self.n_val_blowups} | "
-                f"{self.seconds:.1f}s")
+        err = f"★LLM오류 {self.n_llm_error} " if self.n_llm_error else ""
+        gap = f"{self.val_gap:+.3f}"
+        alarm = "!" if self.val_gap > VAL_GAP_ALARM else " "
+        return (
+            f"r{self.round:<3d} 제안 {self.n_proposed:2d} | {err}"
+            f"거부 스키마 {self.n_rejected_schema} 정적 "
+            f"{self.n_rejected_static} 샌드박스 {self.n_rejected_sandbox} "
+            f"적합 {self.n_rejected_fit} | 채점 {self.n_scored:2d} "
+            f"채택 {self.n_accepted:2d} | best {self.best_regret:.4f} "
+            f"val {self.best_val_regret:.4f}({gap}{alarm})"
+            f"| 셀 {self.n_cells:2d} 폭발 {self.n_val_blowups} | "
+            f"{self.seconds:.1f}s")
 
 
 class RoundLoop:
@@ -280,10 +317,18 @@ class RoundLoop:
             hyp = req["hypothesis"]
             res.n_proposed += 1
             if isinstance(raw, BaseException):
-                # ★ 재시도 상한을 넘은 것은 **폐기**다. 부분 수용 금지 (§26.4)
-                res.n_rejected_schema += 1
-                res.rejections.append(("llm", (f"{type(raw).__name__}: "
-                                              f"{str(raw)[:70]}")))
+                # ★ 두 가지를 가른다 (D-43).
+                #   전송 실패   크레딧·인증·네트워크. **우리 문제**다
+                #   재시도 소진  모델이 스키마를 못 맞춘 것. 폐기다 (§26.4)
+                #   섞으면 "모델이 나쁜 규칙을 냈다" 로 읽힌다.
+                if _is_transport_error(raw):
+                    res.n_llm_error += 1
+                    res.rejections.append(("llm-transport", (
+                        f"{type(raw).__name__}: {str(raw)[:70]}")))
+                else:
+                    res.n_rejected_schema += 1
+                    res.rejections.append(("llm", (
+                        f"{type(raw).__name__}: {str(raw)[:70]}")))
                 continue
             try:
                 prop = validate_rule_proposal(raw)
@@ -390,6 +435,16 @@ class RoundLoop:
                 res = self.run_round()
                 if verbose:
                     print(res.line(), flush=True)
+                # ★ 제안이 **전부** 전송 실패면 멈춘다 (D-43). 크레딧이나
+                #   인증 문제는 저절로 낫지 않는다 — 남은 라운드를 태워도
+                #   빈 아카이브만 남는다. 실제로 12라운드를 그렇게 썼다.
+                if (STOP_ON_TOTAL_LLM_FAILURE and res.n_proposed
+                        and res.n_llm_error == res.n_proposed):
+                    raise LLMUnreachable(
+                        f"r{res.round}: 제안 {res.n_proposed}건이 전부 LLM "
+                        f"전송 실패다. 마지막 사유: "
+                        + next((m for k, m in reversed(res.rejections)
+                                if k == "llm-transport"), "?"))
                 if dump_each_round:
                     self.dump()
                 stop, why = self.should_stop()
