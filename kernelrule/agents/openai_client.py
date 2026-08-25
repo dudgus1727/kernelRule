@@ -115,6 +115,20 @@ class LLMConfig:
     #: 꺼져 물리 유도 능력을 잃는다 — 그래서 엔드포인트를 옮겼다.
     #: gpt-5.4 / 5.4-mini 도 responses 를 지원하므로 통일이 가능하다.
     endpoint: str = "responses"
+    #: ★ 추론 강도. **명시한다** — 안 하면 모델 기본값이 적용되고, 그 기본이
+    #: 바뀌면 우리 결과가 조용히 달라진다 (§15.4 재현성).
+    #:
+    #: 실측 (gpt-5.6-luna, Responses API):
+    #:   none    추론 0 토큰
+    #:   low     ~150
+    #:   medium  ~130   ← 채택
+    #:   high    ~520
+    #: 우리 실제 프롬프트(7,177토큰)에서는 기본값이 1,756 추론토큰을 썼다 —
+    #: 과제가 무거우면 그만큼 더 쓴다.
+    #:
+    #: `None` 이면 보내지 않는다(모델 기본값). 그 경우도 **의도한 것임을
+    #: 기록으로 남기려면** 명시적으로 None 을 적어야 한다.
+    reasoning_effort: str | None = "medium"
 
     def to_dict(self) -> dict:
         return dict(self.__dict__)
@@ -223,11 +237,14 @@ class OpenAILLM:
         model = (OpenAIResponsesModel(self.cfg.model)
                  if self.cfg.endpoint == "responses"
                  else OpenAIChatModel(self.cfg.model))
+        settings: dict = {"temperature": self.cfg.temperature}
+        if self.cfg.seed is not None:
+            settings["seed"] = self.cfg.seed
+        if self.cfg.reasoning_effort is not None:
+            # pydantic-ai 는 공급자 접두사를 붙인 키로 전달한다.
+            settings["openai_reasoning_effort"] = self.cfg.reasoning_effort
         a = Agent(model, output_type=out, instructions=instructions,
-                  retries=self.cfg.max_retries,
-                  model_settings={"temperature": self.cfg.temperature,
-                                  **({"seed": self.cfg.seed}
-                                     if self.cfg.seed is not None else {})})
+                  retries=self.cfg.max_retries, model_settings=settings)
         self._agents[role] = a
         return a
 

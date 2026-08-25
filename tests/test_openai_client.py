@@ -361,3 +361,28 @@ def test_model_has_a_single_source():
                 bad.append(f"  {f.name}:{i}  {line.strip()}")
     assert not bad, ("실험이 모델을 직접 박아 놓았다. "
                      "`DEFAULT_MODEL` 을 쓰라:\n" + "\n".join(bad))
+
+
+def test_reasoning_effort_is_explicit_and_recorded():
+    """★ 명시하지 않으면 모델 기본값이 적용되고, 그 기본이 바뀌면 우리
+    결과가 조용히 달라진다 (§15.4).
+    """
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    cfg = LLMConfig()
+    assert cfg.reasoning_effort == "medium"
+    assert cfg.to_dict()["reasoning_effort"] == "medium"
+
+    llm = OpenAILLM(cfg, feature_names=[], shape_values=[], cache=False)
+    sent = llm._agent("optimize").model_settings or {}
+    assert sent.get("openai_reasoning_effort") == "medium"
+
+
+def test_reasoning_effort_none_sends_nothing():
+    """`None` 은 '모델 기본값' 이다. 문자열 'none' 과 다르다."""
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(reasoning_effort=None), feature_names=[],
+                    shape_values=[], cache=False)
+    assert "openai_reasoning_effort" not in (
+        llm._agent("optimize").model_settings or {})
