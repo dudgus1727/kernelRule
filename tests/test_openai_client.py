@@ -363,6 +363,64 @@ def test_model_has_a_single_source():
                      "`DEFAULT_MODEL` 을 쓰라:\n" + "\n".join(bad))
 
 
+def test_temperature_and_seed_default_to_none():
+    """★ 통제할 수 없는 것을 통제한다고 기록하지 않는다 (D-47).
+
+    전에는 0.7 / 20260821 이었고 **둘 다 모델에 전달되지 않았다.**
+    `config.json` 에만 남아 기록과 실제가 어긋났다 (§30.8).
+    """
+    from kernelrule.agents.openai_client import LLMConfig
+    d = LLMConfig().to_dict()
+    assert d["temperature"] is None
+    assert d["seed"] is None
+
+
+def test_seed_with_responses_endpoint_raises():
+    """조용히 버려지느니 멈춘다 — Responses 에는 seed 파라미터가 없다."""
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(seed=123, endpoint="responses"),
+                    feature_names=[], shape_values=[], cache=False)
+    with pytest.raises(ValueError, match="파라미터가 없다"):
+        llm._agent("optimize")
+
+
+def test_seed_with_chat_endpoint_is_sent():
+    """chat 에서는 실제로 지원되므로 보낸다."""
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(seed=123, temperature=0.7, endpoint="chat"),
+                    feature_names=[], shape_values=[], cache=False)
+    sent = llm._agent("optimize").model_settings or {}
+    assert sent["seed"] == 123
+    assert sent["temperature"] == 0.7
+
+
+def test_none_values_are_not_sent_at_all():
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
+                    cache=False)
+    sent = llm._agent("optimize").model_settings or {}
+    assert "temperature" not in sent
+    assert "seed" not in sent
+
+
+def test_experiments_do_not_pass_temperature_or_seed():
+    """실험이 다시 넣으면 조용히 버려진다 — 여기서 막는다."""
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    bad = []
+    for f in sorted((root / "experiments").glob("*.py")):
+        for i, line in enumerate(f.read_text().splitlines(), 1):
+            if re.search(r"LLMConfig\([^)]*\b(temperature|seed)\s*=", line):
+                bad.append(f"  {f.name}:{i}  {line.strip()}")
+    assert not bad, ("실험이 LLMConfig 에 temperature/seed 를 넘긴다 — "
+                     "gpt-5.6-luna + responses 에서는 조용히 버려진다 "
+                     "(D-47):\n" + "\n".join(bad))
+
+
 def test_reasoning_effort_is_explicit_and_recorded():
     """★ 명시하지 않으면 모델 기본값이 적용되고, 그 기본이 바뀌면 우리
     결과가 조용히 달라진다 (§15.4).

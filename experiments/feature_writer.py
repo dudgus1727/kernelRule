@@ -99,7 +99,7 @@ def main(n_proposals: int = 20, condition: str = "F1",
     hw_alt = _alt_hw(table.hw)
 
     gen = FeatureRegistry(f"generated-{condition}")
-    llm = OpenAILLM(LLMConfig(model=model, temperature=1.0, concurrency=4),
+    llm = OpenAILLM(LLMConfig(model=model, concurrency=4),
                     feature_names=[], shape_values=[], registry=REGISTRY,
                     budget=Budget(max_calls=200), cache=False)
 

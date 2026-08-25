@@ -92,10 +92,31 @@ class LLMConfig:
     """`config.json` 에 그대로 기록된다 (§15.4 재현성)."""
 
     model: str = DEFAULT_MODEL
-    #: ★ 규칙 생성은 다양성이 필요하므로 0 으로 두지 않는다.
-    #:   값을 기록하고 run 간 고정한다.
-    temperature: float = 0.7
-    seed: int | None = 20260821
+    # ------------------------------------------------------------------
+    # ★ temperature / seed — 둘 다 `None` 이다. 통제할 수 없다 (D-47)
+    # ------------------------------------------------------------------
+    # 전에는 0.7 / 20260821 로 두고 "다양성을 통제하고 재현성을 확보한다" 고
+    # 적었다. **둘 다 모델에 전달되지 않고 있었다.** `config.json` 에는
+    # 값이 적히는데 실제로는 모델 기본값으로 돌았다 (§30.8).
+    #
+    # 실측으로 층을 갈랐다 (3모델 x 2엔드포인트):
+    #
+    #   seed         Responses 엔드포인트에 **파라미터 자체가 없다.**
+    #                SDK 가 `TypeError` 를 낸다 — 요청이 나가지도 않는다.
+    #                모델과 무관하다 (gpt-4.1-mini 도 마찬가지).
+    #   temperature  **추론 모델이 거부한다.** gpt-5.6-luna 는 두 엔드포인트
+    #                모두 400 이고, gpt-5.4-mini / gpt-4.1-mini 는 둘 다 된다.
+    #                엔드포인트와 무관하다.
+    #                (추론 모델은 내부적으로 여러 차례 추론·검증·선택을
+    #                 거치므로 샘플링을 막는다. 대신 reasoning_effort 를 준다.)
+    #
+    # pydantic-ai 는 둘 다 **조용히 버린다** — 그래서 몰랐다. 원인이 아니라
+    # 증상을 감춘 쪽이다.
+    #
+    # 따라서 기본을 `None` 으로 둔다. 값을 넣으면 보내되, **보낼 수 없는
+    # 조합이면 예외를 낸다** — 조용히 버려지느니 멈추는 편이 낫다 (§26.4).
+    temperature: float | None = None
+    seed: int | None = None
     #: 스키마 위반 시 재시도 상한. 2 -> 3 (임시).
     #: 지시 모순이 해소되면 필요 없지만, 거부율이 여전히 높을 때
     #: "모델이 배우는 중" 과 "구조적으로 불가능" 을 구분해 준다.
@@ -237,7 +258,18 @@ class OpenAILLM:
         model = (OpenAIResponsesModel(self.cfg.model)
                  if self.cfg.endpoint == "responses"
                  else OpenAIChatModel(self.cfg.model))
-        settings: dict = {"temperature": self.cfg.temperature}
+        # ★ 보낼 수 없는 조합은 **여기서 멈춘다** (D-47). pydantic-ai 에
+        #   넘기면 조용히 버려지고, config.json 에는 값이 남아 기록과 실제가
+        #   어긋난다.
+        if self.cfg.seed is not None and self.cfg.endpoint == "responses":
+            raise ValueError(
+                "seed 는 Responses 엔드포인트에 **파라미터가 없다** (SDK 가 "
+                "TypeError 를 낸다). pydantic-ai 는 조용히 버리므로 "
+                "config.json 에만 남는다. `seed=None` 으로 두거나 "
+                "`endpoint='chat'` 을 써라 (D-47).")
+        settings: dict = {}
+        if self.cfg.temperature is not None:
+            settings["temperature"] = self.cfg.temperature
         if self.cfg.seed is not None:
             settings["seed"] = self.cfg.seed
         if self.cfg.reasoning_effort is not None:

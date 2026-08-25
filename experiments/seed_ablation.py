@@ -109,8 +109,7 @@ def main(rounds: int = 12, n_seeds: int = 3, *, only: str = "",
             if (Path("runs") / run_id / "archive.jsonl").exists():
                 print(f"  [{run_id}] 이미 있다. 건너뛴다")
                 continue
-            llm = OpenAILLM(LLMConfig(model=MODEL, temperature=0.7,
-                                      concurrency=6, seed=20260821 + s),
+            llm = OpenAILLM(LLMConfig(model=MODEL, concurrency=6),
                             feature_names=matrix.feature_names(),
                             shape_values=matrix.shape_value_names(),
                             registry=REGISTRY, budget=budget, cache=False)

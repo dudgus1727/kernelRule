@@ -76,6 +76,15 @@ def _setup(table):
 
 def main(n_seeds: int = 6, seed_base: int = 20260823,
          tag: str = "selB") -> None:
+    """⚠️ `seed_base` 는 더 이상 **LLM 시드가 아니다** (D-47).
+
+    Responses 엔드포인트에 `seed` 파라미터가 없고, 추론 모델은
+    `temperature` 도 거부한다. 따라서 **LLM 쪽 난수는 통제되지 않는다.**
+    "시드 N개" 는 이제 `LoopConfig.seed`(부모 선택 등 우리 RNG)가 다른
+    N개 실행을 뜻하고, LLM 의 비결정성은 그 위에 얹힌다.
+
+    시드 폭 0.0977 의 일부가 여기서 온다 — 통제할 수 없는 부분이다.
+    """
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
     splits = _setup(table)
@@ -95,8 +104,7 @@ def main(n_seeds: int = 6, seed_base: int = 20260823,
         if (Path("runs") / run_id / "archive.jsonl").exists():
             print(f"  [{run_id}] 이미 있다. 건너뛴다")
             continue
-        llm = OpenAILLM(LLMConfig(model=MODEL, temperature=0.7, concurrency=6,
-                                  seed=seed_base + s),
+        llm = OpenAILLM(LLMConfig(model=MODEL, concurrency=6),
                         feature_names=matrix.feature_names(),
                         shape_values=matrix.shape_value_names(),
                         registry=REGISTRY, budget=budget, cache=False)

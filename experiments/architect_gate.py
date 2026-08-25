@@ -72,7 +72,7 @@ def main(condition: str, n_tries: int,
     check_balance(train, table.hw)
     facts = TableFacts.compute(table, train)
 
-    llm = OpenAILLM(LLMConfig(model=model, temperature=1.0, concurrency=5),
+    llm = OpenAILLM(LLMConfig(model=model, concurrency=5),
                     feature_names=matrix.feature_names(),
                     shape_values=matrix.shape_value_names(),
                     registry=REGISTRY, budget=Budget(), cache=False)
