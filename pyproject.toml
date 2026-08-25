@@ -19,7 +19,13 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
-llm = ["pydantic>=2"]   # LLM 경계 전용. 채점 뜨거운 경로에는 쓰지 않는다 (§11.7)
+# LLM 경계 전용. 채점 뜨거운 경로에는 쓰지 않는다 (§11.7).
+# ★ `pydantic_ai` 가 빠져 있었다. `openai_client.py` 가 import 하는데
+#   어디에도 선언되지 않아, 새로 클론하면 실제 LLM 실행 경로가 통째로
+#   죽고 원인이 "8 failed / ModuleNotFoundError" 로만 보였다 (D-48).
+#   설치된 것을 그대로 적는다 — `pydantic-ai-slim[openai]` 이 `pydantic_ai`
+#   모듈을 제공하고, 전체 `pydantic-ai` 는 그 상위 집합이다.
+llm = ["pydantic>=2", "pydantic-ai-slim[openai]>=2", "openai>=1"]
 
 [tool.setuptools.packages.find]
 include = ["kernelrule*"]

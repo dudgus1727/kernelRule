@@ -28,14 +28,25 @@ docs/decisions.md                    결정과 발견 기록
    집합 / 후보 집합 / 홀드아웃 분할 / 계산한 스크립트)
 2. 틀린 값을 **지우지 말고 정정 이력으로** 남긴다
 3. 두 숫자를 나란히 쓰기 전에 **같은 절차 / 같은 분모 / 같은 집계 방식 /
-   이 데이터에서 계산된 것**인지 확인한다
+   같은 데이터 / 같은 모델**에서 나온 것인지 확인한다 (D-31)
 
 ## 설치
 
 ```bash
-pip install -e ../kernelTab      # 표 로더 / 정답 격리 / 노이즈 모델
-pip install -e '.[test]'
+pip install -e ../kernelTab       # 표 로더 / 정답 격리 / 노이즈 모델
+pip install -e '.[test,llm]'      # ★ llm 없이는 실제 실행 경로가 죽는다
 python3 -m pytest tests/ -q
+```
+
+`[llm]` 은 `pydantic` + `pydantic-ai-slim[openai]` + `openai` 다.
+**빼면 `tests/test_openai_client.py` 8건이 스킵되고**, 그 모듈은
+`CRITICAL_MODULES` 라 세션이 실패한다 — 즉 그 실행 결과로는 아무것도
+보증하지 못한다 (§26.3).
+
+채점만 할 거면 `[test]` 만으로도 된다. 다만 LLM 실험은 못 돌린다.
+
+```bash
+export OPENAI_API_KEY=...          # 없으면 MockLLM 으로 조용히 떨어지지 않고 중단한다
 ```
 
 ## 절대 규칙

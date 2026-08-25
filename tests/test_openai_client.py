@@ -38,6 +38,21 @@ def test_missing_key_is_a_hard_error(monkeypatch):
         OpenAILLM(LLMConfig(), feature_names=FEATS, shape_values=SHAPE)
 
 
+def _needs_pydantic_ai():
+    """★ 없으면 **스킵하되 이유를 말한다** (D-48).
+
+    전에는 `ModuleNotFoundError` 8건으로 터졌고, 새로 클론한 사람에게는
+    "테스트가 8개 깨졌다" 로만 보였다. 진짜 문제는 **설치 안내가 이
+    패키지를 빠뜨린 것**이었다.
+
+    `test_openai_client.py` 는 `CRITICAL_MODULES` 에 있으므로, 전부 스킵되면
+    세션이 실패한다 — 즉 `[llm]` 없이 돌린 결과로 무엇도 보증하지 못한다.
+    """
+    return pytest.importorskip(
+        "pydantic_ai",
+        reason="pydantic-ai 가 없다. `pip install -e '.[llm]'` 로 설치하라")
+
+
 def test_key_is_never_stored(client):
     """키가 객체나 설정에 남지 않는다."""
     blob = repr(client.__dict__) + repr(client.cfg.to_dict())
@@ -319,6 +334,7 @@ def test_endpoint_defaults_to_responses_and_is_recorded():
 
 def test_unknown_endpoint_is_rejected():
     """조용히 chat 으로 떨어지지 않는다 (§26.4)."""
+    _needs_pydantic_ai()
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(model="m", endpoint="v1"), feature_names=[],
@@ -332,6 +348,7 @@ def test_unknown_endpoint_is_rejected():
     ("chat", "OpenAIChatModel"),
 ])
 def test_endpoint_picks_the_right_model_class(endpoint, cls_name):
+    _needs_pydantic_ai()
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(model="gpt-5.4-mini-2026-03-17",
@@ -377,6 +394,7 @@ def test_temperature_and_seed_default_to_none():
 
 def test_seed_with_responses_endpoint_raises():
     """조용히 버려지느니 멈춘다 — Responses 에는 seed 파라미터가 없다."""
+    _needs_pydantic_ai()
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(seed=123, endpoint="responses"),
@@ -387,6 +405,7 @@ def test_seed_with_responses_endpoint_raises():
 
 def test_seed_with_chat_endpoint_is_sent():
     """chat 에서는 실제로 지원되므로 보낸다."""
+    _needs_pydantic_ai()
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(seed=123, temperature=0.7, endpoint="chat"),
@@ -397,6 +416,7 @@ def test_seed_with_chat_endpoint_is_sent():
 
 
 def test_none_values_are_not_sent_at_all():
+    _needs_pydantic_ai()
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
@@ -425,6 +445,7 @@ def test_reasoning_effort_is_explicit_and_recorded():
     """★ 명시하지 않으면 모델 기본값이 적용되고, 그 기본이 바뀌면 우리
     결과가 조용히 달라진다 (§15.4).
     """
+    _needs_pydantic_ai()
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     cfg = LLMConfig()
@@ -438,6 +459,7 @@ def test_reasoning_effort_is_explicit_and_recorded():
 
 def test_reasoning_effort_none_sends_nothing():
     """`None` 은 '모델 기본값' 이다. 문자열 'none' 과 다르다."""
+    _needs_pydantic_ai()
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(reasoning_effort=None), feature_names=[],
