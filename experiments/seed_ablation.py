@@ -41,7 +41,7 @@ import time
 from pathlib import Path
 
 import kernelrule.features.physical  # noqa: F401
-from kernelrule.agents.openai_client import Budget, LLMConfig, OpenAILLM
+from kernelrule.agents.openai_client import DEFAULT_MODEL, Budget, LLMConfig, OpenAILLM
 from kernelrule.core.loop import LoopConfig, RoundLoop
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.splits import Split, SplitSet, regime_of
@@ -51,7 +51,7 @@ from kernelrule.rules.physics_seeded import CODE as PS
 from kernelrule.rules.physics_seeded import W0 as PS_W0
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
-MODEL = "gpt-5.4"
+MODEL = DEFAULT_MODEL   # ★ 단일 출처 (D-45)
 ARCH_A = Path("runs/architect-A-gpt-5.4/tries.jsonl")
 
 #: 세 조건 전체의 상한. 넘으면 멈춘다 (§4-1).

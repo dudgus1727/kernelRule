@@ -32,9 +32,15 @@ from pathlib import Path
 from kernelrule.agents.mock import LLMCall
 
 __all__ = ["OpenAILLM", "LLMConfig", "Budget", "BudgetExceeded",
-           "MissingAPIKey", "load_prompt", "classify_violation"]
+           "MissingAPIKey", "load_prompt", "classify_violation",
+           "DEFAULT_MODEL"]
 
 _PROMPTS = Path(__file__).parent / "prompts"
+
+#: ★ 모델의 **유일한 출처**. 실험 스크립트가 각자 상수를 들고 있다가
+#: 서로 다른 모델로 도는 일이 있었다 — 그러면 결과를 나란히 놓을 수 없다
+#: (D-31). 바꿀 때는 여기 하나만 고치고, **사용자가 지시했을 때만** 바꾼다.
+DEFAULT_MODEL = "gpt-5.6-luna"
 
 
 class MissingAPIKey(RuntimeError):
@@ -85,7 +91,7 @@ def load_prompt(name: str) -> str:
 class LLMConfig:
     """`config.json` 에 그대로 기록된다 (§15.4 재현성)."""
 
-    model: str = "gpt-5.4-mini-2026-03-17"
+    model: str = DEFAULT_MODEL
     #: ★ 규칙 생성은 다양성이 필요하므로 0 으로 두지 않는다.
     #:   값을 기록하고 run 간 고정한다.
     temperature: float = 0.7

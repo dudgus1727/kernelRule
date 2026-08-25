@@ -339,3 +339,25 @@ def test_endpoint_picks_the_right_model_class(endpoint, cls_name):
                     feature_names=[], shape_values=[], cache=False)
     agent = llm._agent("optimize")
     assert type(agent.model).__name__ == cls_name
+
+
+def test_model_has_a_single_source():
+    """★ 실험 스크립트가 각자 모델 상수를 들고 있으면 서로 다른 모델로
+    돌 수 있다 — 그러면 결과를 나란히 놓을 수 없다 (D-31, D-45).
+    """
+    import re
+    from pathlib import Path
+
+    from kernelrule.agents.openai_client import DEFAULT_MODEL, LLMConfig
+
+    assert LLMConfig().model == DEFAULT_MODEL
+    root = Path(__file__).resolve().parents[1]
+    bad = []
+    for f in sorted((root / "experiments").glob("*.py")):
+        for i, line in enumerate(f.read_text().splitlines(), 1):
+            # 경로 문자열(`runs/...-gpt-5.4/`)은 과거 실행을 가리키는 것이라
+            # 정상이다. **대입**으로 모델을 박아 놓은 것만 잡는다.
+            if re.search(r'^\s*\w*MODEL\w*\s*=\s*["\']gpt-', line):
+                bad.append(f"  {f.name}:{i}  {line.strip()}")
+    assert not bad, ("실험이 모델을 직접 박아 놓았다. "
+                     "`DEFAULT_MODEL` 을 쓰라:\n" + "\n".join(bad))

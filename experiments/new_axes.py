@@ -43,7 +43,7 @@ from pathlib import Path
 import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
-from kernelrule.agents.openai_client import Budget, LLMConfig, OpenAILLM
+from kernelrule.agents.openai_client import DEFAULT_MODEL, Budget, LLMConfig, OpenAILLM
 from kernelrule.core.loop import LoopConfig, RoundLoop
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.splits import Split, SplitSet
@@ -53,7 +53,7 @@ from kernelrule.features.loader import extended_registry, load_generated
 from kernelrule.features.validate import _spearman
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
-MODEL = "gpt-5.4"
+MODEL = DEFAULT_MODEL   # ★ 단일 출처 (D-45)
 PROPOSALS = Path("runs/featwriter-F1-gpt-5.4/proposals.jsonl")
 DUP_RHO = 0.95
 

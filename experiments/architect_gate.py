@@ -31,7 +31,7 @@ from pathlib import Path
 import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
-from kernelrule.agents.openai_client import Budget, LLMConfig, OpenAILLM
+from kernelrule.agents.openai_client import DEFAULT_MODEL, Budget, LLMConfig, OpenAILLM
 from kernelrule.agents.schemas import SchemaViolation, validate_rule_proposal
 from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.matrix import FeatureMatrix
@@ -46,7 +46,6 @@ from kernelrule.rules.checks import RuleCheckError, check_rule
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
-DEFAULT_MODEL = "gpt-5.4-mini-2026-03-17"
 OUT = Path("runs")
 
 

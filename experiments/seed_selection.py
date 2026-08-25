@@ -42,7 +42,7 @@ from pathlib import Path
 import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
-from kernelrule.agents.openai_client import Budget, LLMConfig, OpenAILLM
+from kernelrule.agents.openai_client import DEFAULT_MODEL, Budget, LLMConfig, OpenAILLM
 from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.canonical import canonical_score
 from kernelrule.core.loop import LoopConfig, RoundLoop
@@ -54,7 +54,7 @@ from kernelrule.features import REGISTRY
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
-MODEL = "gpt-5.4"
+MODEL = DEFAULT_MODEL   # ★ 단일 출처 (D-45)
 
 #: 앞선 두 묶음. 12시드 합산 분포에 쓴다.
 PRIOR = [f"seedabl-desc-다-noseed-s{s}" for s in range(3)] + \
