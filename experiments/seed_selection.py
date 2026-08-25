@@ -157,16 +157,51 @@ def main(n_seeds: int = 6, seed_base: int = 20260823,
     print(f"\n  ★ 표본내 최소 시드: {pick[0]}   구조HO {pick[2]:.4f}")
     print(f"     무작위 시드 중앙 {np.median(ho):.4f}  최악 {ho.max():.4f}")
     print(f"     벤더 {v.at(1):.4f}   기존 묶음의 선택값 1.0518")
-    verdict = ("실력 — 절차로 확정" if pick[2] < 1.065
-               else "선택 편향이었다" if pick[2] > 1.075 else "중간. 판단 보류")
-    print(f"     ★ 판정: {verdict}")
+    # ★ 자동 판정을 하지 않는다 (D-46, D-50). "N개 중 최소" 는 그 자체로
+    #   낙관 편향이고, 임계값은 **다른 모델의 데이터**에서 온 것이었다.
+    #   판정은 절차를 고정하고 **새 묶음**에서 재야 나온다.
+    print(f"     ⚠️ 이 값은 {len(new)}개 중 최소다 — 그 자체로 낙관 편향이다"
+          f" (D-50).\n        절차를 고정하고 **새 묶음**에서 재기 전에는"
+          f" 추정치가 아니다.")
 
-    # -- 12시드 합산 --------------------------------------------------------
+    # -- 묶음 합산 ----------------------------------------------------------
+    #    ★ **같은 모델·엔드포인트끼리만** 합친다 (D-31 의 다섯 번째 축).
+    #      PRIOR 는 gpt-5.4 + chat 이므로 luna 실행과 섞으면 안 된다.
+    import json as _json
+    def _model_of(run: str) -> str:
+        f = Path("runs") / run / "config.json"
+        if f.exists():
+            try:
+                c = _json.loads(f.read_text()).get("llm", {})
+                return f"{c.get('model','?')}/{c.get('endpoint','chat')}"
+            except Exception:                               # noqa: BLE001
+                pass
+        # config.json 이 없던 시절 — llm_calls 에서 **모델만** 복원한다.
+        # ★ 엔드포인트는 어디에도 안 남아 있다. `/chat` 으로 단정하면
+        #   responses 실행이 chat 으로 라벨링되어 **D-31 을 어기면서
+        #   어긴 줄도 모르게 된다.** 모르면 모른다고 적는다 (§26.4).
+        for g in sorted((Path("runs") / run / "llm_calls").glob("*.json"))[:1]:
+            try:
+                m = _json.loads(g.read_text()).get("model", "?")
+                return f"{m}/엔드포인트미상"
+            except Exception:                               # noqa: BLE001
+                pass
+        return "미상"
+
+    here = _model_of(f"{tag}-s0")
+    same = [r for r in PRIOR if _model_of(r) == here]
     print(f"\n{'=' * 76}")
-    print("두 묶음 합산 — 폭이 안정적인가")
+    print(f"묶음 합산 — ★ 같은 조건끼리만 ({here})")
     print("=" * 76)
+    if not same:
+        print("  앞선 묶음은 조건이 다르다 — 합치지 않는다 (D-31).")
+        print(f"  이 묶음 {len(new)}시드만으로는 폭을 추정할 수 없다.")
+        ho2 = sorted(x[2] for x in new)
+        print(f"  {tag} 구조HO  " + "  ".join(f"{x:.4f}" for x in ho2)
+              + f"   폭 {ho2[-1] - ho2[0]:.4f}")
+        return
     allr = []
-    for run in PRIOR:
+    for run in same:
         r = score(run)
         if r:
             allr.append((run, r.in_sample, r.holdout))
