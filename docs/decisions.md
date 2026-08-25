@@ -1477,3 +1477,44 @@ MAP-Elites 가 셀을 9~15개 채우는데 그것들이 실질적으로 같은 �
 **§13 의 셀 축(코드 길이 / 체제별 regret)이 의미 있는 다양성을 못 만들고
 있다**는 증거일 수 있다. 지금 고치지 않지만, 셀 축을 다시 볼 때 근거가
 된다.
+
+## D-44  엔드포인트를 responses 로 통일한다 — 그리고 그것을 기록한다
+
+`gpt-5.6-luna` 를 시험하니 단순 호출은 되는데 파이프라인이 400 으로 죽었다.
+
+```
+"Function tools with reasoning_effort are not supported for gpt-5.6-luna
+ in /v1/chat/completions. To use function tools, use /v1/responses or
+ set reasoning_effort to 'none'."
+```
+
+우리는 구조화 출력(`output_type`)을 쓰는데 pydantic-ai 가 그것을 **함수
+도구**로 구현한다. 그래서 걸렸다.
+
+**측정한 조합 (18가지):**
+
+| 모델 | chat + 구조화 | responses + 구조화 |
+|---|---|---|
+| `gpt-5.6-luna` | ❌ 400 | ✅ |
+| `gpt-5.4` | ✅ | ✅ |
+| `gpt-5.4-mini` | ✅ | ✅ |
+
+우회는 둘이었다.
+
+```
+(가) reasoning_effort='none'   추론을 끈다. 이 프로젝트는 물리 유도를
+                               시키는 일이라 능력 손실이 크다
+(나) responses 엔드포인트       추론 유지. ★ 채택
+```
+
+**(나)를 고른 이유는 세 모델 전부 지원하기 때문이다** — 통일이 가능하다.
+
+**`LLMConfig.endpoint` 를 두고 `config.json` 에 남긴다.** 실행마다 어느
+엔드포인트였는지 확인할 수 있어야 한다. 기존 실행은 전부 `chat` 이었으므로
+**responses 실행과 같은 묶음으로 비교하면 안 된다** (D-31: 같은 절차 /
+분모 / 집계 / 데이터).
+
+알 수 없는 값이면 조용히 chat 으로 떨어지지 않고 예외를 낸다 (§26.4).
+
+**일반화.** 모델을 바꾸는 것뿐 아니라 **전송 경로를 바꾸는 것도 조건
+변경**이다. 기록하지 않으면 나중에 섞였는지 알 수 없다.

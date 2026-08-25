@@ -97,6 +97,18 @@ class LLMConfig:
     #: 동시 호출 상한. rate limit 에 걸리면 줄이되 **로그에 남긴다.**
     concurrency: int = 6
     arch_prompt: str = "hw/sm_86.md"
+    #: ★ OpenAI 엔드포인트. **`config.json` 에 남는다** — 섞이면 비교가
+    #: 깨지므로 나중에 확인할 수 있어야 한다 (D-31, D-44).
+    #:
+    #:   "responses"  /v1/responses.  구조화 출력 + 추론을 함께 쓸 수 있다
+    #:   "chat"       /v1/chat/completions.  전통적 형식
+    #:
+    #: gpt-5.6 계열은 chat 에서 **함수 도구 + reasoning_effort** 조합을
+    #: 400 으로 막는다. 구조화 출력(`output_type`)이 함수 도구로 구현되므로
+    #: 그대로 걸린다. 우회는 `reasoning_effort='none'` 인데 그러면 추론이
+    #: 꺼져 물리 유도 능력을 잃는다 — 그래서 엔드포인트를 옮겼다.
+    #: gpt-5.4 / 5.4-mini 도 responses 를 지원하므로 통일이 가능하다.
+    endpoint: str = "responses"
 
     def to_dict(self) -> dict:
         return dict(self.__dict__)
@@ -189,7 +201,7 @@ class OpenAILLM:
         if role in self._agents:
             return self._agents[role]
         from pydantic_ai import Agent
-        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel
 
         from kernelrule.agents.schemas import AnalysisOutput, FeatureOutput, RuleOutput
 
@@ -198,7 +210,13 @@ class OpenAILLM:
         role_md = load_prompt(f"{role}.md")
         # ★ 두 층으로 나뉜다: [고정] 역할·제약  +  [주입] 하드웨어 사실
         instructions = f"{self._common}\n\n---\n\n{self._hw}\n\n---\n\n{role_md}"
-        model = OpenAIChatModel(self.cfg.model)
+        if self.cfg.endpoint not in ("responses", "chat"):
+            raise ValueError(
+                f"알 수 없는 엔드포인트: {self.cfg.endpoint!r}. "
+                "'responses' 또는 'chat'")
+        model = (OpenAIResponsesModel(self.cfg.model)
+                 if self.cfg.endpoint == "responses"
+                 else OpenAIChatModel(self.cfg.model))
         a = Agent(model, output_type=out, instructions=instructions,
                   retries=self.cfg.max_retries,
                   model_settings={"temperature": self.cfg.temperature,

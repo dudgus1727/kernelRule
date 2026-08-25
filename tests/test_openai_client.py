@@ -299,3 +299,43 @@ def test_architect_prompt_has_no_parent_or_case_slots():
     a = c._architect_prompt(condition="A")
     for banned in ("부모 규칙:", "### 사례 #", "regret 1.", "val "):
         assert banned not in a
+
+
+# ---------------------------------------------------------------------------
+# 엔드포인트 선택 (D-44)
+# ---------------------------------------------------------------------------
+# gpt-5.6 계열은 /v1/chat/completions 에서 **함수 도구 + reasoning_effort**
+# 조합을 400 으로 막는다. 구조화 출력(`output_type`)이 함수 도구로
+# 구현되므로 그대로 걸린다. 우회는 reasoning_effort='none' 인데 그러면
+# 추론이 꺼져 물리 유도 능력을 잃는다 — 그래서 엔드포인트를 옮겼다.
+
+def test_endpoint_defaults_to_responses_and_is_recorded():
+    """★ `config.json` 에 남아야 한다 — 섞이면 비교가 깨진다 (D-31)."""
+    from kernelrule.agents.openai_client import LLMConfig
+    cfg = LLMConfig()
+    assert cfg.endpoint == "responses"
+    assert cfg.to_dict()["endpoint"] == "responses"
+
+
+def test_unknown_endpoint_is_rejected():
+    """조용히 chat 으로 떨어지지 않는다 (§26.4)."""
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(model="m", endpoint="v1"), feature_names=[],
+                    shape_values=[], cache=False)
+    with pytest.raises(ValueError, match="알 수 없는 엔드포인트"):
+        llm._agent("optimize")
+
+
+@pytest.mark.parametrize("endpoint,cls_name", [
+    ("responses", "OpenAIResponsesModel"),
+    ("chat", "OpenAIChatModel"),
+])
+def test_endpoint_picks_the_right_model_class(endpoint, cls_name):
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(model="gpt-5.4-mini-2026-03-17",
+                              endpoint=endpoint),
+                    feature_names=[], shape_values=[], cache=False)
+    agent = llm._agent("optimize")
+    assert type(agent.model).__name__ == cls_name
