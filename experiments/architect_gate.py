@@ -127,6 +127,9 @@ def main(condition: str, n_tries: int,
             record({"i": i, "error": f"{type(e).__name__}: {e}"})
             print(f"  #{i:02d}  실패  {type(e).__name__}: {str(e)[:70]}")
 
+    # ★ LLM 호출은 다시 만들 수 없다 (D-33). 채점보다 먼저 남긴다.
+    llm.dump(d / "llm_calls")
+
     ok = [r for r in rows if "train" in r]
     v = evaluate(vendor_order_fn(table, load_vendor(VENDOR), mapping="nearest"),
                  table, list(train.shapes), ks=(1,))

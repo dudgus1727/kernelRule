@@ -1,5 +1,7 @@
 # 진단 리포트 — dev-cu124-r000-handwritten
 
+**재현** `python3 -m kernelrule.report.diagnostic` 경로가 없다 — `report/diagnostic.py::build_report` 를 손으로 불러 만든 것이다. ⚠️ 이 리포트의 블록 3.5 는 **오염된 상태**였다 (D-28).
+
 > 개발용 표(dev-cu124, CUDA 12.4/호스트)다. 성능 수치를 인용하지 마라.
 > 학습 분할(M<=2048, 50형상)만으로 만들어졌다. 홀드아웃 점수는 들어 있지 않다.
 

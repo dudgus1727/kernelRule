@@ -1,5 +1,7 @@
 # 첫 실제 LLM 실행 — dev-cu124 (2026-08-21)
 
+**재현** 이 실행에는 전용 스크립트가 없다 (`experiments/` 도입 전). `runs/real-gpt-5.4-mini-2026-03-17/` 의 `config.json` · `llm_calls/` 가 남아 있다. 채점은 `experiments/rescore_canonical.py`.
+
 > ## ⚠️ 이 실행의 블록 3.5 는 오염된 상태였다 (2026-08-21 확인, D-28)
 >
 > 진단 리포트에 주입한 `table_facts` 가 **66형상 전수 / a888 61형상**에서

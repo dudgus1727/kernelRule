@@ -1,5 +1,7 @@
 # (가)가 갇힌 이유 — 예산 포화가 아니라 항 하나
 
+**재현** 전용 스크립트 없음 — `experiments/regime_transfer.py::ablate` 로 항을 지우고 `core/canonical.py::canonical_score` 로 재채점했다. 사용률 집계는 `experiments/new_axes.py::used_features`.
+
 **측정일** 2026-08-22 · **LLM 호출 0회** · 정준 절차(체제별 적합, 61형상 결합)
 
 ---

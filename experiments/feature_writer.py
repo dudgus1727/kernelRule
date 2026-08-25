@@ -165,6 +165,9 @@ def main(n_proposals: int = 20, condition: str = "F1",
         with log.open("a") as fh:
             fh.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
+    # ★ LLM 호출은 다시 만들 수 없다 (D-33). 채점보다 먼저 남긴다.
+    llm.dump(d / "llm_calls")
+
     print(f"\n  채택 {len(gen._items)}/{n_proposals}   "
           f"{time.perf_counter() - t0:.0f}s   호출 {llm.budget.calls}"
           f"  입력 {llm.budget.input_tokens:,}  출력 {llm.budget.output_tokens:,}")

@@ -1,5 +1,7 @@
 # 체제별 진단 — 긴 형상에서는 규칙 기반이 통하지 않는다
 
+**재현** `python3 experiments/regime_transfer.py` (체제별 분해) + `python3 experiments/proxy_dispatch.py` (경계가 대리 지표인가).
+
 > dev-cu124 (CUDA 12.4 / 호스트). 성능 수치를 인용하지 마라.
 > **LLM 호출 0.** 기존 데이터와 `fit_weights` / GBDT 재적합만 썼다.
 

@@ -466,3 +466,27 @@ def test_reasoning_effort_none_sends_nothing():
                     shape_values=[], cache=False)
     assert "openai_reasoning_effort" not in (
         llm._agent("optimize").model_settings or {})
+
+
+def test_every_llm_runner_persists_its_calls():
+    """★ LLM 호출은 다시 만들 수 없다 (D-33 / D-51).
+
+    `RoundLoop` 를 쓰는 러너는 `dump()` 가 대신 남겨 주지만, 직접
+    `OpenAILLM` 을 부르는 러너는 스스로 남겨야 한다. 실제로 두 개가
+    빠져 있었고, 비용 집계 때 토큰을 표준출력 로그에서 주워야 했다.
+    """
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    bad = []
+    for f in sorted((root / "experiments").glob("*.py")):
+        src = f.read_text()
+        if "OpenAILLM(" not in src:
+            continue
+        # RoundLoop 가 dump() 안에서 llm.dump() 를 부른다
+        if "RoundLoop(" in src:
+            continue
+        if not re.search(r"\.dump\(", src):
+            bad.append(f"  {f.name}: OpenAILLM 을 직접 쓰는데 dump 가 없다")
+    assert not bad, ("LLM 호출을 남기지 않는 러너가 있다 (D-33):\n"
+                     + "\n".join(bad))
