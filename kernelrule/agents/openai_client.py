@@ -150,6 +150,16 @@ class LLMConfig:
     #: `None` 이면 보내지 않는다(모델 기본값). 그 경우도 **의도한 것임을
     #: 기록으로 남기려면** 명시적으로 None 을 적어야 한다.
     reasoning_effort: str | None = "medium"
+    #: ★ 피처를 어떻게 보여주는가. **실험 조건이므로 기록한다** (D-31).
+    #:
+    #:   "full"   이름 + 범위 + 물리적 의미 + 왜 중요한가  (지금 기본)
+    #:   "names"  이름만 — 2026-08-22 이전 상태
+    #:
+    #: 이 둘의 차이가 이 저장소에서 시드 폭을 넘은 유일한 효과였는데,
+    #: 그 측정이 **임의로 바꾼 모델**에서 나온 것이라 다시 잰다 (D-52).
+    #: 플래그로 둔 이유는 코드를 되돌렸다 돌렸다 하면 어느 실행이 어느
+    #: 조건이었는지 알 수 없게 되기 때문이다.
+    feature_detail: str = "full"
 
     def to_dict(self) -> dict:
         return dict(self.__dict__)
@@ -298,6 +308,16 @@ class OpenAILLM:
         """
         from kernelrule.features import render_features
 
+        if self.cfg.feature_detail not in ("full", "names"):
+            raise ValueError(
+                f"알 수 없는 feature_detail: {self.cfg.feature_detail!r}. "
+                "'full' 또는 'names'")
+        if self.cfg.feature_detail == "names":
+            # ★ 2026-08-22 이전 상태를 그대로 재현한다 — 이름 목록만.
+            return ("## config 수준 (`f.<이름>`)\n\n"
+                    + "\n".join(f"- `{n}`" for n in self.features)
+                    + "\n\n## 형상 수준 (`p.<이름>`)\n\n"
+                    + "\n".join(f"- `{n}`" for n in self.shape_values))
         if self.registry is None:
             # 레지스트리가 없으면 이름만 — 그리고 **그 사실을 말한다** (§26.4)
             names = "\n".join(f"- `{n}`" for n in self.features)

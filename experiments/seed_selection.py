@@ -74,8 +74,8 @@ def _setup(table):
         val=Split("val", tuple(held)), kind="nk11008")
 
 
-def main(n_seeds: int = 6, seed_base: int = 20260823,
-         tag: str = "selB") -> None:
+def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
+         feature_detail: str = "full") -> None:
     """⚠️ `seed_base` 는 더 이상 **LLM 시드가 아니다** (D-47).
 
     Responses 엔드포인트에 `seed` 파라미터가 없고, 추론 모델은
@@ -94,7 +94,7 @@ def main(n_seeds: int = 6, seed_base: int = 20260823,
     print("=" * 76)
     print(f"시드 선택 확인 — 새 시드 {n_seeds}개  [{MODEL}]  tag={tag}")
     print("=" * 76)
-    print("  조건: 씨앗 없음 + 피처 설명 + 기본 24개 (= A-base 와 동일)")
+    print(f"  조건: 씨앗 없음 + 기본 24피처 + feature_detail={feature_detail}")
     print(f"  학습 {len(splits.train.shapes)} / 구조 홀드아웃 "
           f"{len(splits.val.shapes)}\n")
 
@@ -104,7 +104,8 @@ def main(n_seeds: int = 6, seed_base: int = 20260823,
         if (Path("runs") / run_id / "archive.jsonl").exists():
             print(f"  [{run_id}] 이미 있다. 건너뛴다")
             continue
-        llm = OpenAILLM(LLMConfig(model=MODEL, concurrency=6),
+        llm = OpenAILLM(LLMConfig(model=MODEL, concurrency=6,
+                                  feature_detail=feature_detail),
                         feature_names=matrix.feature_names(),
                         shape_values=matrix.shape_value_names(),
                         registry=REGISTRY, budget=budget, cache=False)
@@ -221,4 +222,5 @@ def main(n_seeds: int = 6, seed_base: int = 20260823,
 if __name__ == "__main__":
     main(int(sys.argv[1]) if len(sys.argv) > 1 else 6,
          int(sys.argv[2]) if len(sys.argv) > 2 else 20260823,
-         sys.argv[3] if len(sys.argv) > 3 else "selB")
+         sys.argv[3] if len(sys.argv) > 3 else "selB",
+         sys.argv[4] if len(sys.argv) > 4 else "full")
