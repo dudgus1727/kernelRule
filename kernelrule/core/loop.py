@@ -461,6 +461,22 @@ class RoundLoop:
     def dump(self, out: str | Path | None = None) -> Path:
         d = Path(out or (Path(self.cfg.out_dir) / self.cfg.run_id))
         d.mkdir(parents=True, exist_ok=True)
+        # ★ **무엇으로 돌렸는지**를 남긴다 (D-31, D-45, D-51). 이것이 없으면
+        #   나중에 어느 실행이 어느 모델/엔드포인트/추론강도였는지 알 수
+        #   없고, 그러면 나란히 놓을 수 없다. 실제로 30개 실행 중 2개만
+        #   config.json 이 있었다 — 그 둘은 다른 스크립트가 쓴 것이다.
+        cfg: dict = {"loop": dict(self.cfg.__dict__),
+                     "split": {"kind": self.splits.kind,
+                               "n_train": len(self.splits.train.shapes),
+                               "n_val": len(self.splits.val.shapes)},
+                     "n_features": len(self.matrix.feature_names())}
+        llm_cfg = getattr(self.llm, "cfg", None)
+        if llm_cfg is not None and hasattr(llm_cfg, "to_dict"):
+            cfg["llm"] = llm_cfg.to_dict()
+        else:                                   # MockLLM 등
+            cfg["llm"] = {"class": type(self.llm).__name__}
+        (d / "config.json").write_text(
+            json.dumps(cfg, ensure_ascii=False, indent=1, default=str))
         self.archive.dump(d / "archive.jsonl")
         (d / "rounds.jsonl").write_text("\n".join(
             json.dumps(x.__dict__, ensure_ascii=False, default=str)

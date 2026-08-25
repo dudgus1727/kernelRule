@@ -379,3 +379,20 @@ def test_round_of_total_transport_failure_stops_the_run():
     assert res.n_llm_error == res.n_proposed
     assert "★LLM오류 12" in res.line()
     assert issubclass(LLMUnreachable, RuntimeError)
+
+
+def test_dump_records_what_it_ran_with(loop, tmp_path):
+    """★ 무엇으로 돌렸는지 없으면 나중에 나란히 놓을 수 없다 (D-51).
+
+    30개 실행 중 2개만 `config.json` 이 있었다 — `dump()` 가 안 썼고,
+    그 둘은 다른 스크립트가 쓴 것이었다.
+    """
+    import json
+
+    cfg = json.loads((loop.dump(tmp_path / "d") / "config.json").read_text())
+    assert cfg["loop"]["run_id"] == "test"
+    assert cfg["split"]["n_train"] == len(loop.splits.train.shapes)
+    assert cfg["split"]["n_val"] == len(loop.splits.val.shapes)
+    assert cfg["n_features"] > 0
+    # MockLLM 이면 클래스 이름이라도 남아야 한다 — 빈칸이면 안 된다
+    assert cfg["llm"]
