@@ -4,6 +4,18 @@
 > **조건**: gpt-5.6-luna / responses / medium, 6시드
 
 
+> ## ★ 이 숫자는 검증 가능하다
+>
+> 규칙과 **적합된 가중치**가 `docs/artifacts/rules/luna-s*.py` 에 있고,
+> 점수는 `docs/artifacts/rules/index.json` 에 기계가 썼다.
+>
+> ```
+> python3 experiments/verify_rules.py
+> ```
+>
+> 이 명령이 `runs/` 없이 규칙만으로 아래 값을 다시 낸다. 어긋나면 실패한다.
+> **LLM 실행은 재현할 수 없지만 채점은 결정론적이다** (§24.4b).
+
 **측정일** 2026-08-25 · **재현** `python3 experiments/seed_selection.py 3 20260825 luna`
 **설정** `gpt-5.6-luna` / Responses / `reasoning_effort=medium` /
 `temperature=None` / `seed=None`
@@ -14,6 +26,19 @@
 > 띄운 명령에서 온 것이고, `llm_calls` 에는 모델만 남아 있다.
 
 ---
+
+## ⚠️ 적합기가 절반은 안 움직였다 (D-54)
+
+규칙을 내보내며 발견했다. `index.json` 의 `w_moved` 를 보라.
+
+```
+12실행 x 2체제 = 24회 중 13회에서 가중치가 초기값 그대로다
+설명 있음(luna) 8/12 움직임  vs  이름만(lunaNAMES) 3/12
+```
+
+**아래 숫자는 그 상태의 값이다.** §29.3 이 "가중치 최적화 후에 채점한다"
+고 한 보장이 절반에서 성립하지 않는다. 고치지 않았다 — 고치면 모든 점수가
+바뀌고, 그 전에 얼마나 달라지는지 먼저 재야 한다.
 
 ## 결과
 

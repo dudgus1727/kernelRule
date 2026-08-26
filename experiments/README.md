@@ -8,6 +8,8 @@
 | 스크립트 | LLM | 만든 artifact | 상태 |
 |---|---|---|---|
 | `seed_selection.py` | ✅ | `luna-baseline.md` · `conclusion.md` | **정본 러너** |
+| `export_rules.py` | — | `docs/artifacts/rules/` | **규칙 내보내기** |
+| `verify_rules.py` | — | (검증만) | ★ **검증 경로** |
 
 | `new_axes.py` | ✅ | `new-axes.md` | ⚠️ 원본 삭제 |
 | `feature_writer.py` | ✅ | `feature-writer-f1.md` | ⚠️ 원본 삭제 |
@@ -20,6 +22,25 @@
 | `regime_count.py` | — | `regime-count.md` | ⚠️ evolved 팔 원본 삭제 |
 | `seed_spread.py` | — | `conclusion.md` 의 시드 폭 | ⚠️ 원본 삭제 — 목록을 채워야 돈다 |
 | `selection_spread.py` | — | `decisions.md` D-40 / D-42 | ⚠️ 원본 삭제 — 목록을 채워야 돈다 |
+
+## ★ 숫자를 검증하는 법
+
+```bash
+python3 experiments/verify_rules.py
+```
+
+`runs/` 는 `.gitignore` 라 저장소에 없다. 이 명령은 그것을 **안 읽고**
+`docs/artifacts/rules/*.py` 의 규칙과 적합된 가중치만으로 구조 홀드아웃을
+다시 계산해 `index.json` 과 대조한다. 어긋나면 실패한다.
+
+```
+LLM 실행    재현 불가 (난수 통제 안 됨 — §24.4b)
+채점·재채점  ★ 결정론적. 몇 초
+```
+
+문서의 성능 숫자는 이 경로로 검증된다. 새 실행을 만들면
+`export_rules.py` 를 다시 돌려라 — 안 돌리면 문서가 조용히 낡는다
+(테스트가 `rules/*.py` 와 `index.json` 의 짝은 본다).
 
 ## 실행 조건은 코드가 아니라 설정에 있다
 

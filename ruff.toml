@@ -1,6 +1,11 @@
 line-length = 88
 target-version = "py310"
 
+# ★ 생성된 규칙 파일은 **데이터**다 — LLM 이 쓴 코드를 그대로 담는다.
+#   린트하면 우리 스타일로 고치게 되고, 그러면 커밋된 규칙이
+#   실행된 것과 달라져 검증이 무의미해진다.
+extend-exclude = ["docs/artifacts/rules"]
+
 [lint]
 select = [
     "E", "F", "W",      # pycodestyle / pyflakes

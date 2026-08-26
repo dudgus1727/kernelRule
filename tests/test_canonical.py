@@ -75,3 +75,39 @@ def test_thin_regime_warns_instead_of_pretending():
     r = canonical_score(_CODE, [1.0], table=t, matrix=m, splits=splits)
     assert r.warnings, "형상 3개짜리 학습인데 경고가 없다"
     assert any("학습 형상" in w for w in r.warnings)
+
+
+# ---------------------------------------------------------------------------
+# 커밋된 규칙과 기록된 점수가 어긋나지 않는가
+# ---------------------------------------------------------------------------
+# `runs/` 는 .gitignore 라 문서의 숫자를 대조할 방법이 없었다. 규칙과
+# **적합된** 가중치를 커밋해 두면 채점이 결정론적이므로 검증할 수 있다.
+
+def test_exported_rules_match_their_index():
+    """★ `rules/*.py` 와 `index.json` 이 짝이 맞는가.
+
+    전체 재채점은 `experiments/verify_rules.py` 가 한다 (번들이 필요하고
+    수 분 걸린다). 여기서는 **파일과 기록이 어긋나지 않는지**만 본다 —
+    내보내기를 깜빡하면 문서가 조용히 낡는다.
+    """
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "docs/artifacts/rules"
+    idx = root / "index.json"
+    if not idx.exists():
+        pytest.skip("내보낸 규칙이 없다 — experiments/export_rules.py")
+    index = json.loads(idx.read_text())
+    assert index, "index.json 이 비었다"
+    for row in index:
+        f = root / f"{row['run']}.py"
+        assert f.exists(), f"{row['run']} 의 규칙 파일이 없다"
+        src = f.read_text()
+        assert "def score(" in src and "W_FITTED" in src
+        w = row["weights"]
+        assert set(w) == {"short", "long"}, f"{row['run']}: 체제가 빠졌다"
+        assert all(len(v) > 0 for v in w.values())
+        # ⚠️ 두 체제의 가중치가 **같을 수 있다.** Nelder-Mead 가 계단형
+        #   목적함수에서 한 발짝도 못 움직이는 경우가 실재한다 (D-54) —
+        #   12개 중 여러 개가 그렇다. 그것은 내보내기 버그가 아니므로
+        #   여기서 실패시키지 않는다. 감시는 `index.json` 의 `w_moved` 다.

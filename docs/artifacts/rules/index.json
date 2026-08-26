@@ -1,0 +1,533 @@
+[
+ {
+  "run": "luna-s0",
+  "in_sample": 1.04816,
+  "holdout": 1.057337,
+  "by_regime": {
+   "short": 1.065196,
+   "long": 1.045657
+  },
+  "n_holdout": 20,
+  "llm": {},
+  "weights": {
+   "short": [
+    15.624592,
+    -0.378271,
+    0.980876,
+    1.077807,
+    7.266435,
+    0.003582,
+    10.37789,
+    2.084212
+   ],
+   "long": [
+    12.039729,
+    -0.489001,
+    1.209401,
+    0.873762,
+    6.875513,
+    0.028664,
+    6.83006,
+    1.390639
+   ]
+  },
+  "w_moved": {
+   "short": true,
+   "long": true
+  }
+ },
+ {
+  "run": "luna-s1",
+  "in_sample": 1.087459,
+  "holdout": 1.101776,
+  "by_regime": {
+   "short": 1.109259,
+   "long": 1.090646
+  },
+  "n_holdout": 20,
+  "llm": {},
+  "weights": {
+   "short": [
+    21.6,
+    1.1,
+    0.35,
+    3.3325,
+    -0.12,
+    1.0,
+    0.009,
+    7.808
+   ],
+   "long": [
+    21.6,
+    1.1,
+    0.35,
+    3.3325,
+    -0.12,
+    1.0,
+    0.009,
+    4.88
+   ]
+  },
+  "w_moved": {
+   "short": true,
+   "long": false
+  }
+ },
+ {
+  "run": "luna-s2",
+  "in_sample": 1.093374,
+  "holdout": 1.113746,
+  "by_regime": {
+   "short": 1.106131,
+   "long": 1.125266
+  },
+  "n_holdout": 20,
+  "llm": {},
+  "weights": {
+   "short": [
+    2.01024,
+    0.5051,
+    8.8011,
+    -0.4924,
+    1.0301,
+    0.3559,
+    10.0897,
+    3.1614
+   ],
+   "long": [
+    3.216384,
+    0.5051,
+    8.8011,
+    -0.4924,
+    1.0301,
+    0.3559,
+    10.0897,
+    3.1614
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": true
+  }
+ },
+ {
+  "run": "luna-s3",
+  "in_sample": 1.056636,
+  "holdout": 1.102048,
+  "by_regime": {
+   "short": 1.149684,
+   "long": 1.034269
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium"
+  },
+  "weights": {
+   "short": [
+    2.515815,
+    10.493451,
+    3.826086,
+    -0.191222,
+    0.452789,
+    11.911457,
+    0.994371,
+    4.350195
+   ],
+   "long": [
+    2.656028,
+    17.689044,
+    6.210052,
+    -0.087361,
+    0.298633,
+    12.60577,
+    1.233187,
+    2.290497
+   ]
+  },
+  "w_moved": {
+   "short": true,
+   "long": true
+  }
+ },
+ {
+  "run": "luna-s4",
+  "in_sample": 1.080614,
+  "holdout": 1.08213,
+  "by_regime": {
+   "short": 1.095889,
+   "long": 1.061815
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium"
+  },
+  "weights": {
+   "short": [
+    -0.08,
+    0.58,
+    29.5,
+    1.3,
+    0.83,
+    2.544,
+    1.291709,
+    7.16
+   ],
+   "long": [
+    -0.105245,
+    0.594614,
+    30.430908,
+    1.341023,
+    0.9868,
+    2.624279,
+    1.276466,
+    9.590145
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": true
+  }
+ },
+ {
+  "run": "luna-s5",
+  "in_sample": 1.098707,
+  "holdout": 1.137846,
+  "by_regime": {
+   "short": 1.121083,
+   "long": 1.16346
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium"
+  },
+  "weights": {
+   "short": [
+    89.013196,
+    3.981573,
+    2.339524,
+    0.39137,
+    -8.050287,
+    1.611173,
+    2.799707,
+    0.100835
+   ],
+   "long": [
+    90.236116,
+    4.036275,
+    2.371666,
+    0.405109,
+    -7.939687,
+    2.000755,
+    2.838171,
+    0.114574
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": true
+  }
+ },
+ {
+  "run": "lunaNAMES-s0",
+  "in_sample": 1.065747,
+  "holdout": 1.068846,
+  "by_regime": {
+   "short": 1.085248,
+   "long": 1.044705
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium",
+   "feature_detail": "names"
+  },
+  "weights": {
+   "short": [
+    1.08,
+    2.46,
+    5.11,
+    1.27,
+    0.57,
+    2.624,
+    2.47,
+    4.22
+   ],
+   "long": [
+    1.728,
+    2.46,
+    5.11,
+    1.27,
+    0.57,
+    2.624,
+    2.47,
+    4.22
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": true
+  }
+ },
+ {
+  "run": "lunaNAMES-s1",
+  "in_sample": 1.092149,
+  "holdout": 1.128149,
+  "by_regime": {
+   "short": 1.121238,
+   "long": 1.138596
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium",
+   "feature_detail": "names"
+  },
+  "weights": {
+   "short": [
+    1.593116,
+    1.712757,
+    2.834336,
+    1.021711,
+    1.476512,
+    1.333517,
+    7.749283,
+    0.896875
+   ],
+   "long": [
+    1.593116,
+    1.712757,
+    2.834336,
+    1.021711,
+    1.476512,
+    1.333517,
+    7.749283,
+    0.896875
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": false
+  }
+ },
+ {
+  "run": "lunaNAMES-s2",
+  "in_sample": 1.092681,
+  "holdout": 1.124902,
+  "by_regime": {
+   "short": 1.129905,
+   "long": 1.117437
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium",
+   "feature_detail": "names"
+  },
+  "weights": {
+   "short": [
+    2.368,
+    2.704,
+    1.89,
+    2.19,
+    1.04,
+    0.5,
+    8.58,
+    0.33
+   ],
+   "long": [
+    2.368,
+    2.704,
+    1.89,
+    2.19,
+    1.04,
+    0.5,
+    8.58,
+    0.33
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": false
+  }
+ },
+ {
+  "run": "lunaNAMES-s3",
+  "in_sample": 1.115608,
+  "holdout": 1.136661,
+  "by_regime": {
+   "short": 1.140597,
+   "long": 1.130783
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium",
+   "feature_detail": "names"
+  },
+  "weights": {
+   "short": [
+    0.790854,
+    41.992166,
+    4.095975,
+    0.726483,
+    1.348129,
+    15.845192,
+    10.114663,
+    0.581117
+   ],
+   "long": [
+    0.790854,
+    41.992166,
+    4.095975,
+    0.726483,
+    1.348129,
+    15.845192,
+    10.114663,
+    0.581117
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": false
+  }
+ },
+ {
+  "run": "lunaNAMES-s4",
+  "in_sample": 1.08199,
+  "holdout": 1.084061,
+  "by_regime": {
+   "short": 1.093062,
+   "long": 1.070699
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium",
+   "feature_detail": "names"
+  },
+  "weights": {
+   "short": [
+    0.987587,
+    2.990088,
+    24.459459,
+    22.426959,
+    -1.977602,
+    46.638878,
+    4.869551,
+    2.410129
+   ],
+   "long": [
+    0.987587,
+    2.990088,
+    24.459459,
+    22.426959,
+    -1.977602,
+    46.638878,
+    4.869551,
+    2.410129
+   ]
+  },
+  "w_moved": {
+   "short": false,
+   "long": false
+  }
+ },
+ {
+  "run": "lunaNAMES-s5",
+  "in_sample": 1.084948,
+  "holdout": 1.110612,
+  "by_regime": {
+   "short": 1.115448,
+   "long": 1.103398
+  },
+  "n_holdout": 20,
+  "llm": {
+   "model": "gpt-5.6-luna",
+   "temperature": null,
+   "seed": null,
+   "max_retries": 3,
+   "concurrency": 6,
+   "arch_prompt": "hw/sm_86.md",
+   "endpoint": "responses",
+   "reasoning_effort": "medium",
+   "feature_detail": "names"
+  },
+  "weights": {
+   "short": [
+    0.598277,
+    1.268255,
+    0.276163,
+    -0.864222,
+    2.680459,
+    6.587092,
+    1.008837,
+    13.075421
+   ],
+   "long": [
+    0.314751,
+    1.379876,
+    -0.051336,
+    -0.871805,
+    4.696548,
+    7.140853,
+    0.607984,
+    7.059545
+   ]
+  },
+  "w_moved": {
+   "short": true,
+   "long": true
+  }
+ }
+]

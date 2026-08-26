@@ -60,6 +60,9 @@ class CanonicalScore:
     by_regime: dict[str, float]
     #: 홀드아웃 평가 결과. 유의성 판정(`compare`)에 그대로 쓴다.
     evaluation: Evaluation
+    #: ★ 체제별로 **적합된** 가중치. 이것이 없으면 규칙을 파일로 내보낼 때
+    #: 초기값을 적게 되고, 그 파일은 재현되지 않는다 — 파일이 거짓말을 한다.
+    weights: dict[str, list[float]] = field(default_factory=dict)
     n_holdout: int = 0
     warnings: tuple[str, ...] = field(default_factory=tuple)
 
@@ -94,6 +97,7 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
     reg_tr: dict = {}
     reg_ho: dict = {}
     tol_ho: dict = {}
+    fitted: dict[str, list[float]] = {}
 
     for name in ("short", "long"):
         g_tr = [p for p in train if regime_of(p, table.hw) == name]
@@ -108,6 +112,7 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
                          f"{MIN_PER_REGIME}. 그 체제의 가중치는 믿기 어렵다")
         fit = fit_weights(fn, matrix, table, Split("train", tuple(g_tr)),
                           w0, max_evals=max_evals)
+        fitted[name] = [float(x) for x in fit.w]
         so = make_score_of(fn, matrix, fit.w)
         e_tr = evaluate_scores(so, table, g_tr, ks=(1,))
         for i, p in enumerate(e_tr.shapes):
@@ -140,5 +145,5 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
     return CanonicalScore(
         holdout=geomean(np.array([reg_ho[p] for p in scored])),
         in_sample=geomean(np.array([reg_tr[p] for p in train if p in reg_tr])),
-        by_regime=by_regime, evaluation=ev, n_holdout=len(scored),
-        warnings=tuple(warns))
+        by_regime=by_regime, weights=fitted, evaluation=ev,
+        n_holdout=len(scored), warnings=tuple(warns))

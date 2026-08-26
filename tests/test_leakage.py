@@ -211,3 +211,43 @@ def test_env_hash_is_required(real_bundle_path):
         warnings.simplefilter("ignore")
         with pytest.raises(Exception, match="env_hash"):
             PerfTable.from_bundle(real_bundle_path, env_hash="deadbeef")
+
+
+# ---------------------------------------------------------------------------
+# 피처 함수가 받는 프레임에 정답이 없는가 (§3 5번째 겹)
+# ---------------------------------------------------------------------------
+# `FeatureMatrix` 는 `table.frame_for(p)` 를 피처 함수에 그대로 넘긴다.
+# 그 프레임이 정답을 담고 있으면 **피처가 측정 시간을 볼 수 있다.**
+#
+# 지금 24개는 사람이 썼으니 안 쓰지만, **FeatureWriter 가 만든 피처는
+# 다르다** — 그쪽은 우리가 안 본 코드다. 구조로 막혀 있어야 한다.
+
+@pytest.mark.needs_bundle
+def test_feature_frame_has_no_answer_column(real_bundle_path):
+    """★ `frame_for` 가 `ANSWER_COLS` 를 한 칸도 담지 않는다."""
+    from kerneltab.core.table import ANSWER_COLS
+
+    from kernelrule.core.table import PerfTable
+    t = PerfTable.from_bundle(real_bundle_path, env_hash="c63710df",
+                              ok_only=False)
+    cols = set(t.frame_for(t.shapes()[0]).columns)
+    leaked = cols & set(ANSWER_COLS)
+    assert not leaked, (
+        f"피처 함수가 받는 프레임에 정답 컬럼이 있다: {sorted(leaked)}. "
+        "`PerfTable.from_bundle` 이 `bundle.ranking()` 을 쓰는지 확인하라 (§3)")
+
+
+def test_generated_feature_touching_answers_is_rejected():
+    """★ 정답 컬럼을 참조하는 생성 피처를 검사기가 잡는가 (§11.4).
+
+    프레임에 없으므로 실행하면 어차피 터지지만, **AST 단계에서 사유가
+    분명하게** 잡혀야 한다 — 실행 예외로 터지면 "모델이 나쁜 피처를 냈다"
+    로 읽힌다 (D-49).
+    """
+    from kernelrule.features.generated import FeatureRejected, check_feature_code
+
+    for col in ("time_ms", "cublas_ms", "difficulty", "tflops"):
+        code = (f"def peek(p, hw, cfg) -> float:\n"
+                f"    return float(cfg.{col})\n")
+        with pytest.raises(FeatureRejected):
+            check_feature_code(code, known=frozenset())
