@@ -54,7 +54,9 @@ from kernelrule.features.validate import _spearman
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 MODEL = DEFAULT_MODEL   # ★ 단일 출처 (D-45)
-PROPOSALS = Path("runs/featwriter-F1-gpt-5.4/proposals.jsonl")
+#: ★ 자리표시자다. `<모델>` 을 실제 실행으로 바꿔야 돈다 — 이 스크립트가
+#: 쓰던 `featwriter-F1-gpt-5.4` 는 삭제됐다 (D-52).
+PROPOSALS = Path("runs/featwriter-F1-<모델>/proposals.jsonl")
 DUP_RHO = 0.95
 
 
@@ -71,6 +73,12 @@ def _columns(reg: FeatureRegistry, table, shapes) -> dict:
 
 
 def novel_axes(table, shapes) -> list:
+    if "<모델>" in str(PROPOSALS) or not PROPOSALS.exists():
+        raise SystemExit(
+            f"피처 제안 파일이 없다: {PROPOSALS}\n"
+            "F1 을 지시된 모델로 먼저 돌리고 (experiments/feature_writer.py) "
+            "PROPOSALS 를 그 경로로 바꿔라. 이전 gpt-5.4 산출물은 삭제됐다 "
+            "(D-52).")
     """생성 피처 중 **기존과 중복이 아닌 것**. 목록을 손으로 적지 않는다."""
     gen = load_generated(PROPOSALS)
     ref = _columns(REGISTRY, table, shapes)

@@ -50,12 +50,34 @@ from kernelrule.features import REGISTRY
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
-RUNS = [f"seedabl-desc-다-noseed-s{s}" for s in range(3)] + \
-       [f"newaxes-A-base-s{s}" for s in range(3)]
+#: ★ 이 스크립트가 읽던 `gpt-5.4` 실행은 **삭제됐다** (D-52 — 지시 없이
+#: 도입된 모델의 산출물). 다시 쓰려면 `experiments/seed_selection.py` 처럼
+#: 지시된 모델로 먼저 실행을 만들고 아래 목록을 그것으로 바꿔라.
+#: 없는 실행을 조용히 건너뛰면 **표본이 줄어든 줄 모르고 결론을 낸다.**
+def _require(runs: list[str]) -> list[str]:
+    from pathlib import Path as _P
+    if not runs:
+        raise SystemExit(
+            "비교할 실행 목록이 비어 있다. 이 스크립트가 읽던 gpt-5.4 산출물은 "
+            "삭제됐다 (D-52).\n"
+            "지시된 모델로 실행을 만들고 목록을 채워라 — 빈 목록으로 돌면 "
+            "표본 0으로 결론을 내게 된다.")
+    missing = [r for r in runs if not (_P("runs") / r / "archive.jsonl").exists()]
+    if missing:
+        raise SystemExit(
+            "이 스크립트가 읽던 실행이 없다 (gpt-5.4 산출물은 삭제됐다 — "
+            "D-52):\n  " + "\n  ".join(missing)
+            + "\n지시된 모델로 실행을 만들고 목록을 바꿔라.")
+    return runs
+
+
+#: 비교할 실행 목록. ★ 지시된 모델의 실행으로 바꿔서 쓴다.
+RUNS: list[str] = []
 KS = (1, 3, 5, 10)
 
 
 def main() -> None:
+    _require(RUNS)
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
 

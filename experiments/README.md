@@ -8,18 +8,18 @@
 | 스크립트 | LLM | 만든 artifact | 상태 |
 |---|---|---|---|
 | `seed_selection.py` | ✅ | `luna-baseline.md` · `conclusion.md` | **정본 러너** |
-| `seed_ablation.py` | ✅ | `seed-ablation.md` | 폐기 (gpt-5.4, 3시드) |
-| `new_axes.py` | ✅ | `new-axes.md` | 조건부 (gpt-5.4) |
-| `feature_writer.py` | ✅ | `feature-writer-f1.md` | 조건부 (gpt-5.4) |
-| `architect_gate.py` | ✅ | `architect-gate.md` | 조건부 (gpt-5.4) |
-| `score_ablation.py` | — | `seed-ablation.md` 채점 | 조건부 |
-| `score_new_axes.py` | — | `new-axes.md` 채점 | 조건부 |
+
+| `new_axes.py` | ✅ | `new-axes.md` | ⚠️ 원본 삭제 |
+| `feature_writer.py` | ✅ | `feature-writer-f1.md` | ⚠️ 원본 삭제 |
+| `architect_gate.py` | ✅ | `architect-gate.md` | ⚠️ 원본 삭제 (mini 실행만 남음) |
+
+| `score_new_axes.py` | — | `new-axes.md` 채점 | ⚠️ 원본 삭제 |
 | `rescore_canonical.py` | — | `conclusion.md` 의 정준 표 | 유효 |
 | `regime_transfer.py` | — | `structure-transfer.md` · `regime-diagnosis.md` | 유효 |
 | `proxy_dispatch.py` | — | `regime-diagnosis.md` · `glossary.md` | 유효 |
-| `regime_count.py` | — | `regime-count.md` | 조건부 |
-| `seed_spread.py` | — | `conclusion.md` 의 시드 폭 | 유효 |
-| `selection_spread.py` | — | `decisions.md` D-40 / D-42 | 유효 |
+| `regime_count.py` | — | `regime-count.md` | ⚠️ evolved 팔 원본 삭제 |
+| `seed_spread.py` | — | `conclusion.md` 의 시드 폭 | ⚠️ 원본 삭제 — 목록을 채워야 돈다 |
+| `selection_spread.py` | — | `decisions.md` D-40 / D-42 | ⚠️ 원본 삭제 — 목록을 채워야 돈다 |
 
 ## 실행 조건은 코드가 아니라 설정에 있다
 
