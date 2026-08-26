@@ -1,5 +1,10 @@
 # 피처 설명이 규칙을 바꾼다 — 쓰느냐가 아니라 얼마나 무겁게 보느냐
 
+> **상태**: 폐기
+> **조건**: ★ gpt-5.4 에서 0.058 이었으나 **luna 6시드에서 0.016 (폭의 20%, 부호검정 p=1.000)** 으로 재현되지 않았다
+> **후속**: luna A/B 결과 — `conclusion.md`
+
+
 **측정일** 2026-08-22 · `gpt-5.4` · 시드 3 × 12라운드 · **재현**
 `python3 experiments/seed_ablation.py 12 3 다-noseed -desc` → `score_ablation.py`
 

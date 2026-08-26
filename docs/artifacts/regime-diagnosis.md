@@ -1,5 +1,9 @@
 # 체제별 진단 — 긴 형상에서는 규칙 기반이 통하지 않는다
 
+> **상태**: 유효
+> **조건**: LLM 무관 — 정적 top-1 / 벤더 / GBDT 기준선
+
+
 **재현** `python3 experiments/regime_transfer.py` (체제별 분해) + `python3 experiments/proxy_dispatch.py` (경계가 대리 지표인가).
 
 > dev-cu124 (CUDA 12.4 / 호스트). 성능 수치를 인용하지 마라.

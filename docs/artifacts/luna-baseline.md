@@ -1,5 +1,9 @@
 # luna 기준선 3시드 — 거부율만 확인되고 나머지는 못 잰다
 
+> **상태**: 유효
+> **조건**: gpt-5.6-luna / responses / medium, 6시드
+
+
 **측정일** 2026-08-25 · **재현** `python3 experiments/seed_selection.py 3 20260825 luna`
 **설정** `gpt-5.6-luna` / Responses / `reasoning_effort=medium` /
 `temperature=None` / `seed=None`

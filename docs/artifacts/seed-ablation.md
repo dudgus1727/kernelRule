@@ -1,5 +1,10 @@
 # 씨앗 절제 — 좋은 출발점이 오히려 해로웠다
 
+> **상태**: 폐기
+> **조건**: ★ gpt-5.4 + 시드 3개 (D-52, D-40). 차이 0.022 가 폭 0.0805 안이다
+> **후속**: luna 재현 미실시. 인용하지 마라
+
+
 **측정일** 2026-08-21 · **재현** `python3 experiments/seed_ablation.py 12 3`
 → `python3 experiments/score_ablation.py`
 

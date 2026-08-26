@@ -110,7 +110,7 @@ class _SkipGuardItem(pytest.Item):
                 + "\n".join("  - " + x for x in partial) + "\n\n"
                 "★ 이 실행 결과로 누출 방지를 보증하지 마라.\n"
                 "  대부분 `datasets/` 아래 번들이 없어서다. 받는 법:\n"
-                "    docs/kernelrule_design_addendum.md 의 데이터 절 참조\n"
+                "    docs/design.md 의 데이터 절 참조\n"
                 "  번들 없이 개발하는 것은 정상이지만, 그때는 합성 표만\n"
                 "  검증된 것이다.")
 
