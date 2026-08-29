@@ -22,6 +22,7 @@ from kernelrule.rules.checks import (
 )
 
 __all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "CritiqueOutput",
+           "RuleCritique", "TermCritique",
            "RuleProposal", "SchemaViolation", "validate_rule_proposal",
            "HAVE_PYDANTIC", "check_banned", "MAX_WEIGHTS",
            "N_HYP_MIN", "N_HYP_MAX"]
@@ -117,7 +118,7 @@ N_HYP_MIN, N_HYP_MAX = 2, 8
 
 #: 가중치 상한. **`rules.checks.LIMITS` 가 유일한 출처다** (D-26) —
 #: 스키마와 정적 검사가 어긋나면 한쪽만 통과하는 규칙이 생긴다.
-MAX_WEIGHTS = LIMITS["literal_budget"]
+MAX_WEIGHTS = LIMITS["budget"]
 
 
 @dataclass
@@ -128,6 +129,13 @@ class Hypothesis:
     evidence_cases: list[int] = field(default_factory=list)
     affected_regime: str = ""
     measurable_with: list[str] = field(default_factory=list)
+    #: ★ 없는 축을 요구하는 자리. 이것만 FeatureWriter 에게 전달된다 —
+    #: 진단 리포트는 안 간다 (D-75).
+    #:
+    #: ⚠️ 2026-08-28 에 `physical_requirement` 로 바꿨다가 **되돌렸다**
+    #: (D-81). 기준선 17.9% 가 이 이름과 이 설명으로 측정됐고, 바꾼 채로
+    #: 비교하면 두 변수가 다르다. `loop._requirement_of` 는 두 이름을 다
+    #: 읽으므로 그 사이에 만들어진 실행도 그대로 읽힌다.
     needs_new_feature: str | None = None
     proposed_direction: str = ""
     risk: str = ""
@@ -160,6 +168,39 @@ class CritiqueOutput:
     defects: list[str] = field(default_factory=list)
     measures_what: str = ""
     confidence: float = 0.5
+
+
+@dataclass
+class TermCritique:
+    """규칙 **한 항**에 대한 심사 (D-85). `w[index]` 가 곱해진 항이 단위다."""
+
+    index: int
+    expression: str = ""
+    physics: str = ""
+    #: ★ 이 심사의 요점. `False` 가 정답인 항이 있다 — 억지로 설명을 지어
+    #: 붙이면 심사가 아무 일도 안 하게 된다.
+    explainable: bool = True
+    why_not: str = ""
+    regime_dependent: bool = False
+    regime: str = ""
+
+
+@dataclass
+class RuleCritique:
+    """규칙 함수 전체에 대한 심사 (D-85).
+
+    ⚠️ **같은 모델이 쓰고 심사한다** (D-45 로 모델이 고정돼 있다).
+    오류가 상관될 수 있고, "설명 가능" 이 물리적 타당성이 아니라 그
+    모델의 일관성일 수 있다. 모델 간 대조는 별도 실험이다.
+    """
+
+    terms: list[TermCritique] = field(default_factory=list)
+    overall: str = ""
+    defects: list[str] = field(default_factory=list)
+
+    @property
+    def unexplained(self) -> list[int]:
+        return [t.index for t in self.terms if not t.explainable]
 
 
 @dataclass
@@ -204,8 +245,9 @@ def validate_rule_proposal(obj: Any) -> RuleProposal:
     #   없으면 MockLLM 경로에서만 예산 초과가 통과해 ablation 이 깨진다.
     if len(w0) > MAX_WEIGHTS:
         raise SchemaViolation(
-            f"가중치 {len(w0)}개. 리터럴 예산이 {MAX_WEIGHTS}개다 — 숫자 "
-            "리터럴과 합산된다 (§29.4)")
+            f"가중치 {len(w0)}개. 예산이 {MAX_WEIGHTS}개다 — 숫자 "
+            "리터럴과 합산된다. 단 **분기 조건의 비교 상수는 빠진다** "
+            "(§29.4 / D-78)")
     if not all(abs(x) < 1e6 for x in w0):
         raise SchemaViolation("w0 값이 비정상적으로 크다")
     return RuleProposal(code=code, w0=w0, changes=str(d.get("changes", "")),
@@ -276,17 +318,21 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         """규칙 하나. ★ diff 가 아니라 **전체 코드**다 (§11.6)."""
 
         code: str = Field(
-            description="`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
-                        "설명이나 마크다운 펜스를 넣지 마라. "
-                        "★ 항은 최대 8개이고 각 w[i] 는 정확히 한 번만 쓸 수 "
-                        "있다 — 하나의 가중치를 여러 항에 재사용해 항을 늘리면 "
-                        "거부된다. 부모가 이미 8항이면 항을 추가하지 말고 "
-                        "가장 덜 중요한 항 하나를 지우고 그 자리에 넣어라")
+            description=("`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
+                         "설명이나 마크다운 펜스를 넣지 마라. "
+                         f"★ 항은 최대 {MAX_WEIGHTS}개이고 각 w[i] 는 정확히 "
+                         "한 번만 쓸 수 있다 — 하나의 가중치를 여러 항에 "
+                         "재사용해 항을 늘리면 거부된다. 부모가 이미 "
+                         f"{MAX_WEIGHTS}항이면 항을 추가하지 말고 가장 덜 "
+                         "중요한 항 하나를 지우고 그 자리에 넣어라. "
+                         "★ 분기 조건의 비교 상수(`p.roofline_ratio < 1`)는 "
+                         "예산에 들지 않는다 — 물리적 경계는 그대로 써라"))
         w0: list[float] = Field(
-            description="가중치 초기값. 대략적이면 충분하다 — 수치 "
-                        "최적화기가 맞춘다. 길이는 코드가 참조하는 최대 "
-                        "인덱스 + 1 이어야 한다. ★ 최대 8개. 숫자 리터럴과 "
-                        "합산되므로 리터럴을 쓰면 그만큼 줄어든다")
+            description=("가중치 초기값. 대략적이면 충분하다 — 수치 "
+                         "최적화기가 맞춘다. 길이는 코드가 참조하는 최대 "
+                         f"인덱스 + 1 이어야 한다. ★ 최대 {MAX_WEIGHTS}개. "
+                         "숫자 리터럴과 합산되므로 리터럴을 쓰면 그만큼 "
+                         "줄어든다 — 단 분기 비교 상수는 빠진다"))
         # ★ 계보 추적용이다. **비었다고 규칙을 버리지 않는다** — 필수
         #   필드가 많을수록 재시도 소진 확률만 올라간다. 비면 경고를 남긴다.
         changes: str = Field(
@@ -337,8 +383,9 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
                 raise ValueError("w0 가 비었다")
             if len(v) > MAX_WEIGHTS:
                 raise ValueError(
-                    f"가중치 {len(v)}개. 리터럴 예산이 {MAX_WEIGHTS}개다 — "
-                    "숫자 리터럴과 합산된다 (§29.4)")
+                    f"가중치 {len(v)}개. 예산이 {MAX_WEIGHTS}개다 — "
+                    "숫자 리터럴과 합산된다. 단 **분기 조건의 비교 상수는 "
+                    "빠진다** (§29.4 / D-78)")
             if not all(abs(x) < 1e6 for x in v):
                 raise ValueError("w0 값이 비정상적으로 크다")
             return v
@@ -350,6 +397,52 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         unit: str = "dimensionless"
         expected_range: tuple[float, float] = (0.0, 1.0)
         direction: str = "higher_is_worse"
+
+    class Category(BaseModel):
+        name: str = Field(description="소문자 + 밑줄")
+        description: str = Field(description="한 문장. 무엇이 얼마나 "
+                                             "낭비/제약되는가")
+
+    class CategoryOutput(BaseModel):
+        """★ LLM 이 물리를 어떻게 구조화하는가 (§30.10).
+
+        재발견 개수보다 흥미로울 수 있는 관찰이다 — 사람이 나눈 것과
+        비교할 재료가 된다. `stage1-features/categories.json` 에 남는다.
+        """
+
+        categories: list[Category]
+        notes: str = Field(default="", description="나누면서 뺀 것")
+
+    class TermCritiqueOut(BaseModel):
+        index: int = Field(description="이 항에 곱해진 w 의 인덱스")
+        expression: str = Field(
+            description="그 항의 식을 그대로 옮겨 적어라 (w[i] 제외)")
+        physics: str = Field(
+            description="이 항이 재는 물리량 **한 문장**. 그리고 그것이 "
+                        "성능을 좌우하는 기전. '크면 좋다' 는 기전이 아니다")
+        explainable: bool = Field(
+            description="물리적 기전으로 설명할 수 있는가. ★ False 가 정답인 "
+                        "항이 있다 — 억지로 지어 붙이지 마라")
+        why_not: str = Field(
+            default="", description="explainable 이 false 면 왜 못 하는가")
+        regime_dependent: bool = Field(
+            default=False, description="특정 체제에서만 말이 되는가")
+        regime: str = Field(default="", description="어느 체제인가")
+
+    class RuleCritiqueOutput(BaseModel):
+        """★ 규칙을 **항 단위로** 심사한다 (D-85).
+
+        `CritiqueOutput`(피처 심사, §11.5)과 다른 것이다.
+        """
+
+        terms: list[TermCritiqueOut] = Field(
+            description="w[i] 가 곱해진 항마다 하나씩. 빠뜨리지 마라")
+        overall: str = Field(
+            description="이 규칙 전체가 무엇을 하는가. 한 문단")
+        defects: list[str] = Field(
+            default_factory=list,
+            description="물리적 결함. 차원 불일치 / 중복 항 / 항등 변환 "
+                        "우회(np.sign, np.isfinite 로 상수 만들기) 등")
 
     class CritiqueOutput(BaseModel):
         has_defect: bool
@@ -364,6 +457,8 @@ else:                                               # pragma: no cover
     RuleOutput = _NoPydantic("RuleOutput")
     FeatureOutput = _NoPydantic("FeatureOutput")
     CritiqueOutput = _NoPydantic("CritiqueOutput")
+    Category = _NoPydantic("Category")
+    CategoryOutput = _NoPydantic("CategoryOutput")
     HypothesisOut = _NoPydantic("HypothesisOut")
 
 

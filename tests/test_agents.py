@@ -216,7 +216,7 @@ def test_hypothesis_count_desc_and_validator_share_one_constant():
 def test_weight_cap_has_one_source_of_truth():
     from kernelrule.agents.schemas import MAX_WEIGHTS
     from kernelrule.rules.checks import LIMITS
-    assert LIMITS["literal_budget"] == MAX_WEIGHTS
+    assert LIMITS["budget"] == MAX_WEIGHTS
 
 
 def test_mock_and_real_paths_enforce_the_same_budget():
@@ -320,16 +320,59 @@ def test_f3_shows_the_existing_features():
 
 def test_unknown_condition_is_rejected():
     c, _ = _feat_client()
-    with pytest.raises(ValueError, match="F0~F3"):
+    with pytest.raises(ValueError, match="알 수 없는 조건"):
         c._feature_prompt(condition="F9")
 
 
 def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
-    """D-35 — 형태 예시가 실제 피처를 건네주면 안 된다."""
+    """D-35 — **F0/F1 의** 형태 예시가 실제 피처를 건네주면 안 된다.
+
+    공개 지식을 주는 조건(F1-K/F2/F3)은 실제 피처를 코드까지 보여준다 —
+    그것이 조건의 정의다 (§30.17). 그쪽은 `examples/known5.md` 다.
+    """
     from kernelrule.agents.openai_client import load_prompt
     from kernelrule.features import REGISTRY
-    body = load_prompt("feature.md")
+    body = load_prompt("examples/other_domain.md")
     start = body.index("```python")
     example = body[start:body.index("```", start + 3)]
     leaked = [n for n in REGISTRY._items if n in example]
     assert not leaked, f"형태 예시가 실제 피처를 담고 있다: {leaked}"
+
+
+def test_prompts_never_hardcode_the_budget_number(monkeypatch):
+    """★ 예산 숫자의 출처는 `checks.BUDGET` **하나**다.
+
+    프롬프트 다섯 파일과 스키마와 검사기가 각자 8 을 적고 있었다. 바꾸면
+    하나를 빠뜨린다 — `is_reference` / `top_k` / `DEFAULT_MODEL` /
+    `REGISTRY` / `load_generated` 에 이은 여섯 번째가 된다.
+
+    `checks.BUDGET` 을 바꿨을 때 프롬프트가 따라 바뀌면 단일 출처다.
+    """
+    from kernelrule.agents.openai_client import load_prompt
+    from kernelrule.rules import checks
+
+    files = ["role/_rules_common.md", "role/_rules_edit.md",
+             "role/optimize.md", "role/architect.md"]
+    monkeypatch.setattr(checks, "BUDGET", 16)
+    for f in files:
+        txt = load_prompt(f)
+        assert "{budget}" not in txt, f"{f}: 치환이 안 됐다"
+        assert "16" in txt, f"{f}: 예산이 프롬프트에 안 흘러간다"
+        # 예산 문장에 옛 숫자가 남아 있으면 안 된다
+        for line in txt.splitlines():
+            if "예산" in line or "상한" in line or "리터럴" in line:
+                assert " 8 " not in line and "8개" not in line \
+                    and "<= 8" not in line, f"{f}: 굳은 8 이 남았다 — {line}"
+
+
+def test_prompt_tells_the_model_branch_constants_are_free():
+    """★ 규칙을 바꿨으면 **모델도 알아야 한다** (D-78).
+
+    검사기만 풀고 프롬프트를 그대로 두면 모델은 계속 우회한다 — 제약이
+    풀린 것을 모르기 때문이다.
+    """
+    from kernelrule.agents.openai_client import load_prompt
+
+    for f in ("role/_rules_common.md", "role/architect.md"):
+        txt = load_prompt(f)
+        assert "분기" in txt and "비교 상수" in txt, f"{f}: 면제 설명이 없다"

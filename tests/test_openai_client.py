@@ -18,15 +18,40 @@ from kernelrule.agents.openai_client import (
     estimate_and_confirm,
     load_prompt,
 )
+from kernelrule.features import FeatureRegistry
 
 FEATS = ["traffic_amplification", "has_spill", "waves"]
 SHAPE = ["is_memory_bound", "log_sol_ms"]
+
+#: ★ `registry` 는 필수 인자다 (§30.9). 기본값이 있던 시절 이 파일의
+#   클라이언트들이 전부 `None` 으로 만들어졌고, `render_features` 가 조용히
+#   사람이 쓴 24개로 떨어졌다 — F0~F3 조건에서라면 프롬프트에 답이 들어간다.
+#   `test_diagnose_prompt_carries_the_report` 가 그 폴백 덕에 통과하고
+#   있었다. 이제 프롬프트는 **넘긴 레지스트리만** 렌더링한다.
+EMPTY_REG = FeatureRegistry("test-empty")
+
+
+def _reg(feats=FEATS, shapes=SHAPE) -> FeatureRegistry:
+    """`FEATS`/`SHAPE` 와 **같은 이름**을 담은 작은 레지스트리."""
+    from kernelrule.features import Feature
+
+    r = FeatureRegistry("test-small")
+    for n in feats:
+        r.add(Feature(name=n, fn=lambda p, hw, cfg: 0.0, unit="dimensionless",
+                      expected_range=(0.0, 1.0), direction="higher_is_worse",
+                      code_hash=f"h-{n}"))
+    for n in shapes:
+        r.add(Feature(name=n, fn=lambda p, hw, cfg: 0.0, unit="dimensionless",
+                      expected_range=(0.0, 1.0), direction="higher_is_worse",
+                      shape_level=True, code_hash=f"h-{n}"))
+    return r
 
 
 @pytest.fixture
 def client(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-used")
-    return OpenAILLM(LLMConfig(), feature_names=FEATS, shape_values=SHAPE)
+    return OpenAILLM(LLMConfig(), feature_names=FEATS, shape_values=SHAPE,
+                     registry=_reg())
 
 
 # ---------------------------------------------------------------------------
@@ -35,7 +60,8 @@ def client(monkeypatch):
 def test_missing_key_is_a_hard_error(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     with pytest.raises(MissingAPIKey, match="조용히 폴백하지 않는다"):
-        OpenAILLM(LLMConfig(), feature_names=FEATS, shape_values=SHAPE)
+        OpenAILLM(LLMConfig(), feature_names=FEATS, shape_values=SHAPE,
+                  registry=_reg())
 
 
 def _needs_pydantic_ai():
@@ -91,7 +117,9 @@ def test_estimate_requires_confirmation():
 # 프롬프트 — 두 층 (§11.2)
 # ---------------------------------------------------------------------------
 def test_prompts_exist():
-    for n in ("_common.md", "analyze.md", "optimize.md", "hw/sm_86.md"):
+    for n in ("_base.md", "hw/sm_86.md", "role/_rules_common.md",
+              "role/_rules_edit.md", "role/analyze.md", "role/optimize.md",
+              "role/feature.md", "role/architect.md", "role/categorize.md"):
         assert load_prompt(n).strip()
 
 
@@ -100,18 +128,22 @@ def test_missing_prompt_is_an_error():
         load_prompt("nope.md")
 
 
-def test_instructions_are_two_layers(client, monkeypatch):
-    """[고정] 역할·제약  +  [주입] 하드웨어 사실 (§11.2)."""
-    common = load_prompt("_common.md")
+def test_instructions_are_two_axes(client, monkeypatch):
+    """★ 두 축 — 하드웨어 무관/의존 x 역할 무관/의존 (§30.10)."""
+    base = load_prompt("_base.md")
     hw = load_prompt("hw/sm_86.md")
-    assert "GEMM" in common and "sm_86" in hw
+    assert "GEMM" in base and "sm_86" in hw
     # 하드웨어 파일만 갈아끼우면 새 백엔드가 된다
-    assert "RTX A6000" in hw and "RTX A6000" not in common
+    assert "RTX A6000" in hw and "RTX A6000" not in base
+    # ★ _base.md 는 짧아야 한다 — 여기 쌓이면 모든 역할이 값을 치른다
+    assert len(base.splitlines()) < 40, "공용 블록이 다시 부풀었다"
 
 
-def test_common_prompt_states_the_absolute_rules():
-    c = load_prompt("_common.md")
-    for must in ("import", "np.random", "8", "w[0]", "is_memory_bound"):
+def test_rule_block_states_the_absolute_rules():
+    c = load_prompt("role/_rules_common.md")
+    # ★ `is_memory_bound` 는 뺐다 — 실제 피처 이름을 프롬프트에 박으면
+    #   F0~F2 에서 답을 건네주는 것이다 (D-65). 자리표시자로 바뀌었다.
+    for must in ("import", "np.random", "8", "w[0]", "p.<형상값>"):
         assert must in c
     # ★ no-op 분기 경고가 프롬프트에 들어 있다
     assert "소거된다" in c
@@ -201,10 +233,11 @@ def test_failed_calls_are_counted():
 
 def test_prompt_shows_rejected_examples():
     """★ 규칙만 적어 두면 LLM 이 어긴다. 실제 거부 사례를 함께 준다."""
-    c = load_prompt("_common.md")
+    c = load_prompt("role/_rules_edit.md")
     assert "실제로 거부된 것들" in c
     assert "w[0] 재사용" in c
-    assert "한 번만 쓴다" in c
+    # ★ 규칙 자체는 `_rules_common.md` 에 있다 — 갤러리는 사례만 든다
+    assert "한 번만 쓴다" in load_prompt("role/_rules_common.md")
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +371,7 @@ def test_unknown_endpoint_is_rejected():
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(model="m", endpoint="v1"), feature_names=[],
-                    shape_values=[], cache=False)
+                    shape_values=[], cache=False, registry=EMPTY_REG)
     with pytest.raises(ValueError, match="알 수 없는 엔드포인트"):
         llm._agent("optimize")
 
@@ -353,7 +386,7 @@ def test_endpoint_picks_the_right_model_class(endpoint, cls_name):
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(model="gpt-5.4-mini-2026-03-17",
                               endpoint=endpoint),
-                    feature_names=[], shape_values=[], cache=False)
+                    feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
     agent = llm._agent("optimize")
     assert type(agent.model).__name__ == cls_name
 
@@ -398,7 +431,7 @@ def test_seed_with_responses_endpoint_raises():
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(seed=123, endpoint="responses"),
-                    feature_names=[], shape_values=[], cache=False)
+                    feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
     with pytest.raises(ValueError, match="파라미터가 없다"):
         llm._agent("optimize")
 
@@ -409,7 +442,7 @@ def test_seed_with_chat_endpoint_is_sent():
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(seed=123, temperature=0.7, endpoint="chat"),
-                    feature_names=[], shape_values=[], cache=False)
+                    feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
     sent = llm._agent("optimize").model_settings or {}
     assert sent["seed"] == 123
     assert sent["temperature"] == 0.7
@@ -420,7 +453,7 @@ def test_none_values_are_not_sent_at_all():
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
-                    cache=False)
+                    cache=False, registry=EMPTY_REG)
     sent = llm._agent("optimize").model_settings or {}
     assert "temperature" not in sent
     assert "seed" not in sent
@@ -452,7 +485,7 @@ def test_reasoning_effort_is_explicit_and_recorded():
     assert cfg.reasoning_effort == "medium"
     assert cfg.to_dict()["reasoning_effort"] == "medium"
 
-    llm = OpenAILLM(cfg, feature_names=[], shape_values=[], cache=False)
+    llm = OpenAILLM(cfg, feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
     sent = llm._agent("optimize").model_settings or {}
     assert sent.get("openai_reasoning_effort") == "medium"
 
@@ -463,7 +496,7 @@ def test_reasoning_effort_none_sends_nothing():
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(reasoning_effort=None), feature_names=[],
-                    shape_values=[], cache=False)
+                    shape_values=[], cache=False, registry=EMPTY_REG)
     assert "openai_reasoning_effort" not in (
         llm._agent("optimize").model_settings or {})
 
@@ -490,3 +523,129 @@ def test_every_llm_runner_persists_its_calls():
             bad.append(f"  {f.name}: OpenAILLM 을 직접 쓰는데 dump 가 없다")
     assert not bad, ("LLM 호출을 남기지 않는 러너가 있다 (D-33):\n"
                      + "\n".join(bad))
+
+
+# ---------------------------------------------------------------------------
+# ★ §30.9 — 레지스트리를 갈아 끼울 수 있어야 F0~F3 가 성립한다
+# ---------------------------------------------------------------------------
+def test_registry_is_required(monkeypatch):
+    """기본값이 있으면 F1 조건에 사람 24개가 조용히 들어간다."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-used")
+    with pytest.raises(ValueError, match="필수"):
+        OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
+                  registry=None)
+
+
+def test_prompt_renders_only_the_given_registry(monkeypatch):
+    """★ 사람이 쓴 24개 이름이 **하나도** 안 들어가야 한다."""
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.features import REGISTRY
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-used")
+    gen = FeatureRegistry("f1-like")
+    from kernelrule.features import Feature
+    for n in ("padded_flop_fraction", "l2_tile_pressure"):
+        gen.add(Feature(name=n, fn=lambda p, hw, cfg: 0.0,
+                        unit="dimensionless", expected_range=(0.0, 1.0),
+                        direction="higher_is_worse", code_hash=f"h-{n}"))
+    llm = OpenAILLM(LLMConfig(), feature_names=["padded_flop_fraction"],
+                    shape_values=[], registry=gen)
+    p = llm._user_prompt("analyze", "BODY")
+    leaked = [n for n in REGISTRY._items if n in p]
+    assert not leaked, f"사람이 쓴 피처가 프롬프트에 샜다: {leaked}"
+    assert "padded_flop_fraction" in p
+
+
+def test_feature_names_must_live_in_the_registry(monkeypatch):
+    """정적 검사와 프롬프트가 다른 목록을 보면 안 된다 (원칙 2)."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-used")
+    with pytest.raises(ValueError, match="레지스트리"):
+        OpenAILLM(LLMConfig(), feature_names=["없는_피처"], shape_values=[],
+                  registry=_reg())
+
+
+def test_render_features_refuses_a_missing_registry():
+    from kernelrule.features import render_features
+
+    with pytest.raises(ValueError, match="반드시 받는다"):
+        render_features(None, include_observed=False)
+
+
+def test_feature_decorator_refuses_a_missing_registry():
+    from kernelrule.features import feature
+
+    with pytest.raises(ValueError, match="필수"):
+        @feature(expected_range=(0.0, 1.0))
+        def _f(p, hw, cfg) -> float:
+            return 0.0
+
+
+def test_intrinsic_shape_fields_are_not_stray(monkeypatch):
+    """★ `M/N/K/n_candidates` 는 레지스트리 피처가 아니지만 항상 있다.
+
+    처음에 이걸 빼먹어서 검증 실행이 시작도 못 하고 죽었다 (§30.9).
+    """
+    from kernelrule.core.matrix import INTRINSIC_SHAPE_FIELDS
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-used")
+    llm = OpenAILLM(LLMConfig(), feature_names=FEATS,
+                    shape_values=[*SHAPE, *INTRINSIC_SHAPE_FIELDS],
+                    registry=_reg())
+    assert set(INTRINSIC_SHAPE_FIELDS) <= set(llm.shape_values)
+
+
+# ---------------------------------------------------------------------------
+# §16.1 — Analyst 를 끈 Optimizer 프롬프트 (D-89)
+# ---------------------------------------------------------------------------
+def _optimize_prompts():
+    _needs_pydantic_ai()
+    import os
+
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.agents.schemas import RuleProposal
+    from kernelrule.features import REGISTRY
+
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(),
+                    feature_names=REGISTRY.names(shape_level=False),
+                    shape_values=REGISTRY.names(shape_level=True),
+                    registry=REGISTRY, cache=False)
+    par = RuleProposal(code="def score(f,p,hw,w):\n    return f.waves * w[0]\n",
+                       w0=[1.0])
+
+    def render(flag: bool) -> str:
+        return llm._user_prompt(
+            "optimize", "", parent=par, parent_n_terms=1,
+            hypothesis={"id": "H1", "claim": "c"} if flag else None,
+            hypotheses_applied=["H0: x"] if flag else [], analyst=flag)
+
+    return render(True), render(False)
+
+
+def test_optimize_prompt_without_analyst_mentions_no_hypothesis():
+    """★ 가설 절을 **빈 자리로 남기지 않는다** (§16.1).
+
+    "## 이번 가설\n\n(가설 없음)" 을 남기면 모델이 "가설이 있는데 비어
+    있다" 로 읽어 조건이 달라진다. 진단 리포트를 만들지도 않는 것과
+    같은 원칙이다 — 자리 자체가 없어야 한다.
+    """
+    on, off = _optimize_prompts()
+    assert "가설" in on
+    assert "가설" not in off, "Analyst 를 껐는데 가설을 언급한다"
+    assert "## 이번 가설" not in off
+    assert "부모 규칙" in off and "사용 가능한 피처" in off
+
+
+def test_optimize_prompt_without_analyst_is_a_deletion():
+    """★ 끈 프롬프트는 켠 것에서 **문장을 지운 것**이어야 한다.
+
+    새 문구를 쓰면 ablation 이 "Analyst 만 다르다" 가 아니게 된다.
+    문자 단위 부분수열이면 삭제만 일어난 것이다.
+    """
+    on, off = _optimize_prompts()
+    it = iter(on)
+    assert all(ch in it for ch in off), (
+        "끈 프롬프트에 켠 프롬프트에 없는 글자가 있다 — 삭제가 아니라 "
+        "새로 쓴 것이다 (§16.1)")
+    assert len(off) < len(on)

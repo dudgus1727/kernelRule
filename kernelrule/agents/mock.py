@@ -193,6 +193,7 @@ class MockLLM:
         self.shape_values = list(shape_values or ["is_memory_bound"])
         self.calls: list[LLMCall] = []
         self._seq = 0
+        self._n_features = 0
         self.replay_dir = Path(replay_dir) if replay_dir else None
         self._replay: list[LLMCall] = []
         if mode == "replay":
@@ -246,11 +247,92 @@ class MockLLM:
         if role == "optimize":
             return self._optimize(prompt, **kw)
         if role == "feature":
-            return None          # 이 목은 피처를 만들지 않는다
+            return self._feature()
+        if role == "architect":
+            return self._architect(**kw)
+        if role == "categorize":
+            return {"categories": [
+                {"name": f"mock_area_{i}", "description": f"목 영역 {i}"}
+                for i in range(5)], "notes": "목이 나눈 영역이다"}
         if role == "critique":
-            return {"has_defect": False, "measures_what": "(mock)",
-                    "confidence": 0.5}
+            return self._critique(**kw)
         raise ValueError(f"알 수 없는 역할: {role!r}")
+
+    # -- FeatureWriter / Architect — ★ 배관 확인용 (§30.9) ----------------
+    #
+    #   실제 LLM 없이 F0~F3 파이프라인이 **끝까지 도는지** 보려면 이 두
+    #   역할이 있어야 한다. 목이 만드는 피처는 물리적으로 의미 없다 —
+    #   `--dry-run` 의 목적은 성능이 아니라 배관이다.
+
+    #: 원시 값만으로 만드는 피처 틀. `RAW_FIELDS` 안의 이름만 쓴다.
+    _FEATURE_FORMS = (
+        ("mock_tile_area_ratio", "타일 면적 / 문제 면적",
+         "float(cfg.tile_m * cfg.tile_n) / max(1.0, float(p.M) * p.N)"),
+        ("mock_k_depth", "K 방향 반복 깊이",
+         "float(p.K) / max(1.0, float(cfg.tile_k))"),
+        ("mock_thread_load", "스레드당 출력 원소",
+         "float(cfg.tile_m * cfg.tile_n) / max(1.0, float(cfg.threads))"),
+        ("mock_smem_share", "SM 공유메모리 점유율",
+         "float(cfg.smem_bytes) / max(1.0, float(hw.smem_per_block))"),
+        ("mock_grid_per_sm", "SM 당 타일 수",
+         ("float(p.M) * p.N / max(1.0, float(cfg.tile_m * cfg.tile_n))"
+          " / max(1.0, float(hw.sm_count))")),
+    )
+
+    def _feature(self) -> dict:
+        """제안마다 **다른** 피처를 낸다. 같은 것을 반복하면 중복 판정에
+        전부 걸려서 배관 확인이 안 된다."""
+        i = self._n_features % len(self._FEATURE_FORMS)
+        self._n_features += 1
+        name, doc, expr = self._FEATURE_FORMS[i]
+        suffix = "" if self._n_features <= len(self._FEATURE_FORMS) else \
+            f"_{self._n_features}"
+        code = (f"def {name}{suffix}(p, hw, cfg) -> float:\n"
+                f'    """{doc}."""\n'
+                f"    return {expr}\n")
+        return {"name": name + suffix, "code": code, "unit": "dimensionless",
+                "direction": "higher_is_worse", "expected_range": [0.0, 1e6],
+                "rationale": "목이 만든 피처다 — 배관 확인용이다"}
+
+    def _critique(self, *, code: str = "", **_kw) -> dict:
+        """★ 항 단위 심사의 배관 확인용 (D-85).
+
+        **마지막 항을 항상 "설명 불가" 로 낸다** — 절제 검증(`--ablate`)이
+        실제로 도는지 보려면 설명 불가가 하나는 나와야 한다. 물리적으로
+        의미 있는 판정이 아니다.
+        """
+        import re
+
+        idx = sorted({int(i) for i in re.findall(r"\bw\[(\d+)\]", code)})
+        terms = []
+        for k, i in enumerate(idx):
+            last = k == len(idx) - 1
+            terms.append({
+                "index": i, "expression": f"(mock 항 {i})",
+                "physics": "목이 만든 설명이다 — 배관 확인용이다",
+                "explainable": not last,
+                "why_not": "목이 마지막 항을 항상 설명 불가로 낸다" if last
+                           else "",
+                "regime_dependent": False, "regime": ""})
+        return {"terms": terms, "overall": "목이 만든 심사다",
+                "defects": ["(mock) 결함 없음"]}
+
+    def _architect(self, **kw) -> dict:
+        """씨앗 규칙. **주어진 피처 이름만** 쓴다 (F1 이면 F1 피처).
+
+        `self.features` 가 비어 있으면 조용히 사람 피처로 떨어지지 않고
+        예외를 낸다 — 그것이 §30.9 가 막으려는 경로다.
+        """
+        if not self.features:
+            raise ValueError(
+                "MockLLM(feature_names=...) 이 비었다. 씨앗을 만들 피처가 "
+                "없다 — 조용히 사람이 쓴 24개로 떨어지지 않는다 (§26.4).")
+        n = min(4, len(self.features))
+        pick = [self.features[int(i)] for i in
+                self.rng.choice(len(self.features), size=n, replace=False)]
+        code, w0 = _render_rule([f"f.{x}" for x in pick], None)
+        return {"code": code, "w0": w0,
+                "changes": "목 Architect 씨앗 — 주어진 피처에서 골랐다"}
 
     def _diagnose(self, prompt: str) -> dict:
         """진단 — 리포트에서 **미사용 피처**를 읽어 가설로 만든다.
@@ -271,6 +353,12 @@ class MockLLM:
             measurable_with=[n], proposed_direction=f"{n} 항을 추가한다",
             risk="다른 항의 효과를 희석할 수 있다")
             for i, n in enumerate(missing[:5])]
+        # ★ 첫 가설만 없는 축을 요구한다 (D-75 경로 배관 확인용).
+        #   루프는 `max_new_features_per_round > 0` 일 때만 이것을 읽으므로
+        #   기존 dry-run 은 영향을 받지 않는다.
+        if hyps:
+            hyps[0].needs_new_feature = (
+                "타일 하나가 L2 에 남아 다음 타일이 재사용하는 양")
         return {"hypotheses": [h.__dict__ for h in hyps]}
 
     def _optimize(self, prompt: str, *, parent: RuleProposal | None = None,
