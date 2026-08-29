@@ -77,35 +77,25 @@ class TableFacts:
 
         lines.append(f"학습 분할 {n}형상에서만 계산했다 (§12.3).")
 
-        # -- 정답 집합의 구성 — 어떤 축 값이 최적으로 뽑히는가 -------------
-        #    ★ 컬럼이 없으면 **조용히 빠지지 않는다** (§26.4). 표마다 축이
-        #      다를 수 있고, 없어진 관찰을 모르면 리포트를 잘못 읽는다.
-        axes = (("has_spill", lambda c: c > 0, "스필 커널"),
-                ("ext_stages", lambda c: c == 2, "stages=2(pipelined)"),
-                ("ext_warp_m", lambda c: c == 128, "warp_m=128"),
-                ("split_k_mode", lambda c: c.astype(str) == "parallel",
-                 "split_k_mode=parallel"))
-        cols = set(table.frame_for(shapes[0]).columns)
-        counts: dict[str, int] = {}
-        present = [a for a in axes if a[0] in cols]
-        for p in shapes:
-            frame = table.frame_for(p)
-            win = frame.loc[table.answer_mask(p)]
-            for col, pred, _ in present:
-                if bool(pred(win[col]).any()):
-                    counts[col] = counts.get(col, 0) + 1
+        # ★ 여기 있던 "정답 집합의 구성" 은 **삭제됐다** (2026-08-26, §12.3).
+        #
+        #   `스필 커널이 정답 집합에 든 형상: 0/61개` 같은 줄이었다. 이것은
+        #   **축을 지목하는 정답 요약**이다 — "has_spill 은 볼 필요 없다" 를
+        #   표에서 읽어서 알려주는 것이고, LLM 이 스스로 찾아야 할 것을
+        #   대신 답해 준다. `by_feature` 로 각 피처 설명에 붙기까지 했다.
+        #
+        #   같은 이유로 `design.md` 의 "GBDT 피처 중요도를 블록 3.5 에
+        #   넣어라" 도 철회했다 (§30.6 정정).
+        #
+        #   판정 기준 (§12.3b):
+        #     가능  "고정 config 하나로 top-1 1.115"   여지의 크기
+        #     불가  "스필 커널이 최적인 형상 0개"        축을 지목
+        #     불가  "GBDT 가 mainloop_iters 를 중요하게 봤다"
+        #
+        #   **F0~F3 에서는 더 심각하다.** LLM 이 만든 피처는 이름이 전부
+        #   다르므로 `feat_of` 매핑이 아예 안 맞고, 그런데도 축 이름은
+        #   프롬프트에 남는다.
         by_feature: dict[str, list[str]] = {}
-        feat_of = {"has_spill": "has_spill", "ext_stages": "is_two_stage",
-                   "split_k_mode": "split_k_cost"}
-        for col, _, label in present:
-            c = counts.get(col, 0)
-            emit(f"{label}이 정답 집합에 든 형상: {c}/{n}개", n)
-            if (fname := feat_of.get(col)) and n >= MIN_SUPPORT:
-                by_feature.setdefault(fname, []).append(
-                    f"학습 {n}형상 중 {label}이 정답 집합에 든 것 {c}개")
-        for col, _, label in axes:
-            if col not in cols:
-                withheld.append(f"{label}: 표에 {col!r} 컬럼이 없어 못 쟀다")
 
         # -- 고정 config 하나로 어디까지 가는가 -----------------------------
         from kernelrule.baselines.static_topk import StaticTopK

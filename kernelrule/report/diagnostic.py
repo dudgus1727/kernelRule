@@ -53,6 +53,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.numerics import approx_equal
 from kernelrule.core.scoring import Evaluation, evaluate_scores, geomean
 from kernelrule.core.splits import Split, SplitError
 from kernelrule.core.table import PerfTable
@@ -165,11 +166,18 @@ def _regime_masks(table: PerfTable, matrix: FeatureMatrix,
                   shapes) -> dict[str, np.ndarray]:
     import math
 
+    # ★ 체제는 (형상, 하드웨어)의 성질이지 **피처 목록의 성질이 아니다.**
+    #   전에는 `info.log_sol_ms` / `info.is_memory_bound` 를 읽었는데,
+    #   그것은 레지스트리에 그 두 피처가 있다는 가정이었다. F0/F1
+    #   레지스트리에는 없어서 리포트가 통째로 죽는다 (§30.9).
+    #   `regime_of` 가 `physical.py` 의 **함수**를 직접 부르므로 조건과
+    #   무관하고, 판정이 한 곳에 모인다 (원칙 2).
+    from kernelrule.core.splits import regime_of
+
     small, mem, waves = [], [], []
     for p in shapes:
-        _, info = matrix.for_shape(p)
-        small.append(info.log_sol_ms < math.log2(0.5))
-        mem.append(bool(info.is_memory_bound))
+        small.append(regime_of(p, table.hw, axis="size") == "short")
+        mem.append(regime_of(p, table.hw, axis="roofline") == "mem")
         gm = math.ceil(p.M / 128) * math.ceil(p.N / 128)
         waves.append(gm / table.hw.sm_count)
     small = np.asarray(small)
@@ -246,7 +254,7 @@ def _make_case(table: PerfTable, matrix: FeatureMatrix, p: Problem,
     rows = []
     for name in matrix.feature_names():
         v = getattr(f, name)
-        if abs(float(v[pick]) - float(v[opt])) > 1e-9:
+        if not approx_equal(float(v[pick]), float(v[opt])):
             rows.append((name, float(v[pick]), float(v[opt])))
     rows.sort(key=lambda r: -abs(r[1] - r[2]) / (abs(r[2]) + 1e-9))
     # ★ "항이 없다" 와 "항은 있는데 가중치가 틀렸다" 는 **다른 수정**이다.

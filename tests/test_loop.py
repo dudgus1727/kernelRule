@@ -396,3 +396,194 @@ def test_dump_records_what_it_ran_with(loop, tmp_path):
     assert cfg["n_features"] > 0
     # MockLLM 이면 클래스 이름이라도 남아야 한다 — 빈칸이면 안 된다
     assert cfg["llm"]
+
+
+# ---------------------------------------------------------------------------
+# D-75 — Analyst -> FeatureWriter 경로
+# ---------------------------------------------------------------------------
+#: 씨앗 규칙. 미사용 피처가 남아야 목 Analyst 가 가설을 낸다.
+_SEED_RULE = (("def score(f, p, hw, w):\n"
+               "    return np.log2(f.traffic_amplification) * w[0]\n"), [1.0])
+
+
+def _d75_loop(synth_table, tmp_path, *, cap: int):
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import REGISTRY, FeatureRegistry
+
+    # ★ 레지스트리를 **복제**한다. 루프가 여기에 축을 더하므로, 전역
+    #   `REGISTRY` 를 그대로 쓰면 다른 시험으로 새 나간다.
+    reg = FeatureRegistry("d75")
+    for name in REGISTRY.names():
+        reg.add(REGISTRY[name])
+    fm = FeatureMatrix(synth_table, reg)
+    sh = synth_table.shapes()
+    splits = SplitSet(train=Split("train", tuple(sh[:-2])),
+                      val=Split("val", tuple(sh[-2:])))
+    cfg = LoopConfig(run_id="d75", n_rules_per_round=2, max_rounds=1,
+                     max_evals=30, seed=0, sandbox_first_seen=False,
+                     out_dir=str(tmp_path),
+                     max_new_features_per_round=cap)
+    llm = MockLLM("mutate", seed=1, feature_names=fm.feature_names())
+    return RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
+                     llm=llm), reg
+
+
+def test_feature_path_is_off_by_default(synth_table, tmp_path):
+    """★ 기본값은 **꺼짐**이다 — 지금까지의 실행과 같은 조건이어야 한다."""
+    loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
+    assert loop.cfg.max_new_features_per_round == 0
+    loop.seed(*_SEED_RULE)
+    r = loop.run_round()
+    assert r.n_feature_requests == 0 and r.n_features_made == 0
+    assert loop.features_made == []
+    assert r.llm_calls.get("feature", 0) == 0
+
+
+def test_analyst_request_reaches_the_feature_writer(synth_table, tmp_path):
+    """★ 요구가 **버려지지 않는다** (D-75).
+
+    33실행에서 303번 채워진 필드를 `loop.py` 가 안 읽고 있었다. 경로가
+    생겼는지는 "요구가 있었다" 와 "피처 호출이 있었다" 로 본다.
+    """
+    loop, reg = _d75_loop(synth_table, tmp_path, cap=1)
+    n_before = len(reg._items)
+    loop.seed(*_SEED_RULE)
+    r = loop.run_round()
+    assert r.n_feature_requests >= 1, "요구를 못 읽었다"
+    assert r.llm_calls.get("feature", 0) >= 1, "FeatureWriter 를 안 불렀다"
+    assert loop.features_made, "시도 기록이 없다"
+    row = loop.features_made[0]
+    assert row["requirement"], "요구 문장이 안 실렸다"
+    print("D-75 시도:", row)          # -s 로 보면 무엇이 만들어졌는지 나온다
+    if row.get("accepted"):
+        assert len(reg._items) == n_before + 1
+        assert row["name"] in loop.matrix.feature_names() \
+            or row.get("shape_level"), "열이 안 만들어졌다"
+
+
+def test_feature_writer_never_sees_the_diagnostic_report():
+    """★ 조건 1 — 진단 리포트를 주지 않는다 (D-75).
+
+    루프 안에서 만든 피처가 학습 형상에 맞춰지는 통로를 막는다. 넘어가는
+    것은 **요구 문장 하나**뿐이어야 한다.
+    """
+    import ast
+    import inspect
+
+    from kernelrule.core import loop as loop_mod
+    from kernelrule.core.loop import _feature_task
+
+    # (1) 요구 문장 **말고는 아무것도 변하지 않는다.** 문자열 포함 검사로
+    #     쓰면 안내문 자체("표도 사례도 보지 않고")에 걸린다 — 검사기가
+    #     자기가 허용한 문구를 금지하는 D-73 과 같은 실수다.
+    a = _feature_task("split-K 가 만드는 CTA 병렬성 이득")
+    b = _feature_task("L2 재사용 이득")
+    assert "split-K 가 만드는 CTA 병렬성 이득" in a
+    assert a.replace("split-K 가 만드는 CTA 병렬성 이득", "<X>") \
+        == b.replace("L2 재사용 이득", "<X>"), "요구 말고 다른 것이 변한다"
+
+    # (2) 호출부가 **요구 문장 하나만** 넘긴다. 프롬프트 자리는 빈 문자열이다.
+    import textwrap
+    tree = ast.parse(textwrap.dedent(
+        inspect.getsource(loop_mod.RoundLoop._write_features)))
+    calls = [n for n in ast.walk(tree)
+             if isinstance(n, ast.Call)
+             and isinstance(n.func, ast.Attribute) and n.func.attr == "complete"]
+    assert len(calls) == 1, "FeatureWriter 호출이 하나가 아니다"
+    c = calls[0]
+    assert c.args[0].value == "feature"
+    assert c.args[1].value == "", "프롬프트 자리에 리포트가 들어간다"
+    kw = {k.arg for k in c.keywords}
+    assert kw == {"condition", "registry", "task"}, f"넘기는 것이 늘었다: {kw}"
+
+
+def test_requirement_reads_the_old_field_name():
+    """두 이름을 다 읽는다 — 어느 쪽으로 만든 실행도 조용히 0건이 되면 안 된다."""
+    from kernelrule.core.loop import _requirement_of
+
+    assert _requirement_of({"needs_new_feature": "L2 재사용 이득"}) \
+        == "L2 재사용 이득"
+    # ★ 2026-08-28 에 잠깐 쓴 이름. 그때 만든 실행 3개를 계속 읽어야 한다
+    assert _requirement_of({"physical_requirement": "잠깐 쓴 이름"}) \
+        == "잠깐 쓴 이름"
+    assert _requirement_of({"needs_new_feature": None}) == ""
+
+
+def test_over_cap_requests_are_recorded_not_dropped(synth_table, tmp_path):
+    """★ 상한에 걸린 요구를 **조용히 버리지 않는다**.
+
+    상한은 §21 캐시 때문에 필요하지만, 넘친 요구를 안 남기면 "얼마나
+    요구했나" 를 못 잰다 — 그것이 D-75 의 주 관찰이다.
+    """
+    from kernelrule.core.loop import RoundResult
+
+    loop, _reg = _d75_loop(synth_table, tmp_path, cap=1)
+    res = RoundResult(round=0)
+    hyps = [{"id": "H0", "needs_new_feature": "L2 재사용 이득"},
+            {"id": "H1", "needs_new_feature": "CTA 절대 개수"},
+            {"id": "H2", "needs_new_feature": "split-K 병렬성 이득"}]
+    loop._write_features(hyps, 0, res)
+    assert res.n_feature_requests == 3
+    assert res.n_feature_over_cap == 2
+    over = [x for x in loop.features_made if x.get("over_cap")]
+    assert len(over) == 2, "상한 초과 요구가 기록되지 않았다"
+    assert {x["hypothesis_id"] for x in over} == {"H1", "H2"}
+    assert all(x["requirement"] for x in over), "요구 문장이 안 남았다"
+
+
+def test_analyze_prompt_matches_the_measured_baseline():
+    """★ 요구 필드 안내는 **기준선이 측정된 문구 그대로**여야 한다 (D-81).
+
+    17.9%(옛 6실행)는 아래 세 줄로 측정됐다. 여기에 무엇을 더하거나 빼면
+    비교 대상이 달라진다 — 실제로 안내를 늘렸다가 0~5.9% 로 눌렸다
+    (D-80). 억제 문구("대부분의 라운드에서는 null")도 **기준선의 일부**라
+    그대로 둔다.
+
+    바꿔야 할 이유가 생기면 이 시험을 같이 고치고, **그 실행부터 새
+    계열**로 다뤄라.
+    """
+    from kernelrule.agents.openai_client import load_prompt
+
+    baseline = (
+        "`measurable_with` 에는 **아래 목록에 있는 이름만** 쓰세요.\n"
+        "목록에 없는 물리량이 필요하면 `needs_new_feature` 에 그 이름을 쓰세요\n"
+        "(대부분의 라운드에서는 `null` 입니다 — 물리량이 그렇게 많지 "
+        "않습니다).")
+    txt = load_prompt("role/analyze.md")
+    assert baseline in txt, (
+        "요구 필드 안내가 기준선 문구와 다르다. 그대로 두거나, 바꿀 거면 "
+        "이 시험을 고치고 새 계열로 다뤄라 (D-81)")
+    # 2026-08-28 에 넣었다가 되돌린 것들이 다시 들어오지 않았는가
+    for gone in ("physical_requirement", "전달되지 않고 버려집니다",
+                 "measurable_with 를 쓰는 편이 낫습니다"):
+        assert gone not in txt, f"되돌린 문구가 다시 들어왔다: {gone!r}"
+
+
+# ---------------------------------------------------------------------------
+# §16.1 — Analyst ablation
+# ---------------------------------------------------------------------------
+def test_analyst_off_makes_no_analyze_call(synth_table, tmp_path):
+    """★ 끄면 진단 리포트를 **만들지도 않는다** (§16.1, D-89).
+
+    만들어 놓고 안 주면 "진단이 있는데 안 쓴다" 가 되어 조건이 달라진다.
+    호출 수와 가설 수 둘 다 0 이어야 한다.
+    """
+    loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
+    loop.cfg.use_analyst = False
+    loop.seed(*_SEED_RULE)
+    r = loop.run_round()
+    assert r.llm_calls.get("analyze", 0) == 0, "Analyst 를 껐는데 불렀다"
+    assert loop.hypotheses == []
+    assert r.n_proposed > 0, "Optimizer 는 그대로 돌아야 한다"
+
+
+def test_analyst_on_is_the_default(synth_table, tmp_path):
+    """기본은 켬이다 — 지금까지의 모든 실행이 그 조건이다."""
+    from kernelrule.core.loop import LoopConfig
+
+    assert LoopConfig(run_id="x").use_analyst is True
+    loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
+    loop.seed(*_SEED_RULE)
+    r = loop.run_round()
+    assert r.llm_calls.get("analyze", 0) == 1

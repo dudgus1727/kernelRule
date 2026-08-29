@@ -256,3 +256,64 @@ def test_build_report_refuses_raw_strings():
                        code="def score(f, p, hw, w):\n    return f.idx * w[0]\n",
                        train=Split("train", tuple(t.shapes())),
                        table_facts=["전수 표에서 계산한 문장"])
+
+
+# ---------------------------------------------------------------------------
+# ★ §12.3b — 블록 3.5 는 **축을 지목하면 안 된다**
+#
+#   "스필 커널이 정답 집합에 든 형상 0/61개" 는 정답 요약이다. 그 줄이
+#   있으면 LLM 은 `has_spill` 을 볼 필요가 없다는 것을 표에서 배운 것이
+#   아니라 **받은** 것이다. 같은 이유로 GBDT 피처 중요도도 뺐다.
+#
+#   F0~F3 에서는 더 심각하다 — LLM 이 만든 피처는 이름이 전부 다르므로
+#   축 이름 매핑이 아예 안 맞는데도 프롬프트에는 남는다.
+# ---------------------------------------------------------------------------
+
+#: 블록 3.5 에 나오면 안 되는 것 — config 축 컬럼 이름과 그 값.
+_FORBIDDEN_AXES = ("has_spill", "스필", "ext_stages", "stages=2", "pipelined",
+                   "ext_warp_m", "warp_m", "split_k_mode", "parallel",
+                   "mainloop_iters", "workspace_bytes", "waves_occ",
+                   "grid_tiles", "inst_total", "tile_m",
+                   "regs_total_per_block", "GBDT")
+
+
+def test_block_3_5_never_names_an_axis():
+    import warnings
+
+    from kernelrule.core.splits import Split
+    from kernelrule.core.table import PerfTable
+    from kernelrule.report.table_facts import TableFacts
+
+    bundle = "datasets/rtx-a6000-sm_86-c63710df"
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        t = PerfTable.from_bundle(bundle, env_hash="c63710df", ok_only=False)
+    train = Split("train", tuple(p for p in t.shapes()
+                                 if 11008 not in (p.N, p.K)))
+    facts = TableFacts.compute(t, train)
+
+    body = "\n".join(facts.lines)
+    hit = [a for a in _FORBIDDEN_AXES if a in body]
+    assert not hit, (
+        f"블록 3.5 가 축을 지목한다: {hit}\n"
+        "이것은 정답 요약이다 (§12.3b). 남겨도 되는 것은 '여지의 크기' "
+        "뿐이다 — 고정 config top-k, 체제별 분해, 동률 폭.\n" + body)
+
+
+def test_block_3_5_never_annotates_individual_features():
+    """`by_feature` 는 각 피처 **설명에** 표 관측을 붙인다 — 축 지목이다."""
+    import warnings
+
+    from kernelrule.core.splits import Split
+    from kernelrule.core.table import PerfTable
+    from kernelrule.report.table_facts import TableFacts
+
+    bundle = "datasets/rtx-a6000-sm_86-c63710df"
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        t = PerfTable.from_bundle(bundle, env_hash="c63710df", ok_only=False)
+    train = Split("train", tuple(p for p in t.shapes()
+                                 if 11008 not in (p.N, p.K)))
+    assert not TableFacts.compute(t, train).by_feature, (
+        "피처별 표 관측이 살아 있다. 프롬프트의 피처 설명에 '이 축은 "
+        "정답에 0번 들어간다' 가 붙는다 (§12.3b).")
