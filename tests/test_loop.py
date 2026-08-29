@@ -587,3 +587,57 @@ def test_analyst_on_is_the_default(synth_table, tmp_path):
     loop.seed(*_SEED_RULE)
     r = loop.run_round()
     assert r.llm_calls.get("analyze", 0) == 1
+
+
+def test_borrowed_hypotheses_skip_the_same_seed_index(synth_table, tmp_path):
+    """★ 대조군 C — `abl-B-s1` 의 가설을 `-s1` 에 주면 '다른 실행' 이 아니다.
+
+    그리고 풀이 비면 **조용히 가설 없이 돌지 않는다** (§26.4).
+    """
+    import json
+
+    pool = tmp_path / "f1pipe-x-s0" / "hypotheses.jsonl"
+    pool.parent.mkdir(parents=True)
+    pool.write_text("\n".join(json.dumps(
+        {"id": f"H{i}", "round": i // 2, "claim": f"c{i}", "analyst_pass": 1},
+        ensure_ascii=False) for i in range(6)))
+
+    loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
+    loop.cfg.use_analyst = False
+    loop.cfg.hypothesis_pool = (str(pool),)
+    loop.cfg.run_id = "f1pipe-y-s1"          # 시드 번호가 다르다 -> 쓴다
+    got = loop._pool_round(0)
+    assert got and all("borrowed_from" in h for h in got)
+    assert all("analyst_pass" not in h for h in got)
+
+    loop2, _r2 = _d75_loop(synth_table, tmp_path, cap=0)
+    loop2.cfg.use_analyst = False
+    loop2.cfg.hypothesis_pool = (str(pool),)
+    loop2.cfg.run_id = "f1pipe-y-s0"          # ★ 같은 시드 번호 -> 뺀다
+    with pytest.raises(ValueError, match="가설 풀이 비었다"):
+        loop2._pool_round(0)
+
+
+def test_borrowed_arm_calls_no_analyst_but_renders_the_section(synth_table,
+                                                               tmp_path):
+    """★ C 는 Analyst 를 안 부르지만 **가설 절은 있어야 한다**.
+
+    A(가설 없음)와 C(남의 가설)를 프롬프트 구조까지 같게 만들면 무엇이
+    다른지 못 가른다 — C 의 차이는 **문장의 출처**뿐이어야 한다.
+    """
+    import json
+
+    pool = tmp_path / "f1pipe-x-s2" / "hypotheses.jsonl"
+    pool.parent.mkdir(parents=True)
+    pool.write_text("\n".join(json.dumps(
+        {"id": f"H{i}", "round": 0, "claim": f"c{i}", "analyst_pass": 1},
+        ensure_ascii=False) for i in range(3)))
+
+    loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
+    loop.cfg.use_analyst = False
+    loop.cfg.hypothesis_pool = (str(pool),)
+    loop.seed(*_SEED_RULE)
+    r = loop.run_round()
+    assert r.llm_calls.get("analyze", 0) == 0, "C 인데 Analyst 를 불렀다"
+    assert loop.hypotheses, "빌려온 가설이 기록되지 않았다"
+    assert all(h.get("analyst_pass") == 0 for h in loop.hypotheses)

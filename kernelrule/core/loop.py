@@ -74,6 +74,16 @@ class LoopConfig:
     #: FeatureWriter 조건 (F0/F1/F1-K/F2/F3). 루프 밖 1단계와 **같은 조건**을
     #: 줘야 한다 — 다르면 라운드 안에서 조건이 바뀐다.
     feature_condition: str = "F3"
+    #: ★ §16.1 대조군 C (D-91) — Analyst 를 끄되 **다른 실행·다른 라운드의
+    #: 가설**을 그 자리에 넣는다. `hypotheses.jsonl` 경로들.
+    #:
+    #: 무엇을 가르나:
+    #:   B 에 가까우면  가설이 **현재 상태에 맞을 필요는 없다**
+    #:                  = 진단 리포트의 기여가 다양성 주입이다
+    #:   A 에 가까우면  ★ 이 라운드의 진단에 맞아야 한다 (§16.1 의 강한 형태)
+    #:
+    #: Analyst 를 안 부르므로 **A 와 호출 수가 같다** — 비용 비교가 깨끗하다.
+    hypothesis_pool: tuple[str, ...] = ()
     #: ★ §16.1 ablation — Analyst 를 끄면 진단 리포트도 가설도 없다.
     #: Optimizer 는 부모 규칙과 피처 목록만 보고 고친다.
     #: **기본은 켬**이다 (지금까지의 모든 실행이 그렇다).
@@ -215,11 +225,63 @@ class RoundLoop:
         #: 가설 id 의 **유일한 출처**. 모델이 붙인 id 는 응답 안에서만
         #: 유일해서 라운드/패스를 넘으면 겹친다.
         self._hyp_seq = 0
+        #: 빌려온 가설 묶음 (대조군 C). 처음 쓸 때 한 번만 읽는다.
+        self._pool: list[list[dict]] | None = None
         self._rule_seq = 0
         self._seen_code: dict[str, float] = {}      # 캐시 (§15.4)
         self._feats = matrix.feature_names()
         self._shape_vals = matrix.shape_value_names()
         self._short_mask, self._long_mask = self._regime_masks()
+
+    # -- ★ 대조군 C — 남의 가설을 빌려 온다 (§16.1, D-91) ------------------
+    def _pool_round(self, r: int) -> list[dict]:
+        """다른 실행의 **한 라운드 전체**를 통째로 빌린다.
+
+        가설 하나씩 섞지 않고 (실행, 라운드) 단위로 가져오는 이유는 두
+        가지다.
+
+        ```
+        1  Analyst 한 번의 출력은 서로를 보완하는 집합이다.
+           낱개로 섞으면 "맞지 않는 가설" 이 아니라 "앞뒤가 안 맞는 묶음" 이
+           되어 다른 것을 재게 된다
+        2  라운드당 개수 분포가 B 와 자동으로 같아진다 (평균 4.4개)
+        ```
+
+        ⚠️ **같은 시드 번호의 실행은 뺀다** — `abl-B-s1` 의 가설을
+        `abl-C-s1` 에 주면 "다른 실행" 이 아니다.
+        """
+        if self._pool is None:
+            import json as _json
+            groups: dict[tuple, list[dict]] = {}
+            mine = self.cfg.run_id.rsplit("-s", 1)[-1]
+            for path in self.cfg.hypothesis_pool:
+                pp = Path(path)
+                src = pp.parent.name
+                if src.rsplit("-s", 1)[-1] == mine:
+                    continue                    # 같은 시드 번호는 뺀다
+                for ln in pp.read_text().splitlines():
+                    if not ln.strip():
+                        continue
+                    h = _json.loads(ln)
+                    if h.get("analyst_pass", 1) != 1:
+                        continue
+                    groups.setdefault((src, h.get("round")), []).append(h)
+            self._pool = [groups[k] for k in sorted(groups)]
+            if not self._pool:
+                raise ValueError(
+                    "가설 풀이 비었다. 같은 시드 번호만 줬거나 경로가 "
+                    "틀렸다 — 조용히 가설 없이 돌지 않는다 (§26.4).")
+            self.rng.shuffle(self._pool)
+        block = self._pool[r % len(self._pool)]
+        out = []
+        for h in block:
+            g = dict(h)
+            # ★ 출처를 남긴다. 나중에 "이 가설이 어디서 왔나" 를 못 물으면
+            #   이 팔의 결과를 해석할 수 없다.
+            g["borrowed_from"] = f"{h.get('id')}@r{h.get('round')}"
+            g.pop("analyst_pass", None)
+            out.append(g)
+        return out
 
     # -- ★ Analyst -> FeatureWriter (D-75) --------------------------------
     def _write_features(self, hyps: list[dict], r: int,
@@ -490,6 +552,15 @@ class RoundLoop:
                 h.setdefault("analyst_pass", 1)
             self.hypotheses.extend(replaced)
             self.hypotheses.extend(hyps)
+        elif self.cfg.hypothesis_pool and self.archive.best is not None:
+            # ★ 대조군 C — Analyst 는 안 부르고 남의 가설을 넣는다 (D-91)
+            hyps = self._pool_round(r)
+            for h in hyps:
+                h["id"] = f"H{self._hyp_seq}"
+                self._hyp_seq += 1
+                h["round"] = r
+                h["analyst_pass"] = 0        # 0 = 빌려옴
+            self.hypotheses.extend(hyps)
 
         # 4. 규칙 생성 — ★ 병렬 호출 (§4-0). 12개나 1개나 벽시계가 비슷하다
         parents = self.archive.parents(self.cfg.n_rules_per_round, self.rng)
@@ -513,7 +584,10 @@ class RoundLoop:
                          # ★ 가설 절을 만들지 말지 (§16.1). `hypothesis=None`
                          #   으로 추측하면 안 된다 — 그것은 "가설이 없는
                          #   라운드" 와 "Analyst 자체가 없음" 을 섞는다
-                         "analyst": self.cfg.use_analyst})
+                         # 가설 절을 만들지 말지. 대조군 C 는 Analyst 를
+                         # 안 부르지만 **가설은 받으므로** 절이 있어야 한다
+                         "analyst": bool(self.cfg.use_analyst
+                                         or self.cfg.hypothesis_pool)})
         raws = self._call_optimizers(reqs)
         calls["optimize"] += len(reqs)
 

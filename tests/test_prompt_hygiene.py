@@ -74,3 +74,87 @@ def test_prompt_has_no_table_derived_claim(path: Path):
         "프롬프트에 표 유래 명제가 있다 (§12.3b). 규칙 함수가 표를 못 보게 "
         "막아 놓고 그 표의 결론을 문장으로 넣으면 §3 이 아무 일도 하지 "
         "않는다:\n" + "\n".join(hits))
+
+
+# ---------------------------------------------------------------------------
+# ★ 스키마 필드 설명도 **프롬프트의 일부**다 (D-90)
+# ---------------------------------------------------------------------------
+#
+#   구조화 출력 스키마의 `description` 은 모델에 그대로 전달된다. 그런데
+#   프롬프트를 고칠 때 여기를 안 훑어서 **같은 요청 안에서 시스템 프롬프트와
+#   필드 설명이 반대를 말하는 상태**가 됐다:
+#
+#     _rules_common.md  "w0 를 대충 내지는 마세요 ... 물리적 크기를 반영한"
+#     schemas.py        "대략적이면 충분하다 — 수치 최적화기가 맞춘다"
+#
+#   원칙 26 의 짝이다 — 검사기와 프롬프트가 갈리면 모델은 프롬프트를 믿지만,
+#   프롬프트와 스키마가 갈리면 **모델은 둘 다 본다.**
+
+
+def _schema_descriptions() -> dict[str, str]:
+    from kernelrule.agents.schemas import HAVE_PYDANTIC
+
+    if not HAVE_PYDANTIC:
+        pytest.skip("pydantic 없음")
+    import kernelrule.agents.schemas as S
+
+    out: dict[str, str] = {}
+    for name in dir(S):
+        cls = getattr(S, name)
+        fields = getattr(cls, "model_fields", None)
+        if not isinstance(fields, dict):
+            continue
+        for fname, f in fields.items():
+            if getattr(f, "description", None):
+                out[f"{name}.{fname}"] = f.description
+    return out
+
+
+def test_schema_descriptions_have_no_table_leak():
+    """프롬프트에 건 누출 검사를 **스키마 설명에도** 건다."""
+    bad = []
+    for where, text in _schema_descriptions().items():
+        for rx, why in _LEAK:
+            if rx.search(text):
+                bad.append(f"  {where}: {why}")
+    assert not bad, ("스키마 필드 설명에 표 유래 문장이 있다 — 이것도 "
+                     "모델에 간다:\n" + "\n".join(bad))
+
+
+def test_shared_schema_does_not_mention_a_parent():
+    """★ `RuleOutput` 은 Optimizer 와 Architect 가 **함께** 쓴다.
+
+    설명에 부모 이야기를 넣으면 Architect 가 없는 부모를 찾는다.
+    `_rules_edit.md` 를 Architect 에서 뺀 것과 같은 이유다 (§30.10).
+    교체 지시는 Optimizer 프롬프트의 `budget_note` 가 동적으로 넣는다.
+    """
+    from kernelrule.agents.schemas import HAVE_PYDANTIC
+
+    if not HAVE_PYDANTIC:
+        pytest.skip("pydantic 없음")
+    import kernelrule.agents.schemas as S
+
+    for fname in ("code", "w0"):
+        d = S.RuleOutput.model_fields[fname].description or ""
+        assert "부모" not in d, (
+            f"RuleOutput.{fname} 설명이 부모를 말한다 — Architect 에게는 "
+            "부모가 없다")
+
+
+def test_w0_description_agrees_with_the_prompt():
+    """★ `w0` 설명이 §29 정정을 따라왔는가 (D-54, D-90).
+
+    프롬프트는 "대충 내지 마라, 물리적 크기를 반영하라" 인데 스키마만
+    "대략적이면 충분하다" 로 남아 있었다.
+    """
+    from kernelrule.agents.openai_client import load_prompt
+    from kernelrule.agents.schemas import HAVE_PYDANTIC
+
+    if not HAVE_PYDANTIC:
+        pytest.skip("pydantic 없음")
+    import kernelrule.agents.schemas as S
+
+    d = S.RuleOutput.model_fields["w0"].description or ""
+    assert "대략적이면 충분" not in d, "프롬프트와 반대를 말한다"
+    assert "대충 내지 마라" in d
+    assert "대충 내지는 마세요" in load_prompt("role/_rules_common.md")

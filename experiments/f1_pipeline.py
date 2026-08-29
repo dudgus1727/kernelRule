@@ -608,7 +608,9 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        max_new_features_per_round=getattr(
                            a, "max_new_features", 0),
                        feature_condition=a.condition,
-                       use_analyst=not getattr(a, "no_analyst", False)),
+                       use_analyst=not getattr(a, "no_analyst", False),
+                       hypothesis_pool=tuple(
+                           getattr(a, "hypothesis_pool", []) or ())),
         table=table, matrix=matrix, splits=splits, llm=llm)
 
 
@@ -625,7 +627,8 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            n_rules_per_round=12, seed=100 + a.seed + s,
                            max_new_features_per_round=a.max_new_features,
                            feature_condition=a.condition,
-                           use_analyst=not a.no_analyst),
+                           use_analyst=not a.no_analyst,
+                           hypothesis_pool=tuple(a.hypothesis_pool)),
             table=table, matrix=matrix, splits=splits, llm=llm)
         loop.seed(seed_rule["code"], seed_rule["w0"], changes="stage2 씨앗")
         print(f"\n  --- {run_id} ---", flush=True)
@@ -724,6 +727,12 @@ def main() -> None:
     ap.add_argument("--no-analyst", action="store_true",
                     help="Analyst 를 끈다 (§16.1 ablation). 진단 리포트를 "
                          "만들지도 않는다")
+    # ★ §16.1 대조군 C (D-91). Analyst 는 안 부르고 **남의 가설**을 넣는다.
+    ap.add_argument("--hypothesis-pool", nargs="+", default=[],
+                    metavar="HYPOTHESES_JSONL",
+                    help="다른 실행의 hypotheses.jsonl. Analyst 없이 그 "
+                         "가설을 라운드마다 빌려 쓴다 — 같은 시드 번호의 "
+                         "실행은 자동으로 뺀다")
     ap.add_argument("--max-new-features", type=int, default=0,
                     metavar="N",
                     help="라운드당 만들 수 있는 새 축 (0=경로 없음, D-75). "
