@@ -73,6 +73,24 @@ class ValidationReport:
         return head + ("\n" + body if body else "")
 
 
+def alt_hw(hw: Hardware) -> Hardware:
+    """스케일 불변성 검사용 가짜 하드웨어. **모든 수치 필드를 바꾼다** (D-38).
+
+    ★ 이 함수는 세 실험 스크립트에 **각자 복사돼 있었다**
+    (`f1_pipeline` / `revalidate` / `feature_writer`). 루프에서도 필요해져
+    네 번째 사본이 될 뻔했다 — 하나를 고치면 나머지가 갈린다 (원칙 2).
+    """
+    from dataclasses import replace
+
+    return replace(hw, sm_count=hw.sm_count * 2 + 3,
+                   smem_per_block=int(hw.smem_per_block * 0.7),
+                   max_threads_per_sm=int(hw.max_threads_per_sm * 1.33),
+                   peak_tflops_f16=hw.peak_tflops_f16 * 1.6,
+                   bandwidth_gbps=hw.bandwidth_gbps * 0.8,
+                   regs_per_sm=int(hw.regs_per_sm * 1.5),
+                   l2_bytes=int(hw.l2_bytes * 2))
+
+
 def _sample(table, n_shapes: int, rng) -> list:
     shapes = table.shapes()
     idx = rng.choice(len(shapes), size=min(n_shapes, len(shapes)),

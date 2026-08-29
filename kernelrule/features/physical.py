@@ -31,11 +31,21 @@
 from __future__ import annotations
 
 import math
+from functools import partial
 
 import numpy as np
 
 from kernelrule.core.types import Config, Hardware, Problem
-from kernelrule.features import REGISTRY, feature, shape_feature
+from kernelrule.features import REGISTRY
+from kernelrule.features import feature as _feature
+from kernelrule.features import shape_feature as _shape_feature
+
+# ★ 이 모듈의 피처는 **전부 `REGISTRY` 에** 들어간다. 그 묶음을 여기 한 줄로
+#   못박는다 — `feature()` 자체에는 기본값이 없다 (§30.9). 데코레이터마다
+#   `registry=REGISTRY` 를 반복하지 않으면서도, 어디로 등록되는지가
+#   파일 첫머리에서 한눈에 보인다.
+feature = partial(_feature, registry=REGISTRY)
+shape_feature = partial(_shape_feature, registry=REGISTRY)
 
 __all__ = ["REGISTRY"]
 

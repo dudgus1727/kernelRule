@@ -26,7 +26,7 @@ from __future__ import annotations
 import ast
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -43,7 +43,12 @@ class FeatureRejected(ValueError):
 
 #: 프롬프트에 노출하는 원시 필드. `Config.ext` 는 **의도적으로 뺀다** (§4.3).
 RAW_FIELDS: dict[str, tuple[str, ...]] = {
+    # ★ `bytes_per_element` / `acc_bytes_per_element` 는 `dtype` 에서
+    #   유도된 값이라 **새 정보가 아니다.** 노출하는 이유는 §30.11 —
+    #   `p.dtype` 은 문자열인데 샌드박스에 `np.dtype(...).itemsize` 가
+    #   없어서, roofline 을 만들려던 LLM 이 세 번 연속 거부됐다 (D-63).
     "p": ("M", "N", "K", "dtype", "acc_dtype",
+          "bytes_per_element", "acc_bytes_per_element",
           "layout_a", "layout_b", "layout_c"),
     "hw": ("sm_count", "smem_per_block", "max_threads_per_sm", "regs_per_sm",
            "peak_tflops_f16", "bandwidth_gbps", "l2_bytes", "ridge_point"),
@@ -83,7 +88,65 @@ def field_block() -> str:
     out.append("")
     out.append("`hw.ridge_point` 는 `peak_flops / bandwidth` 입니다 — "
                "roofline 의 무릎이고 계산해 두었습니다.")
+    out.append("")
+    out.append("★ `p.dtype` / `p.acc_dtype` 은 **문자열**입니다 "
+               "(`\"f16\"` 같은). 바이트가 필요하면 "
+               "`p.bytes_per_element` / `p.acc_bytes_per_element` 를 "
+               "쓰세요 — dtype 에서 유도해 둔 float 입니다.")
     return "\n".join(out)
+
+
+def uses_cfg(code: str) -> bool:
+    """이 피처 함수가 `cfg.*` 를 참조하는가 (§30.12).
+
+    `shape_level` 판정의 **AST 겹**이다. 참조하지 않으면 값이 config 와
+    무관하다는 것이 코드에서 확정된다 — 표에 의존하지 않는 판정이다.
+    """
+    tree = ast.parse(code.strip())
+    return any(isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
+               and n.value.id == "cfg" for n in ast.walk(tree))
+
+
+#: 형상 안 상대 분산이 이보다 작으면 "상수" 로 본다. 부동소수 비교라
+#: 정확 일치를 쓰면 마지막 자리 차이에 걸린다.
+_CONST_RTOL = 1e-12
+
+#: 피처 이름 -> 형상 수준으로 판정한 근거. ★ "cfg 를 참조하는데 이 표에서
+#: 상수" 인 것은 **번들이 바뀌면 다시 판정해야 한다** (§30.12).
+SHAPE_LEVEL_REASON: dict[str, str] = {}
+
+
+def detect_shape_level(f: Feature, table, *, n_shapes: int = 8
+                       ) -> tuple[bool, str]:
+    """★ 두 겹 판정 — `(형상 수준인가, 근거)` (§30.12).
+
+    ```
+    1. 데이터   전 형상에서 config 간 상대 분산이 0 인가
+    2. AST      함수가 cfg.* 를 참조하는가
+                안 함        -> 확실히 형상 수준 (코드가 보증한다)
+                하는데 상수  -> ★ 이 표에서만 그럴 수 있다. 경고를 단다
+    ```
+
+    두 번째가 왜 필요한가: `alignment_guarantee_deficit` 은 이 번들의
+    61형상에서 alignment 가 config 와 무관해 상수일 수 있다. **다른 표
+    에서는 config 의존일 수도 있다.** 그런 것은 형상 수준으로 등록하되
+    그 사실을 기록해서, 번들이 바뀔 때 다시 판정하게 한다.
+    """
+    from kernelrule.core.matrix import FeatureMatrix
+
+    one = FeatureRegistry(f"probe-shape-{f.name}")
+    one.add(f)
+    mat = FeatureMatrix(table, one)
+    for p in list(table.shapes())[:n_shapes]:
+        fe, _ = mat.for_shape(p)
+        v = np.asarray(getattr(fe, f.name), dtype=np.float64)
+        scale = max(float(np.nanmax(np.abs(v))), 1.0)
+        if float(np.nanstd(v)) > _CONST_RTOL * scale:
+            return False, "config 마다 값이 다르다"
+    if f.source and not uses_cfg(f.source):
+        return True, "cfg 를 참조하지 않는다 — 코드가 보증한다"
+    return True, ("★ cfg 를 참조하는데 이 표에서 상수다 — "
+                  "다른 번들에서는 config 의존일 수 있다. 재판정 필요")
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,8 +202,19 @@ def check_feature_code(code: str, *, known: frozenset[str]) -> str:
             raise FeatureRejected(f"알 수 없는 이름: {node.id}")
 
     src = ast.unparse(tree)
+    # ★ **허용 필드를 먼저 지운 뒤** 금지어를 찾는다 (D-73).
+    #
+    #   `hw.peak_tflops_f16` 은 `RAW_FIELDS` 가 명시적으로 허용한 필드인데
+    #   금지어 `"tflops"` 가 부분 문자열로 걸렸다. roofline 을 만들려던
+    #   제안이 그렇게 거부됐다 — **검사기가 자기가 허용한 것을 금지했다.**
+    #   D-37(`inspect.getsource` 실패를 "hw 를 쓴다" 로 떨어뜨림)과 같은
+    #   부류다: 검사기의 결함이 LLM 의 실패로 보인다 (원칙 8).
+    masked = src
+    for base, names in RAW_FIELDS.items():
+        for n in names:
+            masked = masked.replace(f"{base}.{n}", f"{base}.<ok>")
     for b in _BANNED:
-        if b in src:
+        if b in masked:
             raise FeatureRejected(f"금지된 참조: {b!r} (§3)")
     if (m := _HW_LITERALS.search(src)):
         raise FeatureRejected(
@@ -216,5 +290,16 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
         raise FeatureRejected(
             f"{name}: §8.3 검증 실패 — "
             + "; ".join(f"{c.name}: {c.detail}" for c in rep.fails()))
+    # ★ 형상 수준 판정 (§30.12). 생성 경로에는 `shape_feature` 데코레이터가
+    #   없어서 **전부 config 수준으로 등록되고 있었다.** 그러면 규칙이
+    #   `if p.<x>:` 로 분기할 수 없고, 형상 안에서 상수인 항은 순위를 하나도
+    #   못 바꾼다 (절대 규칙 2). F1 21개 중 5개가 그 상태였다 (D-65).
+    is_shape, why = detect_shape_level(f, table)
+    if is_shape:
+        f = replace(f, shape_level=True)
+        # ★ 근거를 남긴다. 특히 "cfg 를 참조하는데 이 표에서 상수" 인 것은
+        #   **번들이 바뀌면 다시 판정해야 한다.** frozen dataclass 라
+        #   모듈 수준 표에 담는다 — 호출자가 summary.json 에 적는다.
+        SHAPE_LEVEL_REASON[name] = why
     registry.add(f)
     return f

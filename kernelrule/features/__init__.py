@@ -233,10 +233,16 @@ def feature(*, unit: str = "dimensionless",
                     physical_meaning=physical_meaning,
                     observed=tuple(observed),
                     code_hash=_hash_fn(fn))
-        # ★ `registry or REGISTRY` 를 쓰면 안 된다 — `__len__` 이 있어서
-        # **빈 레지스트리가 falsy** 이고, 그러면 첫 피처가 조용히 전역
-        # 레지스트리에 등록된다. 조용히 틀리는 종류의 버그다 (§30.8).
-        (REGISTRY if registry is None else registry).add(f)
+        # ★ 레지스트리는 **필수**다. 기본값을 두면 F0~F3 조건에서 조용히
+        #   사람이 쓴 24개에 등록된다 (§30.9). `registry or REGISTRY` 도
+        #   안 된다 — `__len__` 이 있어서 **빈 레지스트리가 falsy** 이고,
+        #   그러면 첫 피처만 전역으로 새는 더 나쁜 형태가 된다.
+        if registry is None:
+            raise ValueError(
+                "feature(registry=...) 는 필수다. 기본값을 두면 어느 "
+                "레지스트리에 등록되는지 호출부에서 안 보이고, F0~F3 "
+                "조건에서 사람이 쓴 24개가 조용히 섞인다 (§26.4).")
+        registry.add(f)
         fn.feature = f          # type: ignore[attr-defined]
         return fn
 
@@ -256,7 +262,7 @@ def shape_feature(**kw):
     return feature(**kw)
 
 
-def render_features(registry: FeatureRegistry | None = None, *,
+def render_features(registry: FeatureRegistry, *,
                     include_observed: bool, active_only: bool = True,
                     extra_observed: dict[str, list[str]] | None = None) -> str:
     """프롬프트에 넣을 피처 목록.
@@ -274,9 +280,20 @@ def render_features(registry: FeatureRegistry | None = None, *,
     소스에 박아 두면 어느 분할에서 나왔는지 알 수 없게 된다.
 
     ⚠️ `include_observed=False` 면 `extra_observed` 도 **무시된다.**
+
+    ⚠️ `registry` 에 기본값이 없다. 있으면 F0~F3 조건에서 조용히 사람이 쓴
+    24개가 들어간다 — 그 실험은 "LLM 이 피처를 만들 수 있는가" 를 묻는데
+    프롬프트에 답이 들어가 있게 된다.
     """
     extra = extra_observed or {}
-    reg = REGISTRY if registry is None else registry
+    # ★ 기본값을 두지 않는다. 프롬프트에 **어느 레지스트리가 들어가는지**가
+    #   실험 조건 자체다 — 빠뜨리면 F1 조건에 사람이 쓴 24개가 조용히
+    #   렌더링된다 (§30.9, 원칙 1).
+    if registry is None:
+        raise ValueError(
+            "render_features 는 레지스트리를 반드시 받는다. 어느 피처 "
+            "목록이 프롬프트에 들어가는지가 실험 조건이다 (§26.4).")
+    reg = registry
     items = [reg[n] for n in sorted(reg._items)]
     if active_only:
         items = [f for f in items if f.active]
