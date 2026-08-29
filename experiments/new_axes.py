@@ -80,7 +80,7 @@ def novel_axes(table, shapes) -> list:
             "PROPOSALS 를 그 경로로 바꿔라. 이전 gpt-5.4 산출물은 삭제됐다 "
             "(D-52).")
     """생성 피처 중 **기존과 중복이 아닌 것**. 목록을 손으로 적지 않는다."""
-    gen = load_generated(PROPOSALS)
+    gen = load_generated(PROPOSALS, table=table)
     ref = _columns(REGISTRY, table, shapes)
     tmp = FeatureRegistry("gen-probe")
     for f in gen:

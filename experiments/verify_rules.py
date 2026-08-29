@@ -29,6 +29,7 @@ from pathlib import Path
 
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.numerics import approx_equal
 from kernelrule.core.scoring import evaluate_scores, geomean
 from kernelrule.core.splits import Split, SplitSet, regime_of
 from kernelrule.core.table import PerfTable
@@ -94,7 +95,7 @@ def main() -> None:
                 reg[p] = e.regret[i, 0]
         got = geomean(np.array([reg[p] for p in splits.val.shapes if p in reg]))
         want = row["holdout"]
-        ok = abs(got - want) <= TOL
+        ok = approx_equal(got, want, TOL)
         if not ok:
             bad.append(f"{run}: 기록 {want:.4f} != 재계산 {got:.4f}")
         print(f"  {run:16s} {want:9.4f} {got:9.4f}  {'✅' if ok else '❌'}")

@@ -7,12 +7,14 @@
 
 | 스크립트 | LLM | 만든 artifact | 상태 |
 |---|---|---|---|
-| `seed_selection.py` | ✅ | `luna-baseline.md` · `conclusion.md` | **정본 러너** |
+| `rerun.py` | ✅ | `rerun-preregistration.md` | ★ **재실행 정본 러너** — 기준이 `PREREG` 에 |
+| `f1_pipeline.py` | ✅ | `f1-guided.md` · `f1k-preregistration.md` · (§30.9) | ★ **F0~F3 정본 러너** — `--dry-run` 확인 완료 |
+| `seed_selection.py` | ✅ | `luna-baseline.md` · `conclusion.md` | F3 전용 (구 정본) |
 | `export_rules.py` | — | `docs/artifacts/rules/` | **규칙 내보내기** |
 | `verify_rules.py` | — | (검증만) | ★ **검증 경로** |
 
 | `new_axes.py` | ✅ | `new-axes.md` | ⚠️ 원본 삭제 |
-| `feature_writer.py` | ✅ | `feature-writer-f1.md` | ⚠️ 원본 삭제 |
+| `feature_writer.py` | ✅ | `feature-writer-f1.md` | 유효 — luna 재측정 완료 |
 | `architect_gate.py` | ✅ | `architect-gate.md` | ⚠️ 원본 삭제 (mini 실행만 남음) |
 
 | `score_new_axes.py` | — | `new-axes.md` 채점 | ⚠️ 원본 삭제 |
@@ -22,6 +24,10 @@
 | `regime_count.py` | — | `regime-count.md` | ⚠️ evolved 팔 원본 삭제 |
 | `seed_spread.py` | — | `conclusion.md` 의 시드 폭 | ⚠️ 원본 삭제 — 목록을 채워야 돈다 |
 | `selection_spread.py` | — | `decisions.md` D-40 / D-42 | ⚠️ 원본 삭제 — 목록을 채워야 돈다 |
+| `fitter_sweep.py` | — | `fitter-sweep.md` · D-55 | 유효 — 커밋된 규칙만 읽는다 |
+| `fitter_polish.py` | — | `fitter-sweep.md` · D-55 | 유효 — 커밋된 규칙만 읽는다 |
+| `fitter_movement.py` | — | D-56 · D-57 | ★ **적합기 관문** — 도달률 90% |
+| `polish_ranking.py` | — | D-57 | ★ **재실행 판정** — 순위가 바뀌는가 |
 
 ## ★ 숫자를 검증하는 법
 
@@ -57,3 +63,27 @@ LLM 실행    재현 불가 (난수 통제 안 됨 — §24.4b)
 `canonical_score(code, w0, table=, matrix=, splits=)` 는 **루프의 `SplitSet`
 을 받아야만** 돌고, 형상을 따로 뽑는 경로가 없다. 그러지 않으면 홀드아웃이
 학습 형상과 겹친다 — 실제로 19 중 11이 겹쳤다 (D-36).
+
+## ★ F0~F3 를 돌리는 법
+
+```bash
+python3 experiments/f1_pipeline.py F1 --dry-run      # 배관 확인, LLM 0회
+python3 experiments/f1_pipeline.py F1                # 실제
+python3 experiments/f1_pipeline.py F1 --stage 2      # 1단계 산출물 재사용
+```
+
+조건이 정하는 것은 **어느 레지스트리가 세 단계 전부에 들어가는가** 하나다.
+
+```
+F3  사람 24개 + physics_seeded 씨앗   1단계를 건너뛴다 (조건이 그렇다)
+F2  기초 5개 + FeatureWriter
+F1  원시 값만 -> FeatureWriter -> Architect 씨앗
+F0  피처 없음
+```
+
+돌린 뒤 **가장 먼저 볼 것:**
+
+```bash
+jq .human_features_present runs/f1pipe-F1-*/config.json   # F0/F1 이면 [] 여야 한다
+jq .physics_coverage runs/f1pipe-F1-*/stage1-features/summary.json
+```

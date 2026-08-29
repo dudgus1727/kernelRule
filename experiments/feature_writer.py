@@ -38,7 +38,6 @@ from __future__ import annotations
 import json
 import sys
 import time
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -53,7 +52,7 @@ from kernelrule.features.generated import (
     _reference_columns,
     register_generated,
 )
-from kernelrule.features.validate import _pearson, _spearman
+from kernelrule.features.validate import _pearson, _spearman, alt_hw
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 OUT = Path("runs")
@@ -62,21 +61,6 @@ OUT = Path("runs")
 RHO = 0.95
 
 
-def _alt_hw(hw):
-    """스케일 불변성 검사용 가짜 하드웨어.
-
-    ★ **모든 수치 필드를 바꾼다.** 하나라도 그대로 두면 그것에 물린 피처가
-    "hw 를 안 쓴다" 로 오판된다. 실제로 `max_threads_per_sm` 을 안 바꿔서
-    occupancy 피처가 16회 연속 기각됐다 — `min(by_threads, ...)` 이 그
-    항에 물려 값이 안 변했기 때문이다 (D-38).
-    """
-    return replace(hw, sm_count=hw.sm_count * 2 + 3,
-                   smem_per_block=int(hw.smem_per_block * 0.7),
-                   max_threads_per_sm=int(hw.max_threads_per_sm * 1.33),
-                   peak_tflops_f16=hw.peak_tflops_f16 * 1.6,
-                   bandwidth_gbps=hw.bandwidth_gbps * 0.8,
-                   regs_per_sm=int(hw.regs_per_sm * 1.5),
-                   l2_bytes=int(hw.l2_bytes * 2))
 
 
 def _columns(reg: FeatureRegistry, table, matrix, shapes) -> dict:
@@ -96,7 +80,7 @@ def main(n_proposals: int = 20, condition: str = "F1",
          model: str = DEFAULT_MODEL) -> None:
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
-    hw_alt = _alt_hw(table.hw)
+    hw_alt = alt_hw(table.hw)
 
     gen = FeatureRegistry(f"generated-{condition}")
     llm = OpenAILLM(LLMConfig(model=model, concurrency=4),

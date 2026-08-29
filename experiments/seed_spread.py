@@ -148,7 +148,7 @@ def main() -> None:
 
     # ★ 자리표시자. gpt-5.4 산출물은 삭제됐다 (D-52)
     gen = load_generated("runs/featwriter-F1-<모델>/proposals.jsonl",
-                         only={"split_k_io_amplification"})
+                         table=table, only={"split_k_io_amplification"})
     if not gen:
         print("  (피처를 못 찾았다)")
         return
