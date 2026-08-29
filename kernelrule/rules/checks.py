@@ -26,7 +26,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 
-__all__ = ["CheckReport", "RuleCheckError", "check_rule", "LIMITS",
+__all__ = ["BUDGET", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
            "weight_reuse_message", "literal_budget_message",
            "noop_term_message"]
 
@@ -88,6 +88,70 @@ def _uses_weight(node) -> bool:
                and n.value.id == "w" for n in ast.walk(node))
 
 
+def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
+                                              list[ast.Constant]]:
+    """숫자 리터럴을 **예산에 드는 것 / 안 드는 것**으로 나눈다 (D-78).
+
+    반환은 `(예산에 드는 것, 비교 상수)`.
+
+    ## 왜 나누나
+
+    §29.4 가 두 가지를 한 예산에 묶고 있었다.
+
+    ```
+    가중치 제한   파라미터 수를 막는다 — 구조 비교를 위해서다
+    리터럴 제한   "상수를 하드코딩해 이 표에 맞추는 것" 을 막으려던 것
+    ```
+
+    `p.roofline_ratio < 1` 은 뒤엣것이 아니다 — roofline 의 무릎이라는
+    **물리 상수**다. 그런데 합산 예산에 걸려 진화가 `1` 을 안 쓰고
+    우회했다:
+
+    ```
+    np.square(x) < x        x < np.sqrt(x)        x < np.sign(x)
+    np.isfinite(x)          <- 한 규칙 안에 9번. 오로지 상수 1 을 쓰려고
+    ```
+
+    **넷 다 `x < 1` 과 같고, 사람이 읽기 어렵다.** "해석 가능한 규칙" 이
+    이 연구의 주장인데 그 주장을 예산이 갉아먹고 있었다.
+
+    ## 무엇이 면제인가
+
+    `ast.Compare` 의 **직접 피연산자**인 숫자 리터럴만이다. 중첩된 식
+    안의 상수는 면제가 아니다 — `(f.x - 3) < 1` 에서 `3` 은 든다.
+
+    ## 무엇이 여전히 금지인가
+
+    형상 크기와의 직접 비교(`p.M > 1024`)는 **면제와 무관하게 거부**다.
+    그 검사는 `check_rule` 이 따로 한다. 가르는 기준은 **그 상수가
+    하드웨어/물리에서 나오는가, 이 표의 형상 분포에서 나오는가** 이고,
+    정적으로는 못 가르므로 **면제된 상수를 전부 기록**해 사람이 본다
+    (`CheckReport.branch_constants`).
+    """
+    skip = {id(n.slice) for n in ast.walk(tree)
+            if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
+            and n.value.id == "w"}
+    exempt: set[int] = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Compare):
+            for side in [n.left, *n.comparators]:
+                if (isinstance(side, ast.Constant)
+                        and isinstance(side.value, (int, float))
+                        and not isinstance(side.value, bool)):
+                    exempt.add(id(side))
+    counted: list[ast.Constant] = []
+    branch: list[ast.Constant] = []
+    for n in ast.walk(tree):
+        if not (isinstance(n, ast.Constant)
+                and isinstance(n.value, (int, float))
+                and not isinstance(n.value, bool)):
+            continue
+        if id(n) in skip:
+            continue                    # w[0] 의 0 은 가중치 쪽에서 센다
+        (branch if id(n) in exempt else counted).append(n)
+    return counted, branch
+
+
 def literal_budget_message(code: str, n_weights: int) -> str | None:
     """숫자 리터럴 + 가중치가 예산을 넘으면 메시지를, 아니면 `None`.
 
@@ -95,25 +159,29 @@ def literal_budget_message(code: str, n_weights: int) -> str | None:
     재시도를 걸어야 모델이 무엇이 틀렸는지 듣는다. 이 검사가 정적 단계에만
     있었을 때 Architect 제안 3개가 연속으로 같은 이유로 폐기됐고, 모델은
     "가중치 8개면 리터럴을 쓸 수 없다" 를 끝내 알지 못했다.
+
+    ★ 세는 일은 `_numeric_literals` 하나가 한다 — `check_rule` 과 여기가
+    **따로 세면 갈린다** (D-37 계열). 갈리면 LLM 경계는 통과시키고 정적
+    검사가 조용히 버린다.
     """
     try:
         tree = ast.parse(code.strip())
     except SyntaxError:
         return None
-    skip = {id(n.slice) for n in ast.walk(tree)
-            if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
-            and n.value.id == "w"}
-    n_lit = sum(1 for n in ast.walk(tree)
-                if isinstance(n, ast.Constant)
-                and isinstance(n.value, (int, float))
-                and not isinstance(n.value, bool) and id(n) not in skip)
+    counted, branch = _numeric_literals(tree)
+    n_lit = len(counted)
     total = n_lit + n_weights
-    if total <= LIMITS["literal_budget"]:
+    if total <= LIMITS["budget"]:
         return None
+    hint = ""
+    if branch:
+        hint = (f" (분기 비교 상수 {len(branch)}개는 예산에서 빠졌다 — "
+                "그것은 계속 써도 된다)")
     return (f"숫자 리터럴 {n_lit}개 + 가중치 {n_weights}개 = {total} > "
-            f"{LIMITS['literal_budget']} (§29.4). 리터럴과 가중치는 **같은 "
-            f"예산**을 쓴다 — 상수를 하나 쓰면 가중치를 하나 줄여야 한다. "
-            f"리터럴을 빼고 그 자리를 가중치로 바꾸거나, 항을 줄여라")
+            f"{LIMITS['budget']} (§29.4).{hint} 가중치와 **분기 비교가 "
+            f"아닌** 숫자 리터럴이 같은 예산을 쓴다 — 상수를 하나 쓰면 "
+            f"가중치를 하나 줄여야 한다. 항을 줄이거나, 그 상수를 분기 "
+            f"조건의 비교로 옮겨라")
 
 
 def weight_reuse_message(code: str) -> str | None:
@@ -145,11 +213,19 @@ def weight_reuse_message(code: str) -> str | None:
             f"가중치 {len(uses)}개로 만들었다 — 리터럴 예산(§29.4)을 우회한다. "
             "항마다 **다른** 가중치를 써라. 항이 예산을 넘으면 항을 지워라")
 
+#: ★ 예산의 **유일한 출처**. 프롬프트·스키마·검사기가 각자 8 을 적으면
+#: 하나를 빠뜨린다 (`is_reference` / `top_k` / `DEFAULT_MODEL` /
+#: `REGISTRY` / `load_generated` 에 이은 여섯 번째가 된다).
+#:
+#: ⚠️ **8 은 임의로 정한 숫자이고 검증하지 않았다** (§29.4). 8 vs 16 을
+#: 재려 했으나 적합기가 16차원에서 버티지 못해 멈췄다 (D-77).
+BUDGET = 8
+
 LIMITS = {
-    #: 숫자 리터럴 + len(W0). 가중치를 예산에 넣는 이유는 §29.4 —
-    #: 가중치가 많으면 어떤 구조든 비슷한 regret 에 도달해 구조 비교가
-    #: 무의미해진다.
-    "literal_budget": 8,
+    #: 가중치 개수 + **분기 비교가 아닌** 숫자 리터럴 (D-78).
+    #: 가중치를 예산에 넣는 이유는 §29.4 — 가중치가 많으면 어떤 구조든
+    #: 비슷한 regret 에 도달해 구조 비교가 무의미해진다.
+    "budget": BUDGET,
     "ast_nodes": 400,
     "max_lines": 60,
 }
@@ -205,6 +281,10 @@ class CheckReport:
     n_terms: int = 0
     features_used: set[str] = field(default_factory=set)
     shape_values_used: set[str] = field(default_factory=set)
+    #: ★ 예산에서 **면제된** 분기 비교 상수들 (D-78). 거부하지 않지만
+    #: 기록한다 — "물리 상수인가, 이 표의 형상 분포인가" 는 정적으로 못
+    #: 가르므로 사람이 본다.
+    branch_constants: list[float] = field(default_factory=list)
 
     @property
     def budget_used(self) -> int:
@@ -219,8 +299,10 @@ class CheckReport:
 
     def __str__(self) -> str:
         head = "통과" if self.ok else "거부"
+        bc = (f", 분기상수 {self.branch_constants}(면제)"
+              if self.branch_constants else "")
         return (f"[{head}] 리터럴 {self.n_literals} + 가중치 {self.n_weights} "
-                f"= {self.budget_used}/{LIMITS['literal_budget']}, "
+                f"= {self.budget_used}/{LIMITS['budget']}{bc}, "
                 f"항 {self.n_terms}, "
                 f"노드 {self.n_nodes}/{LIMITS['ast_nodes']}, "
                 f"피처 {sorted(self.features_used)}"
@@ -279,12 +361,13 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     #: 가중치가 곱해진 식의 서명. 중복 항 검출용.
     term_sigs: list[str] = []
 
-    # `w[0]` 의 `0` 은 리터럴 예산에서 뺀다 — 가중치는 `n_weights` 로 이미
-    # 예산에 들어가 있다. 안 빼면 항 하나마다 두 번 세어 예산이 반토막 난다.
-    weight_index_nodes = {
-        id(n.slice) for n in ast.walk(tree)
-        if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
-        and n.value.id == "w" and isinstance(n.slice, ast.Constant)}
+    # ★ 리터럴은 `_numeric_literals` **하나**가 센다 — LLM 경계
+    #   (`literal_budget_message`) 와 여기가 따로 세면 갈린다 (D-37 계열).
+    #   `w[0]` 의 `0` 은 거기서 빠진다: 가중치는 `n_weights` 로 이미 예산에
+    #   들어가 있어서, 안 빼면 항마다 두 번 세어 예산이 반토막 난다.
+    _counted, _branch = _numeric_literals(tree)
+    rep.n_literals = len(_counted)
+    rep.branch_constants = [n.value for n in _branch]
 
     for node in ast.walk(tree):
         # import 금지
@@ -299,13 +382,6 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                 bad(f"금지된 속성 참조: .{node.attr}")
             if node.attr.startswith(_BANNED_ATTR_PREFIX):
                 bad(f"던더 속성 접근 금지: .{node.attr}")
-
-        # 숫자 리터럴
-        if isinstance(node, ast.Constant) and isinstance(node.value,
-                                                         (int, float)):
-            if not isinstance(node.value, bool) \
-                    and id(node) not in weight_index_nodes:
-                rep.n_literals += 1
 
         # f.<name> / p.<name>
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
@@ -405,9 +481,12 @@ def check_rule(code: str, *, feature_names, shape_value_names,
         bad(f"W0 길이 {rep.n_weights} != 참조한 최대 인덱스 + 1 "
             f"({rep.max_w_index + 1}). 안 쓰는 가중치는 예산 낭비다")
 
-    if rep.budget_used > lim["literal_budget"]:
+    if rep.budget_used > lim["budget"]:
         bad(f"리터럴 {rep.n_literals} + 가중치 {rep.n_weights} = "
-            f"{rep.budget_used} > {lim['literal_budget']} (§29.4)")
+            f"{rep.budget_used} > {lim['budget']} (§29.4). "
+            + (f"분기 비교 상수 {rep.branch_constants} 는 이미 면제됐다"
+               if rep.branch_constants else
+               "분기 조건의 비교 상수는 예산에서 빠진다 (D-78)"))
 
     # -- ★ config 수준 분기 금지 -------------------------------------------
     for node in ast.walk(tree):

@@ -151,7 +151,7 @@ def test_physics_seeded_rule_obeys_the_same_constraints():
                    shape_value_names=REGISTRY.names(shape_level=True),
                    n_weights=len(W0))
     assert r.ok, r.violations
-    assert r.budget_used <= LIMITS["literal_budget"]
+    assert r.budget_used <= LIMITS["budget"]
 
 
 # ---------------------------------------------------------------------------
@@ -297,3 +297,75 @@ def test_physics_seeded_rule_uses_one_weight_per_term():
                    n_weights=len(W0))
     assert r.ok, r.violations
     assert r.n_terms == len(W0), f"항 {r.n_terms} != 가중치 {len(W0)}"
+
+
+# ---------------------------------------------------------------------------
+# D-78 — 분기 비교 상수는 예산에서 뺀다
+# ---------------------------------------------------------------------------
+
+def test_branch_comparison_constant_is_free():
+    """★ `p.roofline_ratio < 1` 의 `1` 은 예산에 안 든다 (D-78).
+
+    합산 예산이 물리 상수까지 막아서, 진화가 `1` 을 안 쓰고 우회했다 —
+    `np.square(x) < x`, `x < np.sqrt(x)`, `x < np.sign(x)`,
+    `np.isfinite(x)`. 넷 다 `x < 1` 과 같고 사람이 읽기 어렵다.
+    """
+    code = ("def score(f, p, hw, w):\n"
+            "    s = np.where(p.roofline_ratio < 1, f.waves, f.tail_waste) * w[0]\n"
+            "    s = s + f.edge_waste * w[1]\n"
+            "    return s\n")
+    r = check_rule(code, feature_names=FEAT,
+                   shape_value_names=SHAPE | {"roofline_ratio"}, n_weights=2)
+    assert r.ok, r.violations
+    assert r.n_literals == 0, "비교 상수가 예산에 들어갔다"
+    assert r.branch_constants == [1], "면제한 상수를 기록하지 않았다"
+
+
+def test_non_comparison_constant_still_costs():
+    """중첩된 식 안의 상수는 여전히 예산이다 — 면제는 비교 피연산자만."""
+    code = ("def score(f, p, hw, w):\n"
+            "    s = np.where((f.waves - 3.0) < 1, f.waves, f.tail_waste) * w[0]\n"
+            "    return s\n")
+    r = check_rule(code, feature_names=FEAT,
+                   shape_value_names=SHAPE | {"roofline_ratio"}, n_weights=1)
+    assert r.n_literals == 1, f"3.0 을 세지 않았다: {r}"
+    assert r.branch_constants == [1]
+
+
+def test_shape_size_comparison_is_still_banned():
+    """★ 면제는 **암기를 열어주지 않는다.** `p.M > 1024` 는 그대로 거부."""
+    code = ("def score(f, p, hw, w):\n"
+            "    s = np.where(p.M > 1024, f.waves, f.tail_waste) * w[0]\n"
+            "    return s\n")
+    r = check_rule(code, feature_names=FEAT, shape_value_names=SHAPE,
+                   n_weights=1)
+    assert not r.ok
+    assert any("형상 크기를 직접 비교" in v for v in r.violations), r.violations
+
+
+def test_both_budget_counters_agree():
+    """★ LLM 경계와 정적 검사가 **같은 수를 세야 한다** (D-37 계열).
+
+    갈리면 경계는 통과시키고 정적 검사가 조용히 버린다 — 그때 모델은
+    무엇이 틀렸는지 끝내 듣지 못한다.
+    """
+    from kernelrule.rules.checks import BUDGET, literal_budget_message
+
+    cases = [
+        ("def score(f, p, hw, w):\n    return f.waves * w[0]\n", 1),
+        (("def score(f, p, hw, w):\n"
+          "    return np.where(p.roofline_ratio < 1, f.waves, f.tail_waste)"
+          " * w[0]\n"), 8),
+        (("def score(f, p, hw, w):\n"
+          "    return (f.waves - 2.0) * w[0]\n"), 8),
+        ("def score(f, p, hw, w):\n    return f.waves * w[0] * 1.5\n", 8),
+    ]
+    for code, nw in cases:
+        r = check_rule(code, feature_names=FEAT,
+                       shape_value_names=SHAPE | {"roofline_ratio"},
+                       n_weights=nw)
+        over_static = r.budget_used > BUDGET
+        over_llm = literal_budget_message(code, nw) is not None
+        assert over_static == over_llm, (
+            f"두 계수기가 갈렸다: 정적 {r.budget_used}/{BUDGET} vs "
+            f"경계 {over_llm}\n{code}")
