@@ -89,6 +89,12 @@ class _DictAttr:
         return dict(self._cols)
 
 
+#: ★ 레지스트리와 **무관하게** 항상 있는 형상 필드. 문제 자체의 성질이라
+#: 어떤 조건(F0~F3)에서도 `p.M` 처럼 쓸 수 있다. 레지스트리 교체 검사에서
+#: 예외로 다뤄야 한다 — 피처가 아니다 (§30.9).
+INTRINSIC_SHAPE_FIELDS = ("M", "N", "K", "n_candidates")
+
+
 class Feats(_DictAttr):
     """config 수준 피처. 각 값이 `(n_candidates,)` numpy 배열이다.
 
@@ -189,10 +195,10 @@ class FeatureMatrix:
         shp_feats = self.registry.items(shape_level=True)
         for p in self.table.shapes():
             df = self.table.frame_for(p)
-            info: dict[str, float] = {
-                "M": float(p.M), "N": float(p.N), "K": float(p.K),
-                "n_candidates": float(len(df)),
-            }
+            info: dict[str, float] = dict(zip(
+                INTRINSIC_SHAPE_FIELDS,
+                (float(p.M), float(p.N), float(p.K), float(len(df))),
+                strict=True))
             for f in shp_feats:
                 info[f.name] = self._scalar(f, p, df)
             cols: dict[str, np.ndarray] = {}

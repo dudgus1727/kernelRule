@@ -174,3 +174,209 @@ def test_split_refuses_empty_and_overlap():
         SplitSet(train=Split("train", (a, b)), val=Split("val", (b,)))
     with pytest.raises(SplitError, match="한쪽을 비웠다"):
         by_predicate([a, b], lambda p: False, name="none")
+
+
+# ---------------------------------------------------------------- D-54/D-55
+# 적합기가 "아무것도 안 했는가" 를 스스로 신고해야 한다. 24회 중 13회가
+# 초기값 그대로였는데 아무도 몰랐다 — 그 침묵을 막는 검사다.
+
+def test_fitted_rule_reports_that_it_did_not_move():
+    from kernelrule.core.weights import FittedRule
+
+    fr = FittedRule(w=np.array([1.0, 2.0]), w0=np.array([1.0, 2.0]),
+                    fit_regret=1.1, n_evals=305, n_infeasible=0,
+                    sensitivity=np.zeros(2), seconds=1.0)
+    assert not fr.moved
+    assert any("움직이지 않았다" in m for m in fr.invariants())
+
+
+def test_fitted_rule_flags_dominance_and_negative_weights():
+    """★ 절대 배율이 아니라 **실효 기여도**로 지배를 잡는다 (D-70)."""
+    from kernelrule.core.weights import FittedRule
+
+    fr = FittedRule(w=np.array([500.0, -3.0, 1.0]), w0=np.array([1.0, 2.0, 1.0]),
+                    fit_regret=1.1, n_evals=10, n_infeasible=0,
+                    sensitivity=np.zeros(3), seconds=1.0,
+                    contrib=np.array([1000.0, 1.0, 1.0]))
+    assert fr.moved
+    msgs = " ".join(fr.invariants())
+    assert "압도한다" in msgs and "음수" in msgs
+
+    # 기여도가 고르면 |w| 가 아무리 커도 경고하지 않는다 — 배율은 무해하다
+    ok = FittedRule(w=np.array([5e6, 4e6, 6e6]), w0=np.ones(3),
+                    fit_regret=1.1, n_evals=10, n_infeasible=0,
+                    sensitivity=np.zeros(3), seconds=1.0,
+                    contrib=np.array([1.0, 0.9, 1.1]))
+    assert not any("압도" in m for m in ok.invariants())
+
+
+def test_dead_term_is_flagged():
+    """실효 기여도 0 = 순위에 관여하지 않는 항 (절대 규칙 2)."""
+    from kernelrule.core.weights import FittedRule
+
+    fr = FittedRule(w=np.ones(3), w0=np.ones(3), fit_regret=1.1, n_evals=10,
+                    n_infeasible=0, sensitivity=np.zeros(3), seconds=1.0,
+                    contrib=np.array([1.0, 0.0, 1.2]))
+    assert any("기여도가 0" in m for m in fr.invariants())
+
+
+def test_fit_weights_warns_about_its_own_invariants(known):
+    """적합이 이상하면 **조용히 넘어가지 않는다** (D-54).
+
+    ★ 예전에는 "평가 상한에 닿았다" 로 이것을 확인했다. 그 경고가 **늘
+    떠 있었기 때문**이고, 그래서 시험은 통과했지만 아무것도 안 지키고
+    있었다 (D-76). 이제는 **죽은 항**으로 확인한다 — `w[2]` 가 점수에
+    안 들어가므로 실효 기여도가 0 이고, 그것은 진짜 이상 신호다.
+    """
+    import warnings
+
+    from kernelrule.core.weights import FitWarning
+
+    t, m, _score = known
+
+    def dead_term(f, p, hw, w):
+        return f.f0 * w[0] + f.f1 * w[1] + f.f2 * 0.0 * w[2]
+
+    with warnings.catch_warnings(record=True) as got:
+        warnings.simplefilter("always")
+        fit_weights(dead_term, m, t, _all_train(t), [1.0, 1.0, 1.0],
+                    max_evals=200)
+    msgs = [str(w.message) for w in got if issubclass(w.category, FitWarning)]
+    assert any("실효 기여도가 0" in x for x in msgs), \
+        f"죽은 항을 신고하지 않았다: {msgs}"
+
+
+def test_polish_never_worsens_training_regret(known):
+    """좌표 다듬기는 훈련 regret 을 **개선하거나 같아야** 한다 (D-55).
+
+    받아들이는 조건이 `v < base` 라 구조적으로 그렇다. 이 검사가 깨지면
+    다듬기가 훈련 아닌 것을 보고 있다는 뜻이다 (§29.7).
+    """
+    t, m, score = known
+    tr = _all_train(t)
+    a = fit_weights(score, m, t, tr, [1.0, 1.0, 1.0], max_evals=120,
+                    warn_invariants=False)
+    b = fit_weights(score, m, t, tr, [1.0, 1.0, 1.0], max_evals=120,
+                    warn_invariants=False, polish=True)
+    assert b.fit_regret <= a.fit_regret + 1e-12
+
+
+def test_polish_only_sees_the_training_split(known):
+    """다듬기에 검증 분할을 흘리는 경로가 없다 — 인자 자체가 없다 (§29.7)."""
+    import inspect
+
+    from kernelrule.core.weights import _polish
+
+    names = set(inspect.signature(_polish).parameters)
+    assert "val_split" not in names and "splits" not in names
+
+
+def test_contributions_are_scale_invariant(known):
+    """★ 실효 기여도는 **가중치를 통째로 배로 키워도** 비율이 그대로다.
+
+    절대 배율(|w|/|w0|)은 피처 스케일에 따라 자릿수가 달라져 라이브러리를
+    바꾸면 기준이 무의미해진다 — F1(피처 [0,0.2])에서 |w| 최대가
+    770,164 이고 사람 24개에서는 45.1 이었다 (D-70).
+    """
+    from kernelrule.core.weights import _contributions, _Problem
+
+    t, m, score = known
+    prob = _Problem(m, t, t.shapes(), 1)
+    w = np.array([1.0, 2.0, 0.5])
+    a = _contributions(prob, score, w)
+    b = _contributions(prob, score, w * 1000.0)
+    assert a is not None and b is not None
+    # 절대값은 1000배, **비율**은 같다
+    ra, rb = a / a.max(), b / b.max()
+    assert np.allclose(ra, rb, atol=1e-9), (ra, rb)
+
+
+def test_contribution_of_a_shape_constant_term_is_zero(known):
+    """형상 상수 항은 순위를 안 바꾸므로 기여도가 **정확히 0** 이어야 한다.
+
+    `_rules_common.md` 절대 규칙 2 가 말하는 no-op 항을 잡는 검사다.
+    """
+    from kernelrule.core.weights import _contributions, _Problem
+
+    t, m, _ = known
+
+    def score_with_noop(f, p, hw, w):
+        # w[1] 항은 형상 상수라 그 형상 안에서 순위를 못 바꾼다
+        return f.f0 * w[0] + p.n_candidates * w[1]
+
+    prob = _Problem(m, t, t.shapes(), 1)
+    c = _contributions(prob, score_with_noop, np.array([1.0, 5.0]))
+    assert c is not None
+    assert c[0] > 0.0
+    assert c[1] == 0.0, f"형상 상수 항의 기여도가 0 이 아니다: {c[1]}"
+
+
+def test_contributions_never_touch_the_answer():
+    """★ 시간을 보는 경로가 없다 (§3)."""
+    import ast
+    import inspect
+
+    from kernelrule.core.weights import _contributions
+
+    # ★ 독스트링을 빼고 **본문만** 본다. 문서에 "prob.regret 을 안 부른다"
+    #   라고 적어 두면 문자열 검사가 그걸 잡는다 (원칙 14 — 계측이 만드는 오탐).
+    tree = ast.parse(inspect.getsource(_contributions).strip())
+    fn = tree.body[0]
+    body = fn.body[1:] if (isinstance(fn.body[0], ast.Expr)
+                           and isinstance(fn.body[0].value, ast.Constant)
+                           ) else fn.body
+    src = "\n".join(ast.unparse(n) for n in body)
+    assert "prob.regret" not in src, "정답을 통과하는 regret 을 부른다"
+    assert "_times" in src and "_best" in src, (
+        "정답 자리를 `_` 로 안 받는다 — 이름이 없어야 손댈 수 없다")
+    # `score_fn` 만 부른다
+    assert src.count("score_fn(") == 2
+
+def test_cap_warning_ignores_polish_evals(known):
+    """★ 상한 경고는 **다듬기 전** 평가로 판정한다.
+
+    `n_evals` 는 다듬기까지 합한 값이다. 그것으로 `max_evals` 와 견주면
+    다듬기 예산(600)이 상한(300)을 언제나 넘어 **모든 적합에서** "평가
+    상한에 닿았다 — 수렴 전 중단" 이 뜬다. 다듬기가 기본으로 켜진 뒤
+    (D-56) 이 경고는 늘 켜져 있어 신호가 아니었다 (원칙 11).
+    """
+    import warnings as _w
+
+    from kernelrule.core.weights import FitWarning
+
+    t, m, score = known
+    sp = _all_train(t)
+    with _w.catch_warnings(record=True) as got:
+        _w.simplefilter("always")
+        fr = fit_weights(score, m, t, sp, [1.0, 1.0, 1.0], max_evals=3000,
+                         polish=True, polish_budget=400)
+    assert fr.n_fit_evals < fr.n_evals, "다듬기가 안 돌았다 — 시험이 무의미하다"
+    assert fr.n_fit_evals < 3000, "적합만으로 상한에 닿았다 — 예산을 올려라"
+    caps = [str(x.message) for x in got
+            if issubclass(x.category, FitWarning) and "평가 상한" in str(x.message)]
+    assert not caps, f"다듬기 평가 때문에 상한 경고가 떴다: {caps}"
+
+
+def test_cap_warning_needs_actual_improvement_at_cutoff(known):
+    """★ 예산을 다 쓴 것만으로는 경고하지 않는다.
+
+    재시작 일정이 `max_evals` 를 **설계상 전부 쓰게** 돼 있어 "상한에
+    닿았다" 는 언제나 참이다. 늘 참인 것은 감시가 아니다 (원칙 11).
+    경고는 **잘리는 순간까지 나아지고 있었을 때**만 뜬다.
+
+    생성 계수 `W_TRUE` 로 출발하면 더 나아질 곳이 없다 — 예산은 다 쓰지만
+    개선은 없으므로 경고가 없어야 한다.
+    """
+    import warnings as _w
+
+    from kernelrule.core.weights import FitWarning
+
+    t, m, score = known
+    with _w.catch_warnings(record=True) as got:
+        _w.simplefilter("always")
+        fr = fit_weights(score, m, t, _all_train(t), W_TRUE.tolist(),
+                         max_evals=120, polish=False)
+    assert fr.n_fit_evals >= 120, "예산을 다 쓰지 않았다 — 시험이 무의미하다"
+    caps = [str(x.message) for x in got
+            if issubclass(x.category, FitWarning) and "상한" in str(x.message)]
+    assert not caps, f"예산 소진만으로 경고가 떴다: {caps}"

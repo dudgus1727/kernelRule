@@ -43,6 +43,14 @@ ShapeKey = tuple[int, int, int, str]
 ConfigKey = tuple[str, int, str]
 
 
+
+#: dtype 이름 -> 원소당 바이트. **알 수 없는 이름이면 예외다** — 조용히
+#: 기본값으로 떨어지면 roofline 이 통째로 틀린다 (§26.4).
+_DTYPE_BYTES: dict[str, float] = {
+    "f16": 2.0, "bf16": 2.0, "f32": 4.0, "tf32": 4.0, "f64": 8.0,
+    "i8": 1.0, "u8": 1.0, "f8": 1.0, "i32": 4.0,
+}
+
 @dataclass(frozen=True, slots=True)
 class Problem:
     """GEMM 형상. D[MxN] = A[MxK] @ B[KxN].
@@ -63,6 +71,25 @@ class Problem:
     @property
     def key(self) -> ShapeKey:
         return (self.M, self.N, self.K, self.dtype)
+
+    @property
+    def bytes_per_element(self) -> float:
+        """A/B/C 원소 하나의 바이트. **`dtype` 에서 유도된다 — 새 정보가
+        아니다** (§30.11).
+
+        노출하는 이유: roofline 은 `FLOP / byte` 인데 바이트를 얻으려면
+        dtype 을 바이트로 바꿔야 한다. 그런데 `p.dtype` 은 문자열이고,
+        피처 샌드박스에는 `np.dtype(...).itemsize` 가 없다. 그래서 F1 에서
+        LLM 이 `산술_대역폭_압력` 영역을 **세 번 연속 실패**했다 (D-63).
+
+        **쓸 수 없는 필드를 목록에 올리는 것은 있다고 말하는 것이다.**
+        """
+        return _DTYPE_BYTES[self.dtype]
+
+    @property
+    def acc_bytes_per_element(self) -> float:
+        """누산기 원소 하나의 바이트. split-K parallel 의 부분합이 이 크기다."""
+        return _DTYPE_BYTES[self.acc_dtype]
 
 
 @dataclass(frozen=True, slots=True)

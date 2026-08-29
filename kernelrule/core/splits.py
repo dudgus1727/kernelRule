@@ -53,32 +53,70 @@ class SplitError(RuntimeError):
     """분할이 잘못됐다. **빈 집합으로 진행하지 않는다** (§26.4)."""
 
 
+#: ★ 최종 분할의 봉인을 푸는 환경변수 (§30.15).
+#:
+#:   "끝에 딱 한 번" 은 **의도이지 강제가 아니었다.** `splits.test.shapes`
+#:   를 그냥 읽으면 됐다. 봉인을 코드로 만든다 — 실수로 열 수 없게.
+#:
+#:   푼 실행은 `config.json` 에 `unsealed: true` 로 남고, 그 수치는
+#:   **오염 가능**으로 표시한다.
+UNSEAL_ENV = "KERNELRULE_UNSEAL"
+
+
+def is_unsealed() -> bool:
+    """최종 분할이 열려 있는가. `config.json` 에 기록하기 위한 것이다."""
+    import os
+
+    return os.environ.get(UNSEAL_ENV, "") not in ("", "0", "false", "False")
+
+
 @dataclass(frozen=True, slots=True)
 class Split:
     """형상 부분집합 + **역할**. 역할이 타입에 있는 것이 요점이다.
 
         train  진단 리포트와 가중치 적합에 쓰인다. LLM 이 본다
         val    라운드마다 채점. LLM 은 못 보지만 사람은 본다
-        test   프로젝트 끝에 딱 한 번. 봉인
+        test   프로젝트 끝에 딱 한 번. ★ **봉인** — `KERNELRULE_UNSEAL` 필요
+
+    ★ `role="test"` 의 `shapes` 는 봉인돼 있다 (§30.15). 접근하려면
+    환경변수를 명시해야 하고, 그 사실이 `config.json` 에 남는다.
+    **`len()` 과 `role` 은 봉인과 무관하다** — 분할이 존재한다는 것과
+    그 안을 보는 것은 다르다.
     """
 
     role: Role
-    shapes: tuple[Problem, ...]
+    #: ⚠️ **직접 읽지 마라.** `role="test"` 면 봉인 검사를 우회한다.
+    #: 프로퍼티 `shapes` 를 쓴다.
+    _shapes: tuple[Problem, ...]
     name: str = ""
+
+    @property
+    def shapes(self) -> tuple[Problem, ...]:
+        """형상들. ★ `role="test"` 면 봉인 검사를 거친다 (§30.15)."""
+        if self.role == "test" and not is_unsealed():
+            raise SplitError(
+                "최종 분할은 **봉인돼 있다** (§10.2). 프로젝트 끝에 딱 한 번 "
+                f"연다.\n  열려면 {UNSEAL_ENV}=1 을 **명시**하라.\n"
+                "  그 실행은 config.json 에 `unsealed: true` 로 남고, "
+                "거기서 나온 수치는 **오염 가능**으로 표시된다.\n"
+                "  ⚠️ 한 번 보면 되돌릴 수 없다 — 사람이 그것을 알고 "
+                "다음 결정을 하게 된다 (§10.2 가 3분할을 쓰는 이유).")
+        return self._shapes
 
     def __post_init__(self) -> None:
         if self.role not in ("train", "val", "test"):
             raise SplitError(f"알 수 없는 역할: {self.role!r}")
-        if not self.shapes:
+        if not self._shapes:
             raise SplitError(
                 f"분할 {self.name or self.role!r} 이 빈 집합이다. "
                 "빈 집합을 반환하고 통과시키지 않는다 (§26.4).")
 
     def __len__(self) -> int:
-        return len(self.shapes)
+        # ★ 봉인과 무관하다 — 크기를 아는 것과 안을 보는 것은 다르다.
+        return len(self._shapes)
 
     def __iter__(self):
-        return iter(self.shapes)
+        return iter(self.shapes)          # 봉인 검사를 거친다
 
 
 @dataclass(frozen=True, slots=True)
