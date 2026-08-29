@@ -1,0 +1,162 @@
+{
+ "_note": "★ 기계가 쓰는 정본 수치. `conclusion.md` 의 숫자가 이것과 일치해야 하고, tests/test_artifact_numbers.py 가 그것을 고정한다 (4-1). 손으로 옮겨 적으면 전사 오류가 안 잡힌다.",
+ "_generated_by": "python3 experiments/vendor_compare.py + experiments/f1_pipeline.py",
+ "_date": "2026-08-27",
+ "_bundle": "datasets/rtx-a6000-sm_86-c63710df",
+ "_warning": "dev 표다. 이 수치를 대외 보고하지 마라.",
+ "canonical": {
+  "_procedure": "형상마다 6실행 중앙값 -> geomean. 구조 홀드아웃 nk11008 20형상",
+  "ours_geomean": 1.065,
+  "vendor_geomean": 1.0737,
+  "per_shape_wins": 9,
+  "per_shape_losses": 11,
+  "per_shape_p": 0.824,
+  "per_run_wins": 3,
+  "per_run_total": 6,
+  "per_run_p": 1.0,
+  "verdict": "벤더와 구분 불가"
+ },
+ "canonical_alt": {
+  "_procedure": "★ 다른 절차. 실행마다 geomean -> 6실행의 중앙값. canonical 과 섞지 마라 (원칙 4)",
+  "median": 1.0762,
+  "q1": 1.0706,
+  "q3": 1.0834,
+  "seed_sigma": 0.0124
+ },
+ "by_regime": {
+  "short": {
+   "_label": "빠른 (SOL<0.5ms)",
+   "n_shapes": 12,
+   "ours": 1.066,
+   "vendor": 1.0994,
+   "wins": 8,
+   "losses": 4,
+   "p": 0.388
+  },
+  "long": {
+   "_label": "느린 (SOL>=0.5ms)",
+   "n_shapes": 8,
+   "ours": 1.0635,
+   "vendor": 1.0363,
+   "wins": 1,
+   "losses": 7,
+   "p": 0.07
+  }
+ },
+ "f1_vs_human": {
+  "_procedure": "실행마다 정준 채점 -> 6실행의 중앙값",
+  "f1_median": 1.1195,
+  "f1_sigma": 0.0177,
+  "f1_q1": 1.1108,
+  "f1_q3": 1.1328,
+  "human_median": 1.0762,
+  "human_sigma": 0.0124,
+  "diff": 0.0433,
+  "mann_whitney_p": 0.002,
+  "f1_gen_gap": 0.029,
+  "human_gen_gap": 0.0267,
+  "spread_ratio_stage2": 4.4,
+  "spread_ratio_stage3": 1.42,
+  "_note": "★ 잠정 — 파이프라인의 **1단계만 개선한 상태**의 결과다. 2단계(Architect)와 3단계(Analyst+Optimizer)는 프롬프트만 정리했고 구조는 그대로다."
+ },
+ "f1_rediscovery": {
+  "_note": "엄격 = 스피어만·피어슨 둘 다 >0.95",
+  "old_prompt_free": {
+   "accepted": 17,
+   "strict": 0,
+   "monotone": 3
+  },
+  "new_prompt_free": {
+   "accepted": 16,
+   "strict": 6,
+   "monotone": 2
+  },
+  "new_prompt_guided": {
+   "accepted": 15,
+   "strict": 3,
+   "monotone": 2
+  }
+ },
+ "fitter": {
+  "reach_rate_single_condition": 1.0,
+  "reach_probes": 4000,
+  "reach_rate_mixed_ab": 0.833,
+  "seed_discrimination_sigma": 0.0274,
+  "restart_reach_rate_8dim": 0.75,
+  "restart_gap_max_8dim": 0.011,
+  "restart_reach_rate_16dim": 0.42,
+  "restart_gap_max_16dim": 0.0462,
+  "_note_restart": "★ 무작위 4000'점' 보다 무작위 '적합' 이 센 상대다 (D-77). 8차원에서도 3/12 는 진다 — 0.011 미만의 차이는 적합기 출발점 잡음일 수 있다."
+ },
+ "baselines": {
+  "random_config": 1.671,
+  "static_top1": 1.115,
+  "gbdt": 1.019,
+  "vendor_nearest": 1.0737
+ },
+ "cost": {
+  "explore_runs": 33,
+  "explore_llm_calls": 5019,
+  "reproduce_runs": 18,
+  "reproduce_llm_calls": 2830,
+  "f1_pipeline_calls": 1872,
+  "architect_calls": 21,
+  "_not_counted": [
+   "kernelTab 측정 48시간",
+   "피처 24개 정의",
+   "파이프라인 15,000줄",
+   "Claude Code 세션 수십 회"
+  ]
+ },
+ "f1k": {
+  "_procedure": "실행마다 정준 채점 -> 6실행의 중앙값. F1 과 같은 절차",
+  "_status": "★ 잠정 — 1단계만 개선한 상태",
+  "start_library": 5,
+  "generated": 13,
+  "library_size": 18,
+  "new_axes": 9,
+  "seed_terms": 7,
+  "median": 1.1288,
+  "q1": 1.1227,
+  "q3": 1.14,
+  "sigma": 0.014,
+  "vs_f1_diff": 0.0093,
+  "vs_f1_p": 0.589,
+  "vs_human_diff": 0.0526,
+  "vs_human_p": 0.002,
+  "new_axes_used_after_evolution": 8,
+  "seed_grew_to_8_terms": 6,
+  "seed_grew_at_round_median": 1,
+  "where_select_survived": 4,
+  "llm_calls": 967
+ },
+ "library_sizes": {
+  "_note": "★ 조건 간 교락 — 크기가 다르다",
+  "F1": 21,
+  "F1_K": 18,
+  "human24": 24
+ },
+ "analyst_requests": {
+  "_note": "needs_new_feature 가 채워졌지만 읽는 코드가 없다 (analyst-requests.md)",
+  "total_hypotheses": 1655,
+  "filled": 303,
+  "rate": 0.183,
+  "top_themes": {
+   "wave_cta_absolute": 82,
+   "l2_reuse_gain": 64,
+   "pipeline_family": 51,
+   "splitk_gain": 48,
+   "launch_fixed_cost": 21,
+   "warp_granularity": 15,
+   "mn_asymmetry": 13
+  }
+ },
+ "remaining_headroom": {
+  "_note": "★ 노릴 것은 조건 간 0.02급이 아니라 GBDT 격차다",
+  "ours": 1.0762,
+  "gbdt": 1.019,
+  "gap": 0.0572,
+  "seed_sigma": 0.0124,
+  "gap_in_sigmas": 4.6
+ }
+}

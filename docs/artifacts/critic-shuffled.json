@@ -1,0 +1,674 @@
+{
+ "_model": "gpt-5.6-luna",
+ "_note": "같은 모델이 쓰고 심사했다 — 오류가 상관될 수 있다 (D-85)",
+ "rules": [
+  {
+   "run": "f1pipe-F3-arch24-s0",
+   "code": "def score(f, p, hw, w):\n    s = np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[0]\n    s = s + f.log_grid_tiles * np.log2(np.maximum(f.traffic_amplification, np.isfinite(f.traffic_amplification))) * w[1]\n    s = s + np.nan_to_num(np.isfinite(f.tail_waste) / (np.isfinite(f.tail_waste) - f.tail_waste)) * w[2]\n    s = s + np.where(p.is_memory_bound, np.log2(np.maximum(f.traffic_amplification, np.isfinite(f.traffic_amplification))), f.occupancy_deficit) * w[3]\n    s = s + np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill) * w[4]\n    s = s + f.split_k_cost * np.isfinite(f.split_k_cost) / (np.isfinite(f.split_k_cost) + f.log_mainloop_iters + np.log2(np.maximum(f.waves, np.isfinite(f.waves)))) * w[5]\n    s = s + f.reg_pressure * w[6]\n    s = s + np.where(p.is_memory_bound, np.floor(np.nan_to_num(np.isfinite(f.smem_pressure) / f.smem_pressure)) * np.minimum(f.waves, np.isfinite(f.waves)), f.has_spill - f.has_spill) * w[7]\n    return s\n",
+   "critique": {
+    "terms": [
+     {
+      "index": 0,
+      "expression": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+      "physics": "메모리 바운드에서는 DRAM 트래픽 로그를, 그 외에는 명령어 수 로그를 사용해 각각 대역폭 또는 명령 처리율의 병목을 대리한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "메모리 바운드 형상에서는 DRAM 대역폭 지배, 연산·명령 바운드 형상에서는 명령 처리율 지배라는 분기에서만 타당하다."
+     },
+     {
+      "index": 1,
+      "expression": "f.log_grid_tiles * np.log2(np.maximum(f.traffic_amplification, np.isfinite(f.traffic_amplification)))",
+      "physics": "CTA 규모의 로그와 데이터 재사용 실패로 인한 트래픽 증폭의 로그를 곱한 상호작용량이다.",
+      "explainable": false,
+      "why_not": "실제 총 트래픽은 대체로 타일 수와 증폭도의 곱에 해당하므로 로그를 취하면 두 로그의 합이 되는데, 두 로그의 곱을 정당화하는 별도의 성능 기전이 없다. 타일 수와 트래픽 증폭을 각각 다른 항에서 다시 사용하므로 중복도 생긴다.",
+      "regime_dependent": true,
+      "regime": "트래픽 증폭이 실제로 메모리 비용을 좌우하고 CTA 수가 wave·스케줄링 비용과 결합하는 특수한 상황에서도, 현재의 곱 형태 자체는 물리적으로 유도되지 않는다."
+     },
+     {
+      "index": 2,
+      "expression": "np.nan_to_num(np.isfinite(f.tail_waste) / (np.isfinite(f.tail_waste) - f.tail_waste))",
+      "physics": "마지막 wave의 유휴 슬롯 때문에 유효 실행 시간이 증가하는 배율 1/(1-tail_waste)를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "마지막 wave가 전체 실행시간에서 의미 있는 비중을 차지하는 짧은 그리드 또는 wave 수가 적은 형상에서 중요하며, 많은 완전한 wave가 있는 경우 영향이 작다."
+     },
+     {
+      "index": 3,
+      "expression": "np.where(p.is_memory_bound, np.log2(np.maximum(f.traffic_amplification, np.isfinite(f.traffic_amplification))), f.occupancy_deficit)",
+      "physics": "메모리 바운드에서는 중복 DRAM 트래픽을, 비메모리 바운드에서는 낮은 상주율로 인해 메모리 지연을 가릴 자원이 줄어드는 정도를 측정한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "첫 분기는 메모리 바운드에서, 둘째 분기는 메모리 지연 은닉이 성능에 영향을 주는 비포화 또는 지연 민감 구간에서 의미가 있다."
+     },
+     {
+      "index": 4,
+      "expression": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+      "physics": "레지스터 스필이 발생했을 때 스필 바이트 규모와 스필 발생 자체의 고정 벌점을 결합해 로컬 메모리 왕복 비용을 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "has_spill이 켜져 실제 로컬 메모리 접근이 발생하는 구성에서만 큰 비용이 의미 있으며, 스필이 없을 때는 0이 된다."
+     },
+     {
+      "index": 5,
+      "expression": "f.split_k_cost * np.isfinite(f.split_k_cost) / (np.isfinite(f.split_k_cost) + f.log_mainloop_iters + np.log2(np.maximum(f.waves, np.isfinite(f.waves))))",
+      "physics": "split-K 리덕션 비용을 mainloop 반복 수와 wave 수의 로그로 임의 정규화한 양이다.",
+      "explainable": false,
+      "why_not": "split-K 리덕션 비용이 mainloop 반복 수나 wave 수의 로그에 반비례한다는 기전이 주어져 있지 않다. 리덕션의 추가 DRAM 왕복 및 부분합 비용은 보통 분할 방식과 M·N·K, 동기화에 의해 결정되며, wave 수가 많다고 같은 비용이 물리적으로 사라지지도 않는다. isfinite를 1로 사용한 것도 물리량이 아닌 항등적 수치 보정이다.",
+      "regime_dependent": true,
+      "regime": "split-K를 실제로 사용하는 구성에서만 원래 비용이 존재하지만, 이 정규화 형태가 타당한 체제는 제시된 물리량만으로 특정할 수 없다."
+     },
+     {
+      "index": 6,
+      "expression": "f.reg_pressure",
+      "physics": "블록의 레지스터 요구량이 SM 레지스터 자원을 얼마나 압박해 상주 블록 수 감소나 레지스터 스필을 일으키는지를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "레지스터 파일 용량과 상주 블록 수가 제한 조건이 되는 구간, 특히 reg_pressure가 1 근처의 절벽에 접근하는 구간에서 중요하다."
+     },
+     {
+      "index": 7,
+      "expression": "np.where(p.is_memory_bound, np.floor(np.nan_to_num(np.isfinite(f.smem_pressure) / f.smem_pressure)) * np.minimum(f.waves, np.isfinite(f.waves)), f.has_spill - f.has_spill)",
+      "physics": "메모리 바운드에서 smem 사용률의 역수에 내림을 적용한 값과 underfilled wave 지표를 곱하고, 그 외에는 항상 0을 만든다.",
+      "explainable": false,
+      "why_not": "floor(1/smem_pressure)는 이상적으로는 수용 가능한 블록 수를 흉내 낼 수 있지만, 그 값을 곧바로 벌점으로 곱하면 smem_pressure가 커질수록 값이 작아져 설명된 '상주 블록 감소에 따른 지연 은닉 상실'과 방향이 맞지 않는다. 또한 min(waves, 1)과의 곱을 정당화하는 기전이 없고, floor 때문에 임계값에서 불연속적이다. 비메모리 분기의 has_spill - has_spill은 물리량이 아닌 항등적으로 0인 우회이며, smem_pressure=0에서는 0으로 나누는 문제도 있다.",
+      "regime_dependent": true,
+      "regime": "메모리 지연 은닉과 shared-memory 기반 상주 블록 수가 병목인 경우에만 원래 물리량이 관련되지만, 현재 변환식은 그 체제에서도 타당한 벌점으로 해석되지 않는다."
+     }
+    ],
+    "overall": "이 규칙은 p.is_memory_bound로 메모리 트래픽과 명령어·점유율을 선택하고, tail waste·spill·레지스터 압력·split-K 비용·shared-memory 관련 변환을 가중합해 후보 순위를 만들려 한다. 항 0, 2, 3, 4, 6은 각각 병목 기전과 연결할 수 있지만, 항 1은 로그의 곱이라는 임의 상호작용이고 항 5는 근거 없는 정규화이며 항 7은 물리적 방향과 맞지 않는 불연속 변환이다. 더구나 실제 가중치의 부호와 크기가 없으므로 어떤 항이 성능을 개선하는 후보를 벌점으로 올바르게 정렬하는지는 판단할 수 없다.",
+    "defects": [
+     "항 1의 log_grid_tiles와 log traffic_amplification의 곱은 총 트래픽이나 wave 비용의 로그 합으로부터 나오지 않으며, 두 물리량이 다른 항에서도 중복 사용된다.",
+     "항 2와 항 3의 traffic_amplification은 메모리 바운드에서 중복되어 같은 트래픽 물리에 여러 가중치가 걸린다.",
+     "항 4의 has_spill은 조건 안에서 다시 더해져 스필 발생 자체를 별도의 고정 상수로 중복 인코딩한다.",
+     "항 5는 split-K 비용을 log_mainloop_iters와 log waves로 나눌 물리적 근거가 없고, isfinite를 상수 1처럼 사용한다.",
+     "항 7의 floor(1/smem_pressure)는 압력이 커질수록 값이 감소해 설명된 shared-memory 압박의 방향과 반대이며, floor와 min의 조합도 기전이 없다.",
+     "항 7의 비메모리 분기 has_spill - has_spill은 항등적으로 0을 만드는 불필요한 우회다.",
+     "항 7은 smem_pressure가 0일 때 0으로 나누며, 해당 결과를 후속으로 안전하게 정리하지 않는다.",
+     "tail_waste가 1에 접근할 때 항 2가 발산하며 nan_to_num의 기본 대체값은 물리적 실행시간 배율로 정당화되지 않는다."
+    ]
+   },
+   "shuffle_order": [
+    4,
+    7,
+    1,
+    5,
+    0,
+    6,
+    2,
+    3
+   ],
+   "exprs": {
+    "0": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+    "1": "f.log_grid_tiles * np.log2(np.maximum(f.traffic_amplification, np.isfinite(f.traffic_amplification)))",
+    "2": "np.nan_to_num(np.isfinite(f.tail_waste) / (np.isfinite(f.tail_waste) - f.tail_waste))",
+    "3": "np.where(p.is_memory_bound, np.log2(np.maximum(f.traffic_amplification, np.isfinite(f.traffic_amplification))), f.occupancy_deficit)",
+    "4": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+    "5": "f.split_k_cost * np.isfinite(f.split_k_cost) / (np.isfinite(f.split_k_cost) + f.log_mainloop_iters + np.log2(np.maximum(f.waves, np.isfinite(f.waves))))",
+    "6": "f.reg_pressure",
+    "7": "np.where(p.is_memory_bound, np.floor(np.nan_to_num(np.isfinite(f.smem_pressure) / f.smem_pressure)) * np.minimum(f.waves, np.isfinite(f.waves)), f.has_spill - f.has_spill)"
+   }
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "code": "def score(f, p, hw, w):\n    s = f.sm_idle_cost * w[0]\n    s = s + np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[1]\n    s = s + (f.split_k_cost * np.maximum(f.pipeline_warmup_frac, f.log_mainloop_iters) - np.log2(np.maximum(f.waves, f.log_grid_tiles))) * w[2]\n    s = s + f.reg_pressure * w[3]\n    s = s + np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac) * w[4]\n    s = s + np.where(p.is_memory_bound, np.log2(f.traffic_amplification), f.occupancy_deficit) * w[5]\n    s = s + f.log_workspace_bytes * w[6]\n    s = s + np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill) * w[7]\n    return s\n",
+   "critique": {
+    "terms": [
+     {
+      "index": 0,
+      "expression": "f.sm_idle_cost",
+      "physics": "tail 낭비로 인해 유효하게 일하지 못하는 실행 용량의 비선형 비용을 잰다; 마지막 wave에서 일부 SM만 작업하면 전체 실행이 잔여 작업에 맞춰져 처리율이 떨어진다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "그리드가 몇 개의 wave로만 구성되거나 마지막 wave의 tail_waste가 큰 짧은 형상"
+     },
+     {
+      "index": 1,
+      "expression": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+      "physics": "메모리 바운드에서는 DRAM 트래픽을, 그 밖에서는 명령어 수를 시간의 주된 대리 지표로 선택한다; 각각 대역폭 한계와 명령 발행·실행 한계가 지배하기 때문이다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "p.is_memory_bound가 참인 대역폭 지배 체제 또는 거짓인 연산·명령어 지배 체제"
+     },
+     {
+      "index": 2,
+      "expression": "f.split_k_cost * np.maximum(f.pipeline_warmup_frac, f.log_mainloop_iters) - np.log2(np.maximum(f.waves, f.log_grid_tiles))",
+      "physics": "split-K·파이프라인·wave 규모를 하나의 보정 비용으로 결합하려는 항이지만, 이 식 전체가 나타내는 단일한 성능 물리량은 설명할 수 없다.",
+      "explainable": false,
+      "why_not": "split_k_cost는 리덕션 비용 대리 지표인데 pipeline_warmup_frac(비율)와 log_mainloop_iters(로그 반복 수)의 최대값을 곱할 기전이 없다. waves(실제 wave 개수)와 log_grid_tiles(로그 CTA 개수)를 max로 비교하는 것도 서로 다른 스케일을 섞는다. 마지막으로 큰 waves를 일률적으로 보상하는 음의 로그 항은 점유 충족 효과와 작업량 증가 및 tail 효과를 분리하지 못한다.",
+      "regime_dependent": true,
+      "regime": "파이프라인 초기화, split-K 리덕션, wave 활용도가 동시에 중요한 경계 체제에서 하위 효과들은 각각 의미가 있을 수 있지만, 현재의 결합식 자체는 물리적으로 해석되지 않는다"
+     },
+     {
+      "index": 3,
+      "expression": "f.reg_pressure",
+      "physics": "블록의 레지스터 요구량이 SM의 레지스터 용량과 상주 블록 수를 제한하는 정도를 잰다; 임계점을 넘으면 점유가 줄거나 레지스터 스필이 발생해 병렬성과 지연 은폐가 악화된다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "레지스터 용량 또는 점유율이 병목인 체제, 특히 reg_pressure가 1 부근인 경우"
+     },
+     {
+      "index": 4,
+      "expression": "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)",
+      "physics": "cp.async 사용 가능 여부에 따라 2단 파이프라인 계열의 이산적 차이와 파이프라인 초기화 비용을 벌점화하려 한다; 복사 경로와 stage 수가 데이터 이동의 지연 은폐를 바꾸기 때문이다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "cp.async 정렬 가능 여부가 파이프라인 계열을 제한하고 mainloop가 짧아 warmup이 성능에 영향을 주는 체제"
+     },
+     {
+      "index": 5,
+      "expression": "np.where(p.is_memory_bound, np.log2(f.traffic_amplification), f.occupancy_deficit)",
+      "physics": "메모리 바운드에서는 이론 최소보다 추가된 트래픽을, 그 밖에서는 부족한 상주 스레드 슬롯을 비용으로 잰다; 전자는 대역폭을 소모하고 후자는 지연을 가릴 동시성을 줄인다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "p.is_memory_bound가 참인 대역폭 지배 체제 또는 거짓인 연산 지배 체제"
+     },
+     {
+      "index": 6,
+      "expression": "f.log_workspace_bytes",
+      "physics": "parallel split-K가 부분합을 DRAM에 기록하고 다시 읽는 workspace 트래픽의 크기를 잰다; 이 왕복이 대역폭 사용량과 리덕션 시간을 추가한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "parallel split-K로 workspace가 실제 발생하는 체제"
+     },
+     {
+      "index": 7,
+      "expression": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+      "physics": "스필의 발생 여부와 스필 바이트 규모를 결합한 비용을 잰다; 레지스터 대신 로컬 메모리 왕복이 반복되어 지연과 DRAM 트래픽이 증가한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "has_spill이 1이고 특히 mainloop 반복마다 스필이 발생하는 체제"
+     }
+    ],
+    "overall": "이 규칙은 메모리 바운드 여부를 주 분기로 삼아 DRAM 트래픽 또는 명령어 수를 기본 비용으로 선택하고, tail 낭비·레지스터 압박·파이프라인 warmup·점유 부족·split-K workspace·스필을 추가하는 휴리스틱이다. 대부분의 피처는 알려진 성능 기전과 연결되지만, w[2]는 로그·비율·개수와 서로 다른 비용을 임의로 결합해 하나의 물리량으로 해석되지 않는다. w[4] 역시 이산적인 커널 계열 지시자와 warmup 비율을 동일한 척도처럼 더한 경험적 항이며 w[2]와 warmup 효과가 중복될 수 있다.",
+    "defects": [
+     "w[2]에서 pipeline_warmup_frac와 log_mainloop_iters를 max로 비교한 뒤 split_k_cost를 곱할 물리적 근거가 없다.",
+     "w[2]에서 waves와 log_grid_tiles를 max로 섞어 서로 다른 스케일을 비교하고, 그 결과를 다시 로그화한다.",
+     "w[2]의 음의 로그 항은 waves가 많을수록 항상 유리하게 만든다. 실제 wave 수에는 점유 충족 효과뿐 아니라 작업량 증가 효과도 포함되므로 단조 보상할 수 없다.",
+     "w[2]는 split-K 리덕션, pipeline warmup, wave 활용도를 한 항에 섞어 기전과 적용 체제를 분리하지 못한다.",
+     "w[4]는 is_two_stage라는 이산 지시자와 pipeline_warmup_frac라는 비율을 임의로 더하며, 두 값의 공통 비용 단위가 없다.",
+     "w[4]와 w[2]가 pipeline_warmup_frac를 모두 사용해 같은 초기화 물리를 중복 벌점화할 수 있다.",
+     "sm_idle_cost와 w[2]의 wave 관련 보정은 grid 활용도 또는 tail 효과를 중복 반영할 가능성이 있다.",
+     "reg_pressure와 명시적인 spill 항은 레지스터 압박이 유발하는 스필·점유 저하를 중복 벌점화할 수 있다.",
+     "spill 항에서 has_spill을 1만큼 더하는 것은 존재 자체의 고정 비용으로 해석할 수 있지만, spill_magnitude와 같은 척도라는 근거가 없다.",
+     "log_dram_traffic, log_workspace_bytes, log2(traffic_amplification)는 모두 트래픽 계열이므로 총 트래픽·workspace·증폭률의 중복 및 상쇄를 별도로 검증해야 한다.",
+     "점수가 낮을수록 우선인지 높을수록 우선인지 함수 자체에는 명시되어 있지 않다. 특히 w[2]의 음의 항은 순위 방향이 정해져야 의도를 판단할 수 있다."
+    ]
+   },
+   "shuffle_order": [
+    3,
+    4,
+    1,
+    2,
+    7,
+    5,
+    6,
+    0
+   ],
+   "exprs": {
+    "0": "f.sm_idle_cost",
+    "1": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+    "2": "(f.split_k_cost * np.maximum(f.pipeline_warmup_frac, f.log_mainloop_iters) - np.log2(np.maximum(f.waves, f.log_grid_tiles)))",
+    "3": "f.reg_pressure",
+    "4": "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)",
+    "5": "np.where(p.is_memory_bound, np.log2(f.traffic_amplification), f.occupancy_deficit)",
+    "6": "f.log_workspace_bytes",
+    "7": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)"
+   }
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "code": "def score(f, p, hw, w):\n    s = np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[0]\n    s = s + f.split_k_cost * np.exp(-f.log_mainloop_iters) * w[1]\n    s = s + f.edge_waste * w[2]\n    s = s + np.where(p.is_memory_bound, f.smem_pressure, f.traffic_amplification) * w[3]\n    s = s + f.sm_idle_cost * w[4]\n    s = s + f.reg_pressure * w[5]\n    s = s + np.where(p.is_memory_bound, np.log2(f.traffic_amplification), f.occupancy_deficit) * w[6]\n    s = s + np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill) * w[7]\n    return s\n",
+   "critique": {
+    "terms": [
+     {
+      "index": 0,
+      "expression": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+      "physics": "메모리 바운드 체제에서는 DRAM 트래픽 로그를, 연산 바운드 체제에서는 SASS 명령어 수 로그를 시간의 지배적 대리량으로 선택한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "메모리 바운드에서는 대역폭 제한, 연산 바운드에서는 명령 발행·실행 제한이 지배하는 체제"
+     },
+     {
+      "index": 1,
+      "expression": "f.split_k_cost * np.exp(-f.log_mainloop_iters)",
+      "physics": "split-K 리덕션 비용을 mainloop 반복 수의 역지수형 인자로 축소해 반복 수가 적을 때의 비용 비중 증가를 표현하려 한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "split-K를 사용하는 후보이며 mainloop 프롤로그·파이프라인 충전 비용이 전체 시간에서 의미 있는 짧은-K 또는 소반복 체제"
+     },
+     {
+      "index": 2,
+      "expression": "f.edge_waste",
+      "physics": "형상 경계의 부분 타일에서 수행하지만 결과에 기여하지 않는 작업의 비율을 재어, 유효 연산당 불필요한 실행과 메모리·명령 발행을 증가시키는 효과를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "M 또는 N이 타일 크기에 비해 작거나 경계 잔여가 큰 형상"
+     },
+     {
+      "index": 3,
+      "expression": "np.where(p.is_memory_bound, f.smem_pressure, f.traffic_amplification)",
+      "physics": "메모리 바운드에서는 공유메모리 사용량이 상주 블록 수와 지연 은폐를 제한하는 정도를, 비메모리 바운드에서는 중복 글로벌 메모리 트래픽의 정도를 사용한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "첫 번째 선택지는 메모리 지연 은폐가 중요한 메모리 바운드 체제이고, 두 번째 선택지는 중복 트래픽이 실행 시간을 실제로 제한하는 체제"
+     },
+     {
+      "index": 4,
+      "expression": "f.sm_idle_cost",
+      "physics": "타일의 tail wave 때문에 SM이 유휴 상태가 되는 파동 단위 손실을 재어, 마지막 불완전 wave가 전체 실행 시간에서 차지하는 낭비를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "CTA 수가 적거나 전체 CTA 수가 SM 수의 배수에 맞지 않아 마지막 wave의 비중이 큰 짧은 형상"
+     },
+     {
+      "index": 5,
+      "expression": "f.reg_pressure",
+      "physics": "CTA의 레지스터 파일 요구량이 SM 자원을 압박하는 정도를 재어, 레지스터 제약으로 상주 CTA 수가 줄거나 스필 절벽에 접근하는 효과를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "레지스터 파일 용량과 CTA당 레지스터 요구량이 상주성 또는 스필을 결정하는 체제; 특히 f.reg_pressure가 1 근처인 경우"
+     },
+     {
+      "index": 6,
+      "expression": "np.where(p.is_memory_bound, np.log2(f.traffic_amplification), f.occupancy_deficit)",
+      "physics": "메모리 바운드에서는 이론 최소치 대비 중복 트래픽의 로그를, 비메모리 바운드에서는 부족한 스레드 슬롯으로 인해 지연을 은폐하지 못하는 정도를 사용한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "첫 번째는 대역폭 또는 글로벌 메모리 트래픽이 제한하는 체제, 두 번째는 낮은 점유율이 실행·메모리 지연 은폐를 제한하는 체제"
+     },
+     {
+      "index": 7,
+      "expression": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+      "physics": "레지스터 스필이 발생했는지를 우선적으로 벌점화하고, 발생한 경우 스필 바이트 규모가 추가적인 로컬 메모리 왕복 비용을 키우는 효과를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "실제로 레지스터 스필이 발생하는 후보; 스필이 없을 때 이 항은 0이다"
+     }
+    ],
+    "overall": "이 규칙은 형상 수준의 단일 메모리/비메모리 바운드 분기로 DRAM 트래픽 대 명령어 수, 공유메모리 압박 대 트래픽 증폭, 트래픽 증폭 대 점유율 부족 중 하나를 선택하고, 모든 후보에 edge waste·SM tail 유휴·레지스터 압박·split-K 및 스필 비용을 가산하는 벌점식이다. 따라서 가중치가 양수라면 각 항이 큰 후보를 낮게 평가하려는 구조이지만, 실제 순서는 제공되지 않은 가중치와 항들의 스케일·상관관계에 크게 의존한다.",
+    "defects": [
+     "f.split_k_cost * np.exp(-f.log_mainloop_iters)는 f.log_mainloop_iters가 log2 값인데 자연지수 exp를 사용하므로 일반적인 1/mainloop_iters가 아니라 I^(-1/ln 2)가 된다. 의도한 반복 수 역수라면 로그의 밑과 지수 함수가 일치하지 않는다.",
+     "split-K 리덕션 비용과 mainloop 반복 수를 곱하는 물리적 의미가 충분히 정의되지 않았다. 리덕션 비용은 주로 split-K 부분합의 추가 메모리 트래픽·동기화·리덕션 작업량이고, mainloop 반복 수 역비례는 프롤로그/파이프라인 충전의 별도 비용이므로 두 대리량의 곱이 일반적인 비용식을 보장하지 않는다.",
+     "f.smem_pressure와 f.occupancy_deficit은 모두 상주 CTA 수와 지연 은폐 부족을 통해 겹치는 물리를 측정할 수 있어 중복 벌점이 될 수 있다. 특히 메모리 바운드 분기에서는 smem_pressure가, 비메모리 바운드 분기에서는 occupancy_deficit이 선택되어 직접 중복은 줄지만 다른 항들과의 상관은 남는다.",
+     "f.traffic_amplification은 메모리 바운드일 때 f.log_dram_traffic와 함께 두 번 반영될 가능성이 높다. 전자는 실제 총 DRAM 바이트를, 후자는 이론 최소 대비 증폭을 재므로 총량과 원인을 동시에 가산하는 구조이며 독립적인 시간 기여가 아니다.",
+     "f.edge_waste의 범위가 0~300인데 선형으로 더해져 정상적인 경계 낭비의 작은 변화가 다른 로그 항보다 압도할 수 있다. 제공된 설명처럼 범위 보정이나 포화가 필요하지만 규칙에는 없다.",
+     "f.reg_pressure는 1 근처의 절벽을 가진다고 정의됐는데 선형 항은 그 비선형 절벽과 스필 발생을 제대로 표현하지 못한다. 스필 항이 별도로 있더라도 1 미만과 1 초과의 상주성 변화가 선형으로 처리된다.",
+     "f.sm_idle_cost는 tail waste에 대한 비선형 비용을 이미 담은 값인데 edge_waste와 함께 경계·잔여 타일 효과를 다시 벌점화할 수 있어, 짧은 형상에서 동일한 tail 손실을 중복 반영할 수 있다.",
+     "f.has_spill은 0 또는 1인데 스필이 있으면 f.spill_magnitude + 1이 되어 +1은 물리적 양의 추가 정의 없이 고정 벌점으로 들어간다. 표현 자체는 항등 변환은 아니지만, 스필 발생 비용과 규모 비용의 분리가 불명확하다.",
+     "모든 항이 사실상 비용 벌점 방향을 전제하지만 w의 부호와 정규화가 제시되지 않아, 음수 가중치에서는 물리적으로 나쁜 양을 보상하는 순서가 될 수 있다.",
+     "p.is_memory_bound 하나로 전체 후보와 모든 자원 병목의 우선순위를 이분화한다. 같은 형상 안에서도 후보별로 메모리 병목 정도가 다를 수 있고, ridge point 근처에서는 작은 분류 오차로 항 선택이 불연속적으로 바뀐다."
+    ]
+   },
+   "shuffle_order": [
+    4,
+    6,
+    1,
+    7,
+    3,
+    2,
+    5,
+    0
+   ],
+   "exprs": {
+    "0": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+    "1": "f.split_k_cost * np.exp(-f.log_mainloop_iters)",
+    "2": "f.edge_waste",
+    "3": "np.where(p.is_memory_bound, f.smem_pressure, f.traffic_amplification)",
+    "4": "f.sm_idle_cost",
+    "5": "f.reg_pressure",
+    "6": "np.where(p.is_memory_bound, np.log2(f.traffic_amplification), f.occupancy_deficit)",
+    "7": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)"
+   }
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "code": "def score(f, p, hw, w):\n    s = (f.log_workspace_bytes + f.split_k_cost) * w[0]\n    s = s + f.sm_idle_cost * w[1]\n    s = s + np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill) * w[2]\n    s = s + np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[3]\n    s = s + np.maximum(f.reg_pressure, f.smem_pressure) * w[4]\n    s = s + np.sqrt(f.traffic_amplification) * w[5]\n    s = s + f.tile_aspect_imbalance * w[6]\n    s = s + np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac) * w[7]\n    return s\n",
+   "critique": {
+    "terms": [
+     {
+      "index": 0,
+      "expression": "(f.log_workspace_bytes + f.split_k_cost)",
+      "physics": "분할 K의 작업공간 크기와 리덕션 비용을 하나의 값으로 합산한다.",
+      "explainable": false,
+      "why_not": "log2 바이트와 무차원 리덕션 비용은 서로 다른 물리량이며, 합이 특정 시간 손해나 병목을 뜻한다는 기전이 없다; 작업공간의 로그와 split-K 비용의 선형 합은 임의적인 혼합이다.",
+      "regime_dependent": true,
+      "regime": "split-K를 실제로 사용하는 후보에서만 일부 관련이 있지만, serial 후보의 작업공간과 parallel 후보의 리덕션 비용을 같은 척도로 더할 근거는 없다."
+     },
+     {
+      "index": 1,
+      "expression": "f.sm_idle_cost",
+      "physics": "CTA의 tail waste로 인해 SM이 놀면서 발생하는 점유 손실을 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "전체 작업의 CTA 수가 적거나 마지막 wave가 지배적인 짧은 형상; 충분히 많은 wave에서는 영향이 작다."
+     },
+     {
+      "index": 2,
+      "expression": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+      "physics": "레지스터 스필의 발생 여부와 스필 바이트량에 따른 로컬 메모리 왕복 비용을 강하게 벌점화한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "스필이 mainloop 반복 중 실제로 발생하는 커널; 스필이 없으면 이 항은 0이다."
+     },
+     {
+      "index": 3,
+      "expression": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+      "physics": "메모리 바운드 형상에서는 DRAM 트래픽을, 연산 바운드 형상에서는 명령어 수를 주된 실행시간 대리 지표로 선택한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "각 branch가 각각 메모리 바운드와 연산 바운드 체제에서만 타당하며, ridge point 부근에서는 이진 분기가 병목의 연속적인 혼합을 표현하지 못한다."
+     },
+     {
+      "index": 4,
+      "expression": "np.maximum(f.reg_pressure, f.smem_pressure)",
+      "physics": "레지스터 또는 공유메모리 사용량 중 더 큰 정규화 압력이 상주 CTA 수와 지연 은닉을 제한한다고 본다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "점유율이 성능을 제한하는 체제; 다만 두 값이 같은 정규화 의미를 갖고 실제 점유율을 결정한다는 전제가 필요하다."
+     },
+     {
+      "index": 5,
+      "expression": "np.sqrt(f.traffic_amplification)",
+      "physics": "이론 최소 트래픽 대비 실제 트래픽 증가를 단조롭게 반영하려 한다.",
+      "explainable": false,
+      "why_not": "제공된 물리 설명은 메모리 바운드에서 시간이 traffic_amplification에 거의 비례하고 log2가 자릿수 정합을 위한 변환이라고 한다; 제곱근을 취해야 할 대역폭·캐시·중첩 기전이 없다. 따라서 물리 기반 항이 아니라 임의의 압축이다.",
+      "regime_dependent": true,
+      "regime": "트래픽이 실행시간을 지배하는 메모리 바운드 체제에서만 원래 물리량이 관련된다."
+     },
+     {
+      "index": 6,
+      "expression": "f.tile_aspect_imbalance",
+      "physics": "타일의 길쭉함에 따른 데이터 재사용 및 경계 타일 낭비의 변화를 나타내려 한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "정방형 타일이 재사용에 유리한 형상에서는 큰 imbalance가 불리하지만, 문제 형상 자체가 길쭉해 해당 방향 타일이 경계 낭비를 줄이는 경우에는 imbalance가 오히려 유리할 수 있다; 형상 종횡비를 반영하지 않은 일률적 벌점은 그 체제에서 반증된다."
+     },
+     {
+      "index": 7,
+      "expression": "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)",
+      "physics": "cp.async 사용 가능 여부에 따라 2단 파이프라인 선택과 파이프라인 warmup 비용을 함께 벌점화한다.",
+      "explainable": false,
+      "why_not": "warmup 비율과 커널 계열을 나타내는 이진 지시자를 더할 물리적 공통 단위가 없다. 또한 cp.async 가능 여부는 2단 파이프라인의 비용·우열을 단순히 1만큼 정하지 않으며, 두 커널 계열의 차이를 고정 벌점으로 표현할 기전이 제공되지 않았다.",
+      "regime_dependent": true,
+      "regime": "mainloop가 짧아 warmup이 지배적이거나 cp.async 정렬 가능성이 파이프라인 선택을 제한하는 체제에서만 일부 관련된다."
+     }
+    ],
+    "overall": "이 규칙은 split-K/작업공간, SM tail idle, 스필, 형상별 메모리·연산 병목, 자원 압력, 트래픽 증폭, 타일 종횡비, 파이프라인 warmup을 가중합해 후보를 순위화한다. 스필과 병목별 트래픽·명령어 선택은 물리적 해석이 가능하지만, 여러 항에서 서로 다른 단위의 값을 무근거로 더하고, traffic_amplification에 제곱근을 적용하며, cp.async·2단 계열을 warmup과 합산한다. 또한 tile_aspect_imbalance를 항상 벌점화해 형상 종횡비에 따라 경계 낭비가 줄어드는 경우를 놓친다.",
+    "defects": [
+     "(f.log_workspace_bytes + f.split_k_cost)는 log2 바이트와 무차원 비용의 단위가 맞지 않고 공통 실행시간 모델도 없다.",
+     "np.sqrt(f.traffic_amplification)는 설명된 선형 트래픽 기전이나 권장되는 log2 변환과 일치하지 않는 임의 변환이다.",
+     "np.maximum(f.reg_pressure, f.smem_pressure)는 레지스터 압력과 공유메모리 압력의 스케일·점유율 효과가 다르며, max가 실제 occupancy 계단을 정확히 나타내지 않는다.",
+     "f.tile_aspect_imbalance를 일률적으로 양의 벌점으로 사용하면 길쭉한 문제 형상에서 경계 낭비를 줄이는 타일을 잘못 순위화할 수 있다.",
+     "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)는 이진 커널 계열 지시자와 warmup 비율을 합산하는 차원·기전 불일치가 있다.",
+     "항들 사이에 스필, DRAM 트래픽, 점유율 저하가 같은 성능 손해를 중복 반영할 가능성이 있지만, 가중치와 상관 구조가 없어 중복을 정량적으로 판정할 수 없다."
+    ]
+   },
+   "shuffle_order": [
+    6,
+    3,
+    0,
+    4,
+    2,
+    5,
+    1,
+    7
+   ],
+   "exprs": {
+    "0": "(f.log_workspace_bytes + f.split_k_cost)",
+    "1": "f.sm_idle_cost",
+    "2": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+    "3": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+    "4": "np.maximum(f.reg_pressure, f.smem_pressure)",
+    "5": "np.sqrt(f.traffic_amplification)",
+    "6": "f.tile_aspect_imbalance",
+    "7": "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)"
+   }
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "code": "def score(f, p, hw, w):\n    s = np.where(p.is_memory_bound, f.log_workspace_bytes, np.square(f.smem_pressure)) * w[0]\n    s = s + f.split_k_cost * (f.log_mainloop_iters + f.pipeline_warmup_frac + f.log_workspace_bytes) * w[1]\n    s = s + np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac) * w[2]\n    s = s + np.where(p.is_memory_bound, f.traffic_amplification, f.occupancy_deficit) * w[3]\n    s = s + np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[4]\n    s = s + (f.sm_idle_cost / np.maximum(f.waves, f.log_grid_tiles)) * w[5]\n    s = s + f.reg_pressure * w[6]\n    s = s + np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill) * w[7]\n    return s\n",
+   "critique": {
+    "terms": [
+     {
+      "index": 0,
+      "expression": "np.where(p.is_memory_bound, f.log_workspace_bytes, np.square(f.smem_pressure))",
+      "physics": "메모리 바운드에서는 split-K 부분합의 로그 바이트를, 연산 바운드에서는 공유 메모리 사용 압력의 제곱을 비용 대리값으로 사용한다.",
+      "explainable": false,
+      "why_not": "두 분기는 서로 다른 물리량이며 로그 바이트와 무차원 압력 제곱을 하나의 항으로 취급할 공통 물리적 의미가 없다. 공유 메모리 압력이 상주 블록 수를 계단식으로 바꾸는 기전은 있지만 제곱 형태 자체는 그 기전을 나타내지 않으며, split-K 비용은 이미 별도 항에서도 반영된다.",
+      "regime_dependent": true,
+      "regime": "각 분기는 각각 메모리 바운드 또는 연산 바운드 체제에서만 해석 가능하다."
+     },
+     {
+      "index": 1,
+      "expression": "f.split_k_cost * (f.log_mainloop_iters + f.pipeline_warmup_frac + f.log_workspace_bytes)",
+      "physics": "split-K를 사용할 때 mainloop 반복 수, 파이프라인 채우기 비용, 부분합 workspace 크기를 결합해 split-K의 추가 비용을 추정한다.",
+      "explainable": false,
+      "why_not": "로그 반복 수, 비율, 로그 바이트를 더한 뒤 split_k_cost와 곱한 것은 차원과 스케일이 다른 대리값의 임의 결합이다. split-K 리덕션 비용과 workspace는 기전상 관련되지만 mainloop 반복 수와 warmup 비율까지 이 방식으로 곱할 근거가 없고, workspace 효과는 항 0과 중복된다.",
+      "regime_dependent": true,
+      "regime": "split-K가 실제로 사용되는 구성에서만 의미가 있으며, serial split-K와 parallel split-K의 비용 기전도 다르다."
+     },
+     {
+      "index": 2,
+      "expression": "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)",
+      "physics": "cp.async 사용 가능 여부에 따라 2단 파이프라인 선택 여부와 파이프라인 채우기 비율을 이용해 데이터 이동 파이프라인의 초기화 부담을 나타내려 한다.",
+      "explainable": false,
+      "why_not": "is_two_stage라는 커널 계열의 지시변수와 warmup 비율을 더한 것은 공통 단위나 정의된 비용이 없다. cp.async 가능 여부는 허용되는 구현 공간을 제한할 뿐 is_two_stage 자체가 항상 추가 실행 비용이라는 뜻이 아니며, 두 커널 계열의 성능 차이를 단일 0/1 벌점으로 설명할 물리 기전도 제공되지 않는다.",
+      "regime_dependent": true,
+      "regime": "짧은 mainloop에서 warmup 비용이 중요한 경우에만 warmup 부분이 의미 있고, cp.async가 허용되는 정렬 체제에만 조건부 분기가 적용된다."
+     },
+     {
+      "index": 3,
+      "expression": "np.where(p.is_memory_bound, f.traffic_amplification, f.occupancy_deficit)",
+      "physics": "메모리 바운드에서는 중복 글로벌 메모리 트래픽을, 그 밖에서는 낮은 상주 스레드로 인해 메모리 지연을 숨기지 못하는 정도를 비용으로 잰다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "첫 분기는 대역폭 또는 메모리 지연이 지배하는 체제에서, 둘째 분기는 연산 바운드 체제에서만 주된 성능 요인으로 해석된다."
+     },
+     {
+      "index": 4,
+      "expression": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+      "physics": "메모리 바운드에서는 DRAM 바이트 수를, 연산 바운드에서는 실행 명령어 수를 각각 지배적인 작업량의 대리값으로 사용한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "메모리 바운드에서는 DRAM 트래픽과 유효 대역폭이 지배할 때, 연산 바운드에서는 명령어 처리율과 발행 자원이 지배할 때 의미가 있다."
+     },
+     {
+      "index": 5,
+      "expression": "f.sm_idle_cost / np.maximum(f.waves, f.log_grid_tiles)",
+      "physics": "tail로 인한 SM 유휴 손실을 wave 수와 로그 타일 수 중 큰 값으로 나누어 그 영향을 조정하려 한다.",
+      "explainable": false,
+      "why_not": "sm_idle_cost는 tail waste의 비선형 손해 배수인데, 이를 실제 wave 수와 로그를 취한 타일 수의 최댓값으로 나눌 물리적 기전이 없다. waves는 개수이고 log_grid_tiles는 로그 개수라 차원이 다르며, wave가 많아질수록 tail 손해를 임의로 감소시키는 결과도 일반적인 GEMM 실행 모델과 맞지 않는다.",
+      "regime_dependent": true,
+      "regime": "작은 grid에서 마지막 wave가 지배적인 짧은 실행에 tail 효과 자체는 의미가 있지만, 제시된 나눗셈은 그 체제에서도 정당화되지 않는다."
+     },
+     {
+      "index": 6,
+      "expression": "f.reg_pressure",
+      "physics": "블록의 레지스터 요구량이 레지스터 파일 수용량을 압박해 상주 블록 수를 줄이거나 스필을 유발하는 정도를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "레지스터 제한으로 occupancy가 변하거나 pressure가 1 부근을 넘어 스필 임계에 접근하는 체제에서 특히 중요하다. 다만 선형 벌점은 1 근처의 절벽을 표현하지 못한다."
+     },
+     {
+      "index": 7,
+      "expression": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+      "physics": "레지스터 스필이 있으면 스필 바이트 규모에 추가 벌점을 주고, 없으면 스필 부재를 기준값으로 표현하려 한다.",
+      "explainable": false,
+      "why_not": "스필의 로그 바이트 규모와 0/1 지시변수를 더할 공통 물리적 단위가 없고, 스필이 없는 경우 항상 0이라 별도의 물리량을 재지 않는다. 스필이 DRAM 왕복을 유발한다는 기전과 spill_magnitude 자체는 설명 가능하지만, 여기에 임의의 +1을 붙인 현재 항은 그 기전을 보존한 물리적 비용식이 아니다.",
+      "regime_dependent": true,
+      "regime": "스필이 발생하는 레지스터 초과 체제에서만 spill_magnitude가 의미 있다."
+     }
+    ],
+    "overall": "이 규칙은 memory-bound 여부를 기준으로 트래픽·workspace와 명령어·occupancy를 선택하고, split-K·파이프라인·tail·레지스터 압박·스필을 추가해 후보의 예상 비용을 가중합하려 한다. 그러나 일부 조건부 선택은 지배적인 병목을 바꾸려는 의도는 물리적으로 해석되지만, 여러 항에서 로그 개수·로그 바이트·비율·지시변수를 무차원적으로 더하거나 곱해 공통 비용으로 만들고 있으며, 특히 tail 항의 나눗셈과 pipeline/spill 항의 임의 상수는 성능 기전에서 도출되지 않는다. 따라서 이 함수는 물리적으로 설명 가능한 항과 단순한 스케일 조작을 혼합한 휴리스틱이다.",
+    "defects": [
+     "항 0은 log_workspace_bytes와 smem_pressure^2처럼 서로 다른 물리량을 memory-bound 분기로 교체하며 공통 단위가 없다.",
+     "항 1은 log_mainloop_iters, pipeline_warmup_frac, log_workspace_bytes를 더하고 split_k_cost와 곱해 차원과 기전이 불명확하며 workspace 효과를 항 0과 중복한다.",
+     "항 2는 is_two_stage 지시변수와 pipeline_warmup_frac을 더하고, cp.async 가능 여부를 커널 계열의 고정 벌점처럼 사용한다.",
+     "항 5는 waves와 log_grid_tiles를 maximum으로 비교해 로그 개수와 개수를 혼합하고, sm_idle_cost를 그 값으로 나눌 물리적 근거가 없다.",
+     "항 7은 spill_magnitude와 has_spill을 더해 로그 바이트와 지시변수의 단위를 혼합하며 +1은 임의 상수다.",
+     "reg_pressure와 spill 항은 레지스터 압박 및 스필이라는 같은 레지스터 자원 고갈 기전을 부분적으로 중복 반영한다.",
+     "traffic_amplification은 설명에서 log2를 취하는 편이 낫다고 명시되어 있지만 규칙에서는 원값을 그대로 사용하므로 다른 로그 기반 항과 스케일이 맞지 않을 수 있다.",
+     "단순 가중합은 occupancy·wave tail·스필처럼 임계값과 비선형성이 있는 기전을 선형 조합으로 표현해 절벽 효과를 왜곡할 수 있다."
+    ]
+   },
+   "shuffle_order": [
+    1,
+    6,
+    7,
+    5,
+    4,
+    3,
+    2,
+    0
+   ],
+   "exprs": {
+    "0": "np.where(p.is_memory_bound, f.log_workspace_bytes, np.square(f.smem_pressure))",
+    "1": "f.split_k_cost * (f.log_mainloop_iters + f.pipeline_warmup_frac + f.log_workspace_bytes)",
+    "2": "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)",
+    "3": "np.where(p.is_memory_bound, f.traffic_amplification, f.occupancy_deficit)",
+    "4": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+    "5": "(f.sm_idle_cost / np.maximum(f.waves, f.log_grid_tiles))",
+    "6": "f.reg_pressure",
+    "7": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)"
+   }
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "code": "def score(f, p, hw, w):\n    s = np.where(p.is_memory_bound, f.log_workspace_bytes, f.occupancy_deficit) * w[0]\n    s = s + np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[1]\n    s = s + np.nan_to_num(np.log2(f.traffic_amplification)) * w[2]\n    s = s + f.split_k_cost * (f.log_mainloop_iters + f.log_workspace_bytes - np.log2(np.maximum(f.waves, f.has_spill)) + f.tail_waste - np.log2(np.maximum(f.waves, f.has_spill)) * f.pipeline_warmup_frac) * w[3]\n    s = s + np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill) * w[4]\n    s = s + (f.is_two_stage + f.pipeline_warmup_frac) * w[5]\n    s = s + f.sm_idle_cost * w[6]\n    s = s + f.reg_pressure * w[7]\n    return s\n",
+   "critique": {
+    "terms": [
+     {
+      "index": 0,
+      "expression": "np.where(p.is_memory_bound, f.log_workspace_bytes, f.occupancy_deficit)",
+      "physics": "메모리 바운드에서는 split-K 부분합의 작업공간 트래픽을, 그 밖에서는 점유율 부족으로 인한 지연 은폐 능력 상실을 나타내려는 항이다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "첫 번째 물리량은 split-K를 사용해 부분합을 DRAM에 쓰는 경우, 두 번째 물리량은 메모리 지연 은폐가 성능을 좌우하는 경우에 의미가 있다."
+     },
+     {
+      "index": 1,
+      "expression": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+      "physics": "메모리 바운드 형상에서는 DRAM 트래픽을, 연산 바운드 형상에서는 SASS 명령어 수를 시간의 대리량으로 선택한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "각 분기 자체는 해당 바운드 체제에서만 주된 시간 근사로 타당하다."
+     },
+     {
+      "index": 2,
+      "expression": "np.nan_to_num(np.log2(f.traffic_amplification))",
+      "physics": "이론적 최소 트래픽 대비 실제 A/B 읽기 트래픽의 증가를 로그 스케일로 나타내며, 메모리 대역폭이 병목일 때 재사용 실패가 실행 시간을 늘린다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "메모리 바운드 형상에서 주로 의미가 있으며, 연산 바운드에서는 같은 트래픽 증가가 시간 증가로 직접 이어지지 않을 수 있다."
+     },
+     {
+      "index": 3,
+      "expression": "f.split_k_cost * (f.log_mainloop_iters + f.log_workspace_bytes - np.log2(np.maximum(f.waves, f.has_spill)) + f.tail_waste - np.log2(np.maximum(f.waves, f.has_spill)) * f.pipeline_warmup_frac)",
+      "physics": "split-K 비용과 반복 수·작업공간·wave 수·tail 낭비·파이프라인 warmup을 결합해 split-K 선택의 비용을 나타내려는 항이다.",
+      "explainable": false,
+      "why_not": "괄호 안의 합은 로그 바이트, 로그 반복 수, 로그 wave 수, 무차원 tail 비율을 차원과 의미가 다른 채로 섞으며, wave 항을 같은 형태로 두 번 사용한다. 특히 `-log2(waves)*pipeline_warmup_frac`의 부호와 곱에는 일반적인 실행 시간 기전이 명확하지 않고, `maximum(f.waves, f.has_spill)`는 spill 여부를 wave 수의 대체값으로 쓰므로 두 현상을 물리적으로 연결하지 못한다. split-K 비용에 이 여러 항을 선형 결합할 근거도 제공된 물리량만으로는 설명할 수 없다.",
+      "regime_dependent": true,
+      "regime": "split-K가 실제로 사용되고 짧은 mainloop 또는 마지막 wave와 warmup이 중요한 체제에서 일부 구성요소가 의미를 가질 수 있으나, 현재 결합식 전체는 특정 체제에서도 물리적으로 정당화되지 않는다."
+     },
+     {
+      "index": 4,
+      "expression": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+      "physics": "레지스터 스필이 발생했을 때 스필 바이트의 규모와 발생 자체를 벌점으로 나타내며, 로컬 메모리 왕복이 레지스터 접근보다 훨씬 느려지는 기전을 반영한다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "스필이 실제로 발생하는 구성에서만 `spill_magnitude`가 정보를 추가하며, 스필이 없으면 이 항은 0이다."
+     },
+     {
+      "index": 5,
+      "expression": "f.is_two_stage + f.pipeline_warmup_frac",
+      "physics": "2-stage 커널 계열 여부와 파이프라인 warmup 비율을 함께 벌점화하려는 항이다.",
+      "explainable": false,
+      "why_not": "2-stage 여부는 커널 계열을 나타내는 범주형 변수이고 warmup 비율은 짧은 mainloop에서의 startup 비용인데, 두 값을 단순히 더할 물리적 양이나 공통 단위가 없다. 2-stage가 항상 느리거나 빠르다는 기전도 주어진 물리량만으로 정해지지 않으며, cp.async 가능 여부 같은 조건 없이 고정 벌점으로 만들 수 없다.",
+      "regime_dependent": true,
+      "regime": "warmup 부분은 짧은 mainloop에서만 의미가 있고, 2-stage 부분은 비동기 복사 지원 여부와 파이프라인 계열의 실제 병목에 따라 달라진다."
+     },
+     {
+      "index": 6,
+      "expression": "f.sm_idle_cost",
+      "physics": "마지막 wave의 유휴 SM 슬롯으로 인해 이상적인 처리 시간보다 실행 시간이 늘어나는 비선형 배수를 나타낸다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "grid가 적거나 wave 수가 정수에서 크게 어긋난 짧은 형상에서 중요하며, 충분히 많은 wave에서는 영향이 작다."
+     },
+     {
+      "index": 7,
+      "expression": "f.reg_pressure",
+      "physics": "블록의 레지스터 요구량이 SM 레지스터 파일 수용량에 접근하거나 초과하는 정도를 나타내며, resident CTA 감소와 레지스터 스필이 병렬성과 메모리 지연 은폐를 악화시킨다.",
+      "explainable": true,
+      "why_not": "",
+      "regime_dependent": true,
+      "regime": "레지스터 파일 용량 경계 근처와 스필 임계점 부근에서 특히 중요하며, 낮은 압력의 평탄한 구간에서는 성능 차이가 작을 수 있다."
+     }
+    ],
+    "overall": "이 규칙은 형상이 메모리 바운드인지에 따라 작업공간 대 점유율, DRAM 트래픽 대 명령어 수를 선택하고, 트래픽 증폭·split-K·스필·파이프라인·SM 유휴·레지스터 압력을 가중합해 후보를 순서화하려 한다. 다만 실제 물리적으로 해석 가능한 항과 로그·범주형 값·서로 다른 비용을 임의로 합친 항이 섞여 있어, 전체 점수의 순서가 일관된 실행 시간 근사라고 보기 어렵다.",
+    "defects": [
+     "항 3은 로그 바이트·로그 반복 수·로그 wave 수·비율을 차원과 의미의 공통 근거 없이 합치며, `np.log2(np.maximum(f.waves, f.has_spill))`를 동일 괄호 안에서 두 번 사용한다.",
+     "항 3의 `maximum(f.waves, f.has_spill)`는 wave 수와 spill 여부를 대체 관계로 취급하는 물리적 근거가 없고, warmup 곱 항의 부호도 실행 시간 기전과 맞지 않는다.",
+     "항 5는 범주형 커널 계열 플래그와 연속적인 warmup 비율을 단순 가산한다. 계열 플래그의 고정 벌점은 하드웨어의 cp.async 지원 등 조건 없이 정당화되지 않는다.",
+     "항 0의 두 분기는 서로 다른 물리량(로그 작업공간 바이트와 점유율 부족)을 같은 가중치로 사용하므로, 가중치가 별도 보정되지 않으면 크기와 의미가 비교되지 않는다.",
+     "항 2는 `nan_to_num`이 NaN 또는 무한 입력을 임의의 대체값으로 바꾸어 물리량이 아닌 구현 산물을 점수에 넣을 수 있다.",
+     "스필 비용이 항 4와 항 7에 중복 반영될 수 있고, tail/wave 및 warmup 관련 비용도 항 3과 항 6 사이에서 중복 또는 상충될 수 있다.",
+     "모든 항이 가중합에 들어가지만 가중치의 부호·정규화와 점수의 정렬 방향이 제시되지 않아, 각 항이 빠른 후보를 실제로 올바른 방향으로 순위화하는지는 판정할 수 없다."
+    ]
+   },
+   "shuffle_order": [
+    5,
+    4,
+    1,
+    6,
+    0,
+    7,
+    3,
+    2
+   ],
+   "exprs": {
+    "0": "np.where(p.is_memory_bound, f.log_workspace_bytes, f.occupancy_deficit)",
+    "1": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+    "2": "np.nan_to_num(np.log2(f.traffic_amplification))",
+    "3": "f.split_k_cost * (f.log_mainloop_iters + f.log_workspace_bytes - np.log2(np.maximum(f.waves, f.has_spill)) + f.tail_waste - np.log2(np.maximum(f.waves, f.has_spill)) * f.pipeline_warmup_frac)",
+    "4": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+    "5": "(f.is_two_stage + f.pipeline_warmup_frac)",
+    "6": "f.sm_idle_cost",
+    "7": "f.reg_pressure"
+   }
+  }
+ ]
+}

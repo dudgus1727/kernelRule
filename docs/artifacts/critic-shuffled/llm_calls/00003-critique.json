@@ -1,0 +1,95 @@
+{
+ "role": "critique",
+ "prompt_hash": "661941c660044e68",
+ "seq": 3,
+ "model": "gpt-5.6-luna",
+ "response": {
+  "terms": [
+   {
+    "index": 0,
+    "expression": "(f.log_workspace_bytes + f.split_k_cost)",
+    "physics": "분할 K의 작업공간 크기와 리덕션 비용을 하나의 값으로 합산한다.",
+    "explainable": false,
+    "why_not": "log2 바이트와 무차원 리덕션 비용은 서로 다른 물리량이며, 합이 특정 시간 손해나 병목을 뜻한다는 기전이 없다; 작업공간의 로그와 split-K 비용의 선형 합은 임의적인 혼합이다.",
+    "regime_dependent": true,
+    "regime": "split-K를 실제로 사용하는 후보에서만 일부 관련이 있지만, serial 후보의 작업공간과 parallel 후보의 리덕션 비용을 같은 척도로 더할 근거는 없다."
+   },
+   {
+    "index": 1,
+    "expression": "f.sm_idle_cost",
+    "physics": "CTA의 tail waste로 인해 SM이 놀면서 발생하는 점유 손실을 나타낸다.",
+    "explainable": true,
+    "why_not": "",
+    "regime_dependent": true,
+    "regime": "전체 작업의 CTA 수가 적거나 마지막 wave가 지배적인 짧은 형상; 충분히 많은 wave에서는 영향이 작다."
+   },
+   {
+    "index": 2,
+    "expression": "np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill)",
+    "physics": "레지스터 스필의 발생 여부와 스필 바이트량에 따른 로컬 메모리 왕복 비용을 강하게 벌점화한다.",
+    "explainable": true,
+    "why_not": "",
+    "regime_dependent": true,
+    "regime": "스필이 mainloop 반복 중 실제로 발생하는 커널; 스필이 없으면 이 항은 0이다."
+   },
+   {
+    "index": 3,
+    "expression": "np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total)",
+    "physics": "메모리 바운드 형상에서는 DRAM 트래픽을, 연산 바운드 형상에서는 명령어 수를 주된 실행시간 대리 지표로 선택한다.",
+    "explainable": true,
+    "why_not": "",
+    "regime_dependent": true,
+    "regime": "각 branch가 각각 메모리 바운드와 연산 바운드 체제에서만 타당하며, ridge point 부근에서는 이진 분기가 병목의 연속적인 혼합을 표현하지 못한다."
+   },
+   {
+    "index": 4,
+    "expression": "np.maximum(f.reg_pressure, f.smem_pressure)",
+    "physics": "레지스터 또는 공유메모리 사용량 중 더 큰 정규화 압력이 상주 CTA 수와 지연 은닉을 제한한다고 본다.",
+    "explainable": true,
+    "why_not": "",
+    "regime_dependent": true,
+    "regime": "점유율이 성능을 제한하는 체제; 다만 두 값이 같은 정규화 의미를 갖고 실제 점유율을 결정한다는 전제가 필요하다."
+   },
+   {
+    "index": 5,
+    "expression": "np.sqrt(f.traffic_amplification)",
+    "physics": "이론 최소 트래픽 대비 실제 트래픽 증가를 단조롭게 반영하려 한다.",
+    "explainable": false,
+    "why_not": "제공된 물리 설명은 메모리 바운드에서 시간이 traffic_amplification에 거의 비례하고 log2가 자릿수 정합을 위한 변환이라고 한다; 제곱근을 취해야 할 대역폭·캐시·중첩 기전이 없다. 따라서 물리 기반 항이 아니라 임의의 압축이다.",
+    "regime_dependent": true,
+    "regime": "트래픽이 실행시간을 지배하는 메모리 바운드 체제에서만 원래 물리량이 관련된다."
+   },
+   {
+    "index": 6,
+    "expression": "f.tile_aspect_imbalance",
+    "physics": "타일의 길쭉함에 따른 데이터 재사용 및 경계 타일 낭비의 변화를 나타내려 한다.",
+    "explainable": true,
+    "why_not": "",
+    "regime_dependent": true,
+    "regime": "정방형 타일이 재사용에 유리한 형상에서는 큰 imbalance가 불리하지만, 문제 형상 자체가 길쭉해 해당 방향 타일이 경계 낭비를 줄이는 경우에는 imbalance가 오히려 유리할 수 있다; 형상 종횡비를 반영하지 않은 일률적 벌점은 그 체제에서 반증된다."
+   },
+   {
+    "index": 7,
+    "expression": "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)",
+    "physics": "cp.async 사용 가능 여부에 따라 2단 파이프라인 선택과 파이프라인 warmup 비용을 함께 벌점화한다.",
+    "explainable": false,
+    "why_not": "warmup 비율과 커널 계열을 나타내는 이진 지시자를 더할 물리적 공통 단위가 없다. 또한 cp.async 가능 여부는 2단 파이프라인의 비용·우열을 단순히 1만큼 정하지 않으며, 두 커널 계열의 차이를 고정 벌점으로 표현할 기전이 제공되지 않았다.",
+    "regime_dependent": true,
+    "regime": "mainloop가 짧아 warmup이 지배적이거나 cp.async 정렬 가능성이 파이프라인 선택을 제한하는 체제에서만 일부 관련된다."
+   }
+  ],
+  "overall": "이 규칙은 split-K/작업공간, SM tail idle, 스필, 형상별 메모리·연산 병목, 자원 압력, 트래픽 증폭, 타일 종횡비, 파이프라인 warmup을 가중합해 후보를 순위화한다. 스필과 병목별 트래픽·명령어 선택은 물리적 해석이 가능하지만, 여러 항에서 서로 다른 단위의 값을 무근거로 더하고, traffic_amplification에 제곱근을 적용하며, cp.async·2단 계열을 warmup과 합산한다. 또한 tile_aspect_imbalance를 항상 벌점화해 형상 종횡비에 따라 경계 낭비가 줄어드는 경우를 놓친다.",
+  "defects": [
+   "(f.log_workspace_bytes + f.split_k_cost)는 log2 바이트와 무차원 비용의 단위가 맞지 않고 공통 실행시간 모델도 없다.",
+   "np.sqrt(f.traffic_amplification)는 설명된 선형 트래픽 기전이나 권장되는 log2 변환과 일치하지 않는 임의 변환이다.",
+   "np.maximum(f.reg_pressure, f.smem_pressure)는 레지스터 압력과 공유메모리 압력의 스케일·점유율 효과가 다르며, max가 실제 occupancy 계단을 정확히 나타내지 않는다.",
+   "f.tile_aspect_imbalance를 일률적으로 양의 벌점으로 사용하면 길쭉한 문제 형상에서 경계 낭비를 줄이는 타일을 잘못 순위화할 수 있다.",
+   "np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac)는 이진 커널 계열 지시자와 warmup 비율을 합산하는 차원·기전 불일치가 있다.",
+   "항들 사이에 스필, DRAM 트래픽, 점유율 저하가 같은 성능 손해를 중복 반영할 가능성이 있지만, 가중치와 상관 구조가 없어 중복을 정량적으로 판정할 수 없다."
+  ]
+ },
+ "prompt": "## 규칙 함수\n\n```python\ndef score(f, p, hw, w):\n    s = (f.log_workspace_bytes + f.split_k_cost) * w[0]\n    s = s + f.sm_idle_cost * w[1]\n    s = s + np.where(f.has_spill, f.spill_magnitude + f.has_spill, f.has_spill) * w[2]\n    s = s + np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[3]\n    s = s + np.maximum(f.reg_pressure, f.smem_pressure) * w[4]\n    s = s + np.sqrt(f.traffic_amplification) * w[5]\n    s = s + f.tile_aspect_imbalance * w[6]\n    s = s + np.where(p.can_use_cp_async, f.is_two_stage + f.pipeline_warmup_frac, f.pipeline_warmup_frac) * w[7]\n    return s\n```\n\n## 쓰인 물리량\n\n## 형상 수준 — `p.<이름>` 으로만 접근한다. 스칼라라서 `if p.<이름>:` 분기 가능\np.can_use_cp_async                   [0, 1]  정렬이 cp.async(16바이트)를 허용하는가. 0 이면 stages=2 만 가능하고 글로벌→smem 복사에 레지스터를 거쳐야 한다\np.is_memory_bound                    [0, 1]  arithmetic intensity 가 ridge point 미만인가. 그렇다면 트래픽 항이 지배하고, 아니면 명령어 수와 상주율이 지배한다. ★ 어느 항을 무겁게 볼지 가르는 주 분기다\n\n## config 수준 — `f.<이름>` 으로만 접근한다. **배열이다** (`if` 금지, ValueError)\nf.has_spill                          [0, 1]  레지스터가 넘쳐 로컬 메모리(=DRAM)로 나간다. 레지스터 접근이 1사이클이라면 로컬은 수백 사이클이고, mainloop 안에서 매 반복 일어난다. ★ 켜지면 다른 어떤 이점도 상쇄하기 어렵다 — 가장 큰 벌점을 줘라\nf.is_two_stage                       [0, 1]  2단 파이프라인(MmaPipelined)인가. multistage 와 **다른 커널 계열**이라 성능 특성이 통째로 다르다. cp.async 를 못 쓰면 이것만 가능하다\nf.log_dram_traffic                 [0, 100]  DRAM 에서 읽는 바이트(log2). 대역폭이 상한이면 이것이 곧 시간이다\nf.log_inst_total                    [0, 30]  SASS 명령어 수(log2). 연산 바운드에서 시간의 대리 지표\nf.log_workspace_bytes               [0, 40]  parallel split-K 가 DRAM 에 쓰는 부분합 바이트(log2). serial 이면 0\nf.pipeline_warmup_frac               [0, 4]  파이프라인 채우기가 mainloop 에서 차지하는 비율. mainloop 이 짧을수록 크다 — stages 를 늘리는 것이 손해가 되는 지점을 가른다\nf.reg_pressure                       [0, 4]  블록 하나가 SM 레지스터 파일의 몇 배를 요구하는가. 1 을 넘으면 블록이 SM 에 하나도 안 올라가거나 스필한다 — 1 근처가 절벽이다\nf.sm_idle_cost                     [0, 999]  위의 비선형 형태: 1/(1-tail_waste) - 1. 실제 손해의 배수다. tail_waste 가 1 에 가까우면 발산하므로 구현이 잘라 놓았다\nf.smem_pressure                    [0, 1.5]  smem 예산을 얼마나 쓰는가. 꽉 채우면 SM 당 상주 블록이 1개로 줄어 메모리 지연을 다른 블록으로 가릴 수 없게 된다. 절벽이 아니라 계단이다\nf.spill_magnitude                   [0, 10]  스필의 양(log2 바이트/4). `has_spill` 이 켜졌을 때 얼마나 나쁜지를 가른다. 4 이면 16배 더 많은 바이트가 왕복한다\nf.split_k_cost                       [0, 1]  split-K 리덕션 비용의 대리 지표. K 를 나누면 병렬성을 사지만 부분합을 합쳐야 한다. serial 은 fp16 왕복(정밀도 손실), parallel 은 M*N*sk 를 DRAM 에 쓰고 다시 읽는다\nf.tile_aspect_imbalance              [0, 8]  타일이 얼마나 길쭉한가. |log2(tm/tn)|. 정방형이 재사용에 유리하지만 형상이 길쭉하면 타일도 길쭉한 편이 경계 낭비가 적다\nf.traffic_amplification            [0, 200]  실제 A/B 트래픽 / 이론 최소치. 타일이 작으면 같은 데이터를 여러 번 읽는다. 메모리 바운드 형상에서 시간에 거의 비례한다. ★ 값이 크므로 log2 를 취해 쓰는 편이 다른 항과 자릿수가 맞는다\n\n★ 접두사를 바꿔 쓰면 즉시 거부된다. `p.` 목록에 없는 이름을 `p.` 로 쓰거나 그 반대도 마찬가지다.\n",
+ "input_tokens": 2332,
+ "output_tokens": 1980,
+ "seconds": 22.000922904349864
+}

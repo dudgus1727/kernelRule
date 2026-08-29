@@ -1,0 +1,35 @@
+{
+ "categories": [
+  {
+   "name": "roofline_pressure",
+   "description": "GEMM의 연산량 대비 입력·출력 바이트와 하드웨어 ridge point가 계산 병목과 대역폭 병목 중 어느 쪽을 강제하는지 나타낸다."
+  },
+  {
+   "name": "boundary_utilization",
+   "description": "M·N·K 차원이 타일 크기로 나누어지지 않아 마지막 타일의 유효 작업과 메모리·연산 슬롯이 얼마나 낭비되는지 나타낸다."
+  },
+  {
+   "name": "global_access_alignment",
+   "description": "A·B·C의 레이아웃과 각 정렬 조건이 전역 메모리 접근의 연속성 및 거래 단위 활용을 얼마나 제한하는지 나타낸다."
+  },
+  {
+   "name": "tile_reuse_locality",
+   "description": "타일의 K 방향 크기와 공유 메모리·L2 용량 관계가 전역 메모리에서 가져온 데이터를 얼마나 재사용하고 캐시에 담아둘 수 있는지 나타낸다."
+  },
+  {
+   "name": "parallel_work_distribution",
+   "description": "타일 수와 split-K에 의해 생성되는 작업량이 SM 전체에 얼마나 충분하고 균등하게 분배되는지 나타낸다."
+  },
+  {
+   "name": "resource_occupancy",
+   "description": "스레드 수·레지스터 사용량·공유 메모리 사용량이 SM의 수용 한도를 얼마나 소모하여 동시 블록 수를 제한하는지 나타낸다."
+  },
+  {
+   "name": "reduction_and_execution_overhead",
+   "description": "split-K 부분 결과 결합과 명령 수·파이프라인·레지스터 spill이 본래 GEMM 계산에 추가하는 동기화·명령 실행 비용을 나타낸다."
+  }
+ ],
+ "notes": "원시 값만으로는 실제 캐시 적중률, 메모리 접근의 세부 거래 패턴, 명령별 발행 지연과 SM 간 스케줄링 변동을 직접 측정할 수 없어 각각의 대리 지표로만 표현했다.",
+ "n_min": 5,
+ "n_max": 8
+}

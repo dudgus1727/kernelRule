@@ -1,0 +1,2881 @@
+{
+ "procedure": "runs/*/hypotheses.jsonl 의 needs_new_feature 를 그대로 모았다. LLM 0회.",
+ "generated": "2026-08-28",
+ "n_hypotheses": 1655,
+ "n_requests": 303,
+ "n_unique": 293,
+ "n_runs_total": 34,
+ "n_runs_with_requests": 33,
+ "text_len": {
+  "median": 49,
+  "max": 102,
+  "min": 16
+ },
+ "per_run": {
+  "f1pipe-F1-K-k1-s0": 8,
+  "f1pipe-F1-K-k1-s1": 4,
+  "f1pipe-F1-K-k1-s2": 18,
+  "f1pipe-F1-K-k1-s3": 9,
+  "f1pipe-F1-K-k1-s4": 18,
+  "f1pipe-F1-K-k1-s5": 11,
+  "f1pipe-F1-free-roofline-s0": 14,
+  "f1pipe-F1-free-roofline-s1": 2,
+  "f1pipe-F1-free-roofline-s2": 17,
+  "f1pipe-F1-free-roofline-s3": 15,
+  "f1pipe-F1-free-roofline-s4": 14,
+  "f1pipe-F1-free-roofline-s5": 11,
+  "f1pipe-F3-arch24-s0": 3,
+  "f1pipe-F3-arch24-s1": 14,
+  "f1pipe-F3-arch24-s2": 12,
+  "f1pipe-F3-arch24-s3": 10,
+  "f1pipe-F3-arch24-s4": 13,
+  "f1pipe-F3-arch24-s5": 13,
+  "luna-s0": 20,
+  "luna-s1": 2,
+  "luna-s2": 11,
+  "luna-s3": 8,
+  "luna-s4": 2,
+  "luna-s5": 10,
+  "lunaNAMES-s0": 4,
+  "lunaNAMES-s1": 6,
+  "lunaNAMES-s2": 11,
+  "lunaNAMES-s3": 6,
+  "lunaNAMES-s4": 4,
+  "lunaNAMES-s5": 1,
+  "real-gpt-5.4-mini-2026-03-17": 1,
+  "verify-s0": 4,
+  "verify-s1": 7
+ },
+ "requests": [
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 3,
+   "text": "pipeline_startup_absolute_cost 또는 pipeline_stage_family",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "roofline_lower_bound_time",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 6,
+   "text": "pipeline implementation family 또는 cp.async eligibility",
+   "measurable_with": [
+    "sm_resource_pressure",
+    "instruction_overhead_fraction",
+    "pipeline_fill_drain_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 6,
+   "text": "절대 CTA 수 또는 총 wave 수",
+   "measurable_with": [
+    "tail_waste",
+    "resident_block_scarcity",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 6,
+   "text": "커널 실행 계열별 steady-state issue 효율 또는 MMA 파이프라인 효율",
+   "measurable_with": [
+    "sm_resource_pressure",
+    "occupancy_deficit",
+    "instruction_overhead_fraction",
+    "tiled_global_traffic_ratio"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 10,
+   "text": "split-K가 제공하는 CTA 병렬성·wave 충전 이득 또는 split-K 적용 전후의 유효 wave 부족 완화량",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "resident_block_scarcity",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 10,
+   "text": "L2에서 얻는 타일 재사용 이득 또는 L2 압력에 따른 실제 하위 메모리 트래픽 증분",
+   "measurable_with": [
+    "l2_residency_pressure",
+    "tiled_global_traffic_ratio",
+    "roofline_memory_gap"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 10,
+   "text": "stages=2와 multistage를 구분하는 파이프라인 계열의 startup/synchronization 비용 또는 alignment에 따른 async 경로 사용 여부",
+   "measurable_with": [
+    "occupancy_deficit",
+    "pipeline_fill_drain_fraction",
+    "resident_block_scarcity",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s0",
+   "round": 11,
+   "text": "pipeline stage-count and kernel-family overhead",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s1",
+   "round": 2,
+   "text": "split-K reduction mode별 비용을 나타내는 물리량(예: parallel partial-output DRAM 왕복량과 serial 누산 왕복·정밀도 비용을 분리한 지표)",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "reduction_work_fraction",
+    "tiled_global_traffic_ratio",
+    "roofline_memory_gap"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s1",
+   "round": 4,
+   "text": "split-K에 따른 유효 CTA 수 또는 wave 충원도",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "tail_waste",
+    "resident_block_scarcity",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s1",
+   "round": 5,
+   "text": "형상·타일·split-K로부터 계산한 유효 CTA wave 수 또는 wave 충원율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s1",
+   "round": 8,
+   "text": "pipeline implementation family 또는 cp.async 사용 가능 여부",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 2,
+   "text": "split-K가 늘리는 유효 CTA 수와 SM wave 충전도",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "tail_waste",
+    "occupancy_deficit",
+    "tiled_global_traffic_ratio"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 2,
+   "text": "유효 K-loop 반복 수와 반복당 고정 startup·동기화 비용",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "compute_k_underfill_fraction",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 2,
+   "text": "형상 전체의 wave 수를 고려한 유효 지연 은닉 가능 CTA 수",
+   "measurable_with": [
+    "sm_resource_pressure",
+    "resident_block_scarcity",
+    "tail_waste",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 2,
+   "text": "config별 고정 launch·초기화·CTA 스케줄링 노출 비용",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 3,
+   "text": "config별 launch·초기화·스케줄링 고정 비용의 비상각 비율",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "roofline_lower_bound_time"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 4,
+   "text": "커널 launch 및 CTA prologue/epilogue의 절대 고정 비용",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "compute_k_underfill_fraction",
+    "roofline_lower_bound_time"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 4,
+   "text": "L2 용량 압력과 실제 타일 재사용·L2 적중 이득을 분리한 유효 L2 재사용량",
+   "measurable_with": [
+    "l2_residency_pressure",
+    "tiled_global_traffic_ratio",
+    "roofline_memory_gap"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 5,
+   "text": "절대적인 launch·CTA scheduling·wave 고정비를 나타내는 실행시간 규모 또는 CTA 수 기반 feature",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "tail_waste",
+    "resident_block_scarcity"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 6,
+   "text": "launch_and_cta_scheduling_fixed_cost",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "roofline_lower_bound_time",
+    "instruction_overhead_fraction",
+    "resident_block_scarcity"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 7,
+   "text": "M축과 N축의 operand별 타일 재사용·전역 트래픽 비대칭",
+   "measurable_with": [
+    "tiled_global_traffic_ratio",
+    "edge_waste",
+    "resident_block_scarcity",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 7,
+   "text": "stage-count-dependent buffering, synchronization, and steady-state issue overhead",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "sm_resource_pressure",
+    "resident_block_scarcity",
+    "occupancy_deficit",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 7,
+   "text": "warp-level tile granularity and accumulator instruction-level parallelism",
+   "measurable_with": [
+    "sm_resource_pressure",
+    "occupancy_deficit",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 8,
+   "text": "split-K로 증가하는 유효 CTA 수와 grid wave 충원 정도를 나타내는 config별 병렬성 이득",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "reduction_work_fraction",
+    "resident_block_scarcity",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 8,
+   "text": "stage 계열별 buffering·barrier·prologue/epilogue의 이산적 비용",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure",
+    "resident_block_scarcity"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 8,
+   "text": "warp-level accumulator 타일 크기와 warp 간 MMA 작업분할의 compute throughput·레지스터 재사용 비용",
+   "measurable_with": [
+    "occupancy_deficit",
+    "sm_resource_pressure",
+    "resident_block_scarcity",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 8,
+   "text": "M축·N축별 A/B 재사용 및 경계 접근 비대칭을 분리한 방향성 메모리 비용",
+   "measurable_with": [
+    "tiled_global_traffic_ratio",
+    "edge_waste",
+    "roofline_memory_gap",
+    "l2_residency_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 9,
+   "text": "stages에 따른 커널 계열 오버헤드 또는 multistage 실행 가능성",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s2",
+   "round": 11,
+   "text": "stage-family-specific issue and synchronization overhead",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure",
+    "spill_traffic_ratio"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 1,
+   "text": "split-K를 포함한 전체 CTA 수 또는 wave당 유효 작업량",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "tail_waste",
+    "resident_block_scarcity"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 2,
+   "text": "split-K 증가분을 포함한 CTA 수와 마지막 wave의 SM 활용률",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_work_fraction",
+    "reduction_tree_depth",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 3,
+   "text": "split-K 적용 후 CTA wave 충전율 또는 split-K로 감소하는 SM 유휴량",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "tail_waste",
+    "resident_block_scarcity"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 3,
+   "text": "warp/output 타일의 메모리 접근 병합·Tensor Core 활용 효율",
+   "measurable_with": [
+    "tiled_global_traffic_ratio",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 3,
+   "text": "CTA당 타일 재사용 이득과 메모리 지연 은닉의 결합 효율",
+   "measurable_with": [
+    "resident_block_scarcity",
+    "sm_resource_pressure",
+    "occupancy_deficit",
+    "l2_residency_pressure",
+    "tiled_global_traffic_ratio"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 3,
+   "text": "multistage/async-copy 실행 가능 여부와 stage 계열의 지속적인 효율",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 5,
+   "text": "split-K가 추가한 CTA의 wave 충전 또는 유효 CTA 병렬성",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "reduction_work_fraction",
+    "tail_waste",
+    "resident_block_scarcity"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 5,
+   "text": "async-copy 사용 가능 여부와 pipeline family를 반영한 메모리 발행 방식 비용",
+   "measurable_with": [
+    "instruction_overhead_fraction",
+    "pipeline_fill_drain_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s3",
+   "round": 11,
+   "text": "split_k_execution_mode_cost",
+   "measurable_with": [
+    "tiled_global_traffic_ratio",
+    "reduction_work_fraction",
+    "reduction_merge_tasks_per_sm"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 3,
+   "text": "총 CTA 수 대비 SM 수와 wave 수를 나타내는 config별 wave_supply 또는 parallel_wave_count",
+   "measurable_with": [
+    "resident_block_scarcity",
+    "tail_waste",
+    "reduction_merge_tasks_per_sm"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 4,
+   "text": "전체 CTA 공급량 또는 split-K를 포함한 global wave count",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "resident_block_scarcity",
+    "tail_waste",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 4,
+   "text": "pipeline family 또는 async-copy eligibility",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 5,
+   "text": "split-K를 포함한 전체 CTA 공급량 또는 SM당 총 resident CTA wave 수",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "resident_block_scarcity",
+    "tail_waste",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 5,
+   "text": "pipeline 커널 계열 또는 cp.async/multistage 사용 가능 여부",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 5,
+   "text": "steady-state mainloop의 유효 계산/메모리 파이프라인 처리율 또는 tile_k에 따른 async stage 재사용 효율",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "sm_resource_pressure",
+    "occupancy_deficit",
+    "tiled_global_traffic_ratio"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 6,
+   "text": "split-K 적용 후 CTA wave coverage 또는 wave underfill",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "resident_block_scarcity",
+    "tail_waste",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 6,
+   "text": "L2 유효 재사용률 또는 실제 L2 hit/reuse locality",
+   "measurable_with": [
+    "l2_residency_pressure",
+    "tiled_global_traffic_ratio",
+    "roofline_memory_gap"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 6,
+   "text": "pipeline stage family 또는 cp.async 사용 가능 여부",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 7,
+   "text": "pipeline_family 또는 async multistage mode",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 7,
+   "text": "split-K CTA supply gain 또는 effective wave occupancy",
+   "measurable_with": [
+    "tail_waste",
+    "resident_block_scarcity",
+    "compute_k_underfill_fraction",
+    "reduction_merge_tasks_per_sm"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 8,
+   "text": "split-K CTA supply gain 또는 마지막 wave의 유효 CTA 충전량",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "resident_block_scarcity",
+    "tail_waste",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 8,
+   "text": "pipeline family 또는 multistage capability indicator",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 8,
+   "text": "L2 hit/reuse benefit 또는 하위 메모리 트래픽으로 실제 퇴출되는 재사용량",
+   "measurable_with": [
+    "l2_residency_pressure",
+    "tiled_global_traffic_ratio",
+    "roofline_memory_gap"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 9,
+   "text": "pipeline family 및 cp.async 사용 가능성을 나타내는 커널 계열 피처",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 10,
+   "text": "async_pipeline_eligibility_or_kernel_family",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 11,
+   "text": "split-K CTA 공급량 또는 split-K로 증가한 실행 CTA/wave 병렬성",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "resident_block_scarcity",
+    "tail_waste",
+    "compute_k_underfill_fraction",
+    "reduction_tree_depth",
+    "reduction_work_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s4",
+   "round": 11,
+   "text": "pipeline 계열 및 cp.async 사용 가능성을 반영한 비동기 파이프라인 효율",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "roofline_memory_gap"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 3,
+   "text": "split-K로 증가하는 CTA 병렬성 또는 wave 유휴 감소량",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "reduction_work_fraction",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 3,
+   "text": "커널 고정 startup·CTA 배분·동기화 비용의 절대 시간 또는 작업량 대비 amortization",
+   "measurable_with": [
+    "roofline_lower_bound_time",
+    "pipeline_fill_drain_fraction",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 4,
+   "text": "고정 launch·동기화 startup 비용이 전체 실행시간에서 차지하는 비율",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 5,
+   "text": "launch_and_fixed_synchronization_cost",
+   "measurable_with": [
+    "instruction_overhead_fraction",
+    "pipeline_fill_drain_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 6,
+   "text": "launch_fixed_synchronization_cost",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 9,
+   "text": "split-K가 늘리는 총 CTA 수 또는 wave 충만도",
+   "measurable_with": [
+    "reduction_merge_tasks_per_sm",
+    "reduction_tree_depth",
+    "tail_waste",
+    "tiled_global_traffic_ratio"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 9,
+   "text": "pipeline family 또는 cp.async 사용 가능 여부",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "instruction_overhead_fraction",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 9,
+   "text": "총 CTA wave 수 또는 CTA-wave 충만도",
+   "measurable_with": [
+    "sm_resource_pressure",
+    "resident_block_scarcity",
+    "occupancy_deficit",
+    "roofline_memory_gap",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 10,
+   "text": "pipeline family 및 cp.async 정렬 가능 여부를 나타내는 이산 config 피처",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "sm_resource_pressure",
+    "resident_block_scarcity",
+    "compute_k_underfill_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 11,
+   "text": "pipeline_stage_count 또는 stage_family_overhead",
+   "measurable_with": [
+    "pipeline_fill_drain_fraction",
+    "compute_k_underfill_fraction",
+    "instruction_overhead_fraction",
+    "sm_resource_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-K-k1-s5",
+   "round": 11,
+   "text": "warp_coalescing_efficiency 또는 global_memory_transaction_efficiency",
+   "measurable_with": [
+    "tiled_global_traffic_ratio",
+    "roofline_memory_gap",
+    "sm_resource_pressure",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 1,
+   "text": "swizzle별 전역 메모리 coalescing 효율 또는 shared-memory bank-conflict/접근 충돌 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 2,
+   "text": "swizzle별 전역 coalescing 및 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 3,
+   "text": "swizzle별 global transaction 증가율 및 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 3,
+   "text": "절대 K-stage 반복 수 또는 형상·config별 staging/synchronization의 절대 비용 척도",
+   "measurable_with": [
+    "f.k_stage_iteration_overhead",
+    "f.shared_staging_overhead_fraction",
+    "f.global_tile_traffic_amplification",
+    "f.split_k_reduction_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 4,
+   "text": "shared-memory bank-conflict 또는 shared-memory transaction-efficiency",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 4,
+   "text": "절대 K-stage 반복 수 또는 전체 mainloop 반복량",
+   "measurable_with": [
+    "k_stage_iteration_overhead",
+    "shared_staging_overhead_fraction",
+    "global_tile_traffic_amplification"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 5,
+   "text": "swizzle별 shared-memory bank conflict 또는 global/shared transaction 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 5,
+   "text": "split-K가 추가하는 CTA 수와 유효 wave 충전량의 병렬성 회복",
+   "measurable_with": [
+    "f.split_k_reduction_fraction",
+    "f.global_grid_underfill",
+    "f.tail_wave_imbalance",
+    "f.partial_sum_merge_depth"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 6,
+   "text": "swizzle별 shared-memory bank-conflict 또는 shared-memory transaction overhead",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 7,
+   "text": "swizzle별 shared-memory bank-conflict 또는 global/shared memory transaction amplification",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 8,
+   "text": "shared-memory bank-conflict 또는 swizzle별 shared-memory 접근 직렬화 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 9,
+   "text": "swizzle에 따른 전역 메모리 transaction 수 또는 coalescing 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 10,
+   "text": "swizzle별 전역 메모리 transaction/coalescing 효율 또는 실제 global memory sector 이동량",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s0",
+   "round": 11,
+   "text": "split-K partition 증가로 얻는 CTA 병렬성 및 wave 점유 개선량",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "partial_sum_merge_depth",
+    "global_grid_underfill",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s1",
+   "round": 8,
+   "text": "split-K가 증가시키는 유효 CTA 병렬성 또는 wave 활용 이득",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "global_grid_underfill",
+    "tail_wave_imbalance",
+    "resident_thread_occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s1",
+   "round": 9,
+   "text": "A 패널과 B 패널 중 어느 쪽이 큰지와 각 패널의 실제 staging·재사용 압력을 분리한 방향성 operand-panel pressure",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "p.roofline_bandwidth_pressure",
+    "p.roofline_output_store_fraction",
+    "l2_tile_residency_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 0,
+   "text": "pipeline stage regime 또는 multistage pipeline benefit",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "k_stage_iteration_overhead"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 1,
+   "text": "warp-tile mapping efficiency 또는 operand별 warp load/compute balance",
+   "measurable_with": [
+    "global_tile_traffic_amplification",
+    "operand_panel_imbalance",
+    "shared_staging_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 2,
+   "text": "pipeline_stage_synchronization_or_issue_efficiency",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "shared_memory_capacity_pressure",
+    "resident_thread_occupancy_deficit",
+    "instruction_work_per_flop"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 5,
+   "text": "total_wave_count 또는 누적 tail_idle_time",
+   "measurable_with": [
+    "f.tail_wave_imbalance",
+    "f.global_grid_underfill",
+    "f.split_k_reduction_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 5,
+   "text": "warp_tile_mma_utilization 또는 tensor-core issue_efficiency",
+   "measurable_with": [
+    "f.register_file_footprint_fraction",
+    "f.resident_thread_occupancy_deficit",
+    "f.instruction_work_per_flop"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 5,
+   "text": "pipeline_barrier_and_async_copy_issue_cost",
+   "measurable_with": [
+    "f.shared_staging_overhead_fraction",
+    "f.shared_memory_capacity_pressure",
+    "f.k_stage_iteration_overhead",
+    "p.alignment_guarantee_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 6,
+   "text": "A/B operand별 방향성 메모리 transaction 또는 coalescing 효율",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "shared_memory_capacity_pressure",
+    "shared_staging_overhead_fraction",
+    "global_grid_underfill"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 6,
+   "text": "warp swizzle별 shared-memory bank conflict 및 operand 접근 분산 효율",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "shared_staging_overhead_fraction",
+    "register_file_footprint_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 7,
+   "text": "warp swizzle별 operand 접근·공유메모리 bank conflict 및 warp 발행 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 7,
+   "text": "A/B 방향별 global-memory transaction 및 shared-memory 접근 효율",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "boundary_predication_fraction",
+    "global_tile_traffic_amplification"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 8,
+   "text": "warp-swizzle별 global/shared-memory transaction 및 bank-conflict 효율",
+   "measurable_with": [
+    "f.operand_panel_imbalance",
+    "f.global_tile_traffic_amplification"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 8,
+   "text": "split-K 적용에 따른 유효 CTA wave 충전 이득",
+   "measurable_with": [
+    "f.split_k_reduction_fraction",
+    "f.partial_sum_merge_depth",
+    "f.global_grid_underfill",
+    "f.tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 9,
+   "text": "전체 wave 수 또는 CTA 병렬성 증가에 따른 스케줄링·충전 이득",
+   "measurable_with": [
+    "global_grid_underfill",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 9,
+   "text": "split-K 방식별 추가 DRAM 부분합 트래픽 및 serial 누산 왕복 비용",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "partial_sum_merge_depth"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 9,
+   "text": "swizzle별 global/shared-memory transaction 효율 또는 coalescing·bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 10,
+   "text": "swizzle별 global-memory transaction efficiency 또는 operand-panel coalescing efficiency",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s2",
+   "round": 11,
+   "text": "config별 swizzle·정렬에 따른 실제 전역 메모리 transaction 또는 접근 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 1,
+   "text": "pipeline family indicator distinguishing two-stage MmaPipelined from multistage kernels",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "k_stage_iteration_overhead",
+    "resident_thread_occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 3,
+   "text": "A 패널과 B 패널의 개별 transaction·staging 부담",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "global_tile_traffic_amplification",
+    "shared_staging_overhead_fraction",
+    "l2_tile_residency_pressure",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 3,
+   "text": "형상별 이상적 작업량 또는 하드웨어 기준 실행시간 규모",
+   "measurable_with": [
+    "global_grid_underfill",
+    "tail_wave_imbalance",
+    "global_tile_traffic_amplification",
+    "k_stage_iteration_overhead"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 4,
+   "text": "pipeline stage count/family (stages=2와 stages>=3 및 multistage 내부의 stage 수)",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "shared_memory_capacity_pressure",
+    "register_file_footprint_fraction",
+    "k_stage_iteration_overhead"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 5,
+   "text": "pipeline family 및 명시적인 stage count",
+   "measurable_with": [
+    "k_stage_iteration_overhead",
+    "shared_staging_overhead_fraction",
+    "shared_memory_capacity_pressure",
+    "register_file_footprint_fraction",
+    "spill_burden_ratio"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 5,
+   "text": "signed operand-panel direction (A 패널과 B 패널 중 어느 쪽이 더 큰지)",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "global_tile_traffic_amplification",
+    "l2_tile_residency_pressure",
+    "shared_staging_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 5,
+   "text": "절대 K-loop iteration count 또는 pipeline barrier count",
+   "measurable_with": [
+    "k_stage_iteration_overhead",
+    "tail_wave_imbalance",
+    "global_grid_underfill",
+    "shared_staging_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 6,
+   "text": "operand_panel_direction (A 패널과 B 패널 중 어느 operand가 더 큰지)",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "global_tile_traffic_amplification",
+    "shared_staging_overhead_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 6,
+   "text": "absolute_work_scale 또는 launch_and_wave_duration",
+   "measurable_with": [
+    "register_file_footprint_fraction",
+    "shared_memory_capacity_pressure",
+    "resident_thread_occupancy_deficit",
+    "global_grid_underfill",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 7,
+   "text": "split_k_grid_fill_gain",
+   "measurable_with": [
+    "partial_sum_merge_depth",
+    "split_k_reduction_fraction",
+    "global_grid_underfill",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 7,
+   "text": "fixed_launch_and_synchronization_overhead_fraction",
+   "measurable_with": [
+    "global_grid_underfill",
+    "tail_wave_imbalance",
+    "boundary_predication_fraction",
+    "k_stage_iteration_overhead"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 8,
+   "text": "config·형상에 공통인 고정 launch 및 wave-quantization 비용을 반영하는 실행 오버헤드 물리량",
+   "measurable_with": [
+    "register_file_footprint_fraction",
+    "shared_memory_capacity_pressure",
+    "resident_thread_occupancy_deficit",
+    "tail_wave_imbalance",
+    "global_grid_underfill"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 9,
+   "text": "split-K 적용 후의 유효 CTA wave 수 또는 split-K로 증가한 wave 충전 이득",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "partial_sum_merge_depth",
+    "global_grid_underfill",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 9,
+   "text": "실행 wave 수와 launch·pipeline 고정 비용을 결합한 짧은 커널의 작업 amortization",
+   "measurable_with": [
+    "shared_memory_capacity_pressure",
+    "register_file_footprint_fraction",
+    "resident_thread_occupancy_deficit",
+    "tail_wave_imbalance",
+    "global_grid_underfill"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s3",
+   "round": 9,
+   "text": "실제 non-FMA 명령·주소 계산·제어·pipeline setup 명령 수를 유효 FLOP당 정규화한 후보별 명령 발행 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 2,
+   "text": "split-K가 제공하는 유효 CTA 병렬성 증가 또는 split-K로 줄어드는 SM 유휴 비용",
+   "measurable_with": [
+    "f.global_grid_underfill",
+    "f.split_k_reduction_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 2,
+   "text": "A/B 방향별 global-memory transaction 또는 coalescing 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 3,
+   "text": "split-K가 증가시킨 CTA 병렬성 또는 지연 은닉의 순이득",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "global_grid_underfill",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 3,
+   "text": "M/N 방향별 global-memory transaction 수 또는 coalescing 효율",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "global_tile_traffic_amplification",
+    "boundary_predication_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 4,
+   "text": "총 CTA wave 수 또는 완전 wave 수",
+   "measurable_with": [
+    "tail_wave_imbalance",
+    "global_grid_underfill",
+    "resident_thread_occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 7,
+   "text": "pipeline_latency_hiding_benefit",
+   "measurable_with": [
+    "f.shared_staging_overhead_fraction",
+    "f.shared_memory_capacity_pressure",
+    "f.resident_thread_occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 7,
+   "text": "total_wave_count",
+   "measurable_with": [
+    "f.tail_wave_imbalance",
+    "f.global_grid_underfill",
+    "f.resident_thread_occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 9,
+   "text": "split-K 실행 방식별 부분합 DRAM 왕복 및 serial 누산 정밀도 비용",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "partial_sum_merge_depth"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 9,
+   "text": "전체 CTA 수의 wave 양자화 또는 총 wave 수",
+   "measurable_with": [
+    "tail_wave_imbalance",
+    "global_grid_underfill"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 9,
+   "text": "stages 계열별 파이프라인 startup 비용과 메모리 latency-hiding 이득",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "k_stage_iteration_overhead",
+    "resident_thread_occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 9,
+   "text": "타일 방향별 유효 CTA 처리량 또는 M/N 패널 재사용·발행 균형",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "global_tile_traffic_amplification",
+    "register_file_footprint_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 10,
+   "text": "pipeline family 또는 stages 계열 전환 비용",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "k_stage_iteration_overhead",
+    "register_file_footprint_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 10,
+   "text": "split-K 실행 방식별 부분합 DRAM 왕복 및 serial fp16 누산 비용",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "partial_sum_merge_depth",
+    "global_tile_traffic_amplification"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s4",
+   "round": 11,
+   "text": "split-K 실행 방식별 비용을 구분하는 serial/parallel partial-sum traffic 및 reduction 실행 모드",
+   "measurable_with": [
+    "split_k_reduction_fraction",
+    "partial_sum_merge_depth",
+    "global_grid_underfill",
+    "tail_wave_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 1,
+   "text": "pipeline stage count 또는 multistage pipeline benefit",
+   "measurable_with": [
+    "f.shared_staging_overhead_fraction",
+    "f.k_stage_iteration_overhead",
+    "f.shared_memory_capacity_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 2,
+   "text": "pipeline_stage_family_or_async_copy_eligibility",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 4,
+   "text": "split-K가 제공하는 CTA 병렬성 및 지연 은닉 이득",
+   "measurable_with": [
+    "f.split_k_reduction_fraction",
+    "f.partial_sum_merge_depth",
+    "f.global_grid_underfill",
+    "f.resident_thread_occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 5,
+   "text": "shared_memory_bank_conflict_or_access_efficiency",
+   "measurable_with": [
+    "shared_memory_capacity_pressure",
+    "shared_staging_overhead_fraction",
+    "operand_panel_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 5,
+   "text": "async_copy_pipeline_family_or_stage_transition",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "k_stage_iteration_overhead",
+    "roofline_bandwidth_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 6,
+   "text": "pipeline_family_transition_cost",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "k_stage_iteration_overhead",
+    "shared_memory_capacity_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 6,
+   "text": "shared_memory_bank_conflict_cost",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "operand_panel_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 7,
+   "text": "pipeline_family_or_stage_transition_indicator",
+   "measurable_with": [
+    "shared_staging_overhead_fraction",
+    "k_stage_iteration_overhead",
+    "instruction_work_per_flop"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 7,
+   "text": "shared_memory_bank_conflict_or_access_uniformity_cost",
+   "measurable_with": [
+    "operand_panel_imbalance",
+    "shared_staging_overhead_fraction",
+    "instruction_work_per_flop"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 7,
+   "text": "fixed_launch_and_dispatch_overhead_relative_to_GEMM_work",
+   "measurable_with": [
+    "instruction_work_per_flop",
+    "k_stage_iteration_overhead",
+    "global_grid_underfill",
+    "boundary_predication_fraction"
+   ]
+  },
+  {
+   "run": "f1pipe-F1-free-roofline-s5",
+   "round": 8,
+   "text": "shared_memory_bank_conflict_cost",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s0",
+   "round": 0,
+   "text": "CTA swizzle에 따른 L2 재사용 및 DRAM 접근 국소성",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s0",
+   "round": 1,
+   "text": "CTA swizzle에 따른 L2/DRAM 접근 국소성 또는 파티션 충돌 비용",
+   "measurable_with": [
+    "log_grid_tiles",
+    "waves",
+    "log_dram_traffic",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s0",
+   "round": 4,
+   "text": "SM당 실제 상주 CTA 수 또는 smem·레지스터 제약을 함께 적용한 resident CTA 수",
+   "measurable_with": [
+    "smem_pressure",
+    "reg_pressure",
+    "occupancy_deficit",
+    "waves"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 0,
+   "text": "swizzle별 shared-memory bank conflict 및 global-memory coalescing 비용",
+   "measurable_with": [
+    "smem_pressure",
+    "log_inst_total",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 1,
+   "text": "swizzle별 shared-memory bank conflict 또는 유효 shared-memory 접근 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 2,
+   "text": "shared-memory bank-conflict 또는 swizzle access efficiency",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 3,
+   "text": "swizzle별 shared-memory bank-conflict 또는 유효 shared-memory 접근 대역폭",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 4,
+   "text": "shared-memory bank-conflict/access-efficiency 또는 swizzle별 shared-memory transaction 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 5,
+   "text": "swizzle별 shared-memory bank-conflict 또는 충돌 직렬화 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 6,
+   "text": "swizzle별 shared-memory bank-conflict 또는 유효 shared-memory transaction 효율",
+   "measurable_with": [
+    "smem_pressure",
+    "log_inst_total",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 7,
+   "text": "shared-memory bank-conflict 또는 swizzle별 shared-memory transaction efficiency",
+   "measurable_with": [
+    "smem_pressure",
+    "log_inst_total",
+    "reg_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 8,
+   "text": "swizzle별 shared-memory bank-conflict 또는 shared-memory 접근 효율",
+   "measurable_with": [
+    "smem_pressure",
+    "log_inst_total",
+    "reg_pressure",
+    "waves"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 9,
+   "text": "shared_memory_bank_conflict 또는 swizzle별 shared-memory 접근 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 10,
+   "text": "swizzle별 shared-memory bank-conflict 또는 접근 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 10,
+   "text": "형상 종횡 대비 타일 종횡 불일치",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "edge_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 11,
+   "text": "shape_tile_aspect_mismatch",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "edge_waste",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "round": 11,
+   "text": "shared_memory_bank_conflict_or_swizzle_efficiency",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 0,
+   "text": "swizzle별 global-memory coalescing 및 L2/메모리-partition conflict 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 1,
+   "text": "swizzle별 메모리 파티션 충돌 또는 실제 global-memory transaction 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 2,
+   "text": "swizzle별 메모리 파티션 충돌 및 글로벌 메모리 트랜잭션 효율",
+   "measurable_with": [
+    "f.log_dram_traffic",
+    "f.traffic_amplification",
+    "f.log_grid_tiles"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 3,
+   "text": "swizzle별 메모리 파티션 충돌률 또는 글로벌 메모리 트랜잭션 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 4,
+   "text": "split-K로 증가한 병렬 처리 이득 또는 분할 후 유효 CTA 공급량",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "log_grid_tiles",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 4,
+   "text": "swizzle별 메모리 파티션 충돌률 또는 실제 트랜잭션 효율",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 5,
+   "text": "공유 메모리 제한으로 결정되는 SM당 상주 CTA 수 또는 그에 따른 메모리 지연 은닉 가능도",
+   "measurable_with": [
+    "smem_pressure",
+    "occupancy_deficit",
+    "reg_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 5,
+   "text": "swizzle별 메모리 파티션 충돌률 또는 실제 글로벌 메모리 트랜잭션 효율",
+   "measurable_with": [
+    "traffic_amplification",
+    "log_dram_traffic",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 7,
+   "text": "swizzle별 실제 coalescing 또는 bank/partition conflict로 인한 메모리 접근 비효율",
+   "measurable_with": [
+    "f.traffic_amplification",
+    "f.log_dram_traffic",
+    "f.log_grid_tiles"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 8,
+   "text": "swizzle별 전역 메모리 접근 효율 또는 coalescing/partition-conflict 비용",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 9,
+   "text": "swizzle-dependent global-memory transaction efficiency 또는 coalescing efficiency",
+   "measurable_with": [
+    "f.traffic_amplification",
+    "f.log_dram_traffic",
+    "f.log_grid_tiles"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "round": 10,
+   "text": "swizzle별 글로벌 메모리 coalescing/partition 효율 또는 실제 유효 메모리 대역폭",
+   "measurable_with": [
+    "traffic_amplification",
+    "log_dram_traffic",
+    "tile_aspect_imbalance",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 1,
+   "text": "shared-memory bank-conflict 또는 swizzle별 shared-memory access efficiency",
+   "measurable_with": [
+    "smem_pressure",
+    "log_inst_total",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 2,
+   "text": "shared-memory 접근 효율 또는 swizzle별 bank-conflict/SMEM transaction 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 3,
+   "text": "shared-memory bank-conflict 또는 swizzle별 shared-memory 접근 효율",
+   "measurable_with": [
+    "smem_pressure",
+    "tile_aspect_imbalance"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 3,
+   "text": "multistage pipeline depth에 따른 steady-state 처리량 또는 stage count",
+   "measurable_with": [
+    "pipeline_warmup_frac",
+    "is_two_stage",
+    "log_mainloop_iters",
+    "can_use_cp_async"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 4,
+   "text": "pipeline_stage_count",
+   "measurable_with": [
+    "is_two_stage",
+    "pipeline_warmup_frac",
+    "log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 4,
+   "text": "resident_cta_count 또는 resource_limited_occupancy",
+   "measurable_with": [
+    "reg_pressure",
+    "smem_pressure",
+    "occupancy_deficit",
+    "waves"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 4,
+   "text": "shared_memory_access_efficiency 또는 bank_conflict_factor",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 5,
+   "text": "swizzle별 shared-memory bank conflict 또는 global-memory coalescing 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 7,
+   "text": "SM당 실제 상주 CTA 수 또는 자원별 상주 블록 수",
+   "measurable_with": [
+    "reg_pressure",
+    "smem_pressure",
+    "occupancy_deficit",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "round": 10,
+   "text": "형상 종횡비와 타일 종횡비의 불일치",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "edge_waste",
+    "tail_waste"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 1,
+   "text": "swizzle별 global-memory coalescing 또는 shared-memory bank-conflict 비용",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "log_inst_total"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 2,
+   "text": "swizzle별 global-memory coalescing 및 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 3,
+   "text": "swizzle별 global-memory coalescing 및 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 4,
+   "text": "swizzle_coalescing_bank_conflict_cost",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 4,
+   "text": "multistage_stage_count_resource_cost",
+   "measurable_with": [
+    "is_two_stage",
+    "smem_pressure",
+    "occupancy_deficit",
+    "pipeline_warmup_frac"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 5,
+   "text": "swizzle_coalescing_bank_conflict_cost",
+   "measurable_with": [
+    "traffic_amplification",
+    "log_dram_traffic",
+    "smem_pressure"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 6,
+   "text": "swizzle_coalescing_bank_conflict_cost",
+   "measurable_with": [
+    "traffic_amplification",
+    "smem_pressure",
+    "log_dram_traffic"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 7,
+   "text": "swizzle별 global-memory coalescing 및 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 8,
+   "text": "swizzle별 global-memory coalescing 및 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 9,
+   "text": "swizzle coalescing 및 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 9,
+   "text": "split-K로 추가되는 유효 병렬성 또는 split-K 병렬성 이득",
+   "measurable_with": [
+    "waves",
+    "split_k_cost",
+    "log_grid_tiles",
+    "pipeline_warmup_frac"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 10,
+   "text": "shared-memory bank-conflict/swizzle coalescing cost",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "round": 11,
+   "text": "warp-to-tile mapping에 따른 shared-memory bank-conflict 및 operand-reuse 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 0,
+   "text": "CTA swizzle별 L2 locality 및 메모리 파티션 접근 균형",
+   "measurable_with": [
+    "log_grid_tiles",
+    "waves",
+    "sm_idle_cost",
+    "log_inst_total"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 1,
+   "text": "swizzle별 DRAM/L2 locality 및 CTA 메모리 접근 균형을 나타내는 물리량",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 2,
+   "text": "swizzle별 L2 재사용 및 CTA 메모리 접근 불균형을 반영한 locality/partition-balance 물리량",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 3,
+   "text": "swizzle별 DRAM coalescing/locality 및 CTA 접근 불균형",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 4,
+   "text": "CTA swizzle에 따른 L2/shared-memory 접근 locality 또는 메모리 접근 충돌 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 5,
+   "text": "swizzle에 따른 실제 L2·DRAM 접근 locality 또는 coalescing 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 6,
+   "text": "형상 M/N 종횡비 또는 타일 종횡비와 형상 종횡비의 정렬도",
+   "measurable_with": [
+    "f.tile_aspect_imbalance",
+    "f.edge_waste",
+    "f.traffic_amplification",
+    "f.sm_idle_cost"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 6,
+   "text": "swizzle별 L2/DRAM 접근 locality 또는 coalescing·재사용 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 7,
+   "text": "swizzle별 L2 locality 또는 실제 coalescing/reuse 효율",
+   "measurable_with": [
+    "log_grid_tiles",
+    "log_dram_traffic",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 8,
+   "text": "swizzle별 전역 메모리 접근 효율 또는 shared-memory bank-conflict/reuse locality를 나타내는 config 수준 피처",
+   "measurable_with": [
+    "log_inst_total",
+    "reg_pressure",
+    "occupancy_deficit",
+    "waves"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 9,
+   "text": "swizzle별 shared-memory bank conflict 또는 유효 메모리 재사용 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 10,
+   "text": "swizzle별 shared-memory bank-conflict 또는 shared-memory 접근 충돌 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "round": 11,
+   "text": "swizzle별 shared-memory bank-conflict 또는 shared-memory 접근 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s0",
+   "round": 1,
+   "text": "multistage pipeline의 실제 stage 깊이에 따른 steady-state latency-hiding 효율",
+   "measurable_with": [
+    "f.pipeline_warmup_frac",
+    "f.smem_pressure",
+    "f.log_mainloop_iters",
+    "f.is_two_stage"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 1,
+   "text": "문제의 M/N 종횡비와 후보 타일 종횡비의 불일치",
+   "measurable_with": [
+    "f.tile_aspect_imbalance",
+    "f.edge_waste",
+    "f.tail_waste",
+    "f.traffic_amplification"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 2,
+   "text": "swizzle별 글로벌 메모리 coalescing 및 CTA/L2 locality 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s0",
+   "round": 3,
+   "text": "swizzle별 메모리 접근 locality 또는 L2/coalescing 효율",
+   "measurable_with": [
+    "traffic_amplification",
+    "log_dram_traffic",
+    "tile_aspect_imbalance",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 4,
+   "text": "swizzle별 메모리 접근 효율 또는 coalescing/L2 transaction 증폭",
+   "measurable_with": [
+    "f.traffic_amplification",
+    "f.log_dram_traffic"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 4,
+   "text": "SM당 실제 resident CTA 수와 자원 제한의 계단식 occupancy",
+   "measurable_with": [
+    "f.waves",
+    "f.sm_idle_cost",
+    "f.tail_waste",
+    "f.reg_pressure",
+    "f.smem_pressure",
+    "f.occupancy_deficit"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 5,
+   "text": "swizzle별 메모리 접근 효율 또는 L2/shared-memory 재사용 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s0",
+   "round": 5,
+   "text": "파이프라인 stage 수 또는 stage 깊이에 따른 짧은 mainloop 고정비",
+   "measurable_with": [
+    "pipeline_warmup_frac",
+    "log_mainloop_iters",
+    "is_two_stage"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 5,
+   "text": "정수 CTA 상주 수와 마지막 wave의 실제 활성 SM 또는 CTA 배치 효율",
+   "measurable_with": [
+    "waves",
+    "sm_idle_cost",
+    "occupancy_deficit",
+    "smem_pressure",
+    "reg_pressure"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 6,
+   "text": "multistage pipeline depth 또는 stage count",
+   "measurable_with": [
+    "f.pipeline_warmup_frac",
+    "f.log_mainloop_iters",
+    "f.is_two_stage",
+    "f.smem_pressure",
+    "f.reg_pressure"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 6,
+   "text": "swizzle별 유효 메모리 재사용 또는 coalescing 효율",
+   "measurable_with": [
+    "f.log_dram_traffic",
+    "f.traffic_amplification",
+    "f.log_inst_total",
+    "f.waves"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 6,
+   "text": "출력 M/N 방향별 tile 경계 낭비 또는 방향성 edge waste",
+   "measurable_with": [
+    "f.tile_aspect_imbalance",
+    "f.edge_waste",
+    "f.traffic_amplification",
+    "f.log_dram_traffic"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 7,
+   "text": "swizzle에 따른 coalescing 및 L2 재사용 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s0",
+   "round": 7,
+   "text": "실제 pipeline stage 깊이와 stage별 고정 자원 비용",
+   "measurable_with": [
+    "is_two_stage",
+    "pipeline_warmup_frac",
+    "smem_pressure",
+    "reg_pressure",
+    "log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 8,
+   "text": "swizzle에 따른 메모리 파티션 분산 또는 L2 접근 효율",
+   "measurable_with": [
+    "log_grid_tiles",
+    "waves",
+    "log_dram_traffic",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 9,
+   "text": "swizzle별 L2/DRAM 파티션 접근 균형 또는 swizzle-형상 호환성",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s0",
+   "round": 9,
+   "text": "split-K 증가에 따른 한계 유효 병렬성 이득 또는 split 후 추가 wave의 포화량",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "log_grid_tiles",
+    "log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 10,
+   "text": "swizzle별 메모리 파티션 활용도 또는 실제 coalescing/partition-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s0",
+   "round": 10,
+   "text": "multistage pipeline의 실제 stage 수 또는 stage depth에 따른 steady-state overlap 효율",
+   "measurable_with": [
+    "is_two_stage",
+    "pipeline_warmup_frac",
+    "smem_pressure",
+    "reg_pressure",
+    "log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "luna-s0",
+   "round": 11,
+   "text": "multistage stage depth 또는 stage-count에 따른 pipeline resource cost",
+   "measurable_with": [
+    "is_two_stage",
+    "pipeline_warmup_frac",
+    "smem_pressure",
+    "reg_pressure",
+    "log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "luna-s1",
+   "round": 3,
+   "text": "swizzle에 따른 L2 locality 및 메모리 파티션 접근 균형",
+   "measurable_with": [
+    "traffic_amplification",
+    "log_dram_traffic",
+    "waves",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "luna-s1",
+   "round": 4,
+   "text": "swizzle별 L2 locality 및 메모리 파티션 balance를 나타내는 config 피처",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s2",
+   "round": 4,
+   "text": "자원 제약을 반영한 SM당 실제 동시 상주 CTA 수 또는 유효 점유율",
+   "measurable_with": [
+    "f.waves",
+    "f.log_grid_tiles",
+    "f.occupancy_deficit",
+    "f.reg_pressure",
+    "f.smem_pressure"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 4,
+   "text": "split-K로 증가한 유효 CTA 수 또는 split-K 적용 전후의 wave 충전 이득",
+   "measurable_with": [
+    "f.split_k_cost",
+    "f.waves",
+    "f.log_grid_tiles",
+    "f.sm_idle_cost",
+    "f.tail_waste"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 5,
+   "text": "swizzle의 L2/메모리 파티션 locality 또는 partition-camping 비용",
+   "measurable_with": [
+    "log_grid_tiles",
+    "waves",
+    "traffic_amplification",
+    "log_dram_traffic"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 6,
+   "text": "split-K로 증가한 유효 병렬성 또는 split-K mode별 분리된 reduction/parallelism 비용",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "log_grid_tiles",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 6,
+   "text": "swizzle별 예상 L2 재사용도 또는 메모리 partition camping/locality 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s2",
+   "round": 7,
+   "text": "split-K로 증가하는 병렬성 이득과 리덕션 비용을 분리한 순이득 지표",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 7,
+   "text": "swizzle별 L2 locality 및 메모리 파티션 camping 비용",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 8,
+   "text": "swizzle별 L2 locality 및 메모리 파티션 camping 비용",
+   "measurable_with": [
+    "log_grid_tiles",
+    "waves",
+    "log_dram_traffic",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 9,
+   "text": "L2 재사용 효율 및 메모리 파티션 camping을 반영한 swizzle-aware locality feature",
+   "measurable_with": [
+    "log_grid_tiles",
+    "log_dram_traffic",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "luna-s2",
+   "round": 10,
+   "text": "swizzle별 L2 재사용도와 메모리 파티션 camping을 반영한 config-level locality/camping 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s2",
+   "round": 11,
+   "text": "swizzle별 L2 locality 및 메모리 파티션 camping을 나타내는 config 수준 피처",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s3",
+   "round": 5,
+   "text": "형상과 tile 배치에 대한 CTA swizzle의 L2/메모리 파티션 locality 및 뱅크 충돌 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s3",
+   "round": 6,
+   "text": "swizzle에 따른 CTA 배치 locality 또는 L2 재사용 지표",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s3",
+   "round": 7,
+   "text": "swizzle별 CTA 배치 locality 또는 L2 재사용 효율을 나타내는 config 피처",
+   "measurable_with": [
+    "f.log_grid_tiles",
+    "f.waves",
+    "f.sm_idle_cost"
+   ]
+  },
+  {
+   "run": "luna-s3",
+   "round": 8,
+   "text": "swizzle별 CTA 배치 locality 또는 L2 재사용/partition-conflict 비용",
+   "measurable_with": [
+    "log_grid_tiles",
+    "waves",
+    "sm_idle_cost",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "luna-s3",
+   "round": 9,
+   "text": "swizzle별 메모리 접근 충돌 또는 L2 locality 호환성",
+   "measurable_with": [
+    "traffic_amplification",
+    "log_dram_traffic",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "luna-s3",
+   "round": 9,
+   "text": "split-K 증가로 인한 wave 충만도 또는 병렬성 보충 이득",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "log_grid_tiles",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "luna-s3",
+   "round": 10,
+   "text": "swizzle별 L2 locality 또는 메모리 파티션 충돌/분산도",
+   "measurable_with": [
+    "log_grid_tiles",
+    "traffic_amplification",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "luna-s3",
+   "round": 11,
+   "text": "swizzle별 L2 locality 또는 partition-camping 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s4",
+   "round": 10,
+   "text": "swizzle에 따른 shared-memory bank conflict 또는 L2/메모리 파티션 접근 불균형 지표",
+   "measurable_with": [
+    "f.smem_pressure",
+    "f.log_grid_tiles",
+    "f.waves",
+    "f.tile_aspect_imbalance"
+   ]
+  },
+  {
+   "run": "luna-s4",
+   "round": 11,
+   "text": "swizzle별 공유메모리 bank conflict 및 global/L2 접근 효율을 반영한 config 수준 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s5",
+   "round": 3,
+   "text": "swizzle별 메모리 coalescing 또는 shared-memory bank-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s5",
+   "round": 4,
+   "text": "swizzle별 shared-memory bank conflict 또는 shared-memory 접근 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s5",
+   "round": 5,
+   "text": "swizzle별 shared-memory bank conflict 또는 shared-memory 접근 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s5",
+   "round": 6,
+   "text": "swizzle별 shared-memory bank-conflict 또는 실제 shared-memory transaction 증폭량",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s5",
+   "round": 7,
+   "text": "limiting_resident_CTA_count 또는 자원별 resident-CTA의 최소값",
+   "measurable_with": [
+    "smem_pressure",
+    "reg_pressure",
+    "waves",
+    "occupancy_deficit",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "luna-s5",
+   "round": 7,
+   "text": "operand별 tile reuse/coalescing 불균형",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "edge_waste",
+    "traffic_amplification",
+    "log_dram_traffic",
+    "log_inst_total"
+   ]
+  },
+  {
+   "run": "luna-s5",
+   "round": 8,
+   "text": "shared-memory bank-conflict/swizzle compatibility cost",
+   "measurable_with": []
+  },
+  {
+   "run": "luna-s5",
+   "round": 9,
+   "text": "swizzle별 shared-memory bank-conflict/access-compatibility cost",
+   "measurable_with": [
+    "smem_pressure",
+    "tile_aspect_imbalance"
+   ]
+  },
+  {
+   "run": "luna-s5",
+   "round": 11,
+   "text": "resource-limited resident CTA count",
+   "measurable_with": [
+    "reg_pressure",
+    "smem_pressure",
+    "occupancy_deficit",
+    "waves"
+   ]
+  },
+  {
+   "run": "luna-s5",
+   "round": 11,
+   "text": "swizzle별 L2 locality 또는 partition/bank locality 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s0",
+   "round": 3,
+   "text": "split_k_mode별 reduction 경로 비용",
+   "measurable_with": [
+    "split_k_cost",
+    "traffic_amplification",
+    "log_workspace_bytes",
+    "log_dram_traffic"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s0",
+   "round": 4,
+   "text": "split-K reduction mode and precision-specific cost",
+   "measurable_with": [
+    "split_k_cost",
+    "sm_idle_cost",
+    "waves",
+    "log_workspace_bytes"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s0",
+   "round": 4,
+   "text": "L2 tile-reuse/locality loss caused by swizzle",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s0",
+   "round": 11,
+   "text": "swizzle에 따른 L2 파티션/메모리 접근 locality 또는 partition-camping 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s1",
+   "round": 7,
+   "text": "split-K로 증가한 병렬 작업량 대비 리덕션 비용을 나타내는 순이익 또는 parallelism gain",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "log_grid_tiles",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s1",
+   "round": 7,
+   "text": "타일 모양에 따른 실제 유효 tensor-core 작업률 또는 warp-level 이용률",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "edge_waste",
+    "tail_waste",
+    "smem_pressure",
+    "reg_pressure",
+    "traffic_amplification"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s1",
+   "round": 9,
+   "text": "swizzle에 따른 shared-memory bank-conflict 또는 global-memory coalescing 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s1",
+   "round": 10,
+   "text": "swizzle별 global-memory 접근 효율 또는 파티션 충돌 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s1",
+   "round": 11,
+   "text": "split-K parallelism gain 또는 split-K로 인한 노출 유휴 감소량",
+   "measurable_with": [
+    "split_k_cost",
+    "sm_idle_cost",
+    "waves",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s1",
+   "round": 11,
+   "text": "swizzle별 global-memory transaction 효율 또는 coalescing 손실",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "tile_aspect_imbalance"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 2,
+   "text": "split-K가 제공하는 CTA 병렬성 이득과 리덕션 비용을 분리한 순효과",
+   "measurable_with": [
+    "split_k_cost",
+    "sm_idle_cost",
+    "waves",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 2,
+   "text": "swizzle별 L2 locality 및 SM/CTA 배치 효율",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 3,
+   "text": "swizzle별 메모리 접근 coalescing 및 L2 locality 효과",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 4,
+   "text": "swizzle별 L2 locality 또는 메모리 transaction 효율을 나타내는 후보 피처",
+   "measurable_with": [
+    "traffic_amplification",
+    "log_dram_traffic"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 6,
+   "text": "M/N 방향별 warp·lane 활용률 또는 타일 방향별 유효 계산 비율",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "reg_pressure",
+    "smem_pressure",
+    "waves"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 8,
+   "text": "split-K 적용 후의 유효 CTA 공급 또는 순수 병렬성 이득",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 8,
+   "text": "M/N 방향을 보존한 타일·warp 배치 호환성 또는 방향별 경계/접근 효율",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "tail_waste",
+    "traffic_amplification",
+    "reg_pressure"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 8,
+   "text": "wave 경계에서의 유효 SM 활용률 또는 wave 양자화 잔여량",
+   "measurable_with": [
+    "waves",
+    "sm_idle_cost",
+    "occupancy_deficit",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 10,
+   "text": "split-K로 증가한 유효 CTA 병렬성에서 reduction 비용을 뺀 순처리량 이득",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost",
+    "log_mainloop_iters",
+    "occupancy_deficit"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 10,
+   "text": "swizzle별 global-memory coalescing 및 L2/shared-memory bank/partition conflict 비용",
+   "measurable_with": [
+    "sm_idle_cost",
+    "traffic_amplification",
+    "log_dram_traffic"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s2",
+   "round": 11,
+   "text": "swizzle_memory_partition_conflict 또는 swizzle_access_efficiency",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s3",
+   "round": 1,
+   "text": "split-K reduction mode별 비용과 정밀도 손실을 분리한 물리량",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost",
+    "log_workspace_bytes"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s3",
+   "round": 2,
+   "text": "CTA swizzle/launch-order에 따른 L2 locality와 SM 작업 분산 효율",
+   "measurable_with": [
+    "sm_idle_cost",
+    "waves",
+    "log_grid_tiles",
+    "log_inst_total"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s3",
+   "round": 6,
+   "text": "split-K로 증가하는 CTA 병렬성의 순이득과 reduction 비용을 분리한 feature",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s3",
+   "round": 9,
+   "text": "swizzle별 메모리 파티션 locality 또는 L2 bank-conflict/partition-camping 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "lunaNAMES-s3",
+   "round": 10,
+   "text": "swizzle별 L2 locality 또는 CTA-partition 균형 비용",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s3",
+   "round": 11,
+   "text": "swizzle locality 및 CTA 분할 효율",
+   "measurable_with": [
+    "log_dram_traffic",
+    "traffic_amplification",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s4",
+   "round": 2,
+   "text": "split_k_parallelism_gain",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "log_grid_tiles",
+    "log_mainloop_iters",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s4",
+   "round": 8,
+   "text": "split-K 추가 파티션의 병렬성 이득 또는 split-K 적용 후 유효 wave 공급량",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s4",
+   "round": 9,
+   "text": "split-K로 증가하는 병렬성의 순이득(리덕션 비용과 분리된 split-K 병렬성 이득)",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s4",
+   "round": 10,
+   "text": "split_k_parallelism_gain",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "lunaNAMES-s5",
+   "round": 6,
+   "text": "split_k_parallelism_gain과 split_k_reduction_overhead를 분리한 물리량",
+   "measurable_with": [
+    "split_k_cost",
+    "waves",
+    "sm_idle_cost",
+    "log_grid_tiles",
+    "log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "real-gpt-5.4-mini-2026-03-17",
+   "round": 5,
+   "text": "row_col_work_split",
+   "measurable_with": [
+    "tile_aspect_imbalance",
+    "tail_waste",
+    "edge_waste",
+    "log_grid_tiles"
+   ]
+  },
+  {
+   "run": "verify-s0",
+   "round": 1,
+   "text": "swizzle의 L2/메모리 접근 충돌 및 CTA 배치 적합도를 나타내는 config 수준 swizzle locality/compatibility feature",
+   "measurable_with": []
+  },
+  {
+   "run": "verify-s0",
+   "round": 2,
+   "text": "swizzle별 L2/메모리 파티션 locality 또는 partition-camping 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "verify-s0",
+   "round": 3,
+   "text": "multistage stage count와 steady-state pipeline throughput을 구분하는 피처",
+   "measurable_with": [
+    "pipeline_warmup_frac",
+    "log_mainloop_iters",
+    "is_two_stage"
+   ]
+  },
+  {
+   "run": "verify-s0",
+   "round": 3,
+   "text": "레지스터·shared-memory 제약을 함께 반영한 resident CTA 수 또는 유효 메모리 지연 은폐율",
+   "measurable_with": [
+    "reg_pressure",
+    "smem_pressure",
+    "occupancy_deficit",
+    "has_spill"
+   ]
+  },
+  {
+   "run": "verify-s1",
+   "round": 2,
+   "text": "swizzle과 형상·타일의 메모리 coalescing/L2 재사용 호환성을 나타내는 후보 피처",
+   "measurable_with": []
+  },
+  {
+   "run": "verify-s1",
+   "round": 3,
+   "text": "swizzle별 전역 메모리 coalescing/L2 locality 또는 partition-conflict 비용",
+   "measurable_with": []
+  },
+  {
+   "run": "verify-s1",
+   "round": 3,
+   "text": "multistage의 실제 stage 수 또는 stage 증가에 따른 latency-hiding/자원 비용",
+   "measurable_with": [
+    "is_two_stage",
+    "pipeline_warmup_frac",
+    "log_mainloop_iters",
+    "reg_pressure",
+    "smem_pressure"
+   ]
+  },
+  {
+   "run": "verify-s1",
+   "round": 4,
+   "text": "swizzle별 메모리 coalescing/L2 접근 효율 또는 swizzle 호환성",
+   "measurable_with": []
+  },
+  {
+   "run": "verify-s1",
+   "round": 4,
+   "text": "multistage stage count 및 단계별 latency-hiding 효율",
+   "measurable_with": [
+    "f.pipeline_warmup_frac",
+    "f.reg_pressure",
+    "f.smem_pressure",
+    "f.log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "verify-s1",
+   "round": 4,
+   "text": "split-K로 증가한 유효 CTA 수와 reduction mode별 순수 병렬성 이득",
+   "measurable_with": [
+    "f.split_k_cost",
+    "f.waves",
+    "f.log_grid_tiles",
+    "f.log_mainloop_iters"
+   ]
+  },
+  {
+   "run": "verify-s1",
+   "round": 5,
+   "text": "swizzle별 global-memory coalescing/L2 접근 효율 또는 swizzle compatibility 품질",
+   "measurable_with": []
+  }
+ ]
+}
