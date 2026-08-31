@@ -710,3 +710,55 @@ def test_worker_does_not_do_the_sandbox(synth_table):
              if isinstance(n, ast.Call)}
     assert not any("run_isolated" in n for n in names)
     assert not any("check_rule" in n for n in names)
+
+
+# ---------------------------------------------------------------------------
+# D-96 — cross 계보 기록
+# ---------------------------------------------------------------------------
+def test_observation_keys_never_reach_the_prompt():
+    """★ `_` 로 시작하는 요청 키는 LLM 에 안 간다 (D-96).
+
+    관찰용 부모 코드를 요청에 실었다. 그것이 프롬프트로 새면 `cross` 는
+    "부모 둘 + 부모 코드 또 둘" 을 받게 되고, 그러면 **관찰 장치가 조건을
+    바꾼다.** 여기서 막지 않으면 조용히 새는 종류의 오염이다.
+    """
+    from kernelrule.core.loop import RoundLoop
+
+    seen = []
+
+    class _Spy:
+        def complete(self, role, prompt, **kw):
+            seen.append(kw)
+            raise RuntimeError("stop")
+
+    loop = RoundLoop.__new__(RoundLoop)
+    loop.llm = _Spy()
+    loop._call_optimizers([{"prompt": "p", "parent_kind": "cross",
+                            "_codes": ["A", "B"], "analyst": False}])
+    assert seen and all(not k.startswith("_") for k in seen[0]), seen[0]
+
+
+def test_cross_lineage_counts_mixing_not_just_presence():
+    """자식이 **두 부모 각각에만 있던** 피처를 둘 다 써야 `mixed` 다."""
+    import numpy as np
+
+    from kernelrule.core.loop import RoundLoop
+
+    loop = RoundLoop.__new__(RoundLoop)
+    loop.cross_lineage = []
+    loop._feats = ["waves", "tail_waste", "bytes_per_flop"]
+    loop._shape_vals = []
+
+    def _code(*fs):
+        body = " + ".join(f"f.{x} * w[{i}]" for i, x in enumerate(fs))
+        return f"def score(f, p, hw, w):\n    return {body}\n"
+
+    a, b = _code("waves"), _code("tail_waste")
+    loop._record_cross(0, [a, b], _code("waves", "tail_waste"))
+    loop._record_cross(0, [a, b], a)                  # 한쪽을 그대로
+    loop._record_cross(0, [a, a], _code("waves"))     # 섞을 것이 없다
+    m, c, same = loop.cross_lineage
+    assert m["mixed"] and m["mixable"] and not m["copied"]
+    assert not c["mixed"] and c["copied"]
+    assert not same["mixable"], "고유 항이 없으면 분모에서 빠져야 한다"
+    assert np is not None

@@ -275,6 +275,9 @@ class RoundLoop:
         self.hypotheses: list[dict] = []
         #: ★ 라운드 안에서 만든 피처들 (D-75). 산출물에 그대로 남긴다.
         self.features_made: list[dict] = []
+        #: ★ cross 자식이 두 부모의 항을 섞었는가 (D-96 관찰 1).
+        #: 부모 코드는 남지 않으므로 그 자리에서 계산해 둔다.
+        self.cross_lineage: list[dict] = []
         #: 가설 id 의 **유일한 출처**. 모델이 붙인 id 는 응답 안에서만
         #: 유일해서 라운드/패스를 넘으면 겹친다.
         self._hyp_seq = 0
@@ -644,6 +647,34 @@ class RoundLoop:
         return e
 
     # -- 한 라운드 --------------------------------------------------------
+    def _record_cross(self, r: int, codes: list[str], child: str) -> None:
+        """★ 자식이 **두 부모 각각에만 있던 피처**를 둘 다 썼는가 (D-96).
+
+        `cross` 가 두 부모를 받고도 한쪽만 베끼면 `explore` 와 다를 것이
+        없다 — 그것이 사전 등록의 관찰 1이다. **섞을 것이 없는 경우**
+        (A 고유 또는 B 고유가 비었을 때) 를 따로 세지 않으면 분모가
+        틀린다.
+        """
+        def feats(code: str) -> set:
+            try:
+                return check_rule(code, feature_names=self._feats,
+                                  shape_value_names=self._shape_vals,
+                                  n_weights=_BUDGET).features_used
+            except Exception:                               # noqa: BLE001
+                return set()
+        a, b, c = feats(codes[0]), feats(codes[1]), feats(child)
+        only_a, only_b = a - b, b - a
+        self.cross_lineage.append({
+            "round": r,
+            "a": sorted(a), "b": sorted(b), "child": sorted(c),
+            "only_a": sorted(only_a), "only_b": sorted(only_b),
+            # 섞을 것이 있었는가 — 없으면 분모에서 뺀다
+            "mixable": bool(only_a and only_b),
+            "took_a": sorted(c & only_a), "took_b": sorted(c & only_b),
+            "mixed": bool(c & only_a) and bool(c & only_b),
+            # 한쪽을 통째로 베꼈는가 (부모 코드와 문자 단위로 같다)
+            "copied": child.strip() in (codes[0].strip(), codes[1].strip())})
+
     def run_round(self) -> RoundResult:
         t0 = time.perf_counter()
         r = len(self.rounds)
@@ -758,6 +789,11 @@ class RoundLoop:
                          #   를 옛 자료로 못 쟀다 (D-94).
                          "parent_kind": kind,
                          "parent": parent, "parent2": parent2,
+                         # ★ 관찰용 부모 코드 (D-96 관찰 1). 프롬프트에는
+                         #   안 들어간다 — `_user_prompt` 가 안 읽는 키다.
+                         #   자식이 **두 부모 각각에만 있던 피처**를 둘 다
+                         #   쓰는지 세려면 부모 피처 집합이 필요하다.
+                         "_codes": [x.code for x in ps[:2]],
                          "parent_n_terms": n_terms,
                          "hypothesis": hyp,
                          "hypotheses_applied": applied,
@@ -806,6 +842,8 @@ class RoundLoop:
                 continue
             if hyp:
                 prop.hypothesis_id = hyp.get("id", "")
+            if kind == "cross" and len(req.get("_codes") or ()) > 1:
+                self._record_cross(r, req["_codes"], prop.code)
             key = prop.code.strip()
             if key in self._seen_code:      # 재채점하지 않는다 (§15.4)
                 bump(kind, "dup")
@@ -863,6 +901,11 @@ class RoundLoop:
         `MockLLM` 은 동기이고 `OpenAILLM` 은 `many()` 를 제공한다. 루프는
         둘을 구분하지 않는다 — `LLMClient` Protocol 뒤에 있다.
         """
+        # ★ `_` 로 시작하는 키는 **관찰용**이고 프롬프트에 안 간다 (D-96).
+        #   `_user_prompt` 가 안 읽으므로 넘겨도 지금은 무해하지만, 그것은
+        #   **우연이다** — 나중에 누가 `kw` 를 훑으면 조용히 새어 들어간다.
+        reqs = [{k: v for k, v in q.items() if not k.startswith("_")}
+                for q in reqs]
         many = getattr(self.llm, "many", None)
         if many is None:
             out = []
@@ -987,6 +1030,11 @@ class RoundLoop:
             json.dumps(h, ensure_ascii=False) for h in self.hypotheses))
         # ★ 라운드 안에서 만든 축 (D-75). **거부된 것도 남긴다** — "무엇을
         #   만들려다 실패했나" 가 관찰이다.
+        # ★ cross 계보 (D-96 관찰 1). 부모 코드는 어디에도 안 남으므로
+        #   여기서만 되짚을 수 있다.
+        if self.cross_lineage:
+            (d / "cross.jsonl").write_text("\n".join(
+                json.dumps(x, ensure_ascii=False) for x in self.cross_lineage))
         if self.features_made:
             (d / "features.jsonl").write_text("\n".join(
                 json.dumps(x, ensure_ascii=False) for x in self.features_made))
