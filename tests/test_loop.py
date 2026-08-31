@@ -641,3 +641,72 @@ def test_borrowed_arm_calls_no_analyst_but_renders_the_section(synth_table,
     assert r.llm_calls.get("analyze", 0) == 0, "C 인데 Analyst 를 불렀다"
     assert loop.hypotheses, "빌려온 가설이 기록되지 않았다"
     assert all(h.get("analyst_pass") == 0 for h in loop.hypotheses)
+
+
+# ---------------------------------------------------------------------------
+# D-95 — 채점·적합 병렬화
+# ---------------------------------------------------------------------------
+def _parallel_pair(synth_table, tmp_path, workers: int):
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import REGISTRY
+
+    fm = FeatureMatrix(synth_table, REGISTRY)
+    sh = synth_table.shapes()
+    splits = SplitSet(train=Split("train", tuple(sh[:-2])),
+                      val=Split("val", tuple(sh[-2:])))
+    cfg = LoopConfig(run_id=f"par{workers}", n_rules_per_round=6, max_rounds=1,
+                     max_evals=30, seed=0, sandbox_first_seen=False,
+                     out_dir=str(tmp_path), n_workers=workers)
+    llm = MockLLM("mutate", seed=3, feature_names=fm.feature_names())
+    lp = RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
+                   llm=llm)
+    lp.seed(*_SEED_RULE)
+    r = lp.run_round()
+    elites = sorted(lp.archive.cells.values(), key=lambda e: e.rule_id)
+    return r, [(e.rule_id, e.code, tuple(e.w), e.regret, e.short_regret,
+                e.long_regret, e.val_regret) for e in elites]
+
+
+def test_parallel_matches_sequential(synth_table, tmp_path):
+    """★ 병렬이 순차와 **완전히 같은 값**을 내야 한다 (D-95).
+
+    다르면 `fit_weights` 안에 숨은 상태가 있다는 뜻이다. 빨라지는 것은
+    결과가 같을 때만 이득이고, 아니면 조건이 바뀐 것이다.
+
+    ⚠️ 시간이 아니라 **값**을 본다 — "빠르다" 를 성능 지표로 쓰지 않는다
+    (원칙 29: D-89 에서 Analyst 를 끈 팔이 빨랐던 것은 일을 안 한 것이다).
+    """
+    seq_r, seq = _parallel_pair(synth_table, tmp_path / "a", 0)
+    par_r, par = _parallel_pair(synth_table, tmp_path / "b", 3)
+    assert seq, "순차에서 아무것도 안 나왔다 — 시험이 무의미하다"
+    assert seq == par, "병렬 결과가 순차와 다르다"
+    for f in ("n_proposed", "n_scored", "n_accepted", "n_fit_moved",
+              "n_rejected_static", "n_rejected_fit", "n_cells"):
+        assert getattr(seq_r, f) == getattr(par_r, f), f
+
+
+def test_workers_default_is_sequential():
+    """기본은 순차다 — 지금까지의 모든 실행이 그 조건이다."""
+    from kernelrule.core.loop import LoopConfig
+
+    assert LoopConfig(run_id="x").n_workers == 0
+
+
+def test_worker_does_not_do_the_sandbox(synth_table):
+    """★ 정적 검사·샌드박스는 **부모가** 한다 (D-95).
+
+    워커 안에서 `run_isolated` 를 부르면 프로세스가 중첩 spawn 된다.
+    그 둘은 라운드의 3% 라 병렬로 보낼 값어치도 없다.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from kernelrule.core import loop as loop_mod
+
+    src = textwrap.dedent(inspect.getsource(loop_mod._fit_and_score))
+    names = {ast.unparse(n) for n in ast.walk(ast.parse(src))
+             if isinstance(n, ast.Call)}
+    assert not any("run_isolated" in n for n in names)
+    assert not any("check_rule" in n for n in names)

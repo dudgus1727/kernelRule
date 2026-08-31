@@ -84,6 +84,9 @@ class LoopConfig:
     #:
     #: Analyst 를 안 부르므로 **A 와 호출 수가 같다** — 비용 비교가 깨끗하다.
     hypothesis_pool: tuple[str, ...] = ()
+    #: ★ 채점·적합 병렬화 (D-95). 0 이면 순차 — **지금까지의 동작**이다.
+    #: 결과는 같아야 한다 (`test_parallel_matches_sequential`).
+    n_workers: int = 0
     #: ★ §16.1 ablation — Analyst 를 끄면 진단 리포트도 가설도 없다.
     #: RuleEditor 는 부모 규칙과 피처 목록만 보고 고친다.
     #: **기본은 켬**이다 (지금까지의 모든 실행이 그렇다).
@@ -122,6 +125,49 @@ STOP_ON_TOTAL_LLM_FAILURE = True
 #: 검증 격차가 이보다 크면 **체제 전이 실패**로 본다.
 #: 과적합과 다르다 — 항이 3개뿐인 규칙도 이 값을 넘는다 (실측 +4.99).
 VAL_GAP_ALARM = 0.5
+
+
+#: ★ 워커가 보는 것 (D-95). `fork` 로 만들어진 자식이 **부모의 메모리를
+#: 그대로 물려받는다** — 표 + 피처 행렬이 4.2GB 라 워커마다 다시 로드하면
+#: 12개에 50GB 다. 복사-후-쓰기라 실제로는 거의 안 는다.
+#:
+#: ⚠️ 풀을 만들기 **전에** 채워야 한다. fork 시점의 스냅숏이 전부다.
+_WORKER: dict = {}
+
+
+def _fit_and_score(job: tuple) -> dict:
+    """★ 한 후보를 적합하고 채점한다. **워커에서 돈다** (D-95).
+
+    라운드 벽시계의 96% 가 `fit_weights` 다 (후보당 5.4초 x 12).
+    GIL 때문에 스레드로는 안 되고 프로세스여야 한다.
+
+    ⚠️ **정적 검사·샌드박스는 부모가 한다.** 여기서 하면 워커가 또 프로세스를
+    띄우고(`run_isolated`), 중첩 spawn 이 된다. 그 둘은 합쳐도 3% 다.
+
+    돌려주는 것은 **순수 자료**다 — `Elite` 의 id 와 순서는 부모가 정한다
+    (결정론).
+    """
+    idx, code, w0 = job
+    from kernelrule.core.sandbox import compile_rule
+    from kernelrule.core.scoring import evaluate_scores
+    from kernelrule.core.weights import fit_weights, make_score_of
+
+    c = _WORKER
+    try:
+        fn = compile_rule(code)
+        fr = fit_weights(fn, c["matrix"], c["table"], c["train"], w0,
+                         max_evals=c["max_evals"], val_split=c["val"])
+    except (FitError, SchemaViolation) as e:
+        return {"i": idx, "err": ("fit", str(e)[:90])}
+    except Exception as e:                                  # noqa: BLE001
+        return {"i": idx, "err": ("run", f"{type(e).__name__}: {e}"[:90])}
+    ev = evaluate_scores(make_score_of(fn, c["matrix"], fr.w), c["table"],
+                         list(c["train"].shapes), ks=(1, 3))
+    return {"i": idx, "w": [float(x) for x in fr.w],
+            "regret": fr.fit_regret, "moved": bool(fr.moved),
+            "val_regret": fr.val_regret,
+            "short": ev.at(1, mask=c["short_mask"]),
+            "long": ev.at(1, mask=c["long_mask"])}
 
 
 def _requirement_of(h: dict) -> str:
@@ -173,6 +219,13 @@ class RoundResult:
     n_cells: int = 0
     val_gap: float = float("nan")
     n_val_blowups: int = 0
+    #: ★ 부모 종류별 (exploit / explore / cross) 제안·중복·채점 수 (D-94).
+    #: `{"exploit": {"n": 6, "dup": 1, "scored": 5}, ...}`
+    #:
+    #: 왜 여기 남기나: 부모 종류가 **프롬프트 문자열에만** 있어서
+    #: `llm_calls` 의 `prompt` 가 빈 실행에서는 못 읽었다 — "가설-부모
+    #: 불일치" 를 옛 자료로 재려다 실패했다.
+    by_parent_kind: dict = field(default_factory=dict)
     #: ★ 이 라운드에 Analyst 가 요구한 새 축 / 실제로 만들어진 축 (D-75).
     n_feature_requests: int = 0
     n_features_made: int = 0
@@ -227,11 +280,21 @@ class RoundLoop:
         self._hyp_seq = 0
         #: 빌려온 가설 묶음 (대조군 C). 처음 쓸 때 한 번만 읽는다.
         self._pool: list[list[dict]] | None = None
+        #: 병렬 채점용 프로세스 풀 (D-95). 라운드마다 새로 만들지 않는다.
+        self._pool_exec = None
         self._rule_seq = 0
         self._seen_code: dict[str, float] = {}      # 캐시 (§15.4)
         self._feats = matrix.feature_names()
         self._shape_vals = matrix.shape_value_names()
         self._short_mask, self._long_mask = self._regime_masks()
+        # ★ 풀은 **생성자에서** 만든다 (D-95). `fork` 는 스레드가 도는 중이면
+        #   위험하고(CPython 이 DeprecationWarning 을 낸다) asyncio LLM 호출이
+        #   스레드를 만든다 — 생성자가 이 객체가 통제할 수 있는 가장 이른
+        #   시점이다. 마스크가 `_WORKER` 에 들어가므로 그 뒤여야 한다.
+        #   ⚠️ 완전하지는 않다 — 같은 프로세스에서 앞 단계가 이미 LLM 을
+        #      불렀으면 스레드가 있을 수 있다. 그때는 `n_workers=0` 으로
+        #      떨어뜨려라 (기본값이다).
+        self._pool_or_none()
 
     # -- ★ 대조군 C — 남의 가설을 빌려 온다 (§16.1, D-91) ------------------
     def _pool_round(self, r: int) -> list[dict]:
@@ -348,6 +411,10 @@ class RoundLoop:
                 self.matrix.invalidate(f.name)
                 self._feats = self.matrix.feature_names()
                 self._shape_vals = self.matrix.shape_value_names()
+                # ★ 워커는 fork 시점의 행렬을 들고 있다 — 새 열을 못 본다.
+                #   풀을 버리고 다시 만든다. 안 하면 **워커가 낡은 행렬로
+                #   채점하고** 그것이 조용히 다른 점수가 된다 (D-95).
+                self._restart_pool()
                 row.update(accepted=True, shape_level=f.shape_level)
                 made.append(f.name)
             except FeatureRejected as e:
@@ -386,12 +453,92 @@ class RoundLoop:
         return short, ~short
 
     # -- 채점 -------------------------------------------------------------
+    # -- 병렬 채점 (D-95) --------------------------------------------------
+    def _pool_or_none(self):
+        """`fork` 로 만든 프로세스 풀. **표와 행렬을 복사하지 않는다.**
+
+        표 + 피처 행렬이 4.2GB 다. 워커마다 다시 로드하면 12개에 50GB 이고
+        로드에만 3초씩 든다. `fork` 는 부모 메모리를 복사-후-쓰기로
+        물려주므로 둘 다 안 든다 — 대신 **풀을 만들기 전에 `_WORKER` 를
+        채워야 한다.**
+
+        ⚠️ `fork` 는 스레드가 도는 중이면 위험하다. 여기는 `_call_optimizers`
+        (asyncio)가 끝난 **뒤**에만 불린다.
+        """
+        if self.cfg.n_workers <= 0:
+            return None
+        if self._pool_exec is None:
+            from concurrent.futures import ProcessPoolExecutor
+            from multiprocessing import get_context
+            _WORKER.update(
+                table=self.table, matrix=self.matrix,
+                train=self.splits.train, val=self.splits.val,
+                max_evals=self.cfg.max_evals,
+                short_mask=self._short_mask, long_mask=self._long_mask)
+            self._pool_exec = ProcessPoolExecutor(
+                max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
+        return self._pool_exec
+
+    def _restart_pool(self) -> None:
+        """풀을 버리고 다시 만든다. **행렬이 바뀌면 반드시** (D-95)."""
+        if self._pool_exec is not None:
+            self._pool_exec.shutdown(wait=True)
+            self._pool_exec = None
+        self._pool_or_none()
+
+    def _evaluate_batch(self, props: list, res: RoundResult) -> list:
+        """여러 후보를 한 번에. 순차와 **결과가 같아야 한다** (D-95).
+
+        ★ 결정론을 지키는 방법:
+        ```
+        제출 순서대로 결과를 조립한다 (`sorted(by i)`)
+        rule_id 와 카운터는 부모가 그 순서로 매긴다
+        fit_weights 는 시드가 고정이라 워커 순서와 무관하다
+        ```
+        """
+        pool = self._pool_or_none()
+        admitted = []
+        for prop in props:
+            got = self._admit(prop, res)
+            if got is not None:
+                admitted.append((prop, got[1]))
+        if not admitted:
+            return []
+        if pool is None:                    # 순차 — 지금까지의 경로
+            out = []
+            for prop, _rep in admitted:
+                e = self._evaluate_candidate(prop, res)
+                if e is not None:
+                    out.append(e)
+            return out
+
+        jobs = [(i, prop.code, list(prop.w0))
+                for i, (prop, _r) in enumerate(admitted)]
+        got = sorted(pool.map(_fit_and_score, jobs), key=lambda d: d["i"])
+        elites = []
+        for d in got:
+            prop, rep = admitted[d["i"]]
+            if "err" in d:
+                res.n_rejected_fit += 1
+                res.rejections.append(d["err"])
+                continue
+            if d["moved"]:
+                res.n_fit_moved += 1
+            res.n_scored += 1
+            elites.append(self._elite_from(prop, rep, d))
+        return elites
+
     def _score(self, score_fn, w, shapes):
         return evaluate_scores(make_score_of(score_fn, self.matrix, w),
                                self.table, list(shapes), ks=(1, 3))
 
-    def _evaluate_candidate(self, prop, res: RoundResult):
-        """정적 검사 -> 샌드박스 -> 가중치 최적화 -> 채점. **전부 fail-closed.**"""
+    def _admit(self, prop, res: RoundResult):
+        """정적 검사 -> 컴파일 -> 샌드박스. **fail-closed.** 부모에서 돈다.
+
+        ★ 이 셋은 라운드의 3% 다. 병렬로 보내지 않는 이유는 비용이 아니라
+        `run_isolated` 가 프로세스를 띄우기 때문이다 — 워커 안에서 하면
+        중첩 spawn 이 된다 (D-95).
+        """
         rep = check_rule(prop.code, feature_names=self._feats,
                          shape_value_names=self._shape_vals,
                          n_weights=len(prop.w0))
@@ -416,6 +563,25 @@ class RoundLoop:
                 res.n_rejected_sandbox += 1
                 res.rejections.append(("sandbox", str(out)[:90]))
                 return None
+        return fn, rep
+
+    def _elite_from(self, prop, rep, out: dict) -> Elite:
+        """워커 결과 -> `Elite`. ★ id 와 순서는 **부모가** 정한다 (결정론)."""
+        self._rule_seq += 1
+        return Elite(
+            rule_id=f"r{self._rule_seq:04d}", code=prop.code,
+            w=out["w"], regret=out["regret"],
+            short_regret=out["short"], long_regret=out["long"],
+            code_len=rep.n_nodes, round=len(self.rounds),
+            changes=prop.changes, hypothesis_id=prop.hypothesis_id,
+            val_regret=out["val_regret"])
+
+    def _evaluate_candidate(self, prop, res: RoundResult):
+        """정적 검사 -> 샌드박스 -> 가중치 최적화 -> 채점. **전부 fail-closed.**"""
+        got = self._admit(prop, res)
+        if got is None:
+            return None
+        fn, rep = got
 
         try:
             fr = fit_weights(fn, self.matrix, self.table, self.splits.train,
@@ -435,15 +601,11 @@ class RoundLoop:
             res.n_fit_moved += 1
         ev = self._score(fn, fr.w, self.splits.train.shapes)
         res.n_scored += 1
-        self._rule_seq += 1
-        return Elite(
-            rule_id=f"r{self._rule_seq:04d}", code=prop.code,
-            w=[float(x) for x in fr.w], regret=fr.fit_regret,
-            short_regret=ev.at(1, mask=self._short_mask),
-            long_regret=ev.at(1, mask=self._long_mask),
-            code_len=rep.n_nodes, round=len(self.rounds),
-            changes=prop.changes, hypothesis_id=prop.hypothesis_id,
-            val_regret=fr.val_regret)
+        return self._elite_from(prop, rep, {
+            "w": [float(x) for x in fr.w], "regret": fr.fit_regret,
+            "val_regret": fr.val_regret, "moved": fr.moved,
+            "short": ev.at(1, mask=self._short_mask),
+            "long": ev.at(1, mask=self._long_mask)})
 
     def score_only(self, code: str, w0) -> float:
         """규칙 하나를 **학습 분할에서만** 채점한다. 아카이브에 안 넣는다.
@@ -567,7 +729,7 @@ class RoundLoop:
         applied = [f"{h.get('id','?')}: {h.get('claim','')[:80]}"
                    for h in self.hypotheses[-4:]]
         reqs = []
-        for i, (kind, ps) in enumerate(parents):
+        for kind, ps in parents:
             parent, n_terms = None, 0
             if ps:
                 from kernelrule.agents.schemas import RuleProposal
@@ -577,9 +739,20 @@ class RoundLoop:
                                 shape_value_names=self._shape_vals,
                                 n_weights=len(ps[0].w))
                 n_terms = pr.n_terms
+            # ★ 가설 배정을 **무작위**로 (D-94). `hyps[i % len(hyps)]` 는
+            #   앞쪽 가설을 더 자주 쓴다 — 가설 5개면 3 3 2 2 2, 7개면
+            #   2 2 2 2 2 1 1 이다. **설계가 아니라 12 % n 이고**, 부모
+            #   종류(i=0~5 exploit / 6~8 explore / 9~11 cross)와도 상관된다.
+            #   `self.rng` 를 쓰므로 시드로 재현된다.
+            hyp = (hyps[int(self.rng.integers(len(hyps)))] if hyps else None)
             reqs.append({"prompt": f"round={r} parent={kind}",
+                         # ★ 부모 종류를 **별도 필드**로 남긴다. 프롬프트
+                         #   문자열에만 있으면 `llm_calls` 의 `prompt` 가 빈
+                         #   실행에서 못 읽는다 — 실제로 "가설-부모 불일치"
+                         #   를 옛 자료로 못 쟀다 (D-94).
+                         "parent_kind": kind,
                          "parent": parent, "parent_n_terms": n_terms,
-                         "hypothesis": hyps[i % len(hyps)] if hyps else None,
+                         "hypothesis": hyp,
                          "hypotheses_applied": applied,
                          # ★ 가설 절을 만들지 말지 (§16.1). `hypothesis=None`
                          #   으로 추측하면 안 된다 — 그것은 "가설이 없는
@@ -592,8 +765,17 @@ class RoundLoop:
         calls["rule_editor"] += len(reqs)
 
         elites: list[Elite] = []
+        #: 병렬로 보낼 후보 — 부모 종류를 함께 들고 간다 (D-94 계수용).
+        batch: list = []
+
+        def bump(kind: str, key: str) -> None:
+            res.by_parent_kind.setdefault(
+                kind, {"n": 0, "dup": 0, "scored": 0})[key] += 1
+
         for req, raw in zip(reqs, raws, strict=True):
             hyp = req["hypothesis"]
+            kind = req.get("parent_kind", "?")
+            bump(kind, "n")
             res.n_proposed += 1
             if isinstance(raw, BaseException):
                 # ★ 두 가지를 가른다 (D-43).
@@ -619,11 +801,24 @@ class RoundLoop:
                 prop.hypothesis_id = hyp.get("id", "")
             key = prop.code.strip()
             if key in self._seen_code:      # 재채점하지 않는다 (§15.4)
+                bump(kind, "dup")
                 continue
-            e2 = self._evaluate_candidate(prop, res)
-            if e2 is not None:
-                self._seen_code[key] = e2.regret
-                elites.append(e2)
+            # ★ 중복 제거를 **병렬 진입 전에** 끝낸다 — 같은 라운드 안의
+            #   중복도 여기서 잡아야 워커가 같은 일을 두 번 안 한다.
+            self._seen_code[key] = float("nan")
+            batch.append((prop, kind))
+
+        # ★ 채점·적합은 한 번에 (D-95). `n_workers=0` 이면 순차 그대로다.
+        got = self._evaluate_batch([b for b, _k in batch], res)
+        by_code = {e.code.strip(): e for e in got}
+        for prop, kind in batch:
+            e2 = by_code.get(prop.code.strip())
+            if e2 is None:
+                self._seen_code.pop(prop.code.strip(), None)
+                continue
+            bump(kind, "scored")
+            self._seen_code[prop.code.strip()] = e2.regret
+            elites.append(e2)
 
         # 6~7. 아카이브 갱신 + 실패 기록
         before = self.archive.best.regret if self.archive.best else float("inf")
@@ -733,6 +928,11 @@ class RoundLoop:
                     break
         finally:
             path = self.dump()
+            # ★ 워커를 남기지 않는다. 12개가 4.2GB 를 공유한 채 떠 있으면
+            #   다음 실행이 fork 할 때 메모리가 는다.
+            if self._pool_exec is not None:
+                self._pool_exec.shutdown(wait=True)
+                self._pool_exec = None
             if verbose:
                 print(f"  -> {path}", flush=True)
         return self.rounds

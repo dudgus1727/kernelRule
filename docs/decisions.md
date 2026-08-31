@@ -4543,3 +4543,94 @@ RENAME = {"rule_writer": "rule_writer", "rule_editor": "rule_editor"}
 
 ⚠️ D-93 이전 사전 등록에 적힌 `stage2-architect/` 경로는 그 시점의
 기록이다. 지금 디렉토리는 `stage2-rule-writer/` 다.
+
+---
+
+## D-94  가설 배정이 라운드로빈이라 앞쪽 가설이 더 자주 쓰였다
+
+**날짜** 2026-08-31
+**근거** [artifacts/diversity-and-parallel.md](artifacts/diversity-and-parallel.md) §5
+**고정** `test_hypothesis_assignment_is_not_round_robin` ·
+`test_parent_kind_is_recorded_per_round`
+
+```python
+"hypothesis": hyps[i % len(hyps)]      # 부모 12개
+```
+
+```
+가설 4개  3 3 3 3            1.00
+가설 5개  3 3 2 2 2          1.50
+가설 7개  2 2 2 2 2 1 1      2.00
+가설 8개  2 2 2 2 1 1 1 1    2.00
+```
+
+**Analyst 가 낸 순서가 그대로 배정 빈도가 된다.** 스키마가 2~8개를
+허용하므로 5·7·8 이 실제로 나온다. **설계가 아니라 `12 % n` 이다.**
+
+그리고 부모 종류와도 상관된다 — `i=0~5` exploit / `6~8` explore /
+`9~11` cross 이므로 "어떤 가설이 어떤 부모에 가는가" 가 고정된다.
+
+```
+self.rng.integers(len(hyps))   ★ 편중 없음. 시드로 재현된다
+```
+
+### 부모 종류를 **별도 필드**로 남긴다
+
+`llm_calls` 의 `prompt` 가 빈 실행이 있어 "가설-부모 불일치" 를 옛
+자료로 **못 쟀다** (§3). 부모 종류가 프롬프트 문자열에만 있었기 때문이다.
+`RoundResult.by_parent_kind` 에 종류별 제안/중복/채점을 남긴다.
+
+---
+
+## D-95  채점·적합을 병렬로 — 값이 같을 때만 이득이다
+
+**날짜** 2026-08-31
+**근거** [artifacts/diversity-and-parallel.md](artifacts/diversity-and-parallel.md) §6
+**고정** `test_parallel_matches_sequential` ·
+`test_worker_does_not_do_the_sandbox` · `test_workers_default_is_sequential`
+
+라운드 벽시계의 **96% 가 `fit_weights`** 다 (후보당 5.4초 x 12 = 65초).
+GIL 때문에 스레드로는 안 되고 프로세스여야 한다.
+
+```
+순차   29.6s  채점 5
+병렬   7.4s   채점 5   ★ 4.0배 (워커 6)
+★ 값이 같은가: 예
+```
+
+### 설계에서 고른 것
+
+```
+부모가 한다   정적 검사 · 컴파일 · 샌드박스 · 중복 제거
+             ★ `run_isolated` 가 프로세스를 띄우므로 워커 안에서 하면
+               중첩 spawn 이 된다. 그 셋은 라운드의 3% 다
+워커가 한다   fit_weights + 채점 (96%)
+결정론        제출 순서대로 조립하고 `rule_id` 와 카운터는 부모가 매긴다
+             `fit_weights` 는 시드가 고정이라 워커 순서와 무관하다
+```
+
+### `fork` 를 쓴 이유와 그 위험
+
+표 + 피처 행렬이 **4.2GB** 다. 워커마다 다시 로드하면 12개에 50GB 이고
+로드에만 3초씩 든다. `fork` 는 복사-후-쓰기로 물려주므로 둘 다 안 든다.
+
+⚠️ **`fork` 는 스레드가 도는 중이면 위험하다** — CPython 이
+DeprecationWarning 을 낸다. asyncio LLM 호출이 스레드를 만들므로 풀을
+**생성자에서** 만든다. 그래도 같은 프로세스에서 앞 단계가 이미 LLM 을
+불렀으면 스레드가 있을 수 있다 — 그때는 `n_workers=0` 으로 떨어뜨린다
+(기본값이다).
+
+### ★ 축이 추가되면 풀을 다시 만든다
+
+D-75 경로가 라운드 안에서 피처를 등록하면 `matrix.invalidate()` 로 열이
+생긴다. **워커는 fork 시점의 행렬을 들고 있어 그 열을 못 본다** — 안
+고치면 워커가 낡은 행렬로 채점하고 그것이 **조용히 다른 점수**가 된다.
+`_restart_pool()` 로 버리고 다시 만든다.
+
+### "빠르다" 를 성능 지표로 쓰지 않는다
+
+D-89 에서 Analyst 를 끈 팔의 라운드가 빨랐던 것은 효율이 아니라 **일을
+안 한 것**이다 (채점률 28%, 원칙 29). 그래서 이 변경의 관문은 시간이
+아니라 **값의 일치**다.
+
+**기본은 순차(`n_workers=0`)** — 지금까지의 모든 실행이 그 조건이다.

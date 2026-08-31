@@ -612,6 +612,7 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                            a, "max_new_features", 0),
                        feature_condition=a.condition,
                        use_analyst=not getattr(a, "no_analyst", False),
+                       n_workers=getattr(a, "workers", 0),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
         table=table, matrix=matrix, splits=splits, llm=llm)
@@ -631,6 +632,7 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            max_new_features_per_round=a.max_new_features,
                            feature_condition=a.condition,
                            use_analyst=not a.no_analyst,
+                           n_workers=a.workers,
                            hypothesis_pool=tuple(a.hypothesis_pool)),
             table=table, matrix=matrix, splits=splits, llm=llm)
         loop.seed(seed_rule["code"], seed_rule["w0"], changes="stage2 씨앗")
@@ -736,6 +738,10 @@ def main() -> None:
                     help="다른 실행의 hypotheses.jsonl. Analyst 없이 그 "
                          "가설을 라운드마다 빌려 쓴다 — 같은 시드 번호의 "
                          "실행은 자동으로 뺀다")
+    # ★ 채점·적합 병렬화 (D-95). 0 = 순차(기본). 결과는 같아야 한다.
+    ap.add_argument("--workers", type=int, default=0, metavar="N",
+                    help="채점·적합을 N 프로세스로 (0=순차). 결과는 순차와 "
+                         "같다 — test_parallel_matches_sequential 이 고정한다")
     ap.add_argument("--max-new-features", type=int, default=0,
                     metavar="N",
                     help="라운드당 만들 수 있는 새 축 (0=경로 없음, D-75). "

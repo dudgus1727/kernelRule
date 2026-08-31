@@ -154,7 +154,64 @@ def non_llm_breakdown() -> None:
 def main() -> None:
     llm_share()
     non_llm_breakdown()
+    parallel_speedup()
 
 
 if __name__ == "__main__":
     main()
+
+
+def parallel_speedup(workers: int = 6) -> None:
+    """★ 같은 라운드를 순차/병렬로 돌려 **시간과 값**을 비교한다 (D-95).
+
+    시간만 보면 안 된다 — 값이 같아야 이득이다 (원칙 29).
+    """
+    print("\n" + "=" * 74)
+    print(f"C. 병렬화 — 순차 vs {workers} 워커 (MockLLM, 같은 시드)")
+    print("=" * 74)
+    warnings.simplefilter("ignore")
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.agents.mock import MockLLM
+    from kernelrule.core.loop import LoopConfig, RoundLoop
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.core.splits import Split, SplitSet
+    from kernelrule.core.table import PerfTable
+    from kernelrule.features import REGISTRY
+
+    table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
+    matrix = FeatureMatrix(table, REGISTRY)
+
+    def aligned(p) -> bool:
+        x = table.frame_for(p)
+        return bool((x.align_a == 8).all() and (x.align_b == 8).all()
+                    and (x.align_c == 8).all())
+
+    sh = [p for p in table.shapes() if aligned(p)]
+    splits = SplitSet(
+        train=Split("train", tuple(p for p in sh if 11008 not in (p.N, p.K))),
+        val=Split("val", tuple(p for p in sh if 11008 in (p.N, p.K))))
+    seed = json.loads(
+        (RUNS / "f1pipe-F3-arch24" / "stage2-rule-writer"
+         / "chosen.json").read_text())
+
+    out = {}
+    for n in (0, workers):
+        llm = MockLLM("mutate", seed=1, feature_names=matrix.feature_names(),
+                      shape_values=matrix.shape_value_names())
+        lp = RoundLoop(
+            cfg=LoopConfig(run_id=f"prof{n}", n_rules_per_round=12,
+                           max_rounds=1, seed=0, out_dir="/tmp", n_workers=n),
+            table=table, matrix=matrix, splits=splits, llm=llm)
+        lp.seed(seed["code"], seed["w0"])
+        t0 = time.perf_counter()
+        r = lp.run_round()
+        el = sorted(lp.archive.cells.values(), key=lambda e: e.rule_id)
+        out[n] = (time.perf_counter() - t0, r.n_scored,
+                  [(e.rule_id, round(e.regret, 12), tuple(e.w)) for e in el])
+        if lp._pool_exec is not None:
+            lp._pool_exec.shutdown(wait=True)
+    (ts, ns, es), (tp, np_, ep) = out[0], out[workers]
+    print(f"  순차   {ts:6.1f}s  채점 {ns}")
+    print(f"  병렬   {tp:6.1f}s  채점 {np_}   ★ {ts / tp:.1f}배")
+    print(f"  ★ 값이 같은가: {'예' if es == ep else '★아니오 — 숨은 상태가 있다'}")
+    print("  ⚠️ 빠른 것이 좋은 것이 아니다 — 값이 같을 때만 이득이다 (원칙 29)")
