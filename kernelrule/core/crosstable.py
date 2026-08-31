@@ -63,15 +63,38 @@ def common_axis_keys(a, b, p: Problem) -> set[tuple]:
 
 
 def _arith_intensity(p: Problem) -> float:
-    """FLOP / 이동 바이트. **형상만의 함수다** — 하드웨어가 안 들어간다."""
-    flops = 2.0 * p.M * p.N * p.K
-    byt = p.bytes_per_element * (p.M * p.K + p.K * p.N) \
-        + p.acc_bytes_per_element * (p.M * p.N)
-    return flops / max(byt, 1.0)
+    """FLOP / 이동 바이트. **형상만의 함수다** — 하드웨어가 안 들어간다.
+
+    ## ★ 정정 (2026-08-31) — 정의를 여기서 다시 쓰지 않는다
+
+    원래 이 함수는 출력 항에 `acc_bytes_per_element`(f32, 4바이트)를
+    곱했다. 그런데 누산기는 레지스터에 있고 **DRAM 으로 나가는 C 는
+    f16** 이다. kernelTab 의 `arith_intensity` 컬럼과 등록 피처
+    `features.physical.arith_intensity` 는 둘 다 셋 다 원소 바이트로
+    센다.
+
+    ```
+    128x4096x4096   여기 117.03   표/피처 120.471   5090 ridge 117.855
+    ```
+
+    **경계가 그 사이에 있어서 `bound_flipped` 가 이 형상을 놓쳤다** —
+    5090 전이에서 뒤집힘 4개를 3개로 셌다. 53개 공통 형상 **전부**에서
+    두 정의가 달랐다.
+
+    ★ 세 번째 정의를 만든 것이 잘못이다 (원칙 2). 등록 피처에 위임한다.
+    """
+    from kernelrule.features.physical import arith_intensity
+
+    return arith_intensity(p, None, None)
 
 
 def _ridge(hw: Hardware) -> float:
-    return (hw.peak_tflops_f16 * 1e12) / (hw.bandwidth_gbps * 1e9)
+    """★ `hw.ridge_point` 를 쓴다 — 여기서 다시 나누지 않는다.
+
+    실효값/스펙값 중 무엇을 쓰는지가 26% 어긋나고 경계 형상의 분류를
+    뒤집는다 (§6.2). 그 판단은 `Hardware` 한 곳에만 있어야 한다.
+    """
+    return float(hw.ridge_point)
 
 
 def bound_flipped(a, b, shapes=None) -> list[tuple[Problem, bool, bool]]:

@@ -16,3 +16,5 @@ datasets/baselines/*
 
 # 실행 산출물 (§25). 핵심 결과는 docs/artifacts/ 에 따로 남긴다.
 runs/
+datasets/rtx-5090-sm_120-5bb6f403/
+datasets/rtx-5090-sm_120-5bb6f403.tar.zst

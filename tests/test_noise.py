@@ -75,21 +75,35 @@ def test_from_bundle_records_tick_fallback(real_bundle_path):
     assert "tick_ms=대체값" in m.source
 
 
-def test_from_bundle_rejects_coefficient_mismatch(real_bundle_path, monkeypatch):
-    """★ 번들 계수와 모듈 전역 상수가 다르면 **에러**다.
+def test_from_bundle_records_coefficient_mismatch(real_bundle_path, monkeypatch):
+    """계수 불일치는 **기록**한다. 막지는 않는다.
 
-    `kerneltab.core.table.answer_set()` 이 모듈 전역을 쓰므로, 불일치 상태에서
-    채점하면 정답 집합이 틀린 계수로 만들어진다. 조용히 진행하지 않는다.
+    ## ★ 정정 이력 (2026-08-31)
+
+    이 시험은 원래 **에러**를 요구했다. 근거는 "`answer_set()` 이 모듈
+    전역을 쓰므로 불일치 상태에서 채점하면 정답 집합이 틀린 계수로
+    만들어진다" 였다.
+
+    **kernelTab 이 그 구멍을 막았다** — `answer_set`/`answer_tolerance`
+    는 이제 계수 주입을 요구하고 없으면 `NoiseCoefRequired` 를 던진다.
+    그러면 값 대조는 **다른 GPU 를 영구히 막는 통행 금지**가 된다
+    (5090 눈금은 A6000 의 1/64 이라 정의상 다르다).
+
+    위험을 지키는 것은 `_require_injected_noise` 로 옮겼다 — 아래
+    `test_guard_catches_a_revived_default_tolerance`.
     """
     from kerneltab.core import noise as kt
     from kerneltab.core.bundle import load_bundle
 
     monkeypatch.setattr(kt, "SIGMA_ABS_MS", 0.999)
     b = load_bundle(real_bundle_path)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        with pytest.raises(NoiseMismatchError, match="모듈 상수"):
-            NoiseModel.from_bundle(b)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        m = NoiseModel.from_bundle(b)
+    assert m.sigma_abs_ms != 0.999, "번들 계수를 써야 한다"
+    assert any("A6000 참조값과 다르다" in str(x.message) for x in caught), (
+        "조용히 지나가면 안 된다 — 사실로 기록해야 한다")
+    assert pytest is not None
 
 
 def test_from_bundle_requires_coefficients():
@@ -99,3 +113,49 @@ def test_from_bundle_requires_coefficients():
         tick_ms = 0.001
     with pytest.raises(NoiseMismatchError):
         NoiseModel.from_bundle(FakeBundle())
+
+
+# ---------------------------------------------------------------------------
+# 능력 검사 — 값 대조가 아니라 "위험한 경로가 막혀 있는가" (2026-08-31)
+# ---------------------------------------------------------------------------
+def test_guard_catches_a_revived_default_tolerance(monkeypatch):
+    """★ `answer_tolerance` 가 주입 없이 값을 돌려주면 **막는다**.
+
+    옛 검사(번들 계수 == 모듈 전역)는 이것을 못 잡았다 — 개발용 A6000
+    번들에서는 값이 같아 통과했다. 그리고 정작 위험이 없는 다른 GPU 는
+    영구히 막았다. 방향이 둘 다 틀렸다.
+    """
+    import pytest
+
+    from kernelrule.core.noise import NoiseMismatchError, _require_injected_noise
+
+    _require_injected_noise()           # 지금은 통과해야 한다
+    import kerneltab.core.table as ktt
+    monkeypatch.setattr(ktt, "answer_tolerance", lambda *a, **k: 0.01)
+    with pytest.raises(NoiseMismatchError, match="기본값이 되살아났다"):
+        _require_injected_noise()
+
+
+def test_foreign_gpu_bundle_is_not_blocked_by_coefficient_drift():
+    """다른 GPU 번들은 **계수가 다른 것이 정상**이다. 막지 않고 기록한다.
+
+    5090 은 A6000 대비 눈금이 1/64 이다. 값이 같기를 요구하면 A6000 이
+    아닌 모든 번들이 영구히 막힌다 — 안전장치가 아니라 통행 금지다.
+    """
+    import warnings
+    from pathlib import Path
+
+    import pytest
+
+    b = Path("datasets/rtx-5090-sm_120-5bb6f403")
+    if not b.exists():
+        pytest.skip("5090 번들이 없다")
+    from kernelrule.core.table import PerfTable
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        t = PerfTable.from_bundle(str(b), env_hash="5bb6f403")
+    assert t.noise.tick_ms < 1e-4 and not t.noise.tick_is_fallback
+    msgs = [str(x.message) for x in caught]
+    assert any("A6000 참조값과 다르다" in m for m in msgs), (
+        "불일치를 **사실로 기록**해야 한다 — 조용히 지나가면 안 된다")

@@ -107,3 +107,71 @@ def test_axis_key_uses_every_declared_field(field, synth_table):
     row = dict.fromkeys(AXIS_FIELDS, 1)
     other = row | {field: 99}
     assert axis_key(row) != axis_key(other), f"{field} 가 키에 안 들어갔다"
+
+
+# ---------------------------------------------------------------------------
+# ★ 정의를 세 번 쓰지 않는다 (2026-08-31)
+# ---------------------------------------------------------------------------
+def test_arith_intensity_matches_the_table_column():
+    """★ 우리 산술 강도가 **표의 `arith_intensity` 컬럼과 같아야 한다.**
+
+    한때 `crosstable` 이 출력 항에 `acc_bytes_per_element`(f32) 를 곱하는
+    자기만의 정의를 갖고 있었다. 누산기는 레지스터에 있고 DRAM 으로
+    나가는 C 는 f16 이라 그것이 틀렸다.
+
+    ```
+    128x4096x4096   옛 정의 117.03   표 120.471   5090 ridge 117.855
+    ```
+
+    **경계가 그 사이에 있어서 뒤집힘 4개를 3개로 셌다.** 값이 조금 다른
+    것이 아니라 **분류가 뒤집혔다.** 53개 공통 형상 전부에서 달랐다.
+    """
+    from pathlib import Path
+
+    import pytest
+
+    b = Path("datasets/rtx-5090-sm_120-5bb6f403")
+    if not b.exists():
+        pytest.skip("5090 번들이 없다")
+    import warnings
+
+    from kernelrule.core.crosstable import _arith_intensity
+    from kernelrule.core.numerics import approx_equal
+    from kernelrule.core.table import PerfTable
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        t = PerfTable.from_bundle(str(b), env_hash="5bb6f403")
+    bad = []
+    for p in t.shapes():
+        col = float(t.frame_for(p)["arith_intensity"].iloc[0])
+        if not approx_equal(_arith_intensity(p), col, tol=1e-3):
+            bad.append((p.M, p.N, p.K, _arith_intensity(p), col))
+    assert not bad, f"표 컬럼과 다른 형상 {len(bad)}개: {bad[:3]}"
+
+
+def test_ridge_comes_from_hardware_not_recomputed():
+    """`_ridge` 가 번들의 `ridge_point` 와 같아야 한다.
+
+    실효값/스펙값 중 무엇을 쓰는지가 26% 어긋난다 (§6.2). 그 판단이 두
+    곳에 있으면 경계 형상의 체제가 조용히 갈린다.
+    """
+    import json
+    import warnings
+    from pathlib import Path
+
+    import pytest
+
+    from kernelrule.core.crosstable import _ridge
+    from kernelrule.core.numerics import approx_equal
+    from kernelrule.core.table import PerfTable
+
+    for d, h in (("datasets/rtx-a6000-sm_86-c63710df", "c63710df"),
+                 ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")):
+        if not Path(d).exists():
+            pytest.skip(f"{d} 가 없다")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            t = PerfTable.from_bundle(d, env_hash=h)
+        want = json.loads(Path(d, "BUNDLE.json").read_text())["ridge_point"]
+        assert approx_equal(_ridge(t.hw), float(want), tol=1e-2), d

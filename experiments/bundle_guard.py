@@ -49,7 +49,13 @@ def main() -> None:
     ap.add_argument("--expect-tick-ms", type=float,
                     help="예고된 눈금 (5090 이면 0.000032)")
     ap.add_argument("--expect-sigma-abs-ms", type=float,
-                    help="예고된 절대 노이즈 (5090 이면 0.000016)")
+                    help="예고된 절대 노이즈")
+    # ★ schema_version 3 에서 새로 생긴 것들. 예고값이 있으면 맞춘다.
+    ap.add_argument("--expect-env-hash-v2",
+                    help="예고된 env_hash_v2 (접두 일치)")
+    ap.add_argument("--expect-schema-version", type=int)
+    ap.add_argument("--expect-aggregate-status",
+                    help="'all' 이면 status 필터 없이 전부 집계됐다는 뜻")
     a = ap.parse_args()
 
     root = Path(a.bundle)
@@ -66,6 +72,9 @@ def main() -> None:
     print(f"  행/형상/커널  {meta.get('n_rows')} / {meta.get('n_shapes')} / "
           f"{meta.get('n_kernels')}")
     print(f"  ridge     {meta.get('ridge_point')}")
+    print(f"  schema    v{meta.get('schema_version')}  "
+          f"aggregate_status={meta.get('aggregate_status')!r}  "
+          f"env_hash_v2={str(meta.get('env_hash_v2'))[:16]}")
     print(f"  noise     {json.dumps(nf, ensure_ascii=False)}")
 
     # 1) env_hash 가 요청과 맞는가 (§3.4)
@@ -94,6 +103,23 @@ def main() -> None:
         bad.append(f"sigma_abs_ms {sig} != 예고 {a.expect_sigma_abs_ms}")
     if a.expect_rows is not None and meta.get("n_rows") != a.expect_rows:
         warn.append(f"행 수 {meta.get('n_rows')} != 예고 {a.expect_rows}")
+
+    # 3-b) schema_version 3 의 새 항목들
+    if a.expect_env_hash_v2 and not str(
+            meta.get("env_hash_v2", "")).startswith(a.expect_env_hash_v2):
+        bad.append(f"env_hash_v2 불일치: {str(meta.get('env_hash_v2'))[:16]!r}"
+                   f" != 예고 {a.expect_env_hash_v2[:16]!r}")
+    if a.expect_schema_version is not None \
+            and meta.get("schema_version") != a.expect_schema_version:
+        bad.append(f"schema_version {meta.get('schema_version')} != 예고 "
+                   f"{a.expect_schema_version}")
+    if a.expect_aggregate_status is not None \
+            and meta.get("aggregate_status") != a.expect_aggregate_status:
+        # ★ 거부다. `aggregate_status` 가 'ok' 면 **정답 집합이 다르다** —
+        #   5090 은 status != ok 가 22.21% 라 A6000(10.65%) 보다 훨씬 크고,
+        #   그것을 버린 표와 전부 담은 표는 나란히 못 놓는다 (D-91 계열).
+        bad.append(f"★ aggregate_status {meta.get('aggregate_status')!r} != "
+                   f"예고 {a.expect_aggregate_status!r} — 정답 집합이 다르다")
 
     # 4) 노이즈 출처가 이 GPU 인가
     src_gpu = str(nf.get("gpu", ""))

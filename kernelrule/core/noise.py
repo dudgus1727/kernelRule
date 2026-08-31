@@ -22,6 +22,29 @@ kernelTab 을 고치지 않고(우리 범위 밖) 이쪽에서 **불일치를 �
     NoiseModel.from_bundle(b)  ->  번들 계수를 읽고
                                    모듈 전역 상수와 대조하고
                                    다르면 에러  (조용한 진행 금지)
+
+## ★ 2026-08-31 — kernelTab 이 그 구멍을 막았다. 검사를 바꾼다
+
+**위 서술은 정정 이력으로 남긴다.** 5090 번들(`5bb6f403`)을 처음 열 때
+위 대조가 걸려서 확인해 보니 `kerneltab.core.table.answer_set()` 이
+더는 모듈 전역을 안 쓴다 — `noise` 주입이 **필수**이고 없으면
+`NoiseCoefRequired` 를 던진다. 모듈 전역 `noise_floor()` 함수 자체가
+없어졌다. kernelTab 쪽 docstring 이 우리가 예측한 실패를 그대로 적고
+있다 ("4090/H100 번들을 채점할 때도 A6000 눈금을 경고 없이 쓴다").
+
+그러면 **계수 불일치는 더 이상 위험이 아니다.** 다른 GPU 번들은
+정의상 A6000 상수와 다르므로, 옛 검사를 그대로 두면 **A6000 이 아닌
+모든 번들을 영구히 막는다** — 안전장치가 아니라 통행 금지다.
+
+```
+옛 검사   번들 계수 == 모듈 전역 ?          -> 다른 GPU 는 영원히 실패
+새 검사   ★ answer_set 이 주입을 요구하나 ?  -> 구멍이 살아 있으면 실패
+          계수 불일치는 **사실로 기록**한다 (경고 + source 에 남긴다)
+```
+
+★ 검사를 **능력 검사**로 바꾼다. "값이 같은가" 가 아니라 "위험한 경로가
+막혀 있는가" 다. 구멍이 되살아나면(누가 기본값을 다시 넣으면) 새 검사가
+잡는다 — 옛 검사는 못 잡았다 (값이 같은 A6000 에서는 통과했으니까).
 """
 
 from __future__ import annotations
@@ -40,6 +63,37 @@ class NoiseMismatchError(RuntimeError):
     그 상태에서는 `kerneltab.core.table.answer_set()` 이 **틀린 계수로**
     돈다 (모듈 전역을 쓰기 때문). 우리 쪽 계산만 고쳐도 소용없으므로 멈춘다.
     """
+
+
+def _require_injected_noise() -> None:
+    """★ `answer_set`/`answer_tolerance` 가 계수 주입을 **요구하는가**.
+
+    요구하지 않으면 기본값(= A6000 눈금)으로 조용히 돈다. 그것이 §30.8 이
+    말한 "조용히 아무것도 안 하는 안전장치" 다.
+
+    옛 검사(번들 계수 == 모듈 전역)는 이것을 **못 잡았다** — 개발용
+    A6000 번들에서는 값이 같아서 통과했고, 정작 다른 GPU 에서는 위험이
+    없는데도 막았다. 방향이 둘 다 틀렸다.
+    """
+    from kerneltab.core.noise import NoiseCoefRequired
+    from kerneltab.core.table import answer_tolerance
+
+    try:
+        answer_tolerance(1.0)
+    except NoiseCoefRequired:
+        return
+    except Exception as e:                                  # noqa: BLE001
+        raise NoiseMismatchError(
+            "kerneltab.core.table.answer_tolerance 가 예상 밖으로 실패한다: "
+            f"{type(e).__name__}: {e}") from e
+    raise NoiseMismatchError(
+        "★ kerneltab.core.table.answer_tolerance() 가 노이즈 계수 주입 "
+        "없이도 값을 돌려준다 — 기본값이 되살아났다.\n"
+        "  그 기본값은 A6000 눈금이고, 다른 GPU 번들을 채점하면 정답 "
+        "집합이 조용히 틀린다 (5090 눈금은 A6000 의 1/64 이다).\n"
+        "  kernelTab 쪽을 확인하라. 우리 채점은 "
+        "PerfTable.answer_mask() 로 안전하지만, 이 상태에서는 "
+        "kernelTab 헬퍼를 쓰는 다른 코드가 조용히 틀린다.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,7 +209,13 @@ class NoiseModel:
             tick_is_fallback=not tick_present,
         )
 
-        # ★ 모듈 전역과 대조. answer_set() 이 그쪽을 쓰기 때문이다.
+        # ★ **능력 검사** — 위험한 경로가 막혀 있는가 (2026-08-31).
+        #   값 대조가 아니다. 값은 다른 GPU 면 당연히 다르다.
+        if strict:
+            _require_injected_noise()
+
+        # 계수 불일치는 **사실로 기록**한다. 막지는 않는다 — 다른 GPU
+        # 번들은 정의상 A6000 상수와 다르다.
         drift = {
             "sigma_abs_ms": (model.sigma_abs_ms, kt.SIGMA_ABS_MS),
             "sigma_rel": (model.sigma_rel_coef, kt.SIGMA_REL),
@@ -163,17 +223,13 @@ class NoiseModel:
         }
         bad = {k: v for k, v in drift.items()
                if abs(v[0] - v[1]) > 1e-12 * max(1.0, abs(v[1]))}
-        if bad and strict:
-            raise NoiseMismatchError(
-                f"번들 계수와 kerneltab.core.noise 모듈 상수가 다르다: {bad}\n"
-                "  kerneltab.core.table.answer_set() 은 **모듈 전역**을 쓰므로 "
-                "이 상태에서 채점하면 정답 집합이 틀린 계수로 만들어진다.\n"
-                "  이 번들의 계수로 answer_set 을 계산하려면 "
-                "kernelrule.core.table.PerfTable.answer_mask() 를 써라 — "
-                "그쪽은 이 NoiseModel 을 쓴다.")
         if bad:
-            warnings.warn(f"노이즈 계수 불일치 (strict=False): {bad}",
-                          stacklevel=2)
+            warnings.warn(
+                f"[kernelRule] 번들 계수가 kerneltab.core.noise 의 A6000 "
+                f"참조값과 다르다 (정상 — 다른 GPU다): "
+                f"{ {k: v[0] for k, v in bad.items()} }. "
+                "채점은 번들 계수를 쓴다 (PerfTable.answer_mask).",
+                stacklevel=2)
         return model
 
     @classmethod
