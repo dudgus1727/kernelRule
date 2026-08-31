@@ -21,7 +21,7 @@ from kernelrule.agents.openai_client import (
     load_prompt,
 )
 
-ROLES = ("analyze", "optimize", "feature", "architect")
+ROLES = ("analyze", "rule_editor", "feature", "rule_writer")
 PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 
 
@@ -56,39 +56,39 @@ def test_feature_prompt_has_no_rule_material():
         "뒷단 파이프라인을 알 필요가 없다 (§30.10).")
 
 
-def test_feature_and_optimize_prompts_have_no_hardware_constants():
+def test_feature_and_rule_editor_prompts_have_no_hardware_constants():
     """★ hw 를 안 보면 그 프롬프트는 **GPU 무관**해진다 (§16.2)."""
     hw = load_prompt("hw/sm_86.md")
     marks = [m for m in ("RTX A6000", "sm_86", "84", "101376") if m in hw]
     assert marks, "하드웨어 파일에서 표식을 못 찾았다 — 검사가 무의미하다"
-    for role in ("feature", "optimize"):
+    for role in ("feature", "rule_editor"):
         body = _instructions(role)
         hit = [m for m in ("RTX A6000", "sm_86") if m in body]
         assert not hit, f"{role} 프롬프트에 하드웨어 상수가 샜다: {hit}"
 
 
 def test_rule_writers_get_the_budget():
-    for role in ("optimize", "architect"):
+    for role in ("rule_editor", "rule_writer"):
         body = _instructions(role)
         assert "8" in body and "w[0]" in body, f"{role} 에 예산이 없다"
 
 
 def test_hw_goes_only_to_roles_that_need_it():
-    """★ Architect 뿐이다. Analyst 는 리포트 블록 1 에서 같은 사실을 받는다."""
-    assert set(_NEEDS_HW) == {"architect"}
+    """★ RuleWriter 뿐이다. Analyst 는 리포트 블록 1 에서 같은 사실을 받는다."""
+    assert set(_NEEDS_HW) == {"rule_writer"}
 
 
 def test_architect_does_not_get_the_edit_block():
-    """`role/architect.md` 가 "점수 없음" 이라고 써 놓고 regret 정의를
+    """`role/rule_writer.md` 가 "점수 없음" 이라고 써 놓고 regret 정의를
     받으면 정면으로 모순이다 (§30.10)."""
-    assert "architect" not in _EDITS_RULES
-    body = _instructions("architect")
+    assert "rule_writer" not in _EDITS_RULES
+    body = _instructions("rule_writer")
     assert "점수 없음" in body, "역할 파일이 바뀌었다 — 검사가 무의미하다"
-    assert "regret` = " not in body, "Architect 에 regret 정의가 샜다"
+    assert "regret` = " not in body, "RuleWriter 에 regret 정의가 샜다"
 
 
 def test_optimizer_gets_the_edit_block():
-    body = _instructions("optimize")
+    body = _instructions("rule_editor")
     assert "regret` = " in body and "실제로 거부된 것들" in body
 
 
@@ -161,12 +161,12 @@ def test_every_role_gets_the_base(role):
 
 
 def test_hw_block_does_not_reference_cases():
-    """★ `hw/*.md` 는 이제 **Architect 만** 받는데 Architect 는 사례를
+    """★ `hw/*.md` 는 이제 **RuleWriter 만** 받는데 RuleWriter 는 사례를
     안 받는다. "사례에 붙은 ... 을 보세요" 는 없는 것을 가리킨다 (§30.10).
     """
     hw = load_prompt("hw/sm_86.md")
     assert "사례에 붙은" not in hw
-    arch = _instructions("architect")
+    arch = _instructions("rule_writer")
     assert "사례 없음" in arch, "역할 파일이 바뀌었다 — 검사가 무의미하다"
 
 
@@ -193,7 +193,7 @@ def test_analyst_gets_hardware_facts_from_the_report_not_a_file():
 # ---------------------------------------------------------------------------
 # ★ 프롬프트 어디에도 **실제 피처 이름**이 박혀 있으면 안 된다 (D-35, D-65)
 #
-#   `role/architect.md` 의 크기 맞추기 예시가 `f.traffic_amplification` /
+#   `role/rule_writer.md` 의 크기 맞추기 예시가 `f.traffic_amplification` /
 #   `f.tail_waste` 를 하드코딩하고 있었다. F1 조건에서 그것은 **답을
 #   건네주는 것**이다 — 레지스트리에 없는 이름인데 물리를 지목한다.
 #   `_base.md` 의 `if p.is_memory_bound:` 도 같다.
@@ -380,12 +380,12 @@ def test_internal_notes_never_reach_the_model():
 
 
 # ---------------------------------------------------------------------------
-# ★ §30.20 — Architect 규칙 예시도 조건별로 갈린다
+# ★ §30.20 — RuleWriter 규칙 예시도 조건별로 갈린다
 #
-#   FeatureWriter 는 예시가 조건별로 갈리는데 Architect 는 자리표시자
+#   FeatureWriter 는 예시가 조건별로 갈리는데 RuleWriter 는 자리표시자
 #   하나뿐이었다. 좋은 예시를 주되 **답을 건네지 않아야** 한다 (D-35).
 #
-#   조건 이름을 키로 쓰지 않는다 — Architect 의 `condition` 은 A/B(표
+#   조건 이름을 키로 쓰지 않는다 — RuleWriter 의 `condition` 은 A/B(표
 #   관측 유무)라 피처 조건과 축이 다르다. **레지스트리를 보고 정한다.**
 # ---------------------------------------------------------------------------
 def _reg(names):

@@ -118,8 +118,8 @@ def test_estimate_requires_confirmation():
 # ---------------------------------------------------------------------------
 def test_prompts_exist():
     for n in ("_base.md", "hw/sm_86.md", "role/_rules_common.md",
-              "role/_rules_edit.md", "role/analyze.md", "role/optimize.md",
-              "role/feature.md", "role/architect.md", "role/categorize.md"):
+              "role/_rules_edit.md", "role/analyze.md", "role/rule_editor.md",
+              "role/feature.md", "role/rule_writer.md", "role/categorize.md"):
         assert load_prompt(n).strip()
 
 
@@ -149,11 +149,11 @@ def test_rule_block_states_the_absolute_rules():
     assert "소거된다" in c
 
 
-def test_optimize_prompt_formats(client):
+def test_rule_editor_prompt_formats(client):
     from kernelrule.agents.schemas import RuleProposal
 
     p = client._user_prompt(
-        "optimize", "", parent=RuleProposal(code="def score(f,p,hw,w): return 1",
+        "rule_editor", "", parent=RuleProposal(code="def score(f,p,hw,w): return 1",
                                             w0=[1.0]),
         hypothesis={"id": "H1", "claim": "테스트"},
         hypotheses_applied=["H0: 이전 것"])
@@ -184,7 +184,7 @@ def test_interface_matches_mock(client):
 def test_dump_never_writes_the_key(client, tmp_path):
     from kernelrule.agents.mock import LLMCall
 
-    client.calls.append(LLMCall(role="optimize", prompt_hash="h", seq=0,
+    client.calls.append(LLMCall(role="rule_editor", prompt_hash="h", seq=0,
                                 response={"code": "x"}, mode=client.cfg.model))
     client.calls[-1].__dict__["_meta"] = {"prompt": "p", "input_tokens": 1,
                                           "output_tokens": 1, "seconds": 0.1}
@@ -276,11 +276,11 @@ def test_violation_report_detects_useless_retries(client):
     그러면 재시도 상한을 올릴 것이 아니라 프롬프트를 고쳐야 한다.
     """
     client.violations = [
-        {"round": 0, "seq": 1, "role": "optimize", "attempt": 0,
+        {"round": 0, "seq": 1, "role": "rule_editor", "attempt": 0,
          "code": "w0_too_long", "msg": "x"},
-        {"round": 0, "seq": 1, "role": "optimize", "attempt": 2,
+        {"round": 0, "seq": 1, "role": "rule_editor", "attempt": 2,
          "code": "w0_too_long", "msg": "x"},          # 같은 코드 반복
-        {"round": 0, "seq": 2, "role": "optimize", "attempt": 0,
+        {"round": 0, "seq": 2, "role": "rule_editor", "attempt": 0,
          "code": "banned_substring", "msg": "y"},
     ]
     r = client.violation_report()
@@ -295,7 +295,7 @@ def test_retries_raised_to_three():
 
 
 # ---------------------------------------------------------------------------
-# Architect — A 조건은 표에서 나온 것을 하나도 보지 않는다 (§11.8)
+# RuleWriter — A 조건은 표에서 나온 것을 하나도 보지 않는다 (§11.8)
 # ---------------------------------------------------------------------------
 # 전이가 성립하려면 새 아키텍처에서 **표 없이** 구조가 나와야 한다. 표를
 # 봐야 구조가 나오면 §29.5(c) 재생성이고, 전수를 잴 거면 표를 직접 쓰면
@@ -316,35 +316,35 @@ class _Facts:
     by_feature = {"has_spill": ["학습 51형상 중 정답 집합에 든 것 0개"]}
 
 
-def test_architect_condition_a_contains_no_table_derived_line():
+def test_rule_writer_condition_a_contains_no_table_derived_line():
     """★ 관문. 표에서 나온 문장이 한 줄도 들어가면 안 된다."""
     c = _arch_client()
-    a = c._architect_prompt(condition="A", table_facts=_Facts())
+    a = c._rule_writer_prompt(condition="A", table_facts=_Facts())
     for line in (*_Facts.lines, *_Facts.by_feature["has_spill"]):
         assert line not in a, f"A 조건에 표 문장이 샜다: {line}"
     assert "이 조건 A" in a or "조건 A" in a
 
 
-def test_architect_condition_b_carries_the_aggregates():
+def test_rule_writer_condition_b_carries_the_aggregates():
     c = _arch_client()
-    b = c._architect_prompt(condition="B", table_facts=_Facts())
+    b = c._rule_writer_prompt(condition="B", table_facts=_Facts())
     for line in (*_Facts.lines, *_Facts.by_feature["has_spill"]):
         assert line in b
 
 
-def test_architect_condition_b_refuses_without_facts():
+def test_rule_writer_condition_b_refuses_without_facts():
     """집계 없이 B 라고 부르면 A 와 같아진다 — 조용히 그렇게 되지 않는다."""
     c = _arch_client()
     with pytest.raises(ValueError, match="학습 분할 집계"):
-        c._architect_prompt(condition="B")
-    with pytest.raises(ValueError, match="알 수 없는 Architect 조건"):
-        c._architect_prompt(condition="C")
+        c._rule_writer_prompt(condition="B")
+    with pytest.raises(ValueError, match="알 수 없는 RuleWriter 조건"):
+        c._rule_writer_prompt(condition="C")
 
 
-def test_architect_prompt_has_no_parent_or_case_slots():
+def test_rule_writer_prompt_has_no_parent_or_case_slots():
     """부모·사례·점수를 받지 않는 것이 이 역할의 정의다."""
     c = _arch_client()
-    a = c._architect_prompt(condition="A")
+    a = c._rule_writer_prompt(condition="A")
     for banned in ("부모 규칙:", "### 사례 #", "regret 1.", "val "):
         assert banned not in a
 
@@ -373,7 +373,7 @@ def test_unknown_endpoint_is_rejected():
     llm = OpenAILLM(LLMConfig(model="m", endpoint="v1"), feature_names=[],
                     shape_values=[], cache=False, registry=EMPTY_REG)
     with pytest.raises(ValueError, match="알 수 없는 엔드포인트"):
-        llm._agent("optimize")
+        llm._agent("rule_editor")
 
 
 @pytest.mark.parametrize("endpoint,cls_name", [
@@ -387,7 +387,7 @@ def test_endpoint_picks_the_right_model_class(endpoint, cls_name):
     llm = OpenAILLM(LLMConfig(model="gpt-5.4-mini-2026-03-17",
                               endpoint=endpoint),
                     feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
-    agent = llm._agent("optimize")
+    agent = llm._agent("rule_editor")
     assert type(agent.model).__name__ == cls_name
 
 
@@ -433,7 +433,7 @@ def test_seed_with_responses_endpoint_raises():
     llm = OpenAILLM(LLMConfig(seed=123, endpoint="responses"),
                     feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
     with pytest.raises(ValueError, match="파라미터가 없다"):
-        llm._agent("optimize")
+        llm._agent("rule_editor")
 
 
 def test_seed_with_chat_endpoint_is_sent():
@@ -443,7 +443,7 @@ def test_seed_with_chat_endpoint_is_sent():
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(seed=123, temperature=0.7, endpoint="chat"),
                     feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
-    sent = llm._agent("optimize").model_settings or {}
+    sent = llm._agent("rule_editor").model_settings or {}
     assert sent["seed"] == 123
     assert sent["temperature"] == 0.7
 
@@ -454,7 +454,7 @@ def test_none_values_are_not_sent_at_all():
     os.environ.setdefault("OPENAI_API_KEY", "test-key")
     llm = OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
                     cache=False, registry=EMPTY_REG)
-    sent = llm._agent("optimize").model_settings or {}
+    sent = llm._agent("rule_editor").model_settings or {}
     assert "temperature" not in sent
     assert "seed" not in sent
 
@@ -486,7 +486,7 @@ def test_reasoning_effort_is_explicit_and_recorded():
     assert cfg.to_dict()["reasoning_effort"] == "medium"
 
     llm = OpenAILLM(cfg, feature_names=[], shape_values=[], cache=False, registry=EMPTY_REG)
-    sent = llm._agent("optimize").model_settings or {}
+    sent = llm._agent("rule_editor").model_settings or {}
     assert sent.get("openai_reasoning_effort") == "medium"
 
 
@@ -498,7 +498,7 @@ def test_reasoning_effort_none_sends_nothing():
     llm = OpenAILLM(LLMConfig(reasoning_effort=None), feature_names=[],
                     shape_values=[], cache=False, registry=EMPTY_REG)
     assert "openai_reasoning_effort" not in (
-        llm._agent("optimize").model_settings or {})
+        llm._agent("rule_editor").model_settings or {})
 
 
 def test_every_llm_runner_persists_its_calls():
@@ -595,9 +595,9 @@ def test_intrinsic_shape_fields_are_not_stray(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# §16.1 — Analyst 를 끈 Optimizer 프롬프트 (D-89)
+# §16.1 — Analyst 를 끈 RuleEditor 프롬프트 (D-89)
 # ---------------------------------------------------------------------------
-def _optimize_prompts():
+def _rule_editor_prompts():
     _needs_pydantic_ai()
     import os
 
@@ -616,34 +616,34 @@ def _optimize_prompts():
 
     def render(flag: bool) -> str:
         return llm._user_prompt(
-            "optimize", "", parent=par, parent_n_terms=1,
+            "rule_editor", "", parent=par, parent_n_terms=1,
             hypothesis={"id": "H1", "claim": "c"} if flag else None,
             hypotheses_applied=["H0: x"] if flag else [], analyst=flag)
 
     return render(True), render(False)
 
 
-def test_optimize_prompt_without_analyst_mentions_no_hypothesis():
+def test_rule_editor_prompt_without_analyst_mentions_no_hypothesis():
     """★ 가설 절을 **빈 자리로 남기지 않는다** (§16.1).
 
     "## 이번 가설\n\n(가설 없음)" 을 남기면 모델이 "가설이 있는데 비어
     있다" 로 읽어 조건이 달라진다. 진단 리포트를 만들지도 않는 것과
     같은 원칙이다 — 자리 자체가 없어야 한다.
     """
-    on, off = _optimize_prompts()
+    on, off = _rule_editor_prompts()
     assert "가설" in on
     assert "가설" not in off, "Analyst 를 껐는데 가설을 언급한다"
     assert "## 이번 가설" not in off
     assert "부모 규칙" in off and "사용 가능한 피처" in off
 
 
-def test_optimize_prompt_without_analyst_is_a_deletion():
+def test_rule_editor_prompt_without_analyst_is_a_deletion():
     """★ 끈 프롬프트는 켠 것에서 **문장을 지운 것**이어야 한다.
 
     새 문구를 쓰면 ablation 이 "Analyst 만 다르다" 가 아니게 된다.
     문자 단위 부분수열이면 삭제만 일어난 것이다.
     """
-    on, off = _optimize_prompts()
+    on, off = _rule_editor_prompts()
     it = iter(on)
     assert all(ch in it for ch in off), (
         "끈 프롬프트에 켠 프롬프트에 없는 글자가 있다 — 삭제가 아니라 "

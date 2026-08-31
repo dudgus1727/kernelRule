@@ -64,7 +64,7 @@ def per_run(pattern: str) -> list[dict]:
                 early[1] += 1
                 early[0] += hit
         lit = dodge = m = 0
-        for g in sorted((d / "llm_calls").glob("*optimize.json"))[:MAX_OPT]:
+        for g in sorted((d / "llm_calls").glob("*rule_editor.json"))[:MAX_OPT]:
             r = json.loads(g.read_text())["response"]
             code = (r or {}).get("code") if isinstance(r, dict) else None
             if not code:

@@ -15,7 +15,7 @@
 
 | `new_axes.py` | ✅ | `new-axes.md` | ⚠️ 원본 삭제 |
 | `feature_writer.py` | ✅ | `feature-writer-f1.md` | 유효 — luna 재측정 완료 |
-| `architect_gate.py` | ✅ | `architect-gate.md` | ⚠️ 원본 삭제 (mini 실행만 남음) |
+| `rule_writer_gate.py` | ✅ | `rule-writer-gate.md` | ⚠️ 원본 삭제 (mini 실행만 남음) |
 
 | `score_new_axes.py` | — | `new-axes.md` 채점 | ⚠️ 원본 삭제 |
 | `rescore_canonical.py` | — | `conclusion.md` 의 정준 표 | 유효 |
@@ -77,7 +77,7 @@ python3 experiments/f1_pipeline.py F1 --stage 2      # 1단계 산출물 재사�
 ```
 F3  사람 24개 + physics_seeded 씨앗   1단계를 건너뛴다 (조건이 그렇다)
 F2  기초 5개 + FeatureWriter
-F1  원시 값만 -> FeatureWriter -> Architect 씨앗
+F1  원시 값만 -> FeatureWriter -> RuleWriter 씨앗
 F0  피처 없음
 ```
 

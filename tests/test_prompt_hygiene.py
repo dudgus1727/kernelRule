@@ -122,11 +122,11 @@ def test_schema_descriptions_have_no_table_leak():
 
 
 def test_shared_schema_does_not_mention_a_parent():
-    """★ `RuleOutput` 은 Optimizer 와 Architect 가 **함께** 쓴다.
+    """★ `RuleOutput` 은 RuleEditor 와 RuleWriter 가 **함께** 쓴다.
 
-    설명에 부모 이야기를 넣으면 Architect 가 없는 부모를 찾는다.
-    `_rules_edit.md` 를 Architect 에서 뺀 것과 같은 이유다 (§30.10).
-    교체 지시는 Optimizer 프롬프트의 `budget_note` 가 동적으로 넣는다.
+    설명에 부모 이야기를 넣으면 RuleWriter 가 없는 부모를 찾는다.
+    `_rules_edit.md` 를 RuleWriter 에서 뺀 것과 같은 이유다 (§30.10).
+    교체 지시는 RuleEditor 프롬프트의 `budget_note` 가 동적으로 넣는다.
     """
     from kernelrule.agents.schemas import HAVE_PYDANTIC
 
@@ -137,7 +137,7 @@ def test_shared_schema_does_not_mention_a_parent():
     for fname in ("code", "w0"):
         d = S.RuleOutput.model_fields[fname].description or ""
         assert "부모" not in d, (
-            f"RuleOutput.{fname} 설명이 부모를 말한다 — Architect 에게는 "
+            f"RuleOutput.{fname} 설명이 부모를 말한다 — RuleWriter 에게는 "
             "부모가 없다")
 
 

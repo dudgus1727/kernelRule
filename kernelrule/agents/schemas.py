@@ -22,7 +22,6 @@ from kernelrule.rules.checks import (
 )
 
 __all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "CritiqueOutput",
-           "RuleCritique", "TermCritique",
            "RuleProposal", "SchemaViolation", "validate_rule_proposal",
            "HAVE_PYDANTIC", "check_banned", "MAX_WEIGHTS",
            "N_HYP_MIN", "N_HYP_MAX"]
@@ -171,39 +170,6 @@ class CritiqueOutput:
 
 
 @dataclass
-class TermCritique:
-    """규칙 **한 항**에 대한 심사 (D-85). `w[index]` 가 곱해진 항이 단위다."""
-
-    index: int
-    expression: str = ""
-    physics: str = ""
-    #: ★ 이 심사의 요점. `False` 가 정답인 항이 있다 — 억지로 설명을 지어
-    #: 붙이면 심사가 아무 일도 안 하게 된다.
-    explainable: bool = True
-    why_not: str = ""
-    regime_dependent: bool = False
-    regime: str = ""
-
-
-@dataclass
-class RuleCritique:
-    """규칙 함수 전체에 대한 심사 (D-85).
-
-    ⚠️ **같은 모델이 쓰고 심사한다** (D-45 로 모델이 고정돼 있다).
-    오류가 상관될 수 있고, "설명 가능" 이 물리적 타당성이 아니라 그
-    모델의 일관성일 수 있다. 모델 간 대조는 별도 실험이다.
-    """
-
-    terms: list[TermCritique] = field(default_factory=list)
-    overall: str = ""
-    defects: list[str] = field(default_factory=list)
-
-    @property
-    def unexplained(self) -> list[int]:
-        return [t.index for t in self.terms if not t.explainable]
-
-
-@dataclass
 class RuleProposal:
     """★ diff 가 아니라 **전체 코드**를 받는다 (§11.6).
 
@@ -317,10 +283,10 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
     class RuleOutput(BaseModel):
         """규칙 하나. ★ diff 가 아니라 **전체 코드**다 (§11.6)."""
 
-        # ⚠️ 이 스키마는 **Optimizer 와 Architect 가 함께 쓴다.** 설명에
-        #   부모 이야기를 넣으면 Architect 가 없는 부모를 찾는다 —
-        #   `_rules_edit.md` 를 Architect 에서 뺀 이유와 같다 (§30.10).
-        #   교체 지시는 Optimizer 프롬프트의 `{budget_note}` 가 라운드마다
+        # ⚠️ 이 스키마는 **RuleEditor 와 RuleWriter 가 함께 쓴다.** 설명에
+        #   부모 이야기를 넣으면 RuleWriter 가 없는 부모를 찾는다 —
+        #   `_rules_edit.md` 를 RuleWriter 에서 뺀 이유와 같다 (§30.10).
+        #   교체 지시는 RuleEditor 프롬프트의 `{budget_note}` 가 라운드마다
         #   동적으로 넣는다.
         code: str = Field(
             description=("`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
@@ -354,7 +320,7 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
             """★ 리터럴과 가중치를 **함께** 봐야 한다.
 
             둘을 따로 검사하면 "가중치 8개" 와 "리터럴 1개" 가 각각
-            통과하고 합이 9가 된다. 실제로 Architect 제안 3개가 연속으로
+            통과하고 합이 9가 된다. 실제로 RuleWriter 제안 3개가 연속으로
             여기서 폐기됐고 모델은 이유를 듣지 못했다.
             """
             if (m := literal_budget_message(self.code, len(self.w0))):
@@ -421,37 +387,6 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
 
         categories: list[Category]
         notes: str = Field(default="", description="나누면서 뺀 것")
-
-    class TermCritiqueOut(BaseModel):
-        index: int = Field(description="이 항에 곱해진 w 의 인덱스")
-        expression: str = Field(
-            description="그 항의 식을 그대로 옮겨 적어라 (w[i] 제외)")
-        physics: str = Field(
-            description="이 항이 재는 물리량 **한 문장**. 그리고 그것이 "
-                        "성능을 좌우하는 기전. '크면 좋다' 는 기전이 아니다")
-        explainable: bool = Field(
-            description="물리적 기전으로 설명할 수 있는가. ★ False 가 정답인 "
-                        "항이 있다 — 억지로 지어 붙이지 마라")
-        why_not: str = Field(
-            default="", description="explainable 이 false 면 왜 못 하는가")
-        regime_dependent: bool = Field(
-            default=False, description="특정 체제에서만 말이 되는가")
-        regime: str = Field(default="", description="어느 체제인가")
-
-    class RuleCritiqueOutput(BaseModel):
-        """★ 규칙을 **항 단위로** 심사한다 (D-85).
-
-        `CritiqueOutput`(피처 심사, §11.5)과 다른 것이다.
-        """
-
-        terms: list[TermCritiqueOut] = Field(
-            description="w[i] 가 곱해진 항마다 하나씩. 빠뜨리지 마라")
-        overall: str = Field(
-            description="이 규칙 전체가 무엇을 하는가. 한 문단")
-        defects: list[str] = Field(
-            default_factory=list,
-            description="물리적 결함. 차원 불일치 / 중복 항 / 항등 변환 "
-                        "우회(np.sign, np.isfinite 로 상수 만들기) 등")
 
     class CritiqueOutput(BaseModel):
         has_defect: bool

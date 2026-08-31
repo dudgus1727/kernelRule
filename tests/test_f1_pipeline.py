@@ -69,7 +69,7 @@ def test_architect_mock_refuses_an_empty_feature_list():
     from kernelrule.agents.mock import MockLLM
 
     with pytest.raises(ValueError, match="조용히"):
-        MockLLM("mutate", feature_names=[]).complete("architect", "")
+        MockLLM("mutate", feature_names=[]).complete("rule_writer", "")
 
 
 def test_regime_split_does_not_need_the_registry():

@@ -93,10 +93,10 @@ def test_loop_runs_and_fills_the_archive(loop):
 
 
 def test_llm_call_budget_matches_the_design(loop):
-    """라운드당 진단 1회 + 규칙 n회 (§11.1 — 호출의 약 89%가 Optimizer)."""
+    """라운드당 진단 1회 + 규칙 n회 (§11.1 — 호출의 약 89%가 RuleEditor)."""
     loop.run(3, verbose=False)
     for i, r in enumerate(loop.rounds):
-        assert r.llm_calls["optimize"] == loop.cfg.n_rules_per_round
+        assert r.llm_calls["rule_editor"] == loop.cfg.n_rules_per_round
         # 1라운드는 아카이브가 비어 진단을 건너뛴다
         assert r.llm_calls["analyze"] == (0 if i == 0 else 1)
 
@@ -575,7 +575,7 @@ def test_analyst_off_makes_no_analyze_call(synth_table, tmp_path):
     r = loop.run_round()
     assert r.llm_calls.get("analyze", 0) == 0, "Analyst 를 껐는데 불렀다"
     assert loop.hypotheses == []
-    assert r.n_proposed > 0, "Optimizer 는 그대로 돌아야 한다"
+    assert r.n_proposed > 0, "RuleEditor 는 그대로 돌아야 한다"
 
 
 def test_analyst_on_is_the_default(synth_table, tmp_path):

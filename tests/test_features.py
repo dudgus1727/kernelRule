@@ -336,7 +336,7 @@ def test_load_generated_requires_a_table():
     """★ `table` 에 기본값을 두면 호출부가 빠뜨린다 (D-67).
 
     두었더니 두 곳이 빠뜨렸고 그중 하나가 2단계 경로여서 **형상 수준
-    피처 0개**로 Architect 가 돌았다. 재판정이 정말 필요 없으면
+    피처 0개**로 RuleWriter 가 돌았다. 재판정이 정말 필요 없으면
     `table=None` 을 **명시**해야 한다 — 빠뜨린 것과 구분된다.
     """
     import inspect

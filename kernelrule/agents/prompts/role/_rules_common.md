@@ -1,6 +1,6 @@
-<!-- ★ 규칙 **함수**를 쓰는 역할이 공유하는 하드 제약 (Optimizer + Architect).
+<!-- ★ 규칙 **함수**를 쓰는 역할이 공유하는 하드 제약 (RuleEditor + RuleWriter).
      여기 있는 것은 둘 다에게 참인 것만이다. 한쪽에만 해당하면
-     `_rules_edit.md`(Optimizer) 나 역할 파일로 내려라. -->
+     `_rules_edit.md`(RuleEditor) 나 역할 파일로 내려라. -->
 
 ## 규칙 함수의 형태
 

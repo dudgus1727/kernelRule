@@ -1,7 +1,7 @@
-"""★ 7. Architect A/B 조건 — 전이 주장의 관문.
+"""★ 7. RuleWriter A/B 조건 — 전이 주장의 관문.
 
-    python3 experiments/architect_gate.py A 10
-    python3 experiments/architect_gate.py B 10
+    python3 experiments/rule_writer_gate.py A 10
+    python3 experiments/rule_writer_gate.py B 10
 
 ## 무엇을 재는가
 
@@ -78,7 +78,7 @@ def main(condition: str, n_tries: int,
                     registry=REGISTRY, budget=Budget(), cache=False)
 
     print("=" * 76)
-    print(f"7. Architect 조건 {condition} — {n_tries}회  [{model}]")
+    print(f"7. RuleWriter 조건 {condition} — {n_tries}회  [{model}]")
     print("=" * 76)
     print(f"  학습 {len(train.shapes)}형상 / 검증 {len(val.shapes)}형상")
     print("  A 조건이면 프롬프트에 표에서 나온 문장이 **하나도** 없다\n")
@@ -100,7 +100,7 @@ def main(condition: str, n_tries: int,
     t0 = time.perf_counter()
     for i in range(n_tries):
         try:
-            out = llm.complete("architect", "", condition=condition,
+            out = llm.complete("rule_writer", "", condition=condition,
                                table_facts=facts)
             prop = validate_rule_proposal(out)
             # ★ `check_rule` 은 리포트를 돌려준다. `.raise_if_bad()` 를

@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 
 __all__ = ["BUDGET", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
            "weight_reuse_message", "literal_budget_message",
-           "noop_term_message"]
+           "identity_transform_message", "noop_term_message"]
 
 
 def noop_term_message(code: str) -> str | None:
@@ -39,7 +39,7 @@ def noop_term_message(code: str) -> str | None:
     그런 항은 예산 하나를 그냥 버린다.
 
     문법적으로 합법이라 실행도 되고 예외도 없다 — **조용히 아무 일도
-    하지 않는다.** 그래서 이 검사가 필요하다 (§26.4). Architect A 조건
+    하지 않는다.** 그래서 이 검사가 필요하다 (§26.4). RuleWriter A 조건
     첫 성공 규칙이 `p.log_sol_ms * w[0]` 으로 항 하나를 버렸다.
 
     형상 수준 값이 **`f.*` 와 곱해지면** 의미가 있다 — 그때는 config 수준
@@ -152,12 +152,92 @@ def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
     return counted, branch
 
 
+#: 인자가 유한하면 **언제나 1** 인 호출. 상수를 만드는 데밖에 못 쓴다.
+#: ⚠️ "이 표에서 유한하다" 는 **표 의존 사실**이다 (f 피처 19개 전부에서
+#: 확인, D-78). 다른 표에서는 실제 판별 기능을 가질 수 있으므로 메시지를
+#: "언제나 1" 이 아니라 **"상수 취급 위험"** 으로 쓴다.
+_CONST_CALLS = ("isfinite",)
+
+
+def identity_transform_message(code: str) -> str | None:
+    """★ 항등 변환으로 상수를 만드는가 (D-92).
+
+    ```
+    np.isfinite(x)                    유한하면 언제나 1
+    np.sign(x)                        x > 0 이면 언제나 1
+    x < np.sqrt(x) / np.square(x) < x   둘 다 x < 1 과 같다
+    ```
+
+    **설명 가능성이 아니라 결함이다.** 넷 다 수학적으로 상수/단순 비교와
+    같은데 사람이 읽기 어렵고, "해석 가능한 규칙" 이라는 주장을 갉아먹는다.
+
+    ## 왜 지금 막나
+
+    합산 예산이 리터럴을 막던 동안에는 **우회할 이유가 있었다** — 항 8개를
+    쓰려면 리터럴이 0개여야 했다. D-78 로 분기 비교 상수를 예산에서 빼서
+    그 이유를 없앴고, 실제로 리터럴 비교가 6/6 실행에 나왔다 (D-84).
+    **이유를 없앤 뒤에 막는다** — 순서를 바꾸면 다른 우회를 찾는다.
+
+    거부 메시지에 **대안**을 함께 적는다. 무엇이 금지인지만 말하면 모델은
+    또 다른 우회를 만든다.
+    """
+    try:
+        tree = ast.parse(code.strip())
+    except SyntaxError:
+        return None
+    bad: list[str] = []
+    for n in ast.walk(tree):
+        # np.isfinite(x) — 상수 1 을 만드는 호출
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and isinstance(n.func.value, ast.Name)
+                and n.func.value.id == "np"
+                and n.func.attr in _CONST_CALLS):
+            bad.append(f"np.{n.func.attr}(...) — 인자가 유한하면 상수 1 로 "
+                       "취급될 위험이 있다")
+        # np.sign(x) 이 비교의 한쪽에 오면 사실상 리터럴 1 이다
+        if isinstance(n, ast.Compare):
+            for side in [n.left, *n.comparators]:
+                if (isinstance(side, ast.Call)
+                        and isinstance(side.func, ast.Attribute)
+                        and isinstance(side.func.value, ast.Name)
+                        and side.func.value.id == "np"
+                        and side.func.attr == "sign"):
+                    bad.append("np.sign(...) 을 비교에 썼다 — 양수 입력에서 "
+                               "`< 1` 과 같다")
+            # x < np.sqrt(x) / np.square(x) < x  — 둘 다 x < 1 이다
+            for lo, hi in zip([n.left, *n.comparators][:-1],
+                              [n.left, *n.comparators][1:], strict=False):
+                if _same_arg_transform(lo, hi, "sqrt") \
+                        or _same_arg_transform(hi, lo, "square"):
+                    bad.append("`x < np.sqrt(x)` / `np.square(x) < x` — "
+                               "둘 다 `x < 1` 과 같다")
+    if not bad:
+        return None
+    uniq = sorted(set(bad))
+    return ("항등 변환으로 상수를 만들고 있다 (D-92): " + " / ".join(uniq)
+            + ". ★ 그럴 필요가 없다 — **분기 조건의 비교 상수는 예산에서 "
+              "면제된다** (D-78). `p.<형상값> < 1` 처럼 숫자를 그대로 써라. "
+              "읽는 사람이 물리적 경계를 볼 수 있어야 한다")
+
+
+def _same_arg_transform(a, b, fn: str) -> bool:
+    """`a` 와 `np.<fn>(a)` 가 같은 식인가."""
+    if not (isinstance(b, ast.Call) and isinstance(b.func, ast.Attribute)
+            and isinstance(b.func.value, ast.Name) and b.func.value.id == "np"
+            and b.func.attr == fn and len(b.args) == 1):
+        return False
+    try:
+        return ast.unparse(a) == ast.unparse(b.args[0])
+    except Exception:                                       # noqa: BLE001
+        return False
+
+
 def literal_budget_message(code: str, n_weights: int) -> str | None:
     """숫자 리터럴 + 가중치가 예산을 넘으면 메시지를, 아니면 `None`.
 
     ★ `weight_reuse_message` 와 같은 이유로 따로 뺐다 — LLM 경계에서
     재시도를 걸어야 모델이 무엇이 틀렸는지 듣는다. 이 검사가 정적 단계에만
-    있었을 때 Architect 제안 3개가 연속으로 같은 이유로 폐기됐고, 모델은
+    있었을 때 RuleWriter 제안 3개가 연속으로 같은 이유로 폐기됐고, 모델은
     "가중치 8개면 리터럴을 쓸 수 없다" 를 끝내 알지 못했다.
 
     ★ 세는 일은 `_numeric_literals` 하나가 한다 — `check_rule` 과 여기가
@@ -192,7 +272,7 @@ def weight_reuse_message(code: str) -> str | None:
     코드만 보면 알 수 있다. 스키마 validator 가 이걸 부르면 Pydantic AI 가
     메시지를 모델에 되먹여 **고쳐서 다시 내게** 한다.
 
-    이 검사가 `checks.py` 에만 있었을 때는 Architect 제안이 조용히 폐기됐다
+    이 검사가 `checks.py` 에만 있었을 때는 RuleWriter 제안이 조용히 폐기됐다
     — 모델은 무엇이 틀렸는지 듣지 못하고 같은 실수를 반복했다.
     """
     uses: dict[int, int] = {}
@@ -480,6 +560,9 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     if rep.max_w_index >= 0 and rep.max_w_index + 1 != rep.n_weights:
         bad(f"W0 길이 {rep.n_weights} != 참조한 최대 인덱스 + 1 "
             f"({rep.max_w_index + 1}). 안 쓰는 가중치는 예산 낭비다")
+
+    if (m := identity_transform_message(code)):
+        bad(m)
 
     if rep.budget_used > lim["budget"]:
         bad(f"리터럴 {rep.n_literals} + 가중치 {rep.n_weights} = "

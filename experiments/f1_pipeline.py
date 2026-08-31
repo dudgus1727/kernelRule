@@ -21,7 +21,7 @@
 ## 세 단계
 
     1  FeatureWriter   원시 값만 -> 피처 N개            -> stage1-features/
-    2  Architect       1단계 피처 목록만 -> 씨앗 규칙   -> stage2-architect/
+    2  RuleWriter       1단계 피처 목록만 -> 씨앗 규칙   -> stage2-rule-writer/
     3  RoundLoop       1단계 레지스트리 + 2단계 씨앗    -> stage3-evolution/
 
 **F1/F0 에서는 사람이 만든 24개가 세 단계 어디에도 안 들어간다.** 그것을
@@ -32,7 +32,7 @@
 
     F3  REGISTRY(24개) + physics_seeded 씨앗   = 지금까지의 모든 실행
     F2  기초 5개 + FeatureWriter 로 확장
-    F1  원시 값만 -> FeatureWriter -> Architect 씨앗   ★ 근본 질문
+    F1  원시 값만 -> FeatureWriter -> RuleWriter 씨앗   ★ 근본 질문
     F0  피처 없음 -> FeatureWriter 가 전부
 
 F3 도 **이 경로로** 돌아야 한다. 다른 스크립트로 돌리면 경로 차이가
@@ -84,6 +84,9 @@ F1K_PREREG = {
     "start_library": 5,
     "areas": 7,
     "per_category": 3,
+    # ⚠️ 이 키는 **동결된 기록**이다. D-93 에서 역할 이름을 바꿨지만
+    #   사전 등록은 그때의 이름으로 쓰였다 — 고치면 기록을 다시 쓰는 것이다
+    #   (문서 규칙 2). 살아 있는 이름은 `--n-rule-writer` 다.
     "n_architect": 10,
     "n_seeds": 6,
     "rounds": 12,
@@ -100,7 +103,7 @@ F1K_PREREG = {
                           "정상(다섯을 줬다), §8.3 실패 다수면 검사기·필드 "
                           "문제, 스키마 실패 다수면 프롬프트 문제. "
                           "인프라 -> 검사기 -> 피험자 순서다 (원칙 8)"),
-        "Architect 전부 거부": "멈추고 보고",
+        "RuleWriter 전부 거부": "멈추고 보고",
         "3실행 연속 빈 아카이브": "멈춤"},
     "not_doing": ["나머지 19개를 넣지 않는다 — F3 조건이다",
                   "--recategorize 를 쓰지 않는다 — 고정 일곱",
@@ -160,7 +163,7 @@ def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
             "차례에 만들 것이 없어집니다.")
 
 
-#: Architect 산출물이 정적 검사에 걸릴 때 몇 번까지 다시 부를까.
+#: RuleWriter 산출물이 정적 검사에 걸릴 때 몇 번까지 다시 부를까.
 #: ★ 전부 실패하면 **에러다** — 씨앗 없이 조용히 진행하지 않는다 (§26.4).
 ARCH_RETRIES = 3
 
@@ -507,7 +510,7 @@ def _features_module(gen: FeatureRegistry, base: FeatureRegistry) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 2단계 — Architect
+# 2단계 — RuleWriter
 # ---------------------------------------------------------------------------
 def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
     """씨앗 규칙을 만든다. 학습 점수 최고를 고른다 — **홀드아웃은 안 본다**."""
@@ -515,7 +518,7 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
     from kernelrule.core.splits import is_unsealed
     from kernelrule.rules.checks import check_rule
 
-    out = d / "stage2-architect"
+    out = d / "stage2-rule-writer"
     (out / "candidates").mkdir(parents=True, exist_ok=True)
 
     if a.condition == "F3" and a.seed_source == "physics_seeded":
@@ -529,7 +532,7 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
                                           "source": "physics_seeded"})
         return chosen
 
-    llm = _make_llm(a, registry=reg, budget=Budget(max_calls=a.n_architect * 3))
+    llm = _make_llm(a, registry=reg, budget=Budget(max_calls=a.n_rule_writer * 3))
     facts = TableFacts.compute(table, splits.train)
     loop = _loop(a, table, matrix, splits, llm, run_id=f"arch-{a.condition}")
     rows: list[dict] = []
@@ -538,17 +541,17 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
     def dump() -> None:
         _dump_json(out / "summary.json", {
             "condition": a.condition, "model": a.model, "dry_run": a.dry_run,
-            "n_tries": a.n_architect, "n_ok": sum(r["ok"] for r in rows),
+            "n_tries": a.n_rule_writer, "n_ok": sum(r["ok"] for r in rows),
             "seconds": round(time.perf_counter() - t0, 1), "tries": rows})
         if hasattr(llm, "dump"):
             llm.dump(out / "llm_calls")
 
     try:
-        for i in range(a.n_architect):
+        for i in range(a.n_rule_writer):
             row = {"i": i, "ok": False}
             for attempt in range(ARCH_RETRIES):
                 try:
-                    res = llm.complete("architect", "", condition="A",
+                    res = llm.complete("rule_writer", "", condition="A",
                                        table_facts=facts, registry=reg)
                     prop = validate_rule_proposal(res)
                     check_rule(prop.code, feature_names=matrix.feature_names(),
@@ -575,14 +578,14 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
         #   1라운드가 빈 부모에서 출발하고, 그러면 "리포트를 읽고 고칠 수
         #   있는가" 라는 질문 자체가 성립하지 않는다.
         raise RuntimeError(
-            f"Architect {a.n_architect}회 x 재시도 {ARCH_RETRIES} 가 전부 "
+            f"RuleWriter {a.n_rule_writer}회 x 재시도 {ARCH_RETRIES} 가 전부 "
             f"실패했다. 씨앗 없이 진행하지 않는다 — F1 피처가 규칙을 "
             f"세우기에 부족하다는 것도 **결과**이므로 여기서 멈춘다. "
             f"산출물은 {out} 에 있다.")
     best = min(ok, key=lambda r: r["fit_regret"])
-    chosen = {"source": f"architect-try{best['i']:02d}", "code": best["code"],
+    chosen = {"source": f"rule_writer-try{best['i']:02d}", "code": best["code"],
               "w0": best["w0"], "fit_regret": best["fit_regret"],
-              "why": f"{len(ok)}/{a.n_architect} 성공 중 학습 점수 최고",
+              "why": f"{len(ok)}/{a.n_rule_writer} 성공 중 학습 점수 최고",
               "all_fit_regret": sorted(r["fit_regret"] for r in ok),
               # ★ 4-3 — 선택 시점에 무엇을 봤는가를 **기록으로** 남긴다.
               #   절차로는 지켜지고 있지만 나중에 증거가 필요하다.
@@ -705,8 +708,8 @@ def main() -> None:
                          "축으로 보강할 때 쓴다. ★ 보강분은 **별도 조건**"
                          "이므로 비교표에 섞지 마라")
     ap.set_defaults(categorize=False)
-    ap.add_argument("--n-architect", type=int, default=10)
-    ap.add_argument("--seed-source", choices=("architect", "physics_seeded"),
+    ap.add_argument("--n-rule-writer", type=int, default=10)
+    ap.add_argument("--seed-source", choices=("rule_writer", "physics_seeded"),
                     default=None,
                     help="씨앗을 어디서. 기본은 F3 면 physics_seeded, "
                          "나머지는 architect. ★ F3 에 architect 를 주면 "
@@ -720,7 +723,7 @@ def main() -> None:
     #   씨앗 하나를 공유하므로, 캠페인끼리 견줄 때 씨앗이 교락이 된다 —
     #   씨앗에 대해서는 실효 표본이 1 대 1 이다 (D-82, 원칙 28).
     ap.add_argument("--seed-from", metavar="RUN_DIR",
-                    help="다른 캠페인의 stage2-architect/chosen.json 을 "
+                    help="다른 캠페인의 stage2-rule-writer/chosen.json 을 "
                          "이 캠페인의 씨앗으로 쓴다. 출처를 chosen.json 에 "
                          "기록한다 — 2단계가 만든 것으로 오인되면 안 된다")
     # ★ §16.1 ablation. 끄면 진단 리포트도 가설도 없다 (D-89).
@@ -757,7 +760,7 @@ def main() -> None:
                          "아낀다. 가져온 뒤 --stage 2 로 시작하라")
     a = ap.parse_args()
     if a.seed_source is None:
-        a.seed_source = "physics_seeded" if a.condition == "F3" else "architect"
+        a.seed_source = "physics_seeded" if a.condition == "F3" else "rule_writer"
 
     tag = a.tag or ("mock" if a.dry_run else a.model)
     d = OUT / f"f1pipe-{a.condition}-{tag}"
@@ -843,7 +846,7 @@ def main() -> None:
         # ★ 최종 분할이 열린 채로 돈 실행인가 (§30.15)
         "unsealed": is_unsealed(),
         "seed": a.seed, "rounds": a.rounds, "n_seeds": a.n_seeds,
-        "n_features": a.n_features, "n_architect": a.n_architect,
+        "n_features": a.n_features, "n_rule_writer": a.n_rule_writer,
         "bundle": BUNDLE, "split_kind": splits.kind,
         "registry": {"name": reg.name, "n": len(reg._items),
                      "names": sorted(reg._items)},
@@ -856,13 +859,13 @@ def main() -> None:
     # ★ 씨앗을 다른 캠페인에서 가져온다 (D-83). 2단계보다 **먼저** 처리해
     #   `--stage 3` 만으로도 성립하게 한다.
     if a.seed_from:
-        src = Path(a.seed_from) / "stage2-architect" / "chosen.json"
+        src = Path(a.seed_from) / "stage2-rule-writer" / "chosen.json"
         if not src.exists():
             raise SystemExit(f"{src} 가 없다 — 가져올 씨앗이 없다")
         got = json.loads(src.read_text())
         got["copied_from"] = str(src)
         got["source"] = f"{got.get('source', '?')} (복사: {a.seed_from})"
-        dst = d / "stage2-architect"
+        dst = d / "stage2-rule-writer"
         dst.mkdir(parents=True, exist_ok=True)
         (dst / "chosen.json").write_text(
             json.dumps(got, ensure_ascii=False, indent=1))
@@ -871,11 +874,11 @@ def main() -> None:
 
     if 3 in stages or 2 in stages:
         if 2 in stages:
-            print("\n--- 2단계 Architect ---")
+            print("\n--- 2단계 RuleWriter ---")
             chosen = stage2(a, d, table, matrix, reg, splits)
         else:
             chosen = json.loads(
-                (d / "stage2-architect" / "chosen.json").read_text())
+                (d / "stage2-rule-writer" / "chosen.json").read_text())
             print(f"\n--- 2단계 건너뜀 — 저장된 씨앗 {chosen['source']} ---")
 
         # 3단계

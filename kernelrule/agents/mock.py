@@ -244,21 +244,19 @@ class MockLLM:
     def _generate(self, role: str, prompt: str, **kw) -> Any:
         if role == "analyze":
             return self._diagnose(prompt)
-        if role == "optimize":
+        if role == "rule_editor":
             return self._optimize(prompt, **kw)
         if role == "feature":
             return self._feature()
-        if role == "architect":
-            return self._architect(**kw)
+        if role == "rule_writer":
+            return self._rule_writer(**kw)
         if role == "categorize":
             return {"categories": [
                 {"name": f"mock_area_{i}", "description": f"목 영역 {i}"}
                 for i in range(5)], "notes": "목이 나눈 영역이다"}
-        if role == "critique":
-            return self._critique(**kw)
         raise ValueError(f"알 수 없는 역할: {role!r}")
 
-    # -- FeatureWriter / Architect — ★ 배관 확인용 (§30.9) ----------------
+    # -- FeatureWriter / RuleWriter — ★ 배관 확인용 (§30.9) ----------------
     #
     #   실제 LLM 없이 F0~F3 파이프라인이 **끝까지 도는지** 보려면 이 두
     #   역할이 있어야 한다. 목이 만드는 피처는 물리적으로 의미 없다 —
@@ -294,30 +292,7 @@ class MockLLM:
                 "direction": "higher_is_worse", "expected_range": [0.0, 1e6],
                 "rationale": "목이 만든 피처다 — 배관 확인용이다"}
 
-    def _critique(self, *, code: str = "", **_kw) -> dict:
-        """★ 항 단위 심사의 배관 확인용 (D-85).
-
-        **마지막 항을 항상 "설명 불가" 로 낸다** — 절제 검증(`--ablate`)이
-        실제로 도는지 보려면 설명 불가가 하나는 나와야 한다. 물리적으로
-        의미 있는 판정이 아니다.
-        """
-        import re
-
-        idx = sorted({int(i) for i in re.findall(r"\bw\[(\d+)\]", code)})
-        terms = []
-        for k, i in enumerate(idx):
-            last = k == len(idx) - 1
-            terms.append({
-                "index": i, "expression": f"(mock 항 {i})",
-                "physics": "목이 만든 설명이다 — 배관 확인용이다",
-                "explainable": not last,
-                "why_not": "목이 마지막 항을 항상 설명 불가로 낸다" if last
-                           else "",
-                "regime_dependent": False, "regime": ""})
-        return {"terms": terms, "overall": "목이 만든 심사다",
-                "defects": ["(mock) 결함 없음"]}
-
-    def _architect(self, **kw) -> dict:
+    def _rule_writer(self, **kw) -> dict:
         """씨앗 규칙. **주어진 피처 이름만** 쓴다 (F1 이면 F1 피처).
 
         `self.features` 가 비어 있으면 조용히 사람 피처로 떨어지지 않고
@@ -332,7 +307,7 @@ class MockLLM:
                 self.rng.choice(len(self.features), size=n, replace=False)]
         code, w0 = _render_rule([f"f.{x}" for x in pick], None)
         return {"code": code, "w0": w0,
-                "changes": "목 Architect 씨앗 — 주어진 피처에서 골랐다"}
+                "changes": "목 RuleWriter 씨앗 — 주어진 피처에서 골랐다"}
 
     def _diagnose(self, prompt: str) -> dict:
         """진단 — 리포트에서 **미사용 피처**를 읽어 가설로 만든다.

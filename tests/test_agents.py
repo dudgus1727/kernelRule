@@ -102,7 +102,7 @@ def test_mutate_changes_structure_not_just_weights():
                                "    return s\n", w0=[1.0])
     codes = set()
     for _ in range(12):
-        out = m.complete("optimize", "x", parent=parent,
+        out = m.complete("rule_editor", "x", parent=parent,
                          hypothesis={"measurable_with": ["has_spill"]})
         codes.add(out["code"])
     assert len(codes) > 1, "구조가 하나도 안 바뀐다"
@@ -119,7 +119,7 @@ def test_mutate_follows_the_hypothesis():
                                "    return s\n", w0=[1.0])
     hits = 0
     for _ in range(20):
-        out = m.complete("optimize", "x", parent=parent,
+        out = m.complete("rule_editor", "x", parent=parent,
                          hypothesis={"measurable_with": ["is_two_stage"]})
         if "f.is_two_stage" in out["code"]:
             hits += 1
@@ -130,7 +130,7 @@ def test_mutate_respects_the_literal_budget():
     m = MockLLM("mutate", seed=5, feature_names=FEATS * 3)
     p = None
     for _ in range(40):
-        out = m.complete("optimize", "x", parent=p,
+        out = m.complete("rule_editor", "x", parent=p,
                          hypothesis={"measurable_with": FEATS})
         assert len(out["w0"]) <= 8, out["w0"]
         p = validate_rule_proposal(out)
@@ -153,10 +153,10 @@ def test_diagnose_reads_the_unused_column():
 # ---------------------------------------------------------------------------
 def test_replay_reproduces_exactly(tmp_path):
     a = MockLLM("mutate", seed=11, feature_names=FEATS)
-    outs = [a.complete("optimize", f"p{i}") for i in range(6)]
+    outs = [a.complete("rule_editor", f"p{i}") for i in range(6)]
     a.dump(tmp_path / "calls")
     b = MockLLM("replay", replay_dir=tmp_path / "calls")
-    assert [b.complete("optimize", f"p{i}") for i in range(6)] == outs
+    assert [b.complete("rule_editor", f"p{i}") for i in range(6)] == outs
 
 
 def test_replay_missing_dir_is_an_error(tmp_path):
@@ -167,12 +167,12 @@ def test_replay_missing_dir_is_an_error(tmp_path):
 
 def test_replay_detects_a_changed_loop(tmp_path):
     a = MockLLM("mutate", seed=2, feature_names=FEATS)
-    a.complete("optimize", "x")
+    a.complete("rule_editor", "x")
     a.dump(tmp_path / "c")
     b = MockLLM("replay", replay_dir=tmp_path / "c")
-    b.complete("optimize", "x")
+    b.complete("rule_editor", "x")
     with pytest.raises(SchemaViolation, match="replay"):
-        b.complete("optimize", "y")
+        b.complete("rule_editor", "y")
 
 
 def test_unknown_mode_is_an_error():
@@ -183,8 +183,8 @@ def test_unknown_mode_is_an_error():
 def test_deterministic_across_instances():
     a = MockLLM("mutate", seed=9, feature_names=FEATS)
     b = MockLLM("mutate", seed=9, feature_names=FEATS)
-    assert ([a.complete("optimize", "x") for _ in range(5)]
-            == [b.complete("optimize", "x") for _ in range(5)])
+    assert ([a.complete("rule_editor", "x") for _ in range(5)]
+            == [b.complete("rule_editor", "x") for _ in range(5)])
 
 
 # ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ def test_prompts_never_hardcode_the_budget_number(monkeypatch):
     from kernelrule.rules import checks
 
     files = ["role/_rules_common.md", "role/_rules_edit.md",
-             "role/optimize.md", "role/architect.md"]
+             "role/rule_editor.md", "role/rule_writer.md"]
     monkeypatch.setattr(checks, "BUDGET", 16)
     for f in files:
         txt = load_prompt(f)
@@ -373,6 +373,6 @@ def test_prompt_tells_the_model_branch_constants_are_free():
     """
     from kernelrule.agents.openai_client import load_prompt
 
-    for f in ("role/_rules_common.md", "role/architect.md"):
+    for f in ("role/_rules_common.md", "role/rule_writer.md"):
         txt = load_prompt(f)
         assert "분기" in txt and "비교 상수" in txt, f"{f}: 면제 설명이 없다"

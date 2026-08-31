@@ -1,4 +1,21 @@
-"""★ Critic (D-85) — 규칙을 **항 단위로** 심사하고, 그 판정을 검증한다.
+"""★ Critic — 규칙을 **항 단위로** 심사한다. ★ **루프 밖이다** (D-92).
+
+두 관문(D-85 "빼도 안 나빠지나", D-87 "빼면 학습만 나빠지나")이 다
+실패했고 **목 Critic 이 실제보다 높았다** (0.79 vs 0.50 / 0.36).
+설명 가능성이 성능과 안 붙으므로 **벌점으로 진화 방향을 바꿀 근거가
+없고, 방향을 안 바꾸면 루프에 있을 이유가 없다.**
+
+그래서 프롬프트와 스키마를 **이 파일이 들고 있다.** `kernelrule/agents/`
+는 루프가 부르는 넷만 안다 (`register_role`, D-92).
+
+남긴 쓰임 셋 중 둘이 여기 있다.
+
+```
+(a) 항등 변환 검사   -> `rules/checks.py` 로 옮겼다 (D-92). 여기 없다
+(b) 실행 후 주석     -> `judge`. ★ **최종 규칙 하나에만** 부른다
+(c) 전이 검증        -> `gate --other <5090>` (표가 오면)
+```
+
 
 ```
 python3 experiments/critic.py judge  --runs f1pipe-F3-arch24-s0 ...   # LLM
@@ -65,6 +82,12 @@ def _train_groups(table):
 
 
 def _best_rule(run: str) -> dict:
+    """★ 실행당 **최종 규칙 하나**. 시드당 1회다 (D-92).
+
+    루프 안에서 라운드마다 부르지 않는다 — 그러면 방향을 바꾸게 되고,
+    두 관문이 그럴 근거를 못 줬다. 그리고 규칙이 완성된 뒤라 **맥락이
+    온전하다**는 이점도 있다.
+    """
     arc = [json.loads(ln) for ln in
            (Path("runs") / run / "archive.jsonl").read_text().splitlines()
            if ln.strip()]
@@ -72,6 +95,65 @@ def _best_rule(run: str) -> dict:
 
 
 # ---------------------------------------------------------------- judge (LLM)
+def _register_critic(llm) -> None:
+    """★ 루프 밖 역할을 여기서 등록한다 (D-92).
+
+    프롬프트도 스키마도 이 파일 곁에 둔다 — `kernelrule/agents/` 에 남기면
+    "언젠가 켤 것" 으로 읽히고 조건 목록과 ablation 표에 끌려다닌다.
+    """
+    from pydantic import BaseModel, Field
+
+    class TermOut(BaseModel):
+        index: int = Field(description="이 항에 곱해진 w 의 인덱스")
+        expression: str = Field(description="그 항의 식 (w[i] 제외)")
+        physics: str = Field(
+            description="이 항이 재는 물리량 **한 문장**과 그것이 성능을 "
+                        "좌우하는 기전. '크면 좋다' 는 기전이 아니다")
+        explainable: bool = Field(
+            description="물리적 기전으로 설명할 수 있는가. ★ False 가 정답인 "
+                        "항이 있다 — 억지로 지어 붙이지 마라")
+        why_not: str = Field(default="", description="못 하면 왜")
+        regime_dependent: bool = Field(default=False)
+        regime: str = Field(default="")
+
+    class CritiqueOut(BaseModel):
+        terms: list[TermOut] = Field(
+            description="w[i] 가 곱해진 항마다 하나씩. 빠뜨리지 마라")
+        overall: str = Field(description="규칙 전체가 무엇을 하는가. 한 문단")
+        defects: list[str] = Field(default_factory=list)
+
+    body = (Path(__file__).parent / "prompts" / "critique.md").read_text()
+    llm.register_role("critique", instructions=body, output_type=CritiqueOut)
+
+
+def _critic_user_prompt(code: str, registry) -> str:
+    """규칙 코드 + **쓰인 물리량만**.
+
+    안 주는 것과 이유:
+
+    ```
+    점수 / 사례 / 부모   만든 맥락을 알면 판단이 그쪽으로 끌린다
+    가중치 값            표에 맞춘 값이라 "표가 골랐으니 맞겠지" 가 된다
+    하드웨어 상수        "물리적 의미가 있나" 를 묻지 "A6000 에 맞나" 를 안 묻는다
+    라이브러리 전체       "안 쓴 것을 쓰라" 는 제안이 섞인다 — Critic 의 일이 아니다
+    ```
+    """
+    import re
+
+    from kernelrule.features import render_features
+
+    if not code.strip():
+        raise ValueError("critique 는 규칙 코드를 받아야 한다")
+    used = set(re.findall(r"\b[fp]\.(\w+)", code))
+    sub = type(registry)(f"{registry.name}-used")
+    for n in sorted(used & set(registry._items)):
+        sub.add(registry[n])
+    block = (render_features(sub, include_observed=False) if sub._items
+             else "(피처 목록 없음)")
+    return ("## 규칙 함수\n\n```python\n" + code.strip()
+            + "\n```\n\n## 쓰인 물리량\n\n" + block + "\n")
+
+
 def cmd_judge(a) -> None:
     import numpy as np
 
@@ -85,6 +167,7 @@ def cmd_judge(a) -> None:
                     shape_values=REGISTRY.names(shape_level=True),
                     registry=REGISTRY, cache=False,
                     budget=Budget(max_calls=len(a.runs) * 3))
+    _register_critic(llm)
     # ★ 순서 섞기 (D-86). 항 순서를 바꾸고 `w` 인덱스를 다시 매긴다 —
     #   Critic 이 "마지막 항" 을 지목하는 것이 **위치 편향**인지 본다.
     #   식 자체는 그대로이므로, 같은 식을 지목하면 편향이 아니다.
@@ -98,7 +181,7 @@ def cmd_judge(a) -> None:
             order = [int(i) for i in rng.permutation(sorted(exprs))]
             code = reorder_terms(code, order)
             print(f"  {run}  순서 {order}")
-        res = llm.complete("critique", "", code=code, registry=REGISTRY)
+        res = llm.complete("critique", _critic_user_prompt(code, REGISTRY))
         n_un = sum(1 for t in res["terms"] if not t.get("explainable", True))
         print(f"  {run:32s} 항 {len(res['terms']):2d}  설명 불가 {n_un}")
         for t in res["terms"]:
@@ -208,7 +291,7 @@ def cmd_ablate(a) -> None:
 
 # ----------------------------------------------------------- rank (LLM)
 def cmd_rank(a) -> None:
-    """Architect 후보들을 심사해 **학습 점수와 다른 순서**가 되는지 본다.
+    """RuleWriter 후보들을 심사해 **학습 점수와 다른 순서**가 되는지 본다.
 
     ★ 지금 씨앗 선택은 학습 regret 하나로 한다. 4차(D-84)가 보인 것은
     씨앗의 **피처 다양성**이 하류를 규정한다는 것인데 학습 점수는 그것을
@@ -222,7 +305,7 @@ def cmd_rank(a) -> None:
 
     # ★ 후보는 `summary.json` 의 `tries` 에 코드와 학습 점수가 함께 있다.
     #   `candidates/` 디렉토리는 `.py` 사본이라 점수가 없다.
-    summ = Path(a.campaign) / "stage2-architect" / "summary.json"
+    summ = Path(a.campaign) / "stage2-rule-writer" / "summary.json"
     tries = json.loads(summ.read_text())["tries"]
     cands = [t for t in tries if t.get("ok") and t.get("code")
              and t.get("fit_regret") is not None]
@@ -234,9 +317,11 @@ def cmd_rank(a) -> None:
                     shape_values=REGISTRY.names(shape_level=True),
                     registry=REGISTRY, cache=False,
                     budget=Budget(max_calls=len(cands) * 2))
+    _register_critic(llm)
     rows = []
     for c in cands:
-        res = llm.complete("critique", "", code=c["code"], registry=REGISTRY)
+        res = llm.complete("critique",
+                           _critic_user_prompt(c["code"], REGISTRY))
         n_ok = sum(1 for t in res["terms"] if t.get("explainable", True))
         rows.append(dict(name=f"try{c['i']:02d}", train=c["fit_regret"],
                          n_terms=len(res["terms"]), n_explainable=n_ok,

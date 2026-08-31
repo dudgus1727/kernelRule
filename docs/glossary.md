@@ -113,10 +113,16 @@ regret@k = (규칙이 고른 상위 k 중 최선의 시간) / (그 형상의 최
 | 이름 | 역할 문자열 | 상태 | 하는 일 |
 |---|---|---|---|
 | **Analyst** | `analyze` | 구현 | 진단 리포트를 읽고 **가설**을 낸다. 코드는 안 쓴다 (§11.3) |
-| **Optimizer** | `optimize` | 구현 | 부모 규칙 + 가설 → **구조**를 고친다. 가중치는 안 맞춘다 (§29) |
+<!-- ★ 이름이 바뀌었다 (2026-08-31, D-93). 옛 산출물을 읽을 때의 대응표:
+       Architect -> RuleWriter,  Optimizer -> RuleEditor
+     ★ alias 를 두지 않았다 — 두 이름이 공존하면 갈린다 (원칙 2).
+       옛 `runs/` 는 `experiments/rename_roles.py` 로 한 번에 옮겼고
+       역할별 호출 수 합이 같음을 대조했다.
+     ★ Auditor / Critic 은 루프에서 뺐다 (§16.1, D-92). -->
+| **RuleEditor** | `rule_editor` | 구현 | 부모 규칙 + 가설 → **구조**를 고친다. 가중치는 안 맞춘다 (§29) |
 | **FeatureWriter** | `feature` | ⛔ 미구현 | 물리량을 **피처 함수**로 정의한다 (§11.4) |
 | **Critic** | `critique` | ⛔ 미구현 | 규칙·피처의 **반증을 시도**한다 (§11.5) |
-| **Architect** | `architect` | 구현 | 물리만 보고 **처음부터** 쓴다. ★ 루프 밖 |
+| **RuleWriter** | `rule_writer` | 구현 | 물리만 보고 **처음부터** 쓴다. ★ 루프 밖 |
 
 > ⛔ 옛 이름 `Diagnostician` / `Instrumenter` / `Auditor` 는 쓰지 않는다.
 
@@ -124,10 +130,10 @@ regret@k = (규칙이 고른 상위 k 중 최선의 시간) / (그 형상의 최
 결과이고, "Analyst 가 진단 리포트를 분석한다" 가 자연스럽다.
 `report/diagnostic.py` 도 유지한다.
 
-### Architect 의 위상 — 라운드 루프의 일부가 아니다
+### RuleWriter 의 위상 — 라운드 루프의 일부가 아니다
 
 | 용도 | 내용 |
 |---|---|
 | **주** | 전이 주장 검증 — "새 GPU 에서 표 없이 구조를 만들 수 있는가" |
-| 부수 | ablation — "반복이 기여하는가". 단 A 조건은 표 접근과 교락돼 있어 깨끗하지 않다. 깨끗한 비교는 **Architect B vs 루프** (표 접근이 통제됨) |
+| 부수 | ablation — "반복이 기여하는가". 단 A 조건은 표 접근과 교락돼 있어 깨끗하지 않다. 깨끗한 비교는 **RuleWriter B vs 루프** (표 접근이 통제됨) |
 | ⛔ 기각 | 진화의 씨앗. 씨앗 없이 시작한 것보다 나빴다 (`artifacts/seed-ablation.md`) |

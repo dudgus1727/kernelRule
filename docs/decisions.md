@@ -4361,3 +4361,167 @@ A - C  +0.0191 = 시드 폭의 1.5배    ★ 범위 안 겹침
 
 진단 리포트를 매 라운드 만드는 대신 **가설 은행을 돌려 쓰는 것**만으로
 중복 문제는 사라진다. 다만 성능의 58% 를 포기하므로 지금은 권하지 않는다.
+
+---
+
+## D-92  Critic 을 루프에서 뺐다 — 방향을 안 바꾸면 있을 이유가 없다
+
+**날짜** 2026-08-31
+**근거** [artifacts/critic.md](artifacts/critic.md) (D-85) ·
+[artifacts/critic-gate.md](artifacts/critic-gate.md) (D-87) ·
+[artifacts/critic-shuffle.md](artifacts/critic-shuffle.md) (D-86)
+**고정** `tests/test_role_names.py`
+
+```
+관문 1 (D-85) 빼도 안 나빠지나      실제 0.50 = 무작위
+관문 2 (D-87) 빼면 학습만 나빠지나   실제 0.36 (목 0.36~0.43, 무작위 0.50)
+목 Critic (아무 근거 없이 마지막 항)  0.79
+```
+
+**설명 가능성이 성능과 안 붙는다.** 벌점으로 진화 방향을 바꿀 근거가
+없고, **방향을 안 바꾸면 루프에 있을 이유가 없다** — 비용만 쓰고 조건만
+늘린다.
+
+`dead-terms.md` 가 반대편에서 같은 것을 보였다 — **빼면 학습이 좋아지는
+항 일곱 중 여섯을 Critic 이 "설명 가능" 이라고 했다.**
+
+### 뺀 것
+
+```
+kernelrule/agents/prompts/role/critique.md
+RuleCritique / TermCritique / RuleCritiqueOutput / TermCritiqueOut
+role="critique" 분기와 _critique_prompt
+_NEEDS_HW / _WRITES_RULES / _EDITS_RULES 와 루프 호출 카운터의 critique
+§16.1 ablation 표의 "+ Auditor" 줄
+```
+
+### ★ 살린 것 셋 — 버린 것이 아니다
+
+**(a) 항등 변환을 정적 검사로** — `rules/checks.py::identity_transform_message`.
+
+```
+np.isfinite(x)                       유한하면 상수 1
+np.sign(x) 을 비교에                  양수 입력에서 < 1 과 같다
+x < np.sqrt(x) / np.square(x) < x    둘 다 x < 1
+```
+
+**이것은 설명 가능성이 아니라 결함이다.** D-78 로 우회할 이유를 먼저
+없앴고(분기 비교 상수 예산 면제) 리터럴 비교가 6/6 실행에 나왔으므로
+(D-84) **"이유를 없애고 그것이 듣는지 본 뒤 막는다" 는 조건이 충족됐다.**
+
+★ **되돌려서 잡는지 확인했다** (D-39 계열) — 아카이브 489규칙 중 51개
+(10.4%)를 잡고, `sign`/`sqrt`/`isfinite` 세 형태가 실제 규칙에서 나온다.
+거부 메시지에 **대안**("리터럴은 예산에서 면제된다, D-78")을 함께 적는다
+— 금지만 말하면 또 다른 우회를 만든다.
+
+⚠️ "이 표에서 유한하다" 는 표 의존 사실이므로 메시지를 **"상수 취급
+위험"** 으로 쓴다.
+
+**(b) 실행 후 주석** — `experiments/critic.py judge`. **최종 규칙
+하나에만** 부른다 (시드당 1회). 규칙이 완성된 뒤라 맥락이 온전하다.
+
+**(c) 전이 검증** — `critic-transfer-prereg.md` 그대로. "나쁘다" 가
+아니라 **"일반화 안 된다"** 를 잰다.
+
+### 루프 밖 역할은 **쓰는 쪽이 들고 온다**
+
+`OpenAILLM.register_role(name, instructions, output_type)` 을 뒀다.
+프롬프트(`experiments/prompts/critique.md`)와 스키마를
+`experiments/critic.py` 가 소유한다.
+
+**루프가 안 부르는 역할을 `kernelrule/agents/` 에 남겨 두면 "언젠가 켤
+것" 으로 읽히고 조건 목록과 ablation 표에 계속 끌려다닌다.** 예산·재시도·
+추적·`dump()` 는 그대로 쓴다 (D-33).
+
+---
+
+## D-93  Architect / Optimizer -> RuleWriter / RuleEditor — alias 없이
+
+**날짜** 2026-08-31
+**이전 스크립트** `experiments/rename_roles.py`
+**고정** `tests/test_role_names.py`
+
+```
+Architect   "건축가" — 시스템 전체를 설계하는 사람
+실제        피처 목록을 보고 score() 하나를 쓴다. 10회 뽑아 하나를 씨앗으로
+            ★ RuleEditor 와 같은 크기의 일인데 이름만 크다
+
+Optimizer   ★ 최적화를 하지 않는다
+            구조를 편집하고 w0 를 준다. 최적화는 fit_weights 가 한다
+```
+
+`Sm80Backend` / `Diagnostician` 과 같은 부류다 — **이름이 하는 일과 다르면
+그 이름으로 설계를 이야기하게 된다.**
+
+### ★ alias 를 두지 않았다
+
+옛 이름을 읽는 호환 경로를 만들면 **두 이름이 공존하고 그것이 갈린다** —
+`is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
+`load_generated` / `approx_equal` / 예산 상수에 이은 여덟 번째가 된다
+(원칙 2).
+
+**대신 옛 산출물을 한 번에 옮겼다.**
+
+```
+runs/*/llm_calls/*.json 의 role,  config.json,  rounds.jsonl,  summary.json
+runs/*/stage2-architect/  ->  stage2-rule-writer/     (10개 디렉토리)
+파일 6,713개 · optimize 7,216건 · architect 3건
+★ 집계 대조 — 역할별 호출 수 합이 같다
+   {rule_editor 6649, analyze 464, feature 38, diagnose 23}
+```
+
+**그리고 alias 대신 시험이 막는다** — 코드에 옛 이름이 문자열로 남으면
+`test_no_old_role_string_literals` 가 실패한다.
+
+### ⚠️ 이전 스크립트가 **자기 자신**을 치환했다
+
+일괄 치환을 `experiments/*.py` 전체에 돌렸더니 `rename_roles.py` 의
+`RENAME` 이 **항등 사상**이 됐다.
+
+```python
+RENAME = {"rule_writer": "rule_writer", "rule_editor": "rule_editor"}
+```
+
+그 상태로 다시 돌리면 **아무것도 안 옮기고 "남은 옛 이름 0" 을 보고한다.**
+실제 변환은 그 전 실행에서 이미 끝나 있어 자료는 무사했지만, 순서가
+반대였으면 조용히 실패했다.
+
+★ **그리고 같은 일이 곧바로 두 번째로 일어났다.** `tests/*.py` 에 같은
+일괄 치환을 돌렸더니 이번에는 **가드 시험 자신**이 당했다 —
+`_OLD_ROLES = ("architect", "optimize")` 가 `("rule_writer",
+"rule_editor")` 가 됐다. 검사기가 자기가 찾아야 할 것을 잊은 것이다.
+
+```
+일괄 치환은 **치환 표와 검사기 자신**을 건드린다.
+그 둘은 치환 대상에서 빼거나, 뺐는지 시험으로 고정하라.
+```
+
+이번에는 `test_rename_map_is_not_identity` 와 제외 목록이 잡았다 —
+첫 번째 사고가 만든 시험이 두 번째를 막았다.
+
+**"안 일어났다" 를 볼 때마다 짝이 되는 양의 지표를 보라** (원칙 29) —
+여기서는 "옮긴 건수" 가 그 짝이었고, 0 인데 통과하는 것이 신호였다.
+
+### ★ 동결된 기록까지 바꿀 뻔했다
+
+일괄 치환이 `f1_pipeline.PREREG` 의 키 `n_architect` 도 바꿨다. **그것은
+사전 등록의 동결된 기록**이고, 문서(`f1k-preregistration.md`)는 그때의
+이름으로 쓰여 있다. 코드만 바뀌어 **문서와 코드가 갈렸고**
+`test_numbers_match_between_doc_and_code` 가 잡았다.
+
+```
+살아 있는 이름   --n-rule-writer,  role="rule_writer"     ->  바꾼다
+동결된 기록      PREREG 의 키,  사전 등록 문서,  재현 명령  ->  ★ 안 바꾼다
+```
+
+**"전부 바꾼다" 와 "기록은 안 바꾼다" 가 부딪히는 자리가 있다.**
+가르는 기준은 **그 문자열이 무엇을 하느냐**다 — dispatch 하면 바꾸고,
+"그때 이렇게 정했다" 를 말하면 안 바꾼다.
+
+### 옛 이름을 남긴 곳
+
+`decisions.md` / `docs/artifacts/*` 의 **역사 서술과 재현 명령**은 그대로
+둔다 (문서 규칙 2). `glossary.md` 에 대응표를 뒀다.
+
+⚠️ D-93 이전 사전 등록에 적힌 `stage2-architect/` 경로는 그 시점의
+기록이다. 지금 디렉토리는 `stage2-rule-writer/` 다.

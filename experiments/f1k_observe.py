@@ -63,7 +63,7 @@ def structure(code: str) -> dict:
 
 
 def main(tag: str = "f1pipe-F1-K-k1") -> None:
-    seed = json.loads(Path(f"runs/{tag}/stage2-architect/chosen.json").read_text())
+    seed = json.loads(Path(f"runs/{tag}/stage2-rule-writer/chosen.json").read_text())
     s0 = structure(seed["code"])
     print("=" * 78)
     print("F1-K 3단계 관찰 — 사전 등록 항목")

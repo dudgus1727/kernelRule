@@ -369,3 +369,91 @@ def test_both_budget_counters_agree():
         assert over_static == over_llm, (
             f"두 계수기가 갈렸다: 정적 {r.budget_used}/{BUDGET} vs "
             f"경계 {over_llm}\n{code}")
+
+
+# ---------------------------------------------------------------------------
+# D-92 — 항등 변환으로 상수를 만드는 것을 막는다
+# ---------------------------------------------------------------------------
+IDENTITY = [
+    ("isfinite",
+     ("def score(f, p, hw, w):\n"
+     "    return np.nan_to_num(np.isfinite(f.tail_waste)\n"
+     "                         / (np.isfinite(f.tail_waste) - f.tail_waste)) * w[0]\n")),
+    ("sign 을 비교에",
+     ("def score(f, p, hw, w):\n"
+     "    return np.where(p.roofline_ratio < np.sign(p.roofline_ratio),\n"
+     "                    f.waves, f.tail_waste) * w[0]\n")),
+    ("x < sqrt(x)",
+     ("def score(f, p, hw, w):\n"
+     "    return np.where(p.roofline_ratio < np.sqrt(p.roofline_ratio),\n"
+     "                    f.waves, f.tail_waste) * w[0]\n")),
+    ("square(x) < x",
+     ("def score(f, p, hw, w):\n"
+     "    return np.where(np.square(p.roofline_ratio) < p.roofline_ratio,\n"
+     "                    f.waves, f.tail_waste) * w[0]\n")),
+]
+
+
+@pytest.mark.parametrize(("name", "code"), IDENTITY,
+                         ids=[c[0] for c in IDENTITY])
+def test_identity_transform_is_rejected(name, code):
+    """★ 상수를 만드는 항등 변환은 **결함**이다 (D-92).
+
+    넷 다 수학적으로 상수/단순 비교와 같은데 사람이 읽기 어렵다.
+    "해석 가능한 규칙" 이 이 연구의 주장이므로 그것을 갉아먹는다.
+    """
+    from kernelrule.rules.checks import identity_transform_message
+
+    msg = identity_transform_message(code)
+    assert msg, f"{name} 를 못 잡는다"
+    # ★ 대안을 함께 말해야 한다. 금지만 말하면 또 다른 우회를 만든다.
+    assert "면제" in msg and "D-78" in msg
+    r = check_rule(code, feature_names=FEAT,
+                   shape_value_names=SHAPE | {"roofline_ratio"}, n_weights=1)
+    assert not r.ok, f"{name}: 메시지는 나오는데 거부가 안 된다"
+
+
+LEGIT = [
+    ("리터럴 비교",
+     ("def score(f, p, hw, w):\n"
+     "    return np.where(p.roofline_ratio < 1, f.waves, f.tail_waste) * w[0]\n")),
+    ("정당한 sqrt", "def score(f, p, hw, w):\n    return np.sqrt(f.waves) * w[0]\n"),
+    ("정당한 square",
+     ("def score(f, p, hw, w):\n    return np.square(f.reg_pressure) * w[0]\n")),
+]
+
+
+@pytest.mark.parametrize(("name", "code"), LEGIT, ids=[c[0] for c in LEGIT])
+def test_legitimate_uses_are_not_rejected(name, code):
+    """★ `sqrt` / `square` 자체는 정당하다 — **같은 인자와 비교할 때**만 결함이다.
+
+    이것을 통째로 막으면 비선형 변환을 못 쓴다 (§30.10 의 "1/(1-x) 나
+    log2(x) 는 같은 물리량의 다른 형태다").
+    """
+    from kernelrule.rules.checks import identity_transform_message
+
+    assert identity_transform_message(code) is None, f"{name} 를 오탐한다"
+
+
+def test_identity_check_catches_the_real_archive():
+    """★ 되돌려서 잡는지 확인한다 (D-39 계열).
+
+    합성 사례만으로는 "만든 검사기가 만든 사례를 잡는다" 밖에 안 된다.
+    **실제로 진화가 만든 규칙**을 잡아야 한다.
+    """
+    import json
+    from pathlib import Path
+
+    from kernelrule.rules.checks import identity_transform_message
+
+    root = Path(__file__).resolve().parents[1] / "runs"
+    codes = []
+    for f in sorted(root.glob("*/archive.jsonl")):
+        for ln in f.read_text().splitlines():
+            if ln.strip():
+                codes.append(json.loads(ln)["code"])
+    if not codes:
+        pytest.skip("runs/ 가 없다 (gitignore) — 클론 직후에는 못 돈다")
+    hit = sum(1 for c in codes if identity_transform_message(c))
+    assert hit > 0, ("아카이브에서 하나도 못 잡는다 — 검사기가 실제 우회를 "
+                     "못 본다는 뜻이다")

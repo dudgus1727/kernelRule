@@ -18,7 +18,7 @@
 
 "홀드아웃" 은 하나가 아니다. 단계마다 학습하는 것이 다르다.
 
-    구조     Optimizer/Analyst 가 진화시킨다  -> `splits.val` 로만 잰다
+    구조     RuleEditor/Analyst 가 진화시킨다  -> `splits.val` 로만 잰다
     가중치   fit_weights 가 맞춘다            -> 어떤 분할이든 그 안에서만
     프롬프트  사람이 고친다                    -> `splits.test` 로만 (§10.2)
 

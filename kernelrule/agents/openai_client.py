@@ -97,7 +97,7 @@ _RULE_EXAMPLE_NEEDS = ("tail_waste", "has_spill", "occupancy_deficit",
 def _rule_example_for(registry) -> str:
     """규칙 예시를 **레지스트리를 보고** 고른다 (§30.20).
 
-    Architect 의 `condition` 은 A/B(표 관측 유무)라 피처 조건과 축이
+    RuleWriter 의 `condition` 은 A/B(표 관측 유무)라 피처 조건과 축이
     다르다. 그래서 조건이 아니라 **예시가 쓰는 이름이 레지스트리에
     있는가**로 정한다.
 
@@ -114,24 +114,24 @@ def _rule_example_for(registry) -> str:
     return load_prompt(
         f"examples/{'rule_known' if ok else 'rule_other_domain'}.md")
 
-#: 하드웨어 사실(`hw/*.md`)을 받는 역할. **Architect 뿐이다.**
+#: 하드웨어 사실(`hw/*.md`)을 받는 역할. **RuleWriter 뿐이다.**
 #:
-#:   Optimizer / FeatureWriter   피처가 hw 를 이미 흡수했다. 안 보면 그
+#:   RuleEditor / FeatureWriter   피처가 hw 를 이미 흡수했다. 안 보면 그
 #:                               프롬프트는 GPU 무관해진다 (§16.2)
 #:   Analyst                     ★ 진단 리포트 **블록 1 이 같은 사실**이다.
 #:                               리포트는 표에서 매번 생성되고 `hw/*.md` 는
 #:                               고정이라, 번들이 바뀌면 둘이 갈려 모순된
 #:                               사실을 받는다. 살아 있는 쪽을 남긴다 (원칙 2)
-#:   Architect                   리포트를 안 받으므로 여기서 받아야 한다
-_NEEDS_HW = frozenset({"architect"})
+#:   RuleWriter                   리포트를 안 받으므로 여기서 받아야 한다
+_NEEDS_HW = frozenset({"rule_writer"})
 
 #: 규칙 **함수**를 쓰는 역할 — 형태·예산·벡터화 제약을 공유한다.
-_WRITES_RULES = frozenset({"optimize", "architect"})
+_WRITES_RULES = frozenset({"rule_editor", "rule_writer"})
 
 #: 부모 규칙을 **고치는** 역할. regret 정의와 거부 사례 갤러리를 받는다.
-#: ★ Architect 는 안 받는다 — 백지에서 쓰므로 교체할 항도 이전 점수도
+#: ★ RuleWriter 는 안 받는다 — 백지에서 쓰므로 교체할 항도 이전 점수도
 #: 없고, 주면 자기 역할 파일의 "점수 없음" 과 정면으로 모순된다.
-_EDITS_RULES = frozenset({"optimize"})
+_EDITS_RULES = frozenset({"rule_editor"})
 
 
 #: 프롬프트 파일의 **내부 메모**. 사람이 읽으라고 쓴 것이고 모델에 보내지
@@ -289,7 +289,7 @@ class OpenAILLM:
         self.cfg = cfg
         self.features = list(feature_names)
         self.shape_values = list(shape_values)
-        # ★ Architect 는 이름 목록이 아니라 **물리적 정의**를 넣어야 한다.
+        # ★ RuleWriter 는 이름 목록이 아니라 **물리적 정의**를 넣어야 한다.
         #   `feature_names` 로는 physical_meaning 을 못 읽는다.
         #   기본값 없음 — 어느 레지스트리가 프롬프트에 들어가는지가 실험
         #   조건이고, `None` 이면 `render_features` 가 사람 24개로 떨어졌다
@@ -324,6 +324,11 @@ class OpenAILLM:
         #: 프롬프트 해시 -> 응답. 초반에 같은 프롬프트가 자주 반복된다 (§15.4)
         self._cache: dict[str, object] = {} if cache else None
         self._agents: dict[str, object] = {}
+        #: ★ 루프 밖 역할 (D-92). 실험 스크립트가 **자기 프롬프트와 자기
+        #: 스키마**를 들고 등록한다. `kernelrule/agents/` 는 루프가 부르는
+        #: 넷(analyze / rule_writer / rule_editor / feature + categorize)만
+        #: 안다 — 루프에 없는 역할이 여기 남으면 "언젠가 켤 것" 으로 읽힌다.
+        self._extra: dict[str, tuple] = {}
         self._base = load_prompt("_base.md")
         self._hw = load_prompt(cfg.arch_prompt)
         self._rules = load_prompt("role/_rules_common.md")
@@ -360,14 +365,18 @@ class OpenAILLM:
             AnalysisOutput,
             CategoryOutput,
             FeatureOutput,
-            RuleCritiqueOutput,
             RuleOutput,
         )
 
-        out = {"analyze": AnalysisOutput, "optimize": RuleOutput,
-               "architect": RuleOutput, "feature": FeatureOutput,
-               "categorize": CategoryOutput,
-               "critique": RuleCritiqueOutput}[role]
+        # ★ 루프 밖 역할은 `register_role` 로 실험 스크립트가 직접 등록한다
+        #   (D-92). `kernelrule/agents/` 는 **루프가 부르는 넷**만 안다.
+        if role in self._extra:
+            out, body = self._extra[role]
+        else:
+            out = {"analyze": AnalysisOutput, "rule_editor": RuleOutput,
+                   "rule_writer": RuleOutput, "feature": FeatureOutput,
+                   "categorize": CategoryOutput}[role]
+            body = load_prompt(f"role/{role}.md")
         # ★ **두 축**으로 나뉜다 (§30.10). 한 축(하드웨어 무관/의존)만으로
         #   나눴더니 역할별로 필요 없는 것이 공용에 쌓였다 — FeatureWriter 가
         #   regret 정의와 가중치 예산을 매번 받고 있었다.
@@ -376,13 +385,13 @@ class OpenAILLM:
         #     역할 무관   _base.md            hw/sm_86.md
         #     역할 의존   role/*.md           (없음)
         #
-        #   `hw` 는 Analyst / Architect 만 받는다. Optimizer 와 FeatureWriter
-        #   가 안 보면 그 프롬프트는 **GPU 무관**해져서 새 GPU 에 그대로
-        #   쓸 수 있다 (§16.2).
+        #   `hw` 는 Analyst / RuleWriter 만 받는다. RuleEditor 와
+        #   FeatureWriter 가 안 보면 그 프롬프트는 **GPU 무관**해져서 새
+        #   GPU 에 그대로 쓸 수 있다 (§16.2).
         #   규칙 블록은 다시 둘로 쪼갠다 — `_rules_common.md`(함수 형태·
-        #   예산·벡터화)는 Optimizer + Architect, `_rules_edit.md`(regret
-        #   정의·거부 사례 갤러리)는 **Optimizer 만**. Architect 는 백지에서
-        #   쓰므로 교체할 항도 이전 점수도 없다 (§30.10).
+        #   예산·벡터화)는 RuleEditor + RuleWriter, `_rules_edit.md`(regret
+        #   정의·거부 사례 갤러리)는 **RuleEditor 만**. RuleWriter 는 백지
+        #   에서 쓰므로 교체할 항도 이전 점수도 없다 (§30.10).
         parts = [self._base]
         if role in _NEEDS_HW:
             parts.append(self._hw)
@@ -390,7 +399,7 @@ class OpenAILLM:
             parts.append(self._rules)
         if role in _EDITS_RULES:
             parts.append(self._edit)
-        parts.append(load_prompt(f"role/{role}.md"))
+        parts.append(body)
         instructions = "\n\n---\n\n".join(parts)
         if self.cfg.endpoint not in ("responses", "chat"):
             raise ValueError(
@@ -425,8 +434,8 @@ class OpenAILLM:
     def _feature_block(self) -> str:
         """★ **모든 역할이 같은 렌더러를 쓴다** (§11.2 / D-34).
 
-        전에는 Architect 만 `render_features()` 로 범위와 물리적 정의를 받고,
-        Optimizer 와 Analyst 는 **이름 목록**만 받았다. 진화 루프의 LLM 이
+        전에는 RuleWriter 만 `render_features()` 로 범위와 물리적 정의를 받고,
+        RuleEditor 와 Analyst 는 **이름 목록**만 받았다. 진화 루프의 LLM 이
         `has_spill` 이 무엇을 재는지 모르는 채로 항을 골랐고, 그래서 비용
         없는 가지치기를 놓쳤다 (`artifacts/spill-term.md`).
 
@@ -459,16 +468,17 @@ class OpenAILLM:
 
     def _user_prompt(self, role: str, prompt: str, **kw) -> str:
         fl = self._feature_block()
-        if role == "architect":
-            return self._architect_prompt(**kw)
+        if role == "rule_writer":
+            return self._rule_writer_prompt(**kw)
         if role == "categorize":
             return self._categorize_prompt(**kw)
         if role == "feature":
             return self._feature_prompt(**kw)
+        if role in self._extra:
+            # 등록 역할은 사용자 프롬프트도 호출자가 만든다.
+            return prompt
         if role == "analyze":
             return prompt + "\n\n---\n\n## 등록된 피처\n\n" + fl + "\n"
-        if role == "critique":
-            return self._critique_prompt(**kw)
         parent = kw.get("parent")
         hyp = kw.get("hypothesis") or {}
         applied = kw.get("hypotheses_applied") or []
@@ -509,7 +519,7 @@ class OpenAILLM:
                 "가설이 그 이유를 무효화한다는 근거가\n있어야 합니다.\n")
         else:
             hyp_block = inputs_hyp = one_change = applied_warn = ""
-        body = load_prompt("role/optimize.md")
+        body = load_prompt("role/rule_editor.md")
         return body.format(
             n_terms=n_terms, n_weights=n_w, budget_note=note,
             feature_block=fl, hypothesis_block=hyp_block,
@@ -520,8 +530,8 @@ class OpenAILLM:
             parent_w=(list(parent.w0) if parent else "-"))
 
 
-    # -- Architect (§11.8) — 부모도 사례도 점수도 받지 않는다 ---------------
-    def _architect_prompt(self, *, condition: str = "A",
+    # -- RuleWriter (§11.8) — 부모도 사례도 점수도 받지 않는다 ---------------
+    def _rule_writer_prompt(self, *, condition: str = "A",
                           table_facts=None, registry=None, **_kw) -> str:
         """★ 조건 A 는 **표에서 나온 문장이 하나도 없다.**
 
@@ -540,7 +550,7 @@ class OpenAILLM:
         from kernelrule.features import render_features
 
         if condition not in ("A", "B"):
-            raise ValueError(f"알 수 없는 Architect 조건: {condition!r}. "
+            raise ValueError(f"알 수 없는 RuleWriter 조건: {condition!r}. "
                              "A(물리만) 또는 B(물리+학습분할 집계)")
         if condition == "B" and table_facts is None:
             raise ValueError(
@@ -564,12 +574,12 @@ class OpenAILLM:
                    "개별 형상의 답이 아니라 전체에서 나온 패턴입니다. "
                    "**형상을 식별할 수 있는 것은 없습니다.**\n\n"
                    f"```\n{lines}\n```")
-        # ★ 규칙 예시도 **조건마다 다르다** (§30.20). Architect 는
+        # ★ 규칙 예시도 **조건마다 다르다** (§30.20). RuleWriter 는
         #   `condition` 이 A/B(표 관측 유무)라 피처 조건과 축이 다르다 —
         #   레지스트리가 사람 24개면 실제 이름을 써도 되고, F0/F1
         #   레지스트리면 무관 도메인을 써야 한다.
         rule_ex = _rule_example_for(reg)
-        return load_prompt("role/architect.md").format(
+        return load_prompt("role/rule_writer.md").format(
             rule_example_block=rule_ex,
             table_note=note, feature_block=block, aggregate_block=agg)
 
@@ -587,42 +597,6 @@ class OpenAILLM:
 
         return load_prompt("role/categorize.md").format(
             field_block=field_block(), n_min=n_min, n_max=n_max)
-
-    # -- Critic (§11.5 계열) — 규칙을 **항 단위로** 심사한다 (D-85) --------
-    def _critique_prompt(self, *, code: str = "", registry=None,
-                         **_kw) -> str:
-        """규칙 코드 + 쓰인 물리량. **그것이 전부다.**
-
-        안 주는 것과 이유:
-
-        ```
-        점수 / 사례 / 부모   만든 맥락을 알면 판단이 그쪽으로 끌린다
-        가중치 값            표에 맞춘 값이라 "표가 골랐으니 맞겠지" 가 된다
-                            부호·크기 이상은 invariants() 가 이미 본다
-        하드웨어 상수        "물리적 의미가 있나" 를 묻지 "A6000 에 맞나" 를
-                            안 묻는다. 주면 뒤엣것으로 끌린다
-        ```
-
-        ⚠️ **쓰인 피처만** 준다 — 라이브러리 전체를 주면 "안 쓴 것을
-        쓰라" 는 제안이 섞이고, 그것은 Critic 의 일이 아니다.
-        """
-        import re
-
-        from kernelrule.features import render_features
-
-        if not code.strip():
-            raise ValueError("critique 는 규칙 코드를 받아야 한다")
-        reg = registry if registry is not None else self.registry
-        used = set(re.findall(r"\b[fp]\.(\w+)", code))
-        block = "(피처 목록 없음)"
-        if reg is not None:
-            sub = type(reg)(f"{reg.name}-used")
-            for n in sorted(used & set(reg._items)):
-                sub.add(reg[n])
-            if sub._items:
-                block = render_features(sub, include_observed=False)
-        return ("## 규칙 함수\n\n```python\n" + code.strip()
-                + "\n```\n\n## 쓰인 물리량\n\n" + block + "\n")
 
     def _feature_prompt(self, *, condition: str = "F1", task: str = "",
                         registry=None, **_kw) -> str:
@@ -664,6 +638,24 @@ class OpenAILLM:
             field_block=field_block(), feature_block=block,
             example_block=example, area_block=load_prompt("areas.md"),
             task_block=task or ("## 이번에 만들 것\n\n피처 하나를 제안하세요."))
+
+    # -- 루프 밖 역할 등록 (D-92) -----------------------------------------
+    def register_role(self, name: str, *, instructions: str,
+                      output_type) -> None:
+        """루프에 없는 역할을 **호출자가** 등록한다.
+
+        ★ 루프가 부르지 않는 역할을 `kernelrule/agents/` 에 남겨 두면
+        "언젠가 켤 것" 으로 읽히고, 조건 목록과 ablation 표에 계속 끌려
+        다닌다 (D-92). 프롬프트와 스키마를 **쓰는 쪽이 들고 온다.**
+
+        예산·재시도·추적·`dump()` 는 그대로 쓴다 — LLM 호출은 다시 만들
+        수 없으므로 남기는 경로가 하나여야 한다 (D-33).
+        """
+        if name in ("analyze", "rule_writer", "rule_editor", "feature",
+                    "categorize"):
+            raise ValueError(
+                f"{name!r} 은 루프 역할이다. 덮어쓰면 조용히 다른 것이 돈다.")
+        self._extra[name] = (output_type, instructions)
 
     # -- 진입점 -----------------------------------------------------------
     def complete(self, role: str, prompt: str, **kw):
@@ -738,7 +730,7 @@ class OpenAILLM:
         """
         # ★ `capture_run_messages` 로 감싼다. 그러지 않으면 **실패했을 때**
         #   회차별 메시지를 볼 수 없다 — 예외만 남고 `res` 가 없다.
-        #   Architect A 조건에서 10회 중 8회가 재시도 소진으로 죽었는데
+        #   RuleWriter A 조건에서 10회 중 8회가 재시도 소진으로 죽었는데
         #   무엇이 걸렸는지 알 수 없었다. 그러면 프롬프트를 어디를 고칠지
         #   모른다 (§26.4 — 실패가 정보를 남겨야 한다).
         from pydantic_ai import capture_run_messages

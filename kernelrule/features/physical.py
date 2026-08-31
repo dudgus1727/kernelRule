@@ -435,7 +435,7 @@ def _align_ok(p: Problem) -> bool:
 #
 # 범위가 `tail_waste` 와 같아서 **비슷한 크기의 벌점**으로 읽힌다. 실제로는
 # 자릿수가 다르다 — 그 항을 빼면 regret 1.1637 -> 3.1841 이 된다
-# (`docs/artifacts/spill-term.md`). Architect A 조건이 그 항을 안 골랐고,
+# (`docs/artifacts/spill-term.md`). RuleWriter A 조건이 그 항을 안 골랐고,
 # 그것 하나가 씨앗 실험의 (가) 조건을 갇히게 했다.
 #
 # ⚠️ 여기 쓰는 것은 **표 없이도 아는 것**뿐이다 (§12.3b).

@@ -37,7 +37,7 @@ def load_generated(path: str | Path, *, table, only: set[str] | None = None,
     다른 표에서 config 의존일 수 있다.
 
     **기본값을 두지 않는다.** 두었더니 두 호출부가 빠뜨렸고, 그중 하나가
-    2단계 경로여서 **형상 수준 피처 0개**로 Architect 가 돌았다 (D-67).
+    2단계 경로여서 **형상 수준 피처 0개**로 RuleWriter 가 돌았다 (D-67).
     재판정이 정말 필요 없으면 `table=None` 을 **명시**하라 — 그러면
     기록된 값을 쓴다.
     """

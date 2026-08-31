@@ -55,7 +55,7 @@ class Feature:
     direction: Direction
     doc: str = ""
     # ------------------------------------------------------------------
-    # ★ 설명을 두 층으로 나눈다 (§8.2 / Architect A 조건)
+    # ★ 설명을 두 층으로 나눈다 (§8.2 / RuleWriter A 조건)
     # ------------------------------------------------------------------
     # 전이 주장을 시험하려면 "표를 안 보고 규칙을 쓸 수 있는가" 를 물어야
     # 하는데, 피처 설명에 표에서 나온 문장이 섞여 있으면 그 시험이 성립하지
@@ -104,12 +104,12 @@ class Feature:
     def describe_with(self, *, include_observed: bool,
                       extra: tuple[str, ...] = ()) -> str:
         # ★ 접근 형태를 그대로 보여준다. 이름만 주면 config 수준 피처를
-        #   `p.` 로 쓰는 규칙이 나온다 — 실제로 첫 Architect 호출이 그랬다.
+        #   `p.` 로 쓰는 규칙이 나온다 — 실제로 첫 RuleWriter 호출이 그랬다.
         ref = f"{'p' if self.shape_level else 'f'}.{self.name}"
         # ★ 범위와 단위는 **피처의 물리적 정의의 일부**다 (표가 아니다).
         #   없으면 상대 가중치를 세울 수 없다 — 자릿수가 다른 항을 그냥
         #   더하게 되고, 수치 최적화기도 그 지점에서 못 빠져나온다.
-        #   실제로 Architect A 첫 시도가 regret 8.4 를 냈다.
+        #   실제로 RuleWriter A 첫 시도가 regret 8.4 를 냈다.
         lo, hi = self.expected_range
         rng = f"[{lo:g}, {hi:g}]"
         head = f"{ref:28s} {rng:>14s}  {self.physics}"

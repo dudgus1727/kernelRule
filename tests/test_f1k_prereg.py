@@ -33,6 +33,8 @@ def test_doc_says_it_was_written_before_any_llm_call():
 def test_numbers_match_between_doc_and_code(pre):
     body = DOC.read_text()
     for text in (f"{pre['start_library']}개", f"고정 {pre['areas']}개",
+                 # ★ 사전 등록은 옛 이름으로 쓰였다. 문서도 코드도 그때의
+                 # 기록이므로 둘 다 안 고친다 (D-93, 문서 규칙 2).
                  f"Architect {pre['n_architect']}회",
                  f"{pre['n_seeds']}시드", f"{pre['rounds']}라운드"):
         assert text in body, f"문서에 {text!r} 가 없다"
@@ -70,7 +72,7 @@ def test_not_doing_covers_the_traps(pre):
 
 def test_failure_policy_is_explicit(pre):
     for key in ("영역 3회 연속 거부", "채택 절반 미만",
-                "Architect 전부 거부", "3실행 연속 빈 아카이브"):
+                "RuleWriter 전부 거부", "3실행 연속 빈 아카이브"):
         assert key in pre["on_failure"], key
 
 

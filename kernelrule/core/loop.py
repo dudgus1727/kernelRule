@@ -85,7 +85,7 @@ class LoopConfig:
     #: Analyst 를 안 부르므로 **A 와 호출 수가 같다** — 비용 비교가 깨끗하다.
     hypothesis_pool: tuple[str, ...] = ()
     #: ★ §16.1 ablation — Analyst 를 끄면 진단 리포트도 가설도 없다.
-    #: Optimizer 는 부모 규칙과 피처 목록만 보고 고친다.
+    #: RuleEditor 는 부모 규칙과 피처 목록만 보고 고친다.
     #: **기본은 켬**이다 (지금까지의 모든 실행이 그렇다).
     use_analyst: bool = True
 
@@ -448,7 +448,7 @@ class RoundLoop:
     def score_only(self, code: str, w0) -> float:
         """규칙 하나를 **학습 분할에서만** 채점한다. 아카이브에 안 넣는다.
 
-        Architect 후보를 줄 세우는 데 쓴다 (§30.9 2단계). 홀드아웃은
+        RuleWriter 후보를 줄 세우는 데 쓴다 (§30.9 2단계). 홀드아웃은
         `fit_weights` 가 보고용으로만 계산하고 여기서는 돌려주지 않는다 —
         씨앗 선택이 홀드아웃을 보면 그 홀드아웃은 홀드아웃이 아니다
         (§26.4, 원칙 6).
@@ -486,7 +486,7 @@ class RoundLoop:
         t0 = time.perf_counter()
         r = len(self.rounds)
         res = RoundResult(round=r)
-        calls = {"analyze": 0, "optimize": 0, "feature": 0, "critique": 0}
+        calls = {"analyze": 0, "rule_editor": 0, "feature": 0}
 
         # 1~2. 진단 리포트 -> 가설
         #  ★ `use_analyst=False` 면 이 블록을 통째로 건너뛴다 (§16.1).
@@ -539,7 +539,7 @@ class RoundLoop:
                             h["analyst_pass"] = 2
                         replaced, hyps = first, second
 
-            # 가설에 id 를 붙인다. Optimizer 프롬프트와 계보 추적에 쓰인다.
+            # 가설에 id 를 붙인다. RuleEditor 프롬프트와 계보 추적에 쓰인다.
             # ⚠️ 요구 빈도를 옛 실행과 견줄 때는 `analyst_pass == 1` 만 센다 —
             #    옛 실행은 라운드당 Analyst 가 한 번이었다 (원칙 4).
             # ★ id 는 **우리가 정한다.** 모델이 자기 응답 안에서 `H0..H4` 를
@@ -589,7 +589,7 @@ class RoundLoop:
                          "analyst": bool(self.cfg.use_analyst
                                          or self.cfg.hypothesis_pool)})
         raws = self._call_optimizers(reqs)
-        calls["optimize"] += len(reqs)
+        calls["rule_editor"] += len(reqs)
 
         elites: list[Elite] = []
         for req, raw in zip(reqs, raws, strict=True):
@@ -668,12 +668,12 @@ class RoundLoop:
                 q = dict(req)
                 prompt = q.pop("prompt", "")
                 try:
-                    out.append(self.llm.complete("optimize", prompt, **q))
+                    out.append(self.llm.complete("rule_editor", prompt, **q))
                 except Exception as e:                    # noqa: BLE001
                     out.append(e)
             return out
         import asyncio
-        return asyncio.run(many("optimize", [dict(q) for q in reqs]))
+        return asyncio.run(many("rule_editor", [dict(q) for q in reqs]))
 
     # -- 종료 판정 (§14.3) -------------------------------------------------
     def should_stop(self) -> tuple[bool, str]:

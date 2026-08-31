@@ -4,7 +4,7 @@
 
 ## 왜 필요한가
 
-Architect A/B 는 `nk11008` 구조 분할에서 train41/val20 로 보고했고, 이전
+RuleWriter A/B 는 `nk11008` 구조 분할에서 train41/val20 로 보고했고, 이전
 보고들은 61형상 **체제별 재적합**으로 냈다. 두 숫자를 나란히 놓고 "관문
 미달" 이라고 쓴 것은 §30.8 이 반복해서 잡아온 패턴이다 — 절차가 다른 두
 값을 비교했다.
@@ -93,7 +93,7 @@ def main() -> None:
         r = _best(RUNS / f"architect-{cond}-{model}" / "tries.jsonl")
         if r:
             tag = "mini" if "mini" in model else "5.4"
-            cands.append((f"Architect {cond} ({tag})", r["code"], r["w"]))
+            cands.append((f"RuleWriter {cond} ({tag})", r["code"], r["w"]))
     ev_run = RUNS / "real-gpt-5.4-mini-2026-03-17" / "archive.jsonl"
     if ev_run.exists():
         with ev_run.open() as fh:
