@@ -63,7 +63,10 @@ from kernelrule.features.generated import (
 from kernelrule.features.validate import alt_hw
 from kernelrule.report.table_facts import TableFacts
 
+#: 기본 표. ★ `--bundle` / `--env-hash` 로 바꾼다 — 5090 전이부터
+#: 하드코딩이면 안 된다. **실행마다 config.json 에 기록된다.**
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
+BUNDLE_HASH = "c63710df"
 OUT = Path("runs")
 
 #: F2 의 "기초 5개". **여기 한 곳에서만 정한다** — 흩어지면 갈린다 (원칙 2).
@@ -746,6 +749,11 @@ def main() -> None:
                     metavar="N",
                     help="라운드당 만들 수 있는 새 축 (0=경로 없음, D-75). "
                          "1~2 를 넘기지 마라 — §21 피처 행렬 캐시가 무효화된다")
+    ap.add_argument("--bundle", default=BUNDLE,
+                    help="측정 표. ★ 다른 GPU 로 바꾸면 **다른 조건**이다 — "
+                         "비교표에 섞지 마라 (§3.4)")
+    ap.add_argument("--env-hash", default=BUNDLE_HASH,
+                    help="표의 env_hash 접두. 조인 키가 아니라 격리 경계다")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tag", default=None,
@@ -778,7 +786,8 @@ def main() -> None:
             f"지우고 다시 돌려라.")
     d.mkdir(parents=True, exist_ok=True)
 
-    table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
+    table = PerfTable.from_bundle(a.bundle, env_hash=a.env_hash,
+                                  ok_only=False)
     splits = _splits(table)
     base = _base_registry(a.condition)
 
@@ -853,7 +862,8 @@ def main() -> None:
         "unsealed": is_unsealed(),
         "seed": a.seed, "rounds": a.rounds, "n_seeds": a.n_seeds,
         "n_features": a.n_features, "n_rule_writer": a.n_rule_writer,
-        "bundle": BUNDLE, "split_kind": splits.kind,
+        "bundle": a.bundle, "env_hash": a.env_hash,
+        "split_kind": splits.kind,
         "registry": {"name": reg.name, "n": len(reg._items),
                      "names": sorted(reg._items)},
         "human_features_present": sorted(set(reg._items) & set(REGISTRY._items))
