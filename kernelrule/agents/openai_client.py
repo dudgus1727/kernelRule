@@ -519,8 +519,26 @@ class OpenAILLM:
                 "가설이 그 이유를 무효화한다는 근거가\n있어야 합니다.\n")
         else:
             hyp_block = inputs_hyp = one_change = applied_warn = ""
+        # ★ 두 번째 부모는 `cross` 일 때만 있다 (D-96). 없으면 **절 자체를
+        #   안 만든다** — "(부모 없음)" 같은 빈 자리를 남기면 모델이 "둘째가
+        #   있는데 비어 있다" 로 읽고, 그러면 exploit/explore 의 조건이
+        #   달라진다 (D-89 에서 밟았다).
+        p2 = kw.get("parent2")
+        if p2 is None:
+            second = ""
+        else:
+            second = (
+                "\n\n## ★ 두 번째 부모 — 이 둘을 **합치세요**\n\n"
+                "```python\n" + p2.code.strip() + "\n```\n\n"
+                f"두 번째 부모의 가중치: {list(p2.w0)}\n\n"
+                "**각각의 좋은 항을 골라 하나로 만드세요.** 한쪽을 그대로 "
+                "베끼지 마세요 — 그러면 교차가 아닙니다.\n\n"
+                f"⚠️ 예산이 {BUDGET}항이므로 합치면 **반드시 버려야 "
+                "합니다.** 무엇을 버렸고 왜 그것을 골랐는지 `changes` 에 "
+                "쓰세요.\n")
         body = load_prompt("role/rule_editor.md")
         return body.format(
+            second_parent_block=second,
             n_terms=n_terms, n_weights=n_w, budget_note=note,
             feature_block=fl, hypothesis_block=hyp_block,
             inputs_hyp=inputs_hyp, one_change_hyp=one_change,

@@ -63,4 +63,4 @@ s = s + f.<다른이름> * w[3]
 {parent_code}
 ```
 
-부모의 가중치 (참고용. 다시 맞춰집니다): {parent_w}
+부모의 가중치 (참고용. 다시 맞춰집니다): {parent_w}{second_parent_block}

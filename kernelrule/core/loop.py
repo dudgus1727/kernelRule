@@ -730,10 +730,16 @@ class RoundLoop:
                    for h in self.hypotheses[-4:]]
         reqs = []
         for kind, ps in parents:
-            parent, n_terms = None, 0
+            parent, parent2, n_terms = None, None, 0
             if ps:
                 from kernelrule.agents.schemas import RuleProposal
                 parent = RuleProposal(code=ps[0].code, w0=ps[0].w)
+                # ★ 두 번째 부모를 **실제로 넘긴다** (D-96). `archive.parents`
+                #   는 `cross` 에 Elite 둘을 주는데 여기서 `ps[0]` 만 써서
+                #   **§13 의 교차가 구현된 적이 없었다** — `cross` 가
+                #   `explore` 와 같았다.
+                if len(ps) > 1:
+                    parent2 = RuleProposal(code=ps[1].code, w0=ps[1].w)
                 # 부모의 항 수를 세어 프롬프트에 넣는다 (교체 프레임)
                 pr = check_rule(ps[0].code, feature_names=self._feats,
                                 shape_value_names=self._shape_vals,
@@ -751,7 +757,8 @@ class RoundLoop:
                          #   실행에서 못 읽는다 — 실제로 "가설-부모 불일치"
                          #   를 옛 자료로 못 쟀다 (D-94).
                          "parent_kind": kind,
-                         "parent": parent, "parent_n_terms": n_terms,
+                         "parent": parent, "parent2": parent2,
+                         "parent_n_terms": n_terms,
                          "hypothesis": hyp,
                          "hypotheses_applied": applied,
                          # ★ 가설 절을 만들지 말지 (§16.1). `hypothesis=None`

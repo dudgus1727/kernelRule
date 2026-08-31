@@ -649,3 +649,70 @@ def test_rule_editor_prompt_without_analyst_is_a_deletion():
         "끈 프롬프트에 켠 프롬프트에 없는 글자가 있다 — 삭제가 아니라 "
         "새로 쓴 것이다 (§16.1)")
     assert len(off) < len(on)
+
+
+# ---------------------------------------------------------------------------
+# D-96 — cross 의 두 번째 부모
+# ---------------------------------------------------------------------------
+def _editor_prompt(parent2):
+    _needs_pydantic_ai()
+    import os
+
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.agents.schemas import RuleProposal
+    from kernelrule.features import REGISTRY
+
+    os.environ.setdefault("OPENAI_API_KEY", "test-key")
+    llm = OpenAILLM(LLMConfig(),
+                    feature_names=REGISTRY.names(shape_level=False),
+                    shape_values=REGISTRY.names(shape_level=True),
+                    registry=REGISTRY, cache=False)
+    a = RuleProposal(code="def score(f,p,hw,w):\n    return f.waves * w[0]\n",
+                     w0=[1.0])
+    return llm._user_prompt(
+        "rule_editor", "", parent=a, parent2=parent2, parent_n_terms=1,
+        hypothesis={"id": "H1", "claim": "c"}, hypotheses_applied=["H0"],
+        analyst=True)
+
+
+def test_second_parent_section_is_absent_without_a_second_parent():
+    """★ 두 번째 부모가 없으면 **절 자체가 없다** (D-96).
+
+    "(부모 없음)" 같은 빈 자리를 남기면 모델이 "둘째가 있는데 비어 있다"
+    로 읽고, 그러면 exploit/explore 의 조건이 달라진다 — D-89 에서 밟았다.
+    """
+    from kernelrule.agents.schemas import RuleProposal
+
+    one = _editor_prompt(None)
+    assert "두 번째 부모" not in one
+    b = RuleProposal(
+        code="def score(f,p,hw,w):\n    return f.tail_waste * w[0]\n",
+        w0=[2.0])
+    two = _editor_prompt(b)
+    assert "두 번째 부모" in two and "f.tail_waste" in two
+    # ★ 한 부모 프롬프트가 두 부모의 **부분수열**이다 — 순수 추가다
+    it = iter(two)
+    assert all(ch in it for ch in one), (
+        "두 부모 프롬프트가 한 부모 쪽 문장을 바꿨다 — exploit/explore 의 "
+        "조건이 달라진다")
+
+
+def test_cross_hands_the_second_parent_to_the_editor():
+    """★ `archive.parents` 가 주는 둘째를 `run_round` 가 **실제로 넘긴다**.
+
+    전에는 `ps[0]` 만 써서 `cross` 가 `explore` 와 같았다 — §13 의 교차가
+    구현된 적이 없었다 (D-96).
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from kernelrule.core.loop import RoundLoop
+
+    src = textwrap.dedent(inspect.getsource(RoundLoop.run_round))
+    uses = {ast.unparse(n) for n in ast.walk(ast.parse(src))
+            if isinstance(n, ast.Subscript)
+            and ast.unparse(n).startswith("ps[")}
+    assert "ps[1]" in uses, f"둘째 부모를 안 쓴다: {sorted(uses)}"
+    assert '"parent2": parent2' in src or "'parent2': parent2" in src
