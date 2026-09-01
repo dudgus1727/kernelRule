@@ -148,11 +148,13 @@ def main() -> None:
             if a.weights == "a6000":     # (a) — A6000 에서 맞춘 가중치
                 g = [q for q in spA.train.shapes if regime_of(q, A.hw) == nm]
                 ws[nm] = fit_weights(fn, mA, A, Split("train", tuple(g)),
-                                     e["w"], max_evals=300).w
+                                     e["w"], max_evals=300,
+                          objective="regret").w
             else:                        # ★ (b) — 5090 학습 분할로 재적합
                 g = [q for q in spB.train.shapes if regime_of(q, B.hw) == nm]
                 ws[nm] = fit_weights(fn, mB, B, Split("train", tuple(g)),
-                                     e["w"], max_evals=300).w
+                                     e["w"], max_evals=300,
+                          objective="regret").w
         orders = {}
         for p in shapes:
             cand = B.candidates(p)

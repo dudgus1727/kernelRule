@@ -136,7 +136,7 @@ def main() -> None:
     train = list(spA.train.shapes)
 
     print("=" * 82)
-    print("A. 두 단계 목적함수 — 구조는 순위로, 가중치는 regret 으로")
+    print("A. 목적함수 2x2 — 구조와 가중치 중 무엇이 순위 능력을 담나")
     print("=" * 82)
     print(f"  A6000 홀드아웃 {len(hold)}형상   ★ D-101 의 tau 는 학습 "
           f"41형상 값이라 여기와 나란히 못 놓는다\n")
@@ -146,6 +146,9 @@ def main() -> None:
     for name, runs, by, obj in (
             ("순위 구조 + 순위 가중치", RANK_RUNS, "rank", "rank"),
             ("★ 순위 구조 + regret 가중치", RANK_RUNS, "rank", "regret"),
+            # ★ 2x2 의 빈 칸 (D-103). 세 칸으로 "가중치가 들고 있다" 고
+            #   말한 것은 **대각선만 보고 한 말**이었다.
+            ("★ regret 구조 + 순위 가중치", REG_RUNS, "regret", "rank"),
             ("regret 구조 + regret 가중치", REG_RUNS, "regret", "regret")):
         vals = []
         for run in runs:

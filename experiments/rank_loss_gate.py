@@ -218,8 +218,10 @@ def main() -> None:
                          method="L-BFGS-B",
                          options={"maxiter": 500, "maxfun": 2000})
             ws_a[nm] = r.x
+            # ★ B 팔은 정의상 regret 이다 (D-99). 명시한다 — 기본값이
+            #   rank 로 바뀌었으므로 안 밝히면 두 팔이 같아진다.
             ws_b[nm] = fit_weights(fn, mB, B, Split("train", tuple(g)), w0,
-                                   max_evals=300).w
+                                   max_evals=300, objective="regret").w
         va = _regret_on(fn, mB, B, list(sp.val.shapes), ws_a)
         vb = _regret_on(fn, mB, B, list(sp.val.shapes), ws_b)
         print(f"  {run:26s} {va:12.4f} {vb:11.4f} {va - vb:+9.4f}  ✓")

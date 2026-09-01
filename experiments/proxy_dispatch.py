@@ -103,7 +103,8 @@ def main() -> None:
 
     def refit(code, w0, sh):
         return fit_weights(compile_rule(code), matrix, table,
-                           Split("train", tuple(sh)), w0, max_evals=300)
+                           Split("train", tuple(sh)), w0, max_evals=300,
+                          objective="regret")
 
     def score(code, w, sh):
         return evaluate_scores(make_score_of(compile_rule(code), matrix, w),

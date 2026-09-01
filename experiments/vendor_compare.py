@@ -107,7 +107,8 @@ def main() -> None:
                 g_ho = [p for p in held if regime_of(p, table.hw) == name]
                 fr = fit_weights(fn, matrix, table, Split("train", tuple(g_tr)),
                                  best["w"], max_evals=300,
-                                 warn_invariants=False)
+                                 warn_invariants=False,
+                          objective="regret")
                 e = evaluate_scores(make_score_of(fn, matrix, fr.w), table,
                                     g_ho, ks=(1,))
                 for i, p in enumerate(e.shapes):

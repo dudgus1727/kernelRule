@@ -159,7 +159,8 @@ def obs3(runs: list[Path], control: list[Path]) -> None:
         for name in ("short", "long"):
             g = [p for p in train if regime_of(p, table.hw) == name]
             out[name] = fit_weights(fn, matrix, table, Split("train", tuple(g)),
-                                    w0, max_evals=300).w
+                                    w0, max_evals=300,
+                          objective="regret").w
         return fn, out
 
     def ensemble(fitted: list) -> float:

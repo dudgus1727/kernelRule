@@ -220,7 +220,8 @@ def cmd_ablate(a) -> None:
         tot = n = 0.0
         for _name, g in groups.items():
             fr = fit_weights(fn, matrix, table, Split("train", tuple(g)),
-                             w0, max_evals=300, warn_invariants=False)
+                             w0, max_evals=300, warn_invariants=False,
+                          objective="regret")
             tot += fr.fit_regret * len(g)
             n += len(g)
         return tot / n
@@ -406,7 +407,8 @@ def cmd_gate(a) -> None:
                 continue
             fr = fit_weights(fn, matrix, table, Split("train", tuple(gtr)),
                              [1.0] * n_w, max_evals=300,
-                             warn_invariants=False)
+                             warn_invariants=False,
+                          objective="regret")
             fit_t += fr.fit_regret * len(gtr)
             fit_n += len(gtr)
             if gva:

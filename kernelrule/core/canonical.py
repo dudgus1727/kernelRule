@@ -111,7 +111,12 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
             warns.append(f"체제 {name!r}: 학습 형상 {len(g_tr)}개 < "
                          f"{MIN_PER_REGIME}. 그 체제의 가중치는 믿기 어렵다")
         fit = fit_weights(fn, matrix, table, Split("train", tuple(g_tr)),
-                          w0, max_evals=max_evals)
+                          w0, max_evals=max_evals,
+                          # ★ **정준 채점은 언제나 regret 이다** (D-103).
+                          #   `fit_weights` 의 기본값이 `rank` 로 바뀌었으므로
+                          #   여기서 **명시**해야 한다. 안 하면 이 프로젝트의
+                          #   모든 수치가 조용히 다른 것이 된다.
+                          objective="regret")
         fitted[name] = [float(x) for x in fit.w]
         so = make_score_of(fn, matrix, fit.w)
         e_tr = evaluate_scores(so, table, g_tr, ks=(1,))

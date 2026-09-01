@@ -124,7 +124,8 @@ def _job(arg):
             return {"ri": ri, "k": k, "seed": seed, "holdout": float("nan"),
                     "empty_regime": name}
         fr = fit_weights(fn, matrix, table, Split("train", tuple(g)),
-                         e["w"], max_evals=300)
+                         e["w"], max_evals=300,
+                          objective="regret")
         ws[name] = fr.w
         fits.append(fr.fit_regret)
         moved.append(bool(fr.moved))

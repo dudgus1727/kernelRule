@@ -110,7 +110,8 @@ def main(condition: str, n_tries: int,
                        shape_value_names=matrix.shape_value_names(),
                        n_weights=len(prop.w0)).raise_if_bad()
             fit = fit_weights(compile_rule(prop.code), matrix, table, train,
-                              prop.w0, max_evals=300)
+                              prop.w0, max_evals=300,
+                          objective="regret")
             so = make_score_of(compile_rule(prop.code), matrix, fit.w)
             tr = evaluate_scores(so, table, train.shapes, ks=(1,)).at(1)
             va = evaluate_scores(so, table, val.shapes, ks=(1,)).at(1)

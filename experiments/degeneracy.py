@@ -117,7 +117,8 @@ def main() -> None:
         for nm in ("short", "long"):
             g = [q for q in shapes if regime_of(q, A.hw) == nm]
             ws[nm] = fit_weights(fn, mA, A, Split("train", tuple(g)),
-                                 e["w"], max_evals=300).w
+                                 e["w"], max_evals=300,
+                          objective="regret").w
 
         picks, hit1, taus, taus_top = [], 0, [], []
         n_flat_top = 0

@@ -74,7 +74,8 @@ def main() -> None:
                     warnings.simplefilter("ignore")
                     fr = fit_weights(fn, matrix, table,
                                      Split("train", tuple(g_tr)), best["w"],
-                                     max_evals=300, warn_invariants=False)
+                                     max_evals=300, warn_invariants=False,
+                          objective="regret")
                 tot += 1
                 moved += int(fr.moved)
                 evals.append(fr.n_evals)

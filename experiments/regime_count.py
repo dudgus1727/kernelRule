@@ -84,7 +84,8 @@ def main() -> None:
         per_ho: dict = {}
         for gi, g in enumerate(groups):
             fit = fit_weights(compile_rule(code), matrix, table,
-                              Split("train", tuple(g)), w0, max_evals=300)
+                              Split("train", tuple(g)), w0, max_evals=300,
+                          objective="regret")
             so = make_score_of(compile_rule(code), matrix, fit.w)
             ev = evaluate_scores(so, table, g, ks=(1,))
             for i, p in enumerate(ev.shapes):

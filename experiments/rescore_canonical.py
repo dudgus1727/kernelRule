@@ -80,7 +80,8 @@ def main() -> None:
         reg, tol = {}, {}
         for grp, ev_grp in zip(fit_groups, eval_groups, strict=True):
             fit = fit_weights(compile_rule(code), matrix, table,
-                              Split("train", tuple(grp)), w0, max_evals=300)
+                              Split("train", tuple(grp)), w0, max_evals=300,
+                          objective="regret")
             so = make_score_of(compile_rule(code), matrix, fit.w)
             e = evaluate_scores(so, table, ev_grp, ks=(1,))
             for i, p in enumerate(e.shapes):

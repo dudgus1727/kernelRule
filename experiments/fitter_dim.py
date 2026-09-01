@@ -52,6 +52,9 @@ import numpy as np
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 #: 사람 24개 라이브러리 팔. 예산 실험의 기준선 팔과 같은 실행들이다.
 RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+#: ★ 순위 손실 진화 3실행 (D-101). `--objective rank` 일 때 쓴다 —
+#: 그 경로를 재려면 그 경로가 만든 구조로 재야 한다.
+RANK_RUNS = [f"f1pipe-F3-rankevo-s{i}" for i in range(3)]
 N_PROBE = 4000
 PROBE_LO, PROBE_HI = 0.05, 50.0
 #: 재적합 도달률의 무작위 출발 횟수. 한 번이 적합 한 번이라 비싸다.
@@ -108,8 +111,13 @@ def extend_code(code: str, f_names: list[str], p_names: list[str],
 _G: dict = {}
 
 
+#: 워커가 fork 로 물려받는다. `main` 이 채운다.
+_OBJECTIVE = {"v": "regret"}
+
+
 def _init() -> None:
     warnings.simplefilter("ignore")
+    _G["objective"] = _OBJECTIVE["v"]
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.core.splits import regime_of
@@ -156,14 +164,26 @@ def work(task: tuple[str, str, str]) -> dict:
     g = _G["groups"][regime]
     sp = Split("train", tuple(g))
     fr = fit_weights(fn, _G["matrix"], _G["table"], sp, w0, max_evals=max_evals,
-                     warn_invariants=False, polish=True, polish_budget=pol)
+                     warn_invariants=False, polish=True, polish_budget=pol,
+                          objective=_G.get("objective", "regret"))
 
+    # ★ 탐침은 **적합과 같은 목적함수**로 재야 한다 (D-103). 처음에는
+    #   `prob.regret` 을 고정으로 썼는데, `objective="rank"` 로 적합한
+    #   결과를 regret 탐침과 견주면 **다른 것을 잰다** — 도달률이
+    #   0% 로 나왔고 그것은 지표가 어긋난 것이지 적합기 얘기가 아니었다.
+    obj = _G.get("objective", "regret")
     prob = W._Problem(_G["matrix"], _G["table"], tuple(g), 1)
+    if obj == "rank":
+        prob.build_pairs(_G["table"], 100)
+
+    def _value(w):
+        return prob.regret(fn, w) if obj == "regret" else prob.rank_loss(fn, w)
+
     rng = np.random.default_rng(7)
     bv = np.inf
     for _ in range(N_PROBE):
         c = np.exp(rng.uniform(np.log(PROBE_LO), np.log(PROBE_HI), size=len(w0)))
-        v = prob.regret(fn, c)
+        v = _value(c)
         if np.isfinite(v) and v < bv:
             bv = v
 
@@ -174,12 +194,14 @@ def work(task: tuple[str, str, str]) -> dict:
         try:
             r = fit_weights(fn, _G["matrix"], _G["table"], sp, st,
                             max_evals=max_evals, warn_invariants=False,
-                            polish=True, polish_budget=pol)
+                            polish=True, polish_budget=pol,
+                          objective=_G.get("objective", "regret"))
         except Exception:
             continue
-        rb = min(rb, r.fit_regret)
+        rb = min(rb, _value(r.w))
 
-    return dict(arm=arm, run=run, regime=regime, fit=fr.fit_regret,
+    return dict(arm=arm, run=run, regime=regime, fit=_value(fr.w),
+                fit_regret=fr.fit_regret,
                 n_evals=fr.n_evals, n_fit_evals=fr.n_fit_evals,
                 # ★ 다듬기 평가를 뺀 값으로 견준다 — 합산값으로 견주면
                 #   다듬기 예산이 상한을 언제나 넘어 100% 로 나온다.
@@ -262,6 +284,10 @@ def main() -> None:
     ap.add_argument("--arm", action="append", choices=list(ARMS))
     ap.add_argument("--jobs", type=int, default=12)
     ap.add_argument("--out", default="docs/artifacts/fitter-dim16.json")
+    ap.add_argument("--objective", choices=("regret", "rank"),
+                    default="regret",
+                    help="★ 기본 regret — D-77 이 잰 조건이다. rank 는 "
+                         "미분 가능해 L-BFGS 를 쓰므로 결과가 다를 수 있다")
     ap.add_argument("--reduce", metavar="JSON",
                     help="저장된 칸에서 요약만 다시 만든다 (적합 없음)")
     a = ap.parse_args()
@@ -282,10 +308,14 @@ def main() -> None:
         return
 
     os.environ.setdefault("OMP_NUM_THREADS", "1")
-    tasks = [(arm, run, rg) for arm in arms for run in RUNS
+    _OBJECTIVE["v"] = a.objective
+    # ★ 순위 손실 경로를 재려면 **그 경로가 만든 구조**로 재야 한다.
+    runs = RANK_RUNS if a.objective == "rank" else RUNS
+    tasks = [(arm, run, rg) for arm in arms for run in runs
              for rg in ("short", "long")]
     print("=" * 78)
-    print(f"16차원 적합기 검사 — {len(tasks)}칸, 팔 {arms}")
+    print(f"16차원 적합기 검사 — {len(tasks)}칸, 팔 {arms}, "
+          f"★ 목적함수 {a.objective}, 실행 {len(runs)}개")
     print("=" * 78)
 
     import multiprocessing as mp
@@ -302,7 +332,8 @@ def main() -> None:
     summary = summarize(rows, arms)
 
     Path(a.out).write_text(json.dumps({
-        "_procedure": dict(bundle=BUNDLE, runs=RUNS, n_probe=N_PROBE,
+        "_procedure": dict(bundle=BUNDLE, runs=runs,
+                           objective=a.objective, n_probe=N_PROBE,
                            probe_range=[PROBE_LO, PROBE_HI],
                            n_restart_fits=N_RESTART_FITS, arms=ARMS,
                            note="`fit` 은 재현용 원자료다. 절대값은 보고 "

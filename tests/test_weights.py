@@ -496,3 +496,51 @@ def test_restarts_actually_run(known):
                if issubclass(x.category, FitWarning)
                and "재시작이" in str(x.message)]
         assert not bad, f"{obj}: {bad}"
+
+
+def test_canonical_scoring_pins_regret():
+    """★ 정준 채점은 **언제나 regret** 이다 — 명시돼 있어야 한다.
+
+    `fit_weights` 의 기본값이 `rank` 로 바뀌었다 (D-101). `canonical.py`
+    가 명시하지 않으면 **이 프로젝트의 모든 수치가 조용히 다른 것이
+    된다.** 소스에서 직접 확인한다.
+    """
+    import inspect
+
+    from kernelrule.core import canonical
+
+    src = inspect.getsource(canonical)
+    i = src.index("fit_weights(")
+    depth, k = 1, i + len("fit_weights(")
+    while depth:
+        depth += {"(": 1, ")": -1}.get(src[k], 0)
+        k += 1
+    assert 'objective="regret"' in src[i:k], (
+        "canonical 이 objective 를 명시하지 않는다 — 기본값이 바뀌면 "
+        "정준 채점이 조용히 달라진다")
+
+
+def test_history_experiments_pin_their_objective():
+    """★ 옛 조건을 재현하는 실험 스크립트가 목적함수를 명시하는가.
+
+    기본값을 바꾼 순간 `fit_weights` 를 그냥 부르던 20개 스크립트가
+    **전부 다른 것을 재게 됐다.** 조용히 바뀌는 종류라 시험으로 고정한다.
+    """
+    from pathlib import Path
+
+    bad = []
+    for f in sorted(Path("experiments").glob("*.py")):
+        s = f.read_text()
+        i = 0
+        while True:
+            j = s.find("fit_weights(", i)
+            if j < 0:
+                break
+            depth, k = 1, j + len("fit_weights(")
+            while depth and k < len(s):
+                depth += {"(": 1, ")": -1}.get(s[k], 0)
+                k += 1
+            if "objective=" not in s[j:k]:
+                bad.append(f"{f.name}:{s[:j].count(chr(10)) + 1}")
+            i = k
+    assert not bad, f"목적함수를 안 밝힌 호출: {bad}"

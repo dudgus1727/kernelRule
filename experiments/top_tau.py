@@ -104,7 +104,8 @@ def _one(label, table, matrix, fit_shapes, eval_shapes, out: dict) -> None:
         for nm in ("short", "long"):
             g = [q for q in fit_shapes if regime_of(q, table.hw) == nm]
             ws[nm] = fit_weights(fn, matrix, table, Split("train", tuple(g)),
-                                 e["w"], max_evals=300).w
+                                 e["w"], max_evals=300,
+                          objective="regret").w
         taus = {}
         for p in eval_shapes:
             cand = table.candidates(p)

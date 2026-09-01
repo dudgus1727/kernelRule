@@ -116,10 +116,12 @@ def main() -> None:
             #   생략돼 있어서 "다듬기 끔" 열이 실제로는 켬이었고, 두 열이
             #   똑같은 62.5% 로 나왔다 (원칙 1 — 조용히 한쪽으로 판정).
             off = fit_weights(fn, matrix, table, sp, best["w"], max_evals=300,
-                              warn_invariants=False, polish=False)
+                              warn_invariants=False, polish=False,
+                          objective="regret")
             on = fit_weights(fn, matrix, table, sp, best["w"], max_evals=300,
                              warn_invariants=False, polish=True,
-                             polish_budget=POLISH_BUDGET)
+                             polish_budget=POLISH_BUDGET,
+                          objective="regret")
             prob = W._Problem(matrix, table, tuple(g), 1)
             rng = np.random.default_rng(7)
             bv = np.inf

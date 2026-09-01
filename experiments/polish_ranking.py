@@ -42,7 +42,8 @@ def _fit_regret(fn, matrix, table, train, w0, *, polish: bool) -> float:
     for name in ("short", "long"):
         g = [p for p in train if regime_of(p, table.hw) == name]
         fr = fit_weights(fn, matrix, table, Split("train", tuple(g)), w0,
-                         max_evals=300, warn_invariants=False, polish=polish)
+                         max_evals=300, warn_invariants=False, polish=polish,
+                          objective="regret")
         tot += np.log(fr.fit_regret) * len(g)
         n += len(g)
     return float(np.exp(tot / n))
