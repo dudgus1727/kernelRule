@@ -65,9 +65,20 @@ def test_feature_and_rule_editor_prompts_have_no_hardware_constants():
 
 
 def test_rule_writers_get_the_budget():
+    """★ 예산이 **주어진 값으로** 들어가는가.
+
+    전에는 `"8" in body` 였다. 8 은 피처 설명에도 나오므로 예산이 16 으로
+    렌더링돼도 통과했고, 실제로 `--rule-budget 16` 캠페인 하나가 8 로
+    돌았다 (D-105). **바뀌는 값을 상수로 찾으면 안 된다.**
+    """
+    from kernelrule.agents.openai_client import assemble_instructions
+
     for role in ("rule_editor", "rule_writer"):
-        body = _instructions(role)
-        assert "8" in body and "w[0]" in body, f"{role} 에 예산이 없다"
+        assert "w[0]" in _instructions(role), f"{role} 에 규칙 형태가 없다"
+        for b in (8, 16):
+            body = assemble_instructions(role, objective="rank", budget=b)
+            assert f"항 상한 {b}개" in body or f"{b} 이하" in body, (
+                f"{role}: 예산 {b} 이 안 보인다")
 
 
 def test_hw_goes_only_to_roles_that_need_it():

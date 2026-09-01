@@ -323,3 +323,28 @@ T = 1          ★ s = Φw 라 w 크기와 분리 식별되지 않는다 — 정
 하나뿐이다 — 먼저 그것을 본다.
 
 **언제**: 두 단계 방식이 실패했을 때.
+
+---
+
+## 9. ★ 예산 실험을 **다시 돌린다** — 배선이 고쳐졌다
+
+**날짜** 2026-09-01 · **근거** [D-105](../decisions.md) ·
+[artifacts/chain.md](artifacts/chain.md) §0
+
+`--rule-budget 16` 이 검사기에만 닿아서 `bud16` 은 `bud08` 과 **같은
+조건의 반복**이 됐다. 배선과 시험은 고쳤다
+(`tests/test_rule_budget_wiring.py`). 남은 것은 재실행뿐이다.
+
+```
+python3 experiments/f1_pipeline.py F3 --stage 3 \
+  --seed-from runs/f1pipe-F3-arch24 --rounds 12 --n-seeds 3 --workers 6 \
+  --tag bud16b --objective rank --rule-budget 16
+```
+
+`bud08` 은 그대로 기준선으로 쓴다 — 조건이 안 바뀌었다 (프롬프트가 8
+이었고 예산도 8 이었다). **약 3.5시간, LLM 468회.**
+
+⚠️ 재실행 전에 `bud16b` 첫 라운드의 프롬프트를 **눈으로 확인**한다
+(원칙 16·38). 시험은 넣었지만 이 자리에서 두 번 틀렸다.
+
+**언제**: 지시가 있을 때.

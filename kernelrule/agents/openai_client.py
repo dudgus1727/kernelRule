@@ -94,7 +94,7 @@ _RULE_EXAMPLE_NEEDS = ("tail_waste", "has_spill", "occupancy_deficit",
                        "roofline_ratio")
 
 
-def _rule_example_for(registry) -> str:
+def _rule_example_for(registry, *, budget: int | None = None) -> str:
     """규칙 예시를 **레지스트리를 보고** 고른다 (§30.20).
 
     RuleWriter 의 `condition` 은 A/B(표 관측 유무)라 피처 조건과 축이
@@ -112,7 +112,8 @@ def _rule_example_for(registry) -> str:
     names = set(getattr(registry, "_items", {}) or {})
     ok = names.issuperset(_RULE_EXAMPLE_NEEDS)
     return load_prompt(
-        f"examples/{'rule_known' if ok else 'rule_other_domain'}.md")
+        f"examples/{'rule_known' if ok else 'rule_other_domain'}.md",
+        budget=budget)
 
 #: 하드웨어 사실(`hw/*.md`)을 받는 역할. **RuleWriter 뿐이다.**
 #:
@@ -379,17 +380,26 @@ class OpenAILLM:
         #: 넷(analyze / rule_writer / rule_editor / feature + categorize)만
         #: 안다 — 루프에 없는 역할이 여기 남으면 "언젠가 켤 것" 으로 읽힌다.
         self._extra: dict[str, tuple] = {}
-        self._base = load_prompt("_base.md")
-        self._hw = load_prompt(cfg.arch_prompt)
+        # ★ 유효 항 예산. **여기서 한 번 정하고 모든 자리에 넘긴다**
+        #   (원칙 2). 전에는 `load_prompt` 의 기본값과 `checks.BUDGET`
+        #   직접 import 가 각자 정했고, `rule_budget=16` 을 줘도
+        #   **사용자 프롬프트와 역할 파일은 8 로 렌더링됐다** (D-105).
+        from kernelrule.rules.checks import BUDGET as _CHECK_BUDGET
+        self._budget = int(cfg.rule_budget if cfg.rule_budget is not None
+                           else _CHECK_BUDGET)
+        self._base = load_prompt("_base.md", budget=self._budget)
+        self._hw = load_prompt(cfg.arch_prompt, budget=self._budget)
         #: ★ 목적함수. 프롬프트의 "채점 방식" 절을 정한다 (D-101).
         self.objective = getattr(cfg, "objective", "regret")
         if self.objective not in _OBJECTIVE_BLOCKS:
             raise ValueError(f"알 수 없는 목적함수: {self.objective!r}")
-        self._rules = load_prompt("role/_rules_common.md")
+        self._rules = load_prompt("role/_rules_common.md",
+                                  budget=self._budget)
         # ★ 조립은 `assemble_instructions` 한 곳에서 한다 (원칙 2).
         #   아래 넷은 **프롬프트 존재 확인용**으로만 읽는다 — 파일이
         #   없으면 첫 호출이 아니라 여기서 죽어야 한다.
-        self._edit = load_prompt("role/_rules_edit.md")
+        self._edit = load_prompt("role/_rules_edit.md",
+                                 budget=self._budget)
         # ⚠️ `asyncio.Semaphore` 를 여기서 만들면 **첫 이벤트 루프에
         #    바인딩된다.** 루프는 라운드마다 `asyncio.run()` 을 새로 부르므로
         #    두 번째 라운드부터 "bound to a different event loop" 로 죽는다.
@@ -433,7 +443,7 @@ class OpenAILLM:
             out = {"analyze": AnalysisOutput, "rule_editor": RuleOutput,
                    "rule_writer": RuleOutput, "feature": FeatureOutput,
                    "categorize": CategoryOutput}[role]
-            body = load_prompt(f"role/{role}.md")
+            body = load_prompt(f"role/{role}.md", budget=self._budget)
         # ★ **두 축**으로 나뉜다 (§30.10). 한 축(하드웨어 무관/의존)만으로
         #   나눴더니 역할별로 필요 없는 것이 공용에 쌓였다 — FeatureWriter 가
         #   regret 정의와 가중치 예산을 매번 받고 있었다.
@@ -538,14 +548,15 @@ class OpenAILLM:
         #   예산이 `role/_rules.md`(시스템)에만 있으면 긴 컨텍스트에서 희석된다.
         n_terms = int(kw.get("parent_n_terms") or 0)
         n_w = len(parent.w0) if parent else 0
-        from kernelrule.rules.checks import BUDGET
-        if n_terms >= BUDGET:
+        # ★ `checks.BUDGET` 을 직접 읽으면 `rule_budget` 을 무시한다
+        #   (D-105). 유효 예산은 `self._budget` 하나뿐이다.
+        if n_terms >= self._budget:
             note = ("\n★ 예산이 찼습니다. 항을 추가하지 마세요.\n"
                     "  이번 가설을 반영하려면 **가장 덜 중요한 항 하나를 "
                     "지우고**\n  그 자리에 넣으세요. 무엇을 지웠고 왜 그것을 "
                     "골랐는지\n  `changes` 에 쓰세요.")
         else:
-            note = f"남은 예산: {BUDGET - n_terms}항"
+            note = f"남은 예산: {self._budget - n_terms}항"
         # ★ Analyst 가 꺼져 있으면 **가설 절 자체를 안 만든다** (§16.1, D-89).
         #   "## 이번 가설\n\n(가설 없음)" 처럼 빈 자리를 남기면 모델이
         #   "가설이 있는데 비어 있다" 로 읽어 다른 조건이 된다. 진단
@@ -584,10 +595,10 @@ class OpenAILLM:
                 f"두 번째 부모의 가중치: {list(p2.w0)}\n\n"
                 "**각각의 좋은 항을 골라 하나로 만드세요.** 한쪽을 그대로 "
                 "베끼지 마세요 — 그러면 교차가 아닙니다.\n\n"
-                f"⚠️ 예산이 {BUDGET}항이므로 합치면 **반드시 버려야 "
+                f"⚠️ 예산이 {self._budget}항이므로 합치면 **반드시 버려야 "
                 "합니다.** 무엇을 버렸고 왜 그것을 골랐는지 `changes` 에 "
                 "쓰세요.\n")
-        body = load_prompt("role/rule_editor.md")
+        body = load_prompt("role/rule_editor.md", budget=self._budget)
         return body.format(
             second_parent_block=second,
             n_terms=n_terms, n_weights=n_w, budget_note=note,
@@ -647,8 +658,9 @@ class OpenAILLM:
         #   `condition` 이 A/B(표 관측 유무)라 피처 조건과 축이 다르다 —
         #   레지스트리가 사람 24개면 실제 이름을 써도 되고, F0/F1
         #   레지스트리면 무관 도메인을 써야 한다.
-        rule_ex = _rule_example_for(reg)
-        return load_prompt("role/rule_writer.md").format(
+        rule_ex = _rule_example_for(reg, budget=self._budget)
+        return load_prompt("role/rule_writer.md",
+                           budget=self._budget).format(
             rule_example_block=rule_ex,
             table_note=note, feature_block=block, aggregate_block=agg)
 
@@ -664,7 +676,8 @@ class OpenAILLM:
         """
         from kernelrule.features.generated import field_block
 
-        return load_prompt("role/categorize.md").format(
+        return load_prompt("role/categorize.md",
+                           budget=self._budget).format(
             field_block=field_block(), n_min=n_min, n_max=n_max)
 
     def _feature_prompt(self, *, condition: str = "F1", task: str = "",
@@ -702,10 +715,12 @@ class OpenAILLM:
         #   않으려 무관 도메인을 쓰고, 공개 지식을 주는 조건(F1-K/F2/F3)은
         #   실제 피처를 코드까지 보여준다 — 그것이 조건의 정의이므로
         #   D-35 의 조심이 여기서는 불필요하다.
-        example = load_prompt(f"examples/{_EXAMPLES[condition]}.md")
-        return load_prompt("role/feature.md").format(
+        example = load_prompt(f"examples/{_EXAMPLES[condition]}.md",
+                              budget=self._budget)
+        return load_prompt("role/feature.md", budget=self._budget).format(
             field_block=field_block(), feature_block=block,
-            example_block=example, area_block=load_prompt("areas.md"),
+            example_block=example,
+            area_block=load_prompt("areas.md", budget=self._budget),
             task_block=task or ("## 이번에 만들 것\n\n피처 하나를 제안하세요."))
 
     # -- 루프 밖 역할 등록 (D-92) -----------------------------------------
