@@ -1,0 +1,238 @@
+{
+ "A6000 학습 41형상": {
+  "n_shapes": 41,
+  "top_n": 100,
+  "span_median": 0.06597934420128371,
+  "uniq_time_median": 24,
+  "features": {
+   "edge_waste": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 34
+   },
+   "has_spill": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 40
+   },
+   "is_two_stage": {
+    "uniq_median": 2.0,
+    "cv_median": 2.9999999999999996,
+    "n_const": 8
+   },
+   "log_dram_traffic": {
+    "uniq_median": 2.0,
+    "cv_median": 0.004311668607184155,
+    "n_const": 13
+   },
+   "log_grid_tiles": {
+    "uniq_median": 5.0,
+    "cv_median": 0.06661087269538953,
+    "n_const": 2
+   },
+   "log_inst_total": {
+    "uniq_median": 25.0,
+    "cv_median": 0.04275953013328727,
+    "n_const": 0
+   },
+   "log_mainloop_iters": {
+    "uniq_median": 5.0,
+    "cv_median": 0.09695921254299904,
+    "n_const": 0
+   },
+   "log_workspace_bytes": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 36
+   },
+   "occupancy_deficit": {
+    "uniq_median": 3.0,
+    "cv_median": 0.09253887003992113,
+    "n_const": 0
+   },
+   "pipeline_warmup_frac": {
+    "uniq_median": 8.0,
+    "cv_median": 0.4461137366662726,
+    "n_const": 0
+   },
+   "reg_pressure": {
+    "uniq_median": 8.0,
+    "cv_median": 0.2185536984695606,
+    "n_const": 0
+   },
+   "sm_idle_cost": {
+    "uniq_median": 3.0,
+    "cv_median": 0.5429237074073403,
+    "n_const": 1
+   },
+   "smem_pressure": {
+    "uniq_median": 6.0,
+    "cv_median": 0.2985557093816103,
+    "n_const": 0
+   },
+   "spill_magnitude": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 40
+   },
+   "split_k_cost": {
+    "uniq_median": 5.0,
+    "cv_median": 0.6962959614909002,
+    "n_const": 9
+   },
+   "tail_waste": {
+    "uniq_median": 3.0,
+    "cv_median": 0.39391403285964327,
+    "n_const": 1
+   },
+   "tile_aspect_imbalance": {
+    "uniq_median": 2.0,
+    "cv_median": 0.5,
+    "n_const": 13
+   },
+   "traffic_amplification": {
+    "uniq_median": 2.0,
+    "cv_median": 0.08043438481831372,
+    "n_const": 13
+   },
+   "waves": {
+    "uniq_median": 5.0,
+    "cv_median": 0.39079412838093047,
+    "n_const": 0
+   }
+  },
+  "axes": {
+   "tile_m": 2.0,
+   "tile_n": 2.0,
+   "tile_k": 2.0,
+   "ext_stages": 5.0,
+   "split_k": 5.0,
+   "ext_warp_m": 2.0,
+   "ext_warp_n": 2.0,
+   "ext_warp_k": 2.0,
+   "ext_swizzle_n": 4.0,
+   "split_k_mode": 1.0
+  },
+  "axis_dist_median": 2,
+  "n_const_features": 4,
+  "n_flat_features": 5
+ },
+ "5090 학습 41형상": {
+  "n_shapes": 41,
+  "top_n": 100,
+  "span_median": 0.011857682502294464,
+  "uniq_time_median": 5,
+  "features": {
+   "edge_waste": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 35
+   },
+   "has_spill": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 41
+   },
+   "is_two_stage": {
+    "uniq_median": 2.0,
+    "cv_median": 1.4577379737113247,
+    "n_const": 18
+   },
+   "log_dram_traffic": {
+    "uniq_median": 3.0,
+    "cv_median": 0.008356395982126336,
+    "n_const": 0
+   },
+   "log_grid_tiles": {
+    "uniq_median": 6.0,
+    "cv_median": 0.03962805927313942,
+    "n_const": 0
+   },
+   "log_inst_total": {
+    "uniq_median": 21.0,
+    "cv_median": 0.02230463178861275,
+    "n_const": 0
+   },
+   "log_mainloop_iters": {
+    "uniq_median": 5.0,
+    "cv_median": 0.11077989646153875,
+    "n_const": 0
+   },
+   "log_workspace_bytes": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 33
+   },
+   "occupancy_deficit": {
+    "uniq_median": 3.0,
+    "cv_median": 0.09377396691235762,
+    "n_const": 0
+   },
+   "pipeline_warmup_frac": {
+    "uniq_median": 8.0,
+    "cv_median": 0.30025477810398354,
+    "n_const": 0
+   },
+   "reg_pressure": {
+    "uniq_median": 8.0,
+    "cv_median": 0.27582860564167416,
+    "n_const": 0
+   },
+   "sm_idle_cost": {
+    "uniq_median": 5.0,
+    "cv_median": 0.5886280833589894,
+    "n_const": 0
+   },
+   "smem_pressure": {
+    "uniq_median": 4.0,
+    "cv_median": 0.1701444468952665,
+    "n_const": 0
+   },
+   "spill_magnitude": {
+    "uniq_median": 1.0,
+    "cv_median": 0.0,
+    "n_const": 41
+   },
+   "split_k_cost": {
+    "uniq_median": 5.0,
+    "cv_median": 0.20388689448760666,
+    "n_const": 3
+   },
+   "tail_waste": {
+    "uniq_median": 5.0,
+    "cv_median": 0.46471057713852526,
+    "n_const": 0
+   },
+   "tile_aspect_imbalance": {
+    "uniq_median": 2.0,
+    "cv_median": 0.6081636405595374,
+    "n_const": 0
+   },
+   "traffic_amplification": {
+    "uniq_median": 3.0,
+    "cv_median": 0.15971914124998504,
+    "n_const": 0
+   },
+   "waves": {
+    "uniq_median": 6.0,
+    "cv_median": 0.28743883283419214,
+    "n_const": 0
+   }
+  },
+  "axes": {
+   "tile_m": 2.0,
+   "tile_n": 2.0,
+   "tile_k": 2.0,
+   "ext_stages": 3.0,
+   "split_k": 5.0,
+   "ext_warp_m": 3.0,
+   "ext_warp_n": 2.0,
+   "ext_warp_k": 2.0,
+   "ext_swizzle_n": 4.0,
+   "split_k_mode": 1.0
+  },
+  "axis_dist_median": 2,
+  "n_const_features": 4,
+  "n_flat_features": 5
+ }
+}
