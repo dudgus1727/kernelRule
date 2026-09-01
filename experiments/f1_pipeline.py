@@ -227,7 +227,11 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget):
         return MockLLM("mutate", seed=a.seed, feature_names=names,
                        shape_values=svals)
     from kernelrule.agents.openai_client import OpenAILLM
-    return OpenAILLM(LLMConfig(model=a.model, concurrency=6),
+    # ★ 목적함수를 프롬프트까지 넘긴다 (D-101). 안 넘기면 채택만 순위
+    #   손실이고 모델은 regret 을 듣는다 — 그것도 조건이므로 조용히
+    #   섞이면 안 된다. `config.json` 의 `llm.objective` 로 확인된다.
+    return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
+                               objective=getattr(a, "objective", "regret")),
                      feature_names=names, shape_values=svals,
                      registry=registry, budget=budget, cache=False)
 

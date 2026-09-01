@@ -346,6 +346,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     #   몇 개는 무작위 출발점에서 시작한다. 시드가 고정이라 결정론적이다.
     best_w = w0.copy()
     best_v = obj(w0)
+    #: 실제로 시작한 재시작 횟수. 아래에서 **세어서 경고한다**.
+    n_started = 0
     if objective == "rank":
         # ★ 계단이 아니므로 준뉴턴을 먼저 쓴다. 이것이 이 설계의 이점이다.
         #
@@ -357,6 +359,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         for r in range(n_restarts):
             if n_eval >= max_evals:
                 break
+            n_started += 1
             start = (best_w if r == 0 else best_w + np.random.default_rng(
                 _RESTART_SEED + r).normal(
                     0.0, 0.35 * np.maximum(np.abs(best_w), 1.0)))
@@ -373,6 +376,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     #   "잘리는 순간까지 개선 중이었다" 쪽이다.
     cut_while_improving = False
     for r in range(n_restarts):
+        n_started += 1
         if n_eval >= max_evals:
             break
         before_v, before_n = best_v, n_eval
@@ -385,6 +389,16 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         cut_while_improving = (best_v < before_v - 1e-12
                                and n_eval - before_n >= per)
 
+    # ★ 재시작이 **실제로 돌았는가** (2026-09-01). `n_restarts=4` 라고
+    #   적어 놓고 1회만 도는 일이 실제로 있었다 — rank 경로에서 L-BFGS
+    #   가 `maxfun=max_evals` 로 예산을 혼자 다 썼다. 주석은 "재시작은
+    #   그대로 둔다" 였고 **거짓이었다** (원칙 1).
+    if n_restarts > 1 and n_started < 2:
+        warnings.warn(
+            f"fit_weights: 재시작이 {n_started}회만 돌았다 "
+            f"(n_restarts={n_restarts}). 첫 최적화가 예산 "
+            f"{max_evals} 을 혼자 쓴다 — 전역 탐색이 없다.",
+            FitWarning, stacklevel=2)
     if n_inf >= n_eval:
         raise FitError(
             f"모든 가중치에서 규칙이 유효한 점수를 내지 못했다 "

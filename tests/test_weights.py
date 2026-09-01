@@ -473,3 +473,26 @@ def test_unknown_objective_is_refused(known):
     with pytest.raises(FitError, match="알 수 없는 목적함수"):
         fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0],
                     objective="nope")
+
+
+def test_restarts_actually_run(known):
+    """★ `n_restarts` 를 적어 놓고 1회만 도는 것을 막는다.
+
+    실제로 났다 — rank 경로에서 L-BFGS 에 `maxfun=max_evals` 를 줬더니
+    **혼자 예산을 다 써서 재시작이 0회**였다. 주석에는 "재시작은 그대로
+    둔다" 라고 적혀 있었고 거짓이었다 (원칙 1).
+    """
+    import warnings as _w
+
+    from kernelrule.core.weights import FitWarning
+
+    t, m, score = known
+    for obj in ("regret", "rank"):
+        with _w.catch_warnings(record=True) as got:
+            _w.simplefilter("always")
+            fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0],
+                        max_evals=200, n_restarts=4, objective=obj)
+        bad = [str(x.message) for x in got
+               if issubclass(x.category, FitWarning)
+               and "재시작이" in str(x.message)]
+        assert not bad, f"{obj}: {bad}"
