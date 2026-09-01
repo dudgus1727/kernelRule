@@ -1,0 +1,51 @@
+{
+ "bundle": "datasets/rtx-5090-sm_120-5bb6f403",
+ "n_pos": 32,
+ "n_neg": 256,
+ "temp": 1.0,
+ "note": "config 전수. 샘플링 변수를 섞지 않았다. T 는 w 크기와 분리 식별되지 않으므로 1 로 고정",
+ "rows": [
+  {
+   "run": "f1pipe-F3-arch24-s0",
+   "linear": true,
+   "rank_loss": 1.1077884845917807,
+   "regret": 1.065650674258863,
+   "diff": 0.04213781033291775
+  },
+  {
+   "run": "f1pipe-F3-arch24-s1",
+   "linear": true,
+   "rank_loss": 1.0531199436066736,
+   "regret": 1.0455327565488457,
+   "diff": 0.007587187057827904
+  },
+  {
+   "run": "f1pipe-F3-arch24-s2",
+   "linear": true,
+   "rank_loss": 1.0923119094526614,
+   "regret": 1.0804492317993124,
+   "diff": 0.01186267765334903
+  },
+  {
+   "run": "f1pipe-F3-arch24-s3",
+   "linear": true,
+   "rank_loss": 1.0640121046539568,
+   "regret": 1.0564455672749646,
+   "diff": 0.007566537378992155
+  },
+  {
+   "run": "f1pipe-F3-arch24-s4",
+   "linear": true,
+   "rank_loss": 1.0692744760664168,
+   "regret": 1.0513077678987925,
+   "diff": 0.017966708167624246
+  },
+  {
+   "run": "f1pipe-F3-arch24-s5",
+   "linear": true,
+   "rank_loss": 1.1455589826087786,
+   "regret": 1.0441094919942455,
+   "diff": 0.10144949061453312
+  }
+ ]
+}
