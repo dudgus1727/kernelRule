@@ -15,8 +15,8 @@
 ## 셀 축 (§27) — ★ 크기 체제로 바꿨다
 
     code_len      AST 노드 수                  4구간
-    short_regret  학습 분할 안의 **짧은** 형상   4구간
-    long_regret   학습 분할 안의 **긴** 형상     4구간
+    short_objective  학습 분할 안의 **짧은** 형상   4구간
+    long_objective   학습 분할 안의 **긴** 형상     4구간
                                                 -> 64 셀
 
 **원래는 mem-bound / compute-bound 였다.** 크기 층화가 난이도 층화보다
@@ -42,13 +42,19 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-__all__ = ["Archive", "Elite", "CELL_AXES", "cell_of"]
+__all__ = ["Archive", "Elite", "CELL_AXES", "cell_of", "N_QUANTILES"]
 
+#: ★ 절대 경계 (`cell_mode="absolute"`). **regret 규모에 맞춰 정한 값이다** —
+#: 목적함수가 바뀌면 못 쓴다 (순위 손실은 0.4 근처라 전부 첫 칸에 몰린다).
+#: 그때는 `cell_mode="quantile"` 을 쓴다.
 CELL_AXES: dict[str, list[float]] = {
     "code_len": [0, 60, 120, 200, float("inf")],
-    "short_regret": [1.0, 1.05, 1.15, 1.35, float("inf")],
-    "long_regret": [1.0, 1.05, 1.15, 1.35, float("inf")],
+    "short_objective": [1.0, 1.05, 1.15, 1.35, float("inf")],
+    "long_objective": [1.0, 1.05, 1.15, 1.35, float("inf")],
 }
+
+#: 순위 기반 칸 수 (체제 축마다). 절대 경계와 같은 4칸이다.
+N_QUANTILES = 4
 
 
 def _bin(v: float, edges: list[float]) -> int:
@@ -58,10 +64,12 @@ def _bin(v: float, edges: list[float]) -> int:
     return len(edges) - 2
 
 
-def cell_of(code_len: int, short_regret: float, long_regret: float) -> tuple:
+def cell_of(code_len: int, short_objective: float,
+            long_objective: float) -> tuple:
+    """절대 경계 칸. `cell_mode="quantile"` 이면 `Archive` 가 다르게 센다."""
     return (_bin(code_len, CELL_AXES["code_len"]),
-            _bin(short_regret, CELL_AXES["short_regret"]),
-            _bin(long_regret, CELL_AXES["long_regret"]))
+            _bin(short_objective, CELL_AXES["short_objective"]),
+            _bin(long_objective, CELL_AXES["long_objective"]))
 
 
 @dataclass
@@ -70,10 +78,12 @@ class Elite:
     code: str
     w: list[float]
     regret: float
-    #: 학습 분할 안의 짧은 형상(roofline 하한 < 0.5ms) regret
-    short_regret: float
-    #: 학습 분할 안의 긴 형상 regret
-    long_regret: float
+    #: 학습 분할 안의 짧은 형상(roofline 하한 < 0.5ms) **목적함수 값**.
+    #: ★ 이름이 `short_regret` 이었다 (D-101). 목적함수가 regret 뿐이라는
+    #: 가정이 이름에 박혀 있었고, 순위 손실을 넣으면서 거짓이 됐다.
+    short_objective: float
+    #: 학습 분할 안의 긴 형상 목적함수 값
+    long_objective: float
     code_len: int
     round: int
     changes: str = ""
@@ -91,11 +101,12 @@ class Elite:
         크면 그 규칙은 한 체제를 희생하고 있다. 아카이브가 이 축으로
         갈리므로 격차가 작은 규칙이 따로 보존된다.
         """
-        return abs(self.long_regret - self.short_regret)
+        return abs(self.long_objective - self.short_objective)
 
     @property
     def cell(self) -> tuple:
-        return cell_of(self.code_len, self.short_regret, self.long_regret)
+        return cell_of(self.code_len, self.short_objective,
+                       self.long_objective)
 
     def to_dict(self) -> dict:
         d = dict(self.__dict__)
@@ -107,7 +118,8 @@ class Archive:
     """셀당 최고 하나 + 전체 최고."""
 
     def __init__(self, noise_tol: float = 0.0, *,
-                 select_by: str = "regret") -> None:
+                 select_by: str = "regret",
+                 cell_mode: str = "absolute") -> None:
         #: 갱신을 인정할 최소 개선. `is_significant` 가 준다 (§7.4).
         self.noise_tol = float(noise_tol)
         #: ★ 무엇으로 채택하나 (D-101). 기본은 `regret` — 지금까지의 모든
@@ -119,6 +131,22 @@ class Archive:
         if select_by not in ("regret", "rank"):
             raise ValueError(f"알 수 없는 채택 기준: {select_by!r}")
         self.select_by = select_by
+        #: ★ 칸을 어떻게 나누나 (D-101).
+        #:
+        #: ```
+        #: absolute   CELL_AXES 의 절대 경계. ★ regret 규모에 맞춘 값이다
+        #: quantile   ★ 보유 엘리트 + 새 후보를 목적함수로 정렬해 4분위
+        #: ```
+        #:
+        #: 절대 경계는 목적함수가 바뀌면 못 쓴다 — 순위 손실은 0.4 근처라
+        #: 전부 첫 칸에 몰린다. 순위 기반은 **경계값이 필요 없고** 목적함수가
+        #: 무엇이든 그대로 돈다.
+        #:
+        #: ⚠️ 대가: 칸의 뜻이 라운드마다 바뀐다. 전체가 좋아지면 1분위의
+        #: 절대값이 내려간다. 그 대신 칸이 고르게 찬다.
+        if cell_mode not in ("absolute", "quantile"):
+            raise ValueError(f"알 수 없는 칸 방식: {cell_mode!r}")
+        self.cell_mode = cell_mode
         self.cells: dict[tuple, Elite] = {}
         self.best: Elite | None = None
         self.history: list[dict] = []
@@ -149,6 +177,52 @@ class Archive:
         """
         return self.noise_tol if self.select_by == "regret" else 0.0
 
+    def _quantile_cells(self, pool: list[Elite]) -> dict:
+        """★ 보유분 + 후보를 목적함수로 정렬해 4분위 칸을 매긴다.
+
+        경계값이 없다 — 목적함수가 무엇이든 그대로 돈다. 아카이브가
+        최대 64개라 정렬이 공짜다.
+
+        **동률은 같은 칸**이다 (`argsort(argsort(.))` 를 안 쓴다, D-41).
+        """
+        n = len(pool)
+        out: dict[int, tuple] = {}
+        axes = {}
+        for name in ("short_objective", "long_objective"):
+            vals = [getattr(x, name) for x in pool]
+            order = sorted(range(n), key=lambda i: (vals[i], i))
+            rank = [0] * n
+            r = 0
+            for pos, i in enumerate(order):
+                if pos and vals[i] > vals[order[pos - 1]]:
+                    r = pos
+                rank[i] = r
+            axes[name] = [min(N_QUANTILES - 1, x * N_QUANTILES // max(n, 1))
+                          for x in rank]
+        for i, x in enumerate(pool):
+            out[i] = (_bin(x.code_len, CELL_AXES["code_len"]),
+                      axes["short_objective"][i], axes["long_objective"][i])
+        return out
+
+    def _consider_quantile(self, e: Elite) -> list[str]:
+        """칸을 다시 매기고 칸마다 최선만 남긴다. `e` 가 남으면 이겼다."""
+        pool = [*self.cells.values(), e]
+        cells = self._quantile_cells(pool)
+        best: dict[tuple, int] = {}
+        for i, x in enumerate(pool):
+            c = cells[i]
+            cur = best.get(c)
+            if cur is None or self._key(x) < self._key(pool[cur]):
+                best[c] = i
+        new = {c: pool[i] for c, i in best.items()}
+        won: list[str] = []
+        if e in new.values():
+            won.append("new_cell" if len(new) > len(self.cells) else "cell")
+        self.cells = new
+        if won:
+            self.last_new_cell_round = e.round
+        return won
+
     def consider(self, e: Elite) -> list[str]:
         """넣어 본다. 어느 자리를 차지했는지 돌려준다. 빈 리스트면 폐기.
 
@@ -162,15 +236,22 @@ class Archive:
         if self.best is None or self._key(e) < self._key(self.best) - self._tol:
             won.append("best")
             self.best = e
-        c = e.cell
-        cur = self.cells.get(c)
-        if cur is None:
-            won.append("new_cell")
-            self.cells[c] = e
-            self.last_new_cell_round = e.round
-        elif self._key(e) < self._key(cur) - self._tol:
-            won.append("cell")
-            self.cells[c] = e
+        if self.cell_mode == "quantile":
+            won.extend(self._consider_quantile(e))
+            # ★ 순위 칸에서는 `e.cell`(절대 경계)이 뜻이 없다. 기록에는
+            #   실제로 들어간 칸을 남긴다 — 못 찾으면 절대 칸을 적고
+            #   그 사실이 보이게 한다.
+            c = next((k for k, v in self.cells.items() if v is e), e.cell)
+        else:
+            c = e.cell
+            cur = self.cells.get(c)
+            if cur is None:
+                won.append("new_cell")
+                self.cells[c] = e
+                self.last_new_cell_round = e.round
+            elif self._key(e) < self._key(cur) - self._tol:
+                won.append("cell")
+                self.cells[c] = e
         if won:
             self.n_accepted += 1
         self.history.append({"round": e.round, "rule_id": e.rule_id,

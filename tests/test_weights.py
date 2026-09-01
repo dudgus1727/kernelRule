@@ -360,6 +360,10 @@ def test_cap_warning_ignores_polish_evals(known):
 def test_cap_warning_needs_actual_improvement_at_cutoff(known):
     """★ 예산을 다 쓴 것만으로는 경고하지 않는다.
 
+    ⚠️ `objective="regret"` 을 **명시한다** (2026-09-01). 이 시험은
+    regret 경로의 재시작 일정(D-76)을 고정하는 것이고, 기본값이 `rank`
+    로 바뀌면서 다른 경로를 재게 됐다.
+
     재시작 일정이 `max_evals` 를 **설계상 전부 쓰게** 돼 있어 "상한에
     닿았다" 는 언제나 참이다. 늘 참인 것은 감시가 아니다 (원칙 11).
     경고는 **잘리는 순간까지 나아지고 있었을 때**만 뜬다.
@@ -375,7 +379,7 @@ def test_cap_warning_needs_actual_improvement_at_cutoff(known):
     with _w.catch_warnings(record=True) as got:
         _w.simplefilter("always")
         fr = fit_weights(score, m, t, _all_train(t), W_TRUE.tolist(),
-                         max_evals=120, polish=False)
+                         max_evals=120, objective="regret", polish=False)
     assert fr.n_fit_evals >= 120, "예산을 다 쓰지 않았다 — 시험이 무의미하다"
     caps = [str(x.message) for x in got
             if issubclass(x.category, FitWarning) and "상한" in str(x.message)]
@@ -385,18 +389,36 @@ def test_cap_warning_needs_actual_improvement_at_cutoff(known):
 # ---------------------------------------------------------------------------
 # D-101 — 순위 손실
 # ---------------------------------------------------------------------------
-def test_objective_default_is_regret_and_unchanged(known):
-    """★ `objective` 를 안 넘기면 **예전과 정확히 같아야 한다.**
+def test_objective_default_is_rank(known):
+    """★ 기본은 `"rank"` 다 (2026-09-01 정정).
 
-    이 함수는 지금까지의 모든 결과가 통과한 경로다. 기본값이 조용히
-    바뀌면 그 결과들이 흔들린다.
+    처음에는 `"regret"` 을 기본으로 뒀다 — "기존 결과가 통과한 경로라
+    조용히 달라지면 안 된다" 는 이유였다. 그런데 **지금 하는 실험이
+    순위 손실**이고, 옛 조건은 명시하면 된다.
     """
     t, m, score = known
     a = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60)
     b = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
-                    objective="regret")
+                    objective="rank")
     assert np.array_equal(a.w, b.w)
-    assert a.fit_regret == b.fit_regret
+
+
+def test_explicit_regret_still_reproduces_the_old_path(known):
+    """★ 반대 방향 대조 — `objective="regret"` 이 옛 경로 그대로인가.
+
+    기본을 바꿨으므로 **옛 결과를 되짚는 경로**가 살아 있는지를 여기서
+    지킨다. 이것이 깨지면 지금까지의 모든 수치를 재현할 수 없다.
+    """
+    t, m, score = known
+    a = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
+                    objective="regret")
+    b = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
+                    objective="regret")
+    assert np.array_equal(a.w, b.w) and a.fit_regret == b.fit_regret
+    # 결정론이면서 rank 와는 달라야 한다 — 같으면 분기가 안 도는 것이다
+    r = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
+                    objective="rank")
+    assert not np.array_equal(a.w, r.w), "objective 분기가 안 돈다"
 
 
 def test_rank_pairs_drop_the_noise_indistinguishable(known):

@@ -12,7 +12,7 @@ from kernelrule.core.splits import Split, SplitSet
 
 def _elite(regret=1.2, short=1.2, long=1.2, n=100, rnd=0, rid="r1"):
     return Elite(rule_id=rid, code="x", w=[1.0], regret=regret,
-                 short_regret=short, long_regret=long, code_len=n, round=rnd)
+                 short_objective=short, long_objective=long, code_len=n, round=rnd)
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +223,10 @@ def test_val_blowup_is_reported_not_hidden(loop):
     bad = Elite(rule_id="bad",
                 code="def score(f, p, hw, w):\n"
                      "    return f.waves * w[0]\n", w=[1.0], regret=1.0,
-                short_regret=1.0, long_regret=1.0, code_len=10, round=0,
+                short_objective=1.0, long_objective=1.0, code_len=10, round=0,
+                # ★ 기본 채택 기준이 rank 다 (D-101). 없으면 아카이브가
+                #   **거부한다** — 조용히 regret 으로 안 떨어진다
+                rank_loss=0.5,
                 val_regret=1.0 + VAL_GAP_ALARM * 10)
     loop.archive.consider(bad)
     r = loop.run_round()
@@ -302,7 +305,7 @@ def test_cell_axes_use_size_regimes():
     """★ 셀 축이 크기 체제다 — mem/comp 가 아니다 (§10.1, §30.5)."""
     from kernelrule.core.archive import CELL_AXES
 
-    assert set(CELL_AXES) == {"code_len", "short_regret", "long_regret"}
+    assert set(CELL_AXES) == {"code_len", "short_objective", "long_objective"}
 
 
 def test_regime_gap_is_exposed():
@@ -664,8 +667,8 @@ def _parallel_pair(synth_table, tmp_path, workers: int):
     lp.seed(*_SEED_RULE)
     r = lp.run_round()
     elites = sorted(lp.archive.cells.values(), key=lambda e: e.rule_id)
-    return r, [(e.rule_id, e.code, tuple(e.w), e.regret, e.short_regret,
-                e.long_regret, e.val_regret) for e in elites]
+    return r, [(e.rule_id, e.code, tuple(e.w), e.regret, e.short_objective,
+                e.long_objective, e.val_regret) for e in elites]
 
 
 def test_parallel_matches_sequential(synth_table, tmp_path):

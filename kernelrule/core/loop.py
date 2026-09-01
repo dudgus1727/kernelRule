@@ -87,8 +87,11 @@ class LoopConfig:
     #: ★ 가중치 목적함수 (D-101). 기본 `"regret"` — **지금까지의 동작**이다.
     #: `"rank"` 면 참 상위 `rank_top_k` 안의 가중 쌍 손실로 맞추고,
     #: **아카이브 채택도 그것으로 한다** (셀 축은 안 바뀐다).
-    #: `regret` 은 그 경우에도 계속 계산해서 기록한다.
-    objective: str = "regret"
+    #: `regret` 은 그 경우에도 계속 계산해서 기록한다 (사전 등록 §4 —
+    #: 판정에는 안 쓰고 두 진화를 나란히 놓을 때 쓴다).
+    #: ★ 2026-09-01 정정: 기본을 `"rank"` 로 바꿨다. 지금 하는 실험이
+    #: 순위 손실이고, 옛 조건은 `objective="regret"` 을 명시하면 된다.
+    objective: str = "rank"
     rank_top_k: int = 100
     #: ★ 채점·적합 병렬화 (D-95). 0 이면 순차 — **지금까지의 동작**이다.
     #: 결과는 같아야 한다 (`test_parallel_matches_sequential`).
@@ -243,6 +246,9 @@ class RoundResult:
     n_accepted: int = 0
     best_regret: float = float("nan")
     best_val_regret: float = float("nan")
+    #: ★ 채택 기준이 `rank` 일 때 아카이브 최고의 순위 손실 (D-101).
+    #: `regret` 조건에서는 NaN 이다 — 억지로 계산하지 않는다.
+    best_rank_loss: float = float("nan")
     n_cells: int = 0
     val_gap: float = float("nan")
     n_val_blowups: int = 0
@@ -277,7 +283,9 @@ class RoundResult:
             f"{self.n_rejected_static} 샌드박스 {self.n_rejected_sandbox} "
             f"적합 {self.n_rejected_fit} | 채점 {self.n_scored:2d} "
             f"채택 {self.n_accepted:2d} | {mv}best {self.best_regret:.4f} "
-            f"val {self.best_val_regret:.4f}({gap}{alarm})"
+            + (f"rank {self.best_rank_loss:.4f} "
+               if self.best_rank_loss == self.best_rank_loss else "")
+            + f"val {self.best_val_regret:.4f}({gap}{alarm})"
             f"| 셀 {self.n_cells:2d} 폭발 {self.n_val_blowups} | "
             f"{self.seconds:.1f}s")
 
@@ -298,8 +306,12 @@ class RoundLoop:
         self.rng = np.random.default_rng(cfg.seed)
         self.archive = Archive(
             noise_tol=0.0,
-            select_by=("rank" if cfg.objective == "rank"
-                       else "regret"))
+            select_by=("rank" if cfg.objective == "rank" else "regret"),
+            # ★ 칸도 목적함수를 따라간다 (D-101). 절대 경계는 regret
+            #   규모에 맞춰 정한 값이라 순위 손실에서는 전부 첫 칸에
+            #   몰린다. 순위 4분위는 경계값이 필요 없다.
+            cell_mode=("quantile" if cfg.objective == "rank"
+                       else "absolute"))
         self.rounds: list[RoundResult] = []
         self.failures: list[dict] = []
         self.hypotheses: list[dict] = []
@@ -308,6 +320,8 @@ class RoundLoop:
         #: ★ cross 자식이 두 부모의 항을 섞었는가 (D-96 관찰 1).
         #: 부모 코드는 남지 않으므로 그 자리에서 계산해 둔다.
         self.cross_lineage: list[dict] = []
+        #: ★ 라운드별 아카이브 최고 (코드째). D-101 관찰용.
+        self.bests: list[dict] = []
         #: 가설 id 의 **유일한 출처**. 모델이 붙인 id 는 응답 안에서만
         #: 유일해서 라운드/패스를 넘으면 겹친다.
         self._hyp_seq = 0
@@ -606,7 +620,7 @@ class RoundLoop:
         return Elite(
             rule_id=f"r{self._rule_seq:04d}", code=prop.code,
             w=out["w"], regret=out["regret"],
-            short_regret=out["short"], long_regret=out["long"],
+            short_objective=out["short"], long_objective=out["long"],
             code_len=rep.n_nodes, round=len(self.rounds),
             changes=prop.changes, hypothesis_id=prop.hypothesis_id,
             val_regret=out["val_regret"],
@@ -921,7 +935,16 @@ class RoundLoop:
         res.n_cells = self.archive.n_cells
         if self.archive.best:
             res.best_regret = self.archive.best.regret
+            res.best_rank_loss = self.archive.best.rank_loss
             res.best_val_regret = self.archive.best.val_regret
+            # ★ 라운드마다 **그때의 최고**를 코드째 남긴다 (D-101 관찰).
+            #   `archive.jsonl` 은 마지막 상태뿐이라 "라운드마다 tau 가
+            #   오르는가" 를 되짚을 수 없다.
+            self.bests.append({
+                "round": len(self.rounds), "rule_id": self.archive.best.rule_id,
+                "code": self.archive.best.code, "w": self.archive.best.w,
+                "regret": self.archive.best.regret,
+                "rank_loss": self.archive.best.rank_loss})
             res.val_gap = res.best_val_regret - res.best_regret
         # ★ 아카이브는 **학습** 점수로 고른다 (검증을 쓰면 홀드아웃이 오염된다).
         #   그래서 검증에서 무너지는 규칙이 "최고" 가 될 수 있다 — 실제로 났다
@@ -1072,6 +1095,9 @@ class RoundLoop:
         #   만들려다 실패했나" 가 관찰이다.
         # ★ cross 계보 (D-96 관찰 1). 부모 코드는 어디에도 안 남으므로
         #   여기서만 되짚을 수 있다.
+        if self.bests:
+            (d / "bests.jsonl").write_text("\n".join(
+                json.dumps(x, ensure_ascii=False) for x in self.bests))
         if self.cross_lineage:
             (d / "cross.jsonl").write_text("\n".join(
                 json.dumps(x, ensure_ascii=False) for x in self.cross_lineage))

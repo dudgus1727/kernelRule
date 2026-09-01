@@ -17,7 +17,6 @@ import pytest
 from kernelrule.agents.openai_client import (
     _EDITS_RULES,
     _NEEDS_HW,
-    _WRITES_RULES,
     load_prompt,
 )
 
@@ -25,17 +24,15 @@ ROLES = ("analyze", "rule_editor", "feature", "rule_writer")
 PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 
 
-def _instructions(role: str) -> str:
-    """`_agent()` 가 조립하는 것과 **같은 순서로** 만든다."""
-    parts = [load_prompt("_base.md")]
-    if role in _NEEDS_HW:
-        parts.append(load_prompt("hw/sm_86.md"))
-    if role in _WRITES_RULES:
-        parts.append(load_prompt("role/_rules_common.md"))
-    if role in _EDITS_RULES:
-        parts.append(load_prompt("role/_rules_edit.md"))
-    parts.append(load_prompt(f"role/{role}.md"))
-    return "\n\n---\n\n".join(parts)
+def _instructions(role: str, *, objective: str = "rank") -> str:
+    """★ `_agent()` 와 **같은 함수**를 부른다 (원칙 2).
+
+    전에는 여기서 조립을 다시 썼다. `{objective_block}` 이 생기자
+    시험 쪽만 안 채워져서 갈렸다 — 조립은 한 곳에서만 한다.
+    """
+    from kernelrule.agents.openai_client import assemble_instructions
+
+    return assemble_instructions(role, objective=objective)
 
 
 # ---------------------------------------------------------------------------
@@ -88,8 +85,31 @@ def test_architect_does_not_get_the_edit_block():
 
 
 def test_optimizer_gets_the_edit_block():
+    """RuleEditor 만 편집 블록(목표 정의 + 거부 사례)을 받는다.
+
+    ★ 목표 정의는 목적함수에 따라 문장이 다르다 (D-101). 기본이 `rank`
+    이므로 "regret` = " 를 찾으면 안 된다 — **절이 있는가**로 본다.
+    """
     body = _instructions("rule_editor")
-    assert "regret` = " in body and "실제로 거부된 것들" in body
+    assert "## 채점 방식" in body and "실제로 거부된 것들" in body
+    assert "{objective_block}" not in body, "자리표시자가 안 채워졌다"
+    assert "낮을수록 좋습니다" in body
+
+
+def test_objective_block_differs_and_only_for_the_editor():
+    """★ 목적함수를 바꾸면 **RuleEditor 만** 달라진다 (D-101).
+
+    RuleWriter 는 "점수 없음" 이라 이 절을 안 받는다. 걸리면 목적함수
+    변경이 RuleWriter 의 조건까지 바꾸는 것이고, 그러면 사전 등록의
+    "바꾸는 곳" 목록이 틀린 것이 된다.
+    """
+    a = {r: _instructions(r, objective="regret")
+         for r in ("rule_editor", "rule_writer", "analyze", "feature")}
+    b = {r: _instructions(r, objective="rank")
+         for r in ("rule_editor", "rule_writer", "analyze", "feature")}
+    assert a["rule_editor"] != b["rule_editor"]
+    for r in ("rule_writer", "analyze", "feature"):
+        assert a[r] == b[r], f"{r} 가 목적함수에 걸린다"
 
 
 # ---------------------------------------------------------------------------

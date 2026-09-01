@@ -123,6 +123,46 @@ def _rule_example_for(registry) -> str:
 #:                               고정이라, 번들이 바뀌면 둘이 갈려 모순된
 #:                               사실을 받는다. 살아 있는 쪽을 남긴다 (원칙 2)
 #:   RuleWriter                   리포트를 안 받으므로 여기서 받아야 한다
+#: ★ 목표 정의 (D-101). **RuleEditor 만** 받는다 — RuleWriter 는 "점수
+#: 없음" 이므로 이 절 자체를 안 본다 (§30.10). 그래서 목적함수를 바꿔도
+#: RuleWriter 의 조건은 안 바뀐다.
+_OBJECTIVE_BLOCKS = {
+    "regret": """`regret` = (규칙이 1등으로 고른 config 의 시간) / (그 형상의 전수 최적 시간).
+1.0 이 완벽입니다. 낮을수록 좋습니다.""",
+    "rank": """★ **1등 하나가 아니라 상위권의 순서**로 채점합니다.
+
+각 형상에서 실제로 가장 빠른 config 100개를 놓고, 그 안의 모든 쌍 (i, j) 에
+대해 **더 빠른 쪽에 더 낮은 점수**를 주었는지 봅니다. 쌍마다 두 시간의
+차이만큼 무게가 붙습니다 — 차이가 큰 쌍을 뒤집으면 손해가 큽니다.
+
+0 이 완벽입니다. 낮을수록 좋습니다.
+
+⚠️ 측정 노이즈로 구별할 수 없는 쌍은 채점에서 빠집니다. **미세한 차이를
+맞추려 하지 말고 순서를 만드는 물리를 쓰세요.**""",
+}
+def assemble_instructions(role: str, *, objective: str = "rank",
+                          hw_file: str = "hw/sm_86.md",
+                          body: str | None = None) -> str:
+    """★ 시스템 프롬프트 조립. **한 곳에서만 한다** (원칙 2).
+
+    전에는 `_agent()` 와 `tests/test_prompt_layout.py` 가 각자 조립했다.
+    `{objective_block}` 을 넣자 **시험 쪽만 안 채워져서** 갈렸다 —
+    "같은 판정이 여러 곳에 있으면 갈린다" 의 여덟 번째다.
+    """
+    if objective not in _OBJECTIVE_BLOCKS:
+        raise ValueError(f"알 수 없는 목적함수: {objective!r}")
+    parts = [load_prompt("_base.md")]
+    if role in _NEEDS_HW:
+        parts.append(load_prompt(hw_file))
+    if role in _WRITES_RULES:
+        parts.append(load_prompt("role/_rules_common.md"))
+    if role in _EDITS_RULES:
+        parts.append(load_prompt("role/_rules_edit.md").replace(
+            "{objective_block}", _OBJECTIVE_BLOCKS[objective]))
+    parts.append(body if body is not None else load_prompt(f"role/{role}.md"))
+    return "\n\n---\n\n".join(parts)
+
+
 _NEEDS_HW = frozenset({"rule_writer"})
 
 #: 규칙 **함수**를 쓰는 역할 — 형태·예산·벡터화 제약을 공유한다.
@@ -166,6 +206,9 @@ class LLMConfig:
     """`config.json` 에 그대로 기록된다 (§15.4 재현성)."""
 
     model: str = DEFAULT_MODEL
+    #: ★ 목표 정의를 정한다 (D-101). `config.json` 에 남아야 조건이 기록된다.
+    #: RuleEditor 의 "채점 방식" 절만 바뀐다 — RuleWriter 는 안 받는다.
+    objective: str = "regret"
     # ------------------------------------------------------------------
     # ★ temperature / seed — 둘 다 `None` 이다. 통제할 수 없다 (D-47)
     # ------------------------------------------------------------------
@@ -331,7 +374,14 @@ class OpenAILLM:
         self._extra: dict[str, tuple] = {}
         self._base = load_prompt("_base.md")
         self._hw = load_prompt(cfg.arch_prompt)
+        #: ★ 목적함수. 프롬프트의 "채점 방식" 절을 정한다 (D-101).
+        self.objective = getattr(cfg, "objective", "regret")
+        if self.objective not in _OBJECTIVE_BLOCKS:
+            raise ValueError(f"알 수 없는 목적함수: {self.objective!r}")
         self._rules = load_prompt("role/_rules_common.md")
+        # ★ 조립은 `assemble_instructions` 한 곳에서 한다 (원칙 2).
+        #   아래 넷은 **프롬프트 존재 확인용**으로만 읽는다 — 파일이
+        #   없으면 첫 호출이 아니라 여기서 죽어야 한다.
         self._edit = load_prompt("role/_rules_edit.md")
         # ⚠️ `asyncio.Semaphore` 를 여기서 만들면 **첫 이벤트 루프에
         #    바인딩된다.** 루프는 라운드마다 `asyncio.run()` 을 새로 부르므로
@@ -392,15 +442,9 @@ class OpenAILLM:
         #   예산·벡터화)는 RuleEditor + RuleWriter, `_rules_edit.md`(regret
         #   정의·거부 사례 갤러리)는 **RuleEditor 만**. RuleWriter 는 백지
         #   에서 쓰므로 교체할 항도 이전 점수도 없다 (§30.10).
-        parts = [self._base]
-        if role in _NEEDS_HW:
-            parts.append(self._hw)
-        if role in _WRITES_RULES:
-            parts.append(self._rules)
-        if role in _EDITS_RULES:
-            parts.append(self._edit)
-        parts.append(body)
-        instructions = "\n\n---\n\n".join(parts)
+        instructions = assemble_instructions(
+            role, objective=self.objective, hw_file=self.cfg.arch_prompt,
+            body=body)
         if self.cfg.endpoint not in ("responses", "chat"):
             raise ValueError(
                 f"알 수 없는 엔드포인트: {self.cfg.endpoint!r}. "

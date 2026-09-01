@@ -616,6 +616,8 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        feature_condition=a.condition,
                        use_analyst=not getattr(a, "no_analyst", False),
                        n_workers=getattr(a, "workers", 0),
+                       objective=getattr(a, "objective", "regret"),
+                       rank_top_k=getattr(a, "rank_top_k", 100),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
         table=table, matrix=matrix, splits=splits, llm=llm)
@@ -636,6 +638,8 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            feature_condition=a.condition,
                            use_analyst=not a.no_analyst,
                            n_workers=a.workers,
+                           objective=a.objective,
+                           rank_top_k=a.rank_top_k,
                            hypothesis_pool=tuple(a.hypothesis_pool)),
             table=table, matrix=matrix, splits=splits, llm=llm)
         loop.seed(seed_rule["code"], seed_rule["w0"], changes="stage2 씨앗")
@@ -754,6 +758,14 @@ def main() -> None:
                          "비교표에 섞지 마라 (§3.4)")
     ap.add_argument("--env-hash", default=BUNDLE_HASH,
                     help="표의 env_hash 접두. 조인 키가 아니라 격리 경계다")
+    ap.add_argument("--objective", choices=("regret", "rank"),
+                    default="regret",
+                    help="가중치 목적함수. ★ 기본 regret — 지금까지의 모든 "
+                         "실행이 그 조건이다. rank 면 아카이브 채택도 "
+                         "순위 손실로 한다 (셀 축은 그대로, D-101)")
+    ap.add_argument("--rank-top-k", type=int, default=100,
+                    help="순위 손실이 볼 참 상위 개수. ★ 사전 등록에 100 을 "
+                         "박았다 — 결과를 보고 바꾸지 마라")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tag", default=None,

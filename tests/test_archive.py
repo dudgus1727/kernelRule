@@ -7,7 +7,7 @@ def _e(rid, regret, rank_loss=float("nan"), code_len=10, short=1.0, long=1.0):
     from kernelrule.core.archive import Elite
 
     return Elite(rule_id=rid, code=f"# {rid}", w=[1.0], regret=regret,
-                 short_regret=short, long_regret=long, code_len=code_len,
+                 short_objective=short, long_objective=long, code_len=code_len,
                  round=0, rank_loss=rank_loss)
 
 

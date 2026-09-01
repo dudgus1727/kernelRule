@@ -251,7 +251,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 polish: bool = True,          # ★ D-55/D-56, 기본 켜짐
                 polish_budget: int = 600,   # ★ 적합 305 의 2배 이내 (D-59)
                 sensitivity_delta: float = 0.5,
-                objective: str = "regret",    # ★ 기본은 regret. D-101
+                objective: str = "rank",      # ★ 기본은 rank. D-101
                 rank_top_k: int = 100) -> FittedRule:
     """구조를 고정하고 가중치만 맞춘다.
 
@@ -261,16 +261,21 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     `val_split` 은 적합이 끝난 뒤 **보고용으로만** 채점된다. 목적함수에
     관여하지 않는다 — 격차(`FittedRule.gap`)를 라운드마다 기록하기 위한 것이다.
 
-    ## ★ `objective` — 기본은 `"regret"` 이다 (D-101)
+    ## ★ `objective` — 기본은 `"rank"` 다 (D-101)
 
     ```
-    "regret"  argmin 하나의 상대 시간. ★ 계단 함수라 Nelder-Mead + 재시작
-    "rank"    참 상위 `rank_top_k` 안의 가중 쌍 손실. 미분 가능 -> L-BFGS-B
+    "rank"    ★ 기본. 참 상위 `rank_top_k` 안의 가중 쌍 손실.
+              미분 가능 -> L-BFGS-B
+    "regret"  argmin 하나의 상대 시간. 계단 함수라 Nelder-Mead + 재시작
     ```
 
-    **기본값을 바꾸지 않는다.** 이 함수는 지금까지의 모든 결과가 통과한
-    경로다 — 조용히 달라지면 그 결과들이 흔들린다. `"rank"` 는
-    **명시할 때만** 돈다.
+    ### 왜 기본을 바꿨나 (2026-09-01 정정)
+
+    처음에는 `"regret"` 을 기본으로 뒀다. 이유는 "지금까지의 모든 결과가
+    통과한 경로라 조용히 달라지면 안 된다" 였다. **그런데 지금 하는
+    실험이 순위 손실이다** — 그것이 기본이어야 한다. 옛 결과를 재현할
+    때 `objective="regret"` 을 명시하면 되고, **그 재현이 드물지 지금
+    실험이 매번**이다.
 
     `"rank"` 에서도 `fit_regret` 은 계속 `regret` 으로 계산해 기록한다 —
     **채점 기준은 안 바꾼다** (사전 등록 `rank-evo-prereg.md` §3).
@@ -343,13 +348,23 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     best_v = obj(w0)
     if objective == "rank":
         # ★ 계단이 아니므로 준뉴턴을 먼저 쓴다. 이것이 이 설계의 이점이다.
-        #   그 뒤의 재시작·다듬기는 그대로 둔다 (전역성은 여전히 없다).
+        #
+        # ⚠️ **예산을 나눠 준다.** 처음에는 `maxfun=max_evals` 로 뒀는데,
+        #    실측에서 L-BFGS 혼자 209/200 을 써서 **재시작이 한 번도 안
+        #    돌았다.** "재시작은 그대로 둔다" 가 거짓이 되고, 전역 탐색
+        #    없이 국소해 하나로 끝난다 (원칙 1 — 장치가 안 돈다).
         from scipy.optimize import minimize as _min
-        r0 = _min(obj, best_w, method="L-BFGS-B",
-                  options={"maxiter": 500, "maxfun": max_evals})
-        obj(np.asarray(r0.x, dtype=np.float64))
-        if seen_v < best_v:
-            best_v, best_w = seen_v, seen_w.copy()
+        for r in range(n_restarts):
+            if n_eval >= max_evals:
+                break
+            start = (best_w if r == 0 else best_w + np.random.default_rng(
+                _RESTART_SEED + r).normal(
+                    0.0, 0.35 * np.maximum(np.abs(best_w), 1.0)))
+            _min(obj, start, method="L-BFGS-B",
+                 options={"maxiter": 500,
+                          "maxfun": max(20, max_evals // n_restarts)})
+            if seen_v < best_v:
+                best_v, best_w = seen_v, seen_w.copy()
     rng = np.random.default_rng(_RESTART_SEED)
     per = max(20, max_evals // max(1, n_restarts))
     # ★ **마지막 재시작이 예산을 다 쓰면서도 아직 나아지고 있었는가.**
