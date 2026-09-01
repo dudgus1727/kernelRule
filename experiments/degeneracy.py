@@ -92,6 +92,16 @@ def main() -> None:
     print("  ★ 키 = (kernel_id, split_k, split_k_mode) — 규칙의 선택도 "
           "같은 키로 센다\n")
 
+    # ★ 상위권에 순위가 존재하는가 — tau 를 읽기 전에 이것부터 본다
+    uniq = np.array([len(np.unique(np.asarray(A.times_of(p))[
+        np.argsort(np.asarray(A.times_of(p)), kind="stable")[:TOP_N]]))
+        for p in shapes])
+    print(f"  ★ 참 상위 {TOP_N}개의 서로 다른 시간값: 중앙 "
+          f"{int(np.median(uniq))}  범위 {uniq.min()}~{uniq.max()}   "
+          f"전부 동률 {int((uniq == 1).sum())}형상 / "
+          f"10개 이하 {int((uniq <= 10).sum())}형상")
+    print(f"     눈금 {A.noise.tick_ms} ms — 상위권은 분해능이 지배한다\n")
+
     rng0 = np.random.default_rng(TAU_SEED)
     res: dict = {"runs": {}, "n_shapes": len(shapes),
                  "answer_set_sizes": ans_sz}
@@ -110,6 +120,7 @@ def main() -> None:
                                  e["w"], max_evals=300).w
 
         picks, hit1, taus, taus_top = [], 0, [], []
+        n_flat_top = 0
         hits = {q: [0, 0] for q in PCTS}
         for p in shapes:
             cand = A.candidates(p)
@@ -126,8 +137,13 @@ def main() -> None:
             idx = rng0.choice(n, size=min(TAU_SAMPLE, n), replace=False)
             taus.append(kendalltau(sc[idx], t[idx], variant="b").statistic)
             top = np.argsort(t, kind="stable")[:TOP_N]
-            taus_top.append(kendalltau(sc[top], t[top],
-                                       variant="b").statistic)
+            # ★ 상위 TOP_N 의 시간이 전부 동률이면 tau 가 정의되지 않는다.
+            #   `nan` 하나가 median 을 통째로 오염시킨다 — 세고 뺀다.
+            if len(np.unique(t[top])) > 1:
+                taus_top.append(kendalltau(sc[top], t[top],
+                                           variant="b").statistic)
+            else:
+                n_flat_top += 1
             order = np.argsort(sc, kind="stable")
             am = A.answer_mask(p)
             best = int(np.argmin(t))
@@ -142,13 +158,16 @@ def main() -> None:
         row = {"n_kinds": len(c), "top_count": c.most_common(1)[0][1],
                "same_as_static": n_static, "hit1": hit1,
                "tau_all": float(np.median(taus)),
-               "tau_top100": float(np.median(taus_top)),
+               "tau_top100": (float(np.median(taus_top)) if taus_top
+                              else float("nan")),
+               "n_flat_top": n_flat_top,
                "hits": {str(q): {"best": hits[q][0], "answer": hits[q][1]}
                         for q in PCTS}}
         res["runs"][run] = row
         print(f"  {run:22s} {len(c):5d} {row['top_count']:5d} "
               f"{n_static:6d} {hit1:6d} {row['tau_all']:10.3f} "
-              f"{row['tau_top100']:12.3f}")
+              f"{row['tau_top100']:12.3f}"
+              + (f"  (동률 {n_flat_top})" if n_flat_top else ""))
 
     # -- 무작위 바닥 (20번 뽑기 — ★ 바닥도 표본이다, 원칙 7) ---------------
     rng = np.random.default_rng(0)
@@ -179,11 +198,12 @@ def main() -> None:
             idx = rng.choice(n, size=min(TAU_SAMPLE, n), replace=False)
             tt.append(kendalltau(sc[idx], t[idx], variant="b").statistic)
             top = np.argsort(t, kind="stable")[:TOP_N]
-            ttt.append(kendalltau(sc[top], t[top], variant="b").statistic)
+            if len(np.unique(t[top])) > 1:
+                ttt.append(kendalltau(sc[top], t[top], variant="b").statistic)
         b_hit1.append(h1)
         b_kinds.append(len(Counter(picks)))
         b_tau.append(float(np.median(tt)))
-        b_tau_top.append(float(np.median(ttt)))
+        b_tau_top.append(float(np.median(ttt)) if ttt else float("nan"))
         for q in PCTS:
             b_hits[q][0].append(hh[q][0])
             b_hits[q][1].append(hh[q][1])
@@ -213,15 +233,17 @@ def main() -> None:
     # -- 판정 (사전 등록에 박은 선) ----------------------------------------
     kinds = [res["runs"][r]["n_kinds"] for r in SRC_RUNS]
     tt = [res["runs"][r]["tau_top100"] for r in SRC_RUNS]
+    n_flat = sum(res["runs"][r]["n_flat_top"] for r in SRC_RUNS) // len(SRC_RUNS)
     print("\n" + "=" * 78)
     print("판정 — 사전 등록에 박은 선")
     print("=" * 78)
     mk = float(np.median(kinds))
-    mt = float(np.median(tt))
+    mt = float(np.nanmedian(tt))
     print(f"  다양성 중앙 {mk:.1f}종  -> " + (
         "★ 형상을 실제로 본다 (>=20)" if mk >= 20
         else "★ 사실상 상수 + 변주 (<=5)" if mk <= 5 else "가운데 (6~19)"))
-    print(f"  상위100 tau 중앙 {mt:.3f}  -> " + (
+    print(f"  상위100 tau 중앙 {mt:.3f}  "
+          f"(★ 동률로 정의 불가 {n_flat}/{len(shapes)}형상 제외)  -> " + (
         "★ 의미 있는 구간에서 순위를 매긴다 (>=0.30)" if mt >= 0.30
         else "★ 매기지 못한다 (<=0.10)" if mt <= 0.10 else "가운데"))
     Path(a.out).write_text(json.dumps(res, ensure_ascii=False, indent=1))

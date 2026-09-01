@@ -96,6 +96,9 @@ def _hits(order: np.ndarray, table: PerfTable, p, pcts) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="docs/artifacts/hit-at-k.json")
+    ap.add_argument("--weights", choices=("a6000", "refit"), default="a6000",
+                    help="a6000 = (a) 완전 이식 / refit = ★ (b) 5090 재적합. "
+                         "둘을 견주면 '순위 능력이 전이되나' 를 가른다")
     a = ap.parse_args()
     warnings.simplefilter("ignore")
 
@@ -141,17 +144,23 @@ def main() -> None:
                     if x.strip()), key=lambda z: z["regret"])[0]
         fn = compile_rule(e["code"])
         ws = {}
-        for nm in ("short", "long"):     # ★ A6000 에서 맞춘 가중치
-            g = [q for q in spA.train.shapes if regime_of(q, A.hw) == nm]
-            ws[nm] = fit_weights(fn, mA, A, Split("train", tuple(g)),
-                                 e["w"], max_evals=300).w
+        for nm in ("short", "long"):
+            if a.weights == "a6000":     # (a) — A6000 에서 맞춘 가중치
+                g = [q for q in spA.train.shapes if regime_of(q, A.hw) == nm]
+                ws[nm] = fit_weights(fn, mA, A, Split("train", tuple(g)),
+                                     e["w"], max_evals=300).w
+            else:                        # ★ (b) — 5090 학습 분할로 재적합
+                g = [q for q in spB.train.shapes if regime_of(q, B.hw) == nm]
+                ws[nm] = fit_weights(fn, mB, B, Split("train", tuple(g)),
+                                     e["w"], max_evals=300).w
         orders = {}
         for p in shapes:
             cand = B.candidates(p)
             sc = np.asarray(make_score_of(fn, mB, ws[regime_of(p, B.hw)])(
                 p, cand), dtype=float)
             orders[p.key] = np.argsort(sc, kind="stable")
-        record(f"(a) {run.split('-')[-1]}", orders)
+        tag = "(a)" if a.weights == "a6000" else "(b)"
+        record(f"{tag} {run.split('-')[-1]}", orders)
 
     # -- 정적 top-k: A6000 표에서 고른 고정 축 좌표 ------------------------
     # ★ 축 좌표로 조인한다. kernel_id 는 아키텍처마다 다르게 컴파일된다
