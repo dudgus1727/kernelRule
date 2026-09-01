@@ -161,7 +161,7 @@ class _Problem:
     **순서가 정해진 뒤** 인덱싱에만 쓰인다.
     """
 
-    __slots__ = ("hw", "items", "k")
+    __slots__ = ("hw", "items", "k", "_pairs", "n_pairs", "n_dropped")
 
     def __init__(self, matrix: FeatureMatrix, table: PerfTable,
                  shapes: Sequence[Problem], k: int) -> None:
@@ -173,6 +173,59 @@ class _Problem:
             cand = table.candidates(p)
             t = np.asarray(table.times_of(p), dtype=np.float64)
             self.items.append((f, info, cand, t, float(table.best_time(p))))
+        self._pairs = None
+        self.n_pairs = 0
+        self.n_dropped = 0
+
+    # -- 순위 손실 (D-101) -------------------------------------------------
+    def build_pairs(self, table: PerfTable, top_k: int) -> None:
+        """★ 참 상위 `top_k` 안의 쌍. **노이즈로 못 가르는 쌍은 뺀다.**
+
+        가중치는 `|t_j - t_i| / t_best` — **실제 손해**다. 튜닝할 값이
+        없고, 노이즈 바닥 이내면 자동으로 0 에 가까워진다.
+
+        ⚠️ `NoiseModel.resolvable` 을 쓴다. 판정을 새로 정의하지 않는다
+        (원칙 2).
+        """
+        self._pairs = []
+        self.n_pairs = self.n_dropped = 0
+        for _f, _info, _cand, t, best in self.items:
+            top = np.argsort(t, kind="stable")[:top_k]
+            tt = t[top]
+            n = len(top)
+            iu, ju = np.triu_indices(n, k=1)          # t[iu] <= t[ju]
+            if iu.size == 0:
+                self._pairs.append(None)
+                continue
+            a, b = tt[iu], tt[ju]
+            ok = table.noise.resolvable(a, b) & (b > a)
+            self.n_dropped += int((~ok).sum())
+            if not ok.any():
+                self._pairs.append(None)
+                continue
+            iu, ju = iu[ok], ju[ok]
+            w = (tt[ju] - tt[iu]) / best              # ★ 실제 손해
+            self.n_pairs += int(iu.size)
+            self._pairs.append((top, iu, ju, w, float(w.sum())))
+
+    def rank_loss(self, score_fn: ScoreFn, w: np.ndarray) -> float:
+        """가중 로지스틱 쌍 손실. **작을수록 좋다** 규약이므로 s_i < s_j."""
+        if self._pairs is None:
+            raise FitError("build_pairs 를 먼저 불러야 한다.")
+        tot = den = 0.0
+        for (f, info, cand, _t, _best), pr in zip(self.items, self._pairs,
+                                                  strict=True):
+            if pr is None:
+                continue
+            top, iu, ju, pw, wsum = pr
+            s = np.asarray(score_fn(f, info, self.hw, w), dtype=np.float64)
+            if s.shape != (cand.n,) or not np.all(np.isfinite(s)):
+                return float("inf")
+            st = s[top]
+            # softplus(s_i - s_j): s_i 가 작아야(=좋아야) 손실이 준다
+            tot += float((pw * np.logaddexp(0.0, st[iu] - st[ju])).sum())
+            den += wsum
+        return tot / den if den > 0 else float("inf")
 
     def regret(self, score_fn: ScoreFn, w: np.ndarray) -> float:
         rs = np.empty(len(self.items), dtype=np.float64)
@@ -197,7 +250,9 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 warn_invariants: bool = True,
                 polish: bool = True,          # ★ D-55/D-56, 기본 켜짐
                 polish_budget: int = 600,   # ★ 적합 305 의 2배 이내 (D-59)
-                sensitivity_delta: float = 0.5) -> FittedRule:
+                sensitivity_delta: float = 0.5,
+                objective: str = "regret",    # ★ 기본은 regret. D-101
+                rank_top_k: int = 100) -> FittedRule:
     """구조를 고정하고 가중치만 맞춘다.
 
     `split` 은 **`role="train"` 이어야 한다.** 검증/최종이 목적함수에
@@ -205,6 +260,20 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
 
     `val_split` 은 적합이 끝난 뒤 **보고용으로만** 채점된다. 목적함수에
     관여하지 않는다 — 격차(`FittedRule.gap`)를 라운드마다 기록하기 위한 것이다.
+
+    ## ★ `objective` — 기본은 `"regret"` 이다 (D-101)
+
+    ```
+    "regret"  argmin 하나의 상대 시간. ★ 계단 함수라 Nelder-Mead + 재시작
+    "rank"    참 상위 `rank_top_k` 안의 가중 쌍 손실. 미분 가능 -> L-BFGS-B
+    ```
+
+    **기본값을 바꾸지 않는다.** 이 함수는 지금까지의 모든 결과가 통과한
+    경로다 — 조용히 달라지면 그 결과들이 흔들린다. `"rank"` 는
+    **명시할 때만** 돈다.
+
+    `"rank"` 에서도 `fit_regret` 은 계속 `regret` 으로 계산해 기록한다 —
+    **채점 기준은 안 바꾼다** (사전 등록 `rank-evo-prereg.md` §3).
     """
     if not isinstance(split, Split):
         raise SplitError(
@@ -237,11 +306,23 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     seen_v = float("inf")
     seen_w = w0.copy()
 
+    if objective not in ("regret", "rank"):
+        raise FitError(f"알 수 없는 목적함수: {objective!r}. "
+                       "regret | rank 중 하나여야 한다.")
+    if objective == "rank":
+        prob.build_pairs(table, rank_top_k)
+        if prob.n_pairs == 0:
+            raise FitError(
+                "순위 손실에 쓸 쌍이 하나도 없다 — 노이즈 바닥으로 가를 "
+                "수 있는 쌍이 상위 "
+                f"{rank_top_k} 안에 없다. 조용히 진행하지 않는다.")
+
     def obj(w: np.ndarray) -> float:
         nonlocal n_eval, n_inf, seen_v, seen_w
         n_eval += 1
         wa = np.asarray(w, dtype=np.float64)
-        v = prob.regret(score_fn, wa)
+        v = (prob.regret(score_fn, wa) if objective == "regret"
+             else prob.rank_loss(score_fn, wa))
         if not np.isfinite(v):
             n_inf += 1
             return 1e6      # 이 가중치는 실행 불가. 구조 기각은 아니다.
@@ -260,6 +341,15 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     #   몇 개는 무작위 출발점에서 시작한다. 시드가 고정이라 결정론적이다.
     best_w = w0.copy()
     best_v = obj(w0)
+    if objective == "rank":
+        # ★ 계단이 아니므로 준뉴턴을 먼저 쓴다. 이것이 이 설계의 이점이다.
+        #   그 뒤의 재시작·다듬기는 그대로 둔다 (전역성은 여전히 없다).
+        from scipy.optimize import minimize as _min
+        r0 = _min(obj, best_w, method="L-BFGS-B",
+                  options={"maxiter": 500, "maxfun": max_evals})
+        obj(np.asarray(r0.x, dtype=np.float64))
+        if seen_v < best_v:
+            best_v, best_w = seen_v, seen_w.copy()
     rng = np.random.default_rng(_RESTART_SEED)
     per = max(20, max_evals // max(1, n_restarts))
     # ★ **마지막 재시작이 예산을 다 쓰면서도 아직 나아지고 있었는가.**
@@ -290,6 +380,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     if polish:
         w, best_v, n_pol = _polish(prob, score_fn, w, best_v, polish_budget)
         n_eval += n_pol
+    # ★ 채점 기준은 언제나 regret 이다 — `objective="rank"` 여도 그렇다.
+    #   "채점은 regret, 학습은 순위 손실" (rank-evo-prereg.md §3)
     fit_regret = float(prob.regret(score_fn, w))
     if not np.isfinite(fit_regret) or fit_regret >= 1e6:
         raise FitError("적합된 가중치에서 regret 이 유한하지 않다. 기각한다.")
