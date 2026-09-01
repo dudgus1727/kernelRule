@@ -126,7 +126,7 @@ def _select(strategy: str, k: int) -> list:
             # 층별로 돌아가며 하나씩. 층 안에서는 SOL 중앙에 가까운 것
             buckets: dict = {}
             for p in pool:
-                buckets.setdefault(layers.get(p.key, "?"), []).append(p)
+                buckets.setdefault(layers.get((p.M, p.N, p.K), "?"), []).append(p)
             keys = sorted(buckets)
             picked: list = []
             r = 0
@@ -220,10 +220,12 @@ def main() -> None:
     sp = _splits(table)
     train = list(sp.train.shapes)
 
+    # ★ 조인 키를 맞춘다. `p.key` 는 (M,N,K,dtype) 이고 `shape_layers`
+    #   는 [M,N,K] 다 — 그대로 넣으면 **하나도 안 맞는다.**
     layers: dict = {}
     for name, shs in (table.meta.get("shape_layers") or {}).items():
-        for s in shs:
-            layers[tuple(s)] = name
+        for sh in shs:
+            layers[(sh[0], sh[1], sh[2])] = name
     feats = {p.key: _features_without_table(p, table.hw) for p in train}
     by_regime: dict = {}
     for p in train:
@@ -247,9 +249,21 @@ def main() -> None:
           + "  ".join(f"{n} {len(v)}" for n, v in sorted(by_regime.items())))
     lay_n: dict = {}
     for p in train:
-        lay_n[layers.get(p.key, "?")] = lay_n.get(layers.get(p.key, "?"), 0) + 1
-    print(f"  층 분포 {dict(sorted(lay_n.items()))}"
-          "   ★ d_alignment 는 0개다 (정렬 8 필터)")
+        key = layers.get((p.M, p.N, p.K), "?")
+        lay_n[key] = lay_n.get(key, 0) + 1
+    print(f"  층 분포 {dict(sorted(lay_n.items()))}")
+    # ★ 라벨이 안 붙으면 `layer` 전략은 **한 통에서 뽑는 것**이 된다.
+    #   숫자는 나오는데 전략이 안 돈 것이다 (원칙 1). 멈춘다.
+    if lay_n.get("?", 0):
+        raise SystemExit(
+            f"★ 층 라벨이 안 붙은 형상 {lay_n['?']}개. `shape_layers` 조인 "
+            "키를 확인하라 — `p.key` 는 (M,N,K,dtype) 이고 번들은 "
+            "[M,N,K] 다.\n  조용히 두면 `layer` 전략이 한 통에서 뽑으면서 "
+            "결과는 그럴듯하게 나온다.")
+    absent = sorted(set(table.meta.get("shape_layers") or {}) - set(lay_n))
+    if absent:
+        print(f"  ★ 학습 41형상에 **없는 층**: {absent}  "
+              "— '층 균등' 은 나머지 층 균등이다")
     print(f"  구조 {len(rules)}개   전략 {list(STRATEGIES)}")
     print("  ★ 설계 팔은 결정론이다 — 뽑기 운이 없다\n")
 
