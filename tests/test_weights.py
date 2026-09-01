@@ -380,3 +380,74 @@ def test_cap_warning_needs_actual_improvement_at_cutoff(known):
     caps = [str(x.message) for x in got
             if issubclass(x.category, FitWarning) and "상한" in str(x.message)]
     assert not caps, f"예산 소진만으로 경고가 떴다: {caps}"
+
+
+# ---------------------------------------------------------------------------
+# D-101 — 순위 손실
+# ---------------------------------------------------------------------------
+def test_objective_default_is_regret_and_unchanged(known):
+    """★ `objective` 를 안 넘기면 **예전과 정확히 같아야 한다.**
+
+    이 함수는 지금까지의 모든 결과가 통과한 경로다. 기본값이 조용히
+    바뀌면 그 결과들이 흔들린다.
+    """
+    t, m, score = known
+    a = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60)
+    b = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
+                    objective="regret")
+    assert np.array_equal(a.w, b.w)
+    assert a.fit_regret == b.fit_regret
+
+
+def test_rank_pairs_drop_the_noise_indistinguishable(known):
+    """★ 노이즈 바닥으로 못 가르는 쌍은 손실에서 빠진다.
+
+    안 빼면 잡음에 맞춘다. 빠지는 쌍이 하나도 없으면 `resolvable` 이
+    안 도는 것이다.
+    """
+    from kernelrule.core.weights import _Problem
+
+    t, m, _score = known
+    pr = _Problem(m, t, _all_train(t).shapes, 1)
+    pr.build_pairs(t, 100)
+    assert pr.n_pairs > 0
+    assert pr.n_dropped >= 0
+    assert pr.n_pairs + pr.n_dropped > 0
+
+
+def test_rank_objective_still_records_regret(known):
+    """`objective="rank"` 여도 `fit_regret` 은 **regret 이다.**
+
+    "채점은 regret, 학습은 순위 손실" — 채점 기준을 바꾸면 기존 결과와
+    나란히 못 놓는다 (`rank-evo-prereg.md` §3).
+    """
+    from kernelrule.core.weights import _Problem
+
+    t, m, score = known
+    fr = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0],
+                     max_evals=60, objective="rank", rank_top_k=100)
+    pr = _Problem(m, t, _all_train(t).shapes, 1)
+    assert fr.fit_regret == pytest.approx(pr.regret(score, fr.w), abs=1e-12)
+
+
+def test_rank_loss_prefers_the_true_order(known):
+    """★ 참 계수에서 순위 손실이 **더 작아야 한다.** 부호 확인이다.
+
+    `s_i < s_j` 여야 맞는 순서인데(작을수록 좋다), 부호를 뒤집으면
+    손실이 조용히 반대를 학습한다.
+    """
+    from kernelrule.core.weights import _Problem
+
+    t, m, score = known
+    pr = _Problem(m, t, _all_train(t).shapes, 1)
+    pr.build_pairs(t, 100)
+    good = pr.rank_loss(score, W_TRUE)
+    bad = pr.rank_loss(score, -W_TRUE)
+    assert good < bad, f"부호가 뒤집혔다: 참 {good:.4f} vs 반대 {bad:.4f}"
+
+
+def test_unknown_objective_is_refused(known):
+    t, m, score = known
+    with pytest.raises(FitError, match="알 수 없는 목적함수"):
+        fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0],
+                    objective="nope")

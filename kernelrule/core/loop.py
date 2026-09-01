@@ -84,6 +84,12 @@ class LoopConfig:
     #:
     #: Analyst 를 안 부르므로 **A 와 호출 수가 같다** — 비용 비교가 깨끗하다.
     hypothesis_pool: tuple[str, ...] = ()
+    #: ★ 가중치 목적함수 (D-101). 기본 `"regret"` — **지금까지의 동작**이다.
+    #: `"rank"` 면 참 상위 `rank_top_k` 안의 가중 쌍 손실로 맞추고,
+    #: **아카이브 채택도 그것으로 한다** (셀 축은 안 바뀐다).
+    #: `regret` 은 그 경우에도 계속 계산해서 기록한다.
+    objective: str = "regret"
+    rank_top_k: int = 100
     #: ★ 채점·적합 병렬화 (D-95). 0 이면 순차 — **지금까지의 동작**이다.
     #: 결과는 같아야 한다 (`test_parallel_matches_sequential`).
     n_workers: int = 0
@@ -156,7 +162,9 @@ def _fit_and_score(job: tuple) -> dict:
     try:
         fn = compile_rule(code)
         fr = fit_weights(fn, c["matrix"], c["table"], c["train"], w0,
-                         max_evals=c["max_evals"], val_split=c["val"])
+                         max_evals=c["max_evals"], val_split=c["val"],
+                         objective=c.get("objective", "regret"),
+                         rank_top_k=c.get("rank_top_k", 100))
     except (FitError, SchemaViolation) as e:
         return {"i": idx, "err": ("fit", str(e)[:90])}
     except Exception as e:                                  # noqa: BLE001
@@ -165,9 +173,28 @@ def _fit_and_score(job: tuple) -> dict:
                          list(c["train"].shapes), ks=(1, 3))
     return {"i": idx, "w": [float(x) for x in fr.w],
             "regret": fr.fit_regret, "moved": bool(fr.moved),
+            "rank_loss": _rank_loss_of(fn, c, fr.w),
             "val_regret": fr.val_regret,
             "short": ev.at(1, mask=c["short_mask"]),
             "long": ev.at(1, mask=c["long_mask"])}
+
+
+def _rank_loss_of(fn, c: dict, w) -> float:
+    """★ 채택에 쓸 순위 손실. `objective="regret"` 이면 NaN 을 남긴다.
+
+    `regret` 조건에서 억지로 계산하지 않는다 — 그러면 쌍을 만드는 비용이
+    모든 기존 실행에 붙는다.
+    """
+    import math
+
+    if c.get("objective") != "rank":
+        return float("nan")
+    from kernelrule.core.weights import _Problem
+
+    pr = _Problem(c["matrix"], c["table"], c["train"].shapes, 1)
+    pr.build_pairs(c["table"], c.get("rank_top_k", 100))
+    v = pr.rank_loss(fn, w)
+    return float(v) if math.isfinite(v) else float("nan")
 
 
 def _requirement_of(h: dict) -> str:
@@ -269,7 +296,10 @@ class RoundLoop:
         from kernelrule.report.table_facts import TableFacts
         self.table_facts = TableFacts.compute(table, splits.train)
         self.rng = np.random.default_rng(cfg.seed)
-        self.archive = Archive(noise_tol=0.0)
+        self.archive = Archive(
+            noise_tol=0.0,
+            select_by=("rank" if cfg.objective == "rank"
+                       else "regret"))
         self.rounds: list[RoundResult] = []
         self.failures: list[dict] = []
         self.hypotheses: list[dict] = []
@@ -477,6 +507,8 @@ class RoundLoop:
                 table=self.table, matrix=self.matrix,
                 train=self.splits.train, val=self.splits.val,
                 max_evals=self.cfg.max_evals,
+                objective=self.cfg.objective,
+                rank_top_k=self.cfg.rank_top_k,
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
                 max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
@@ -577,7 +609,8 @@ class RoundLoop:
             short_regret=out["short"], long_regret=out["long"],
             code_len=rep.n_nodes, round=len(self.rounds),
             changes=prop.changes, hypothesis_id=prop.hypothesis_id,
-            val_regret=out["val_regret"])
+            val_regret=out["val_regret"],
+            rank_loss=float(out.get("rank_loss", float("nan"))))
 
     def _evaluate_candidate(self, prop, res: RoundResult):
         """정적 검사 -> 샌드박스 -> 가중치 최적화 -> 채점. **전부 fail-closed.**"""
@@ -589,7 +622,9 @@ class RoundLoop:
         try:
             fr = fit_weights(fn, self.matrix, self.table, self.splits.train,
                              prop.w0, max_evals=self.cfg.max_evals,
-                             val_split=self.splits.val)
+                             val_split=self.splits.val,
+                             objective=self.cfg.objective,
+                             rank_top_k=self.cfg.rank_top_k)
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
             res.rejections.append(("fit", str(e)[:90]))
@@ -606,6 +641,11 @@ class RoundLoop:
         res.n_scored += 1
         return self._elite_from(prop, rep, {
             "w": [float(x) for x in fr.w], "regret": fr.fit_regret,
+            "rank_loss": _rank_loss_of(fn, {
+                "objective": self.cfg.objective,
+                "rank_top_k": self.cfg.rank_top_k,
+                "matrix": self.matrix, "table": self.table,
+                "train": self.splits.train}, fr.w),
             "val_regret": fr.val_regret, "moved": fr.moved,
             "short": ev.at(1, mask=self._short_mask),
             "long": ev.at(1, mask=self._long_mask)})

@@ -38,6 +38,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -79,6 +80,9 @@ class Elite:
     hypothesis_id: str = ""
     parent_ids: list[str] = field(default_factory=list)
     val_regret: float = float("nan")
+    #: ★ 순위 손실 (D-101). `Archive(select_by="rank")` 일 때 채택 기준이
+    #: 된다. `regret` 은 그때도 **계속 채워진다** — 기록은 양쪽 다 한다.
+    rank_loss: float = float("nan")
 
     @property
     def regime_gap(self) -> float:
@@ -102,9 +106,19 @@ class Elite:
 class Archive:
     """셀당 최고 하나 + 전체 최고."""
 
-    def __init__(self, noise_tol: float = 0.0) -> None:
+    def __init__(self, noise_tol: float = 0.0, *,
+                 select_by: str = "regret") -> None:
         #: 갱신을 인정할 최소 개선. `is_significant` 가 준다 (§7.4).
         self.noise_tol = float(noise_tol)
+        #: ★ 무엇으로 채택하나 (D-101). 기본은 `regret` — 지금까지의 모든
+        #: 실행이 그 조건이다. `"rank"` 는 **명시할 때만** 돈다.
+        #:
+        #: ⚠️ 셀 **축**은 안 바뀐다 (코드 길이 / 체제별 regret). 축은
+        #: 다양성을 만드는 장치이고 채택이 목표를 정한다 — 둘을 함께
+        #: 바꾸면 변수가 둘이 된다 (`rank-evo-prereg.md` 정정).
+        if select_by not in ("regret", "rank"):
+            raise ValueError(f"알 수 없는 채택 기준: {select_by!r}")
+        self.select_by = select_by
         self.cells: dict[tuple, Elite] = {}
         self.best: Elite | None = None
         self.history: list[dict] = []
@@ -113,11 +127,39 @@ class Archive:
         #: 셀이 새로 채워진 라운드. 조기 종료 판정에 쓴다 (§14.3).
         self.last_new_cell_round = -1
 
+    def _key(self, e: Elite) -> float:
+        """채택에 쓰는 값. **작을수록 좋다.**"""
+        if self.select_by == "regret":
+            return e.regret
+        v = e.rank_loss
+        if not math.isfinite(v):
+            raise ValueError(
+                "select_by='rank' 인데 Elite.rank_loss 가 없다. "
+                "조용히 regret 으로 떨어지지 않는다 (§26.4).")
+        return v
+
+    @property
+    def _tol(self) -> float:
+        """★ 순위 손실에는 `noise_tol` 을 안 쓴다.
+
+        `noise_tol` 은 regret 규모에 맞춰 `is_significant` 가 준 값이고
+        순위 손실은 규모가 다르다. 그리고 **순위 손실의 쌍은 이미
+        `resolvable` 로 걸러져 있어** 그 자체가 노이즈를 반영한다 —
+        허용치를 또 붙이면 두 번 빼는 것이 된다.
+        """
+        return self.noise_tol if self.select_by == "regret" else 0.0
+
     def consider(self, e: Elite) -> list[str]:
-        """넣어 본다. 어느 자리를 차지했는지 돌려준다. 빈 리스트면 폐기."""
+        """넣어 본다. 어느 자리를 차지했는지 돌려준다. 빈 리스트면 폐기.
+
+        ⚠️ 검사를 **맨 앞에서** 한다. `self.best is None or _key(e) < ...`
+        는 아카이브가 비었을 때 단락 평가로 `_key` 를 건너뛴다 — 첫
+        후보만 검사 없이 들어가는 fail-open 이었다 (시험이 잡았다).
+        """
         self.n_seen += 1
+        self._key(e)          # ★ 검사. 값은 아래에서 다시 쓴다
         won: list[str] = []
-        if self.best is None or e.regret < self.best.regret - self.noise_tol:
+        if self.best is None or self._key(e) < self._key(self.best) - self._tol:
             won.append("best")
             self.best = e
         c = e.cell
@@ -126,13 +168,14 @@ class Archive:
             won.append("new_cell")
             self.cells[c] = e
             self.last_new_cell_round = e.round
-        elif e.regret < cur.regret - self.noise_tol:
+        elif self._key(e) < self._key(cur) - self._tol:
             won.append("cell")
             self.cells[c] = e
         if won:
             self.n_accepted += 1
         self.history.append({"round": e.round, "rule_id": e.rule_id,
-                             "regret": e.regret, "cell": list(c),
+                             "regret": e.regret, "rank_loss": e.rank_loss,
+                             "select_by": self.select_by, "cell": list(c),
                              "won": won, "changes": e.changes})
         return won
 
