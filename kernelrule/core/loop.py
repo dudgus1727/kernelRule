@@ -93,6 +93,18 @@ class LoopConfig:
     #: 순위 손실이고, 옛 조건은 `objective="regret"` 을 명시하면 된다.
     objective: str = "rank"
     rank_top_k: int = 100
+    #: ★ 두 순서 실험 (D-104). `"rank->regret"` 또는 `"regret->rank"`.
+    #: `None` 이면 목적함수가 안 바뀐다 — 지금까지의 동작이다.
+    #:
+    #: **전환 시점은 하이퍼파라미터가 아니라 중단 조건이다** — 직전
+    #: `switch_window` 라운드의 개선이 `switch_min_improve` 미만이면
+    #: 바꾼다. 근거: s2 가 r5~r9 에서 0.2945 -> 0.2915 (1.0%) 로 평평했다.
+    #: ★ 항 예산 (D-104). `None` 이면 `checks.BUDGET`(8) — 지금까지의 동작.
+    #: 검사기·프롬프트가 **같은 값**을 봐야 한다 (원칙 2).
+    rule_budget: int | None = None
+    objective_switch: str | None = None
+    switch_min_improve: float = 0.01
+    switch_window: int = 3
     #: ★ 채점·적합 병렬화 (D-95). 0 이면 순차 — **지금까지의 동작**이다.
     #: 결과는 같아야 한다 (`test_parallel_matches_sequential`).
     n_workers: int = 0
@@ -322,6 +334,15 @@ class RoundLoop:
         self.cross_lineage: list[dict] = []
         #: ★ 라운드별 아카이브 최고 (코드째). D-101 관찰용.
         self.bests: list[dict] = []
+        #: ★ 목적함수 전환 상태 (D-104). `switch_round` 는 안 바뀌면 -1.
+        #: ★ 예산을 검사기에 흘린다. `None` 이면 기본(8) 그대로다.
+        self._budget = (cfg.rule_budget if cfg.rule_budget is not None
+                        else _BUDGET)
+        self._limits = ({"budget": cfg.rule_budget}
+                        if cfg.rule_budget is not None else None)
+        self._objective = cfg.objective
+        self._switched = False
+        self.switch_round = -1
         #: 가설 id 의 **유일한 출처**. 모델이 붙인 id 는 응답 안에서만
         #: 유일해서 라운드/패스를 넘으면 겹친다.
         self._hyp_seq = 0
@@ -521,7 +542,7 @@ class RoundLoop:
                 table=self.table, matrix=self.matrix,
                 train=self.splits.train, val=self.splits.val,
                 max_evals=self.cfg.max_evals,
-                objective=self.cfg.objective,
+                objective=self._objective,
                 rank_top_k=self.cfg.rank_top_k,
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
@@ -588,7 +609,8 @@ class RoundLoop:
         `run_isolated` 가 프로세스를 띄우기 때문이다 — 워커 안에서 하면
         중첩 spawn 이 된다 (D-95).
         """
-        rep = check_rule(prop.code, feature_names=self._feats,
+        rep = check_rule(prop.code, limits=self._limits,
+                         feature_names=self._feats,
                          shape_value_names=self._shape_vals,
                          n_weights=len(prop.w0))
         if not rep.ok:
@@ -637,7 +659,7 @@ class RoundLoop:
             fr = fit_weights(fn, self.matrix, self.table, self.splits.train,
                              prop.w0, max_evals=self.cfg.max_evals,
                              val_split=self.splits.val,
-                             objective=self.cfg.objective,
+                             objective=self._objective,
                              rank_top_k=self.cfg.rank_top_k)
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
@@ -656,7 +678,7 @@ class RoundLoop:
         return self._elite_from(prop, rep, {
             "w": [float(x) for x in fr.w], "regret": fr.fit_regret,
             "rank_loss": _rank_loss_of(fn, {
-                "objective": self.cfg.objective,
+                "objective": self._objective,
                 "rank_top_k": self.cfg.rank_top_k,
                 "matrix": self.matrix, "table": self.table,
                 "train": self.splits.train}, fr.w),
@@ -711,9 +733,10 @@ class RoundLoop:
         """
         def feats(code: str) -> set:
             try:
-                return check_rule(code, feature_names=self._feats,
+                return check_rule(code, limits=self._limits,
+                                 feature_names=self._feats,
                                   shape_value_names=self._shape_vals,
-                                  n_weights=_BUDGET).features_used
+                                  n_weights=self._budget).features_used
             except Exception:                               # noqa: BLE001
                 return set()
         a, b, c = feats(codes[0]), feats(codes[1]), feats(child)
@@ -826,7 +849,8 @@ class RoundLoop:
                 if len(ps) > 1:
                     parent2 = RuleProposal(code=ps[1].code, w0=ps[1].w)
                 # 부모의 항 수를 세어 프롬프트에 넣는다 (교체 프레임)
-                pr = check_rule(ps[0].code, feature_names=self._feats,
+                pr = check_rule(ps[0].code, limits=self._limits,
+                                feature_names=self._feats,
                                 shape_value_names=self._shape_vals,
                                 n_weights=len(ps[0].w))
                 n_terms = pr.n_terms
@@ -983,6 +1007,72 @@ class RoundLoop:
         import asyncio
         return asyncio.run(many("rule_editor", [dict(q) for q in reqs]))
 
+    # -- 목적함수 전환 (D-104) ---------------------------------------------
+    def _maybe_switch(self) -> bool:
+        """★ 직전 `switch_window` 라운드의 개선이 문턱 미만이면 바꾼다.
+
+        전환은 **한 번뿐이다.** 두 번 바꾸면 "언제 바꾸나" 가 두 개가 되고
+        그것이 곧 하이퍼파라미터다.
+        """
+        sw = self.cfg.objective_switch
+        if not sw or self._switched:
+            return False
+        src, dst = sw.split("->")
+        if self._objective != src:
+            raise ValueError(
+                f"objective_switch={sw!r} 인데 시작 목적함수가 "
+                f"{self._objective!r} 다. 앞쪽과 같아야 한다.")
+        n = self.cfg.switch_window
+        if len(self.rounds) < n + 1:
+            return False
+        key = ("best_rank_loss" if self._objective == "rank"
+               else "best_regret")
+        vals = [getattr(x, key) for x in self.rounds[-(n + 1):]]
+        if not np.all(np.isfinite(vals)) or vals[0] <= 0:
+            return False
+        if (vals[0] - vals[-1]) / vals[0] >= self.cfg.switch_min_improve:
+            return False
+        self._switch_to(dst)
+        return True
+
+    def _switch_to(self, dst: str) -> None:
+        """목적함수를 바꾸고 **아카이브를 새 기준으로 재정렬한다.**"""
+        from kernelrule.core.archive import Archive
+
+        self._objective = dst
+        self._switched = True
+        self.switch_round = len(self.rounds)
+        old = list(self.archive.cells.values())
+        if self.archive.best is not None and self.archive.best not in old:
+            old.append(self.archive.best)
+        # ★ 새 기준값이 없으면 채운다. 조용히 NaN 으로 두면 아카이브가
+        #   거부한다 (그것이 맞는 동작이다).
+        if dst == "rank":
+            for e in old:
+                if not np.isfinite(e.rank_loss):
+                    e.rank_loss = _rank_loss_of(
+                        compile_rule(e.code),
+                        {"objective": "rank",
+                         "rank_top_k": self.cfg.rank_top_k,
+                         "matrix": self.matrix, "table": self.table,
+                         "train": self.splits.train}, np.asarray(e.w))
+        self.archive = Archive(
+            noise_tol=0.0,
+            select_by=("rank" if dst == "rank" else "regret"),
+            cell_mode=("quantile" if dst == "rank" else "absolute"))
+        for e in sorted(old, key=lambda x: (x.rank_loss if dst == "rank"
+                                            else x.regret)):
+            self.archive.consider(e)
+        # ★ 프롬프트의 목표 정의도 바꾼다. 캐시된 에이전트를 버린다 —
+        #   안 버리면 옛 지시가 계속 간다 (원칙 1).
+        if hasattr(self.llm, "objective"):
+            self.llm.objective = dst
+            if hasattr(self.llm, "_agents"):
+                self.llm._agents.clear()
+        self._restart_pool()
+        print(f"  ★ 목적함수 전환 r{self.switch_round}: -> {dst} "
+              f"(아카이브 {len(old)}개 재정렬 -> 셀 {len(self.archive.cells)})")
+
     # -- 종료 판정 (§14.3) -------------------------------------------------
     def should_stop(self) -> tuple[bool, str]:
         """★ **검증 분할**로 판정한다. 두 조건을 모두 쓴다."""
@@ -1022,6 +1112,9 @@ class RoundLoop:
                 res = self.run_round()
                 if verbose:
                     print(res.line(), flush=True)
+                # ★ 목적함수 전환 (D-104). 라운드가 끝난 **뒤에** 본다 —
+                #   그래야 그 라운드까지의 개선으로 판정한다.
+                self._maybe_switch()
                 # ★ 제안이 **전부** 전송 실패면 멈춘다 (D-43). 크레딧이나
                 #   인증 문제는 저절로 낫지 않는다 — 남은 라운드를 태워도
                 #   빈 아카이브만 남는다. 실제로 12라운드를 그렇게 썼다.
@@ -1073,8 +1166,15 @@ class RoundLoop:
                          1 for x in self.features_made if x.get("accepted")),
                      # ★ 규칙 제약. **조건이므로 실행마다 남긴다** (D-78).
                      #   분기 비교 상수 면제 전후는 같은 계열이 아니다.
+                     # ★ 목적함수 전환 (D-104). **조건이므로 남긴다.**
+                     "objective": self.cfg.objective,
+                     "objective_switch": self.cfg.objective_switch,
+                     "switch_round": self.switch_round,
+                     "final_objective": self._objective,
                      "rule_constraints": {
-                         "budget": _BUDGET,
+                         "budget": (self.cfg.rule_budget
+                                    if self.cfg.rule_budget is not None
+                                    else _BUDGET),
                          "branch_constants_exempt": True}}
         llm_cfg = getattr(self.llm, "cfg", None)
         if llm_cfg is not None and hasattr(llm_cfg, "to_dict"):

@@ -142,7 +142,8 @@ _OBJECTIVE_BLOCKS = {
 }
 def assemble_instructions(role: str, *, objective: str = "rank",
                           hw_file: str = "hw/sm_86.md",
-                          body: str | None = None) -> str:
+                          body: str | None = None,
+                          budget: int | None = None) -> str:
     """★ 시스템 프롬프트 조립. **한 곳에서만 한다** (원칙 2).
 
     전에는 `_agent()` 와 `tests/test_prompt_layout.py` 가 각자 조립했다.
@@ -151,15 +152,16 @@ def assemble_instructions(role: str, *, objective: str = "rank",
     """
     if objective not in _OBJECTIVE_BLOCKS:
         raise ValueError(f"알 수 없는 목적함수: {objective!r}")
-    parts = [load_prompt("_base.md")]
+    parts = [load_prompt("_base.md", budget=budget)]
     if role in _NEEDS_HW:
-        parts.append(load_prompt(hw_file))
+        parts.append(load_prompt(hw_file, budget=budget))
     if role in _WRITES_RULES:
-        parts.append(load_prompt("role/_rules_common.md"))
+        parts.append(load_prompt("role/_rules_common.md", budget=budget))
     if role in _EDITS_RULES:
-        parts.append(load_prompt("role/_rules_edit.md").replace(
+        parts.append(load_prompt("role/_rules_edit.md", budget=budget).replace(
             "{objective_block}", _OBJECTIVE_BLOCKS[objective]))
-    parts.append(body if body is not None else load_prompt(f"role/{role}.md"))
+    parts.append(body if body is not None
+                 else load_prompt(f"role/{role}.md", budget=budget))
     return "\n\n---\n\n".join(parts)
 
 
@@ -179,7 +181,7 @@ _EDITS_RULES = frozenset({"rule_editor"})
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
-def load_prompt(name: str) -> str:
+def load_prompt(name: str, *, budget: int | None = None) -> str:
     """프롬프트를 읽는다. **HTML 주석은 걷어내고 `{budget}` 를 채운다.**
 
     `<!-- ... -->` 는 "왜 이렇게 썼나" 를 남기는 자리다. 그것이 모델에
@@ -198,7 +200,8 @@ def load_prompt(name: str) -> str:
     if not p.exists():
         raise FileNotFoundError(f"프롬프트가 없다: {p}")
     txt = _HTML_COMMENT.sub("", p.read_text()).strip() + "\n"
-    return txt.replace("{budget}", str(BUDGET))
+    return txt.replace("{budget}", str(budget if budget is not None
+                                       else BUDGET))
 
 
 @dataclass
@@ -209,6 +212,10 @@ class LLMConfig:
     #: ★ 목표 정의를 정한다 (D-101). `config.json` 에 남아야 조건이 기록된다.
     #: RuleEditor 의 "채점 방식" 절만 바뀐다 — RuleWriter 는 안 받는다.
     objective: str = "regret"
+    #: ★ 항 예산 (D-104). `None` 이면 `checks.BUDGET`(8). 프롬프트의
+    #: `{budget}` 이 이 값으로 채워진다 — 검사기와 갈리면 안 되므로
+    #: 루프가 같은 값을 `check_rule(limits=...)` 에도 넘긴다.
+    rule_budget: int | None = None
     # ------------------------------------------------------------------
     # ★ temperature / seed — 둘 다 `None` 이다. 통제할 수 없다 (D-47)
     # ------------------------------------------------------------------
@@ -444,7 +451,7 @@ class OpenAILLM:
         #   에서 쓰므로 교체할 항도 이전 점수도 없다 (§30.10).
         instructions = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
-            body=body)
+            body=body, budget=self.cfg.rule_budget)
         if self.cfg.endpoint not in ("responses", "chat"):
             raise ValueError(
                 f"알 수 없는 엔드포인트: {self.cfg.endpoint!r}. "

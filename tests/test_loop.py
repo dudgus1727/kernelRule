@@ -751,6 +751,10 @@ def test_cross_lineage_counts_mixing_not_just_presence():
     loop.cross_lineage = []
     loop._feats = ["waves", "tail_waste", "bytes_per_flop"]
     loop._shape_vals = []
+    # ★ `_record_cross` 가 예산을 본다. 없으면 `except` 가 삼켜서 피처
+    #   집합이 빈 채로 지나간다 — 실제로 그렇게 걸렸다.
+    loop._budget = 8
+    loop._limits = None
 
     def _code(*fs):
         body = " + ".join(f"f.{x} * w[{i}]" for i, x in enumerate(fs))
@@ -765,3 +769,66 @@ def test_cross_lineage_counts_mixing_not_just_presence():
     assert not c["mixed"] and c["copied"]
     assert not same["mixable"], "고유 항이 없으면 분모에서 빠져야 한다"
     assert np is not None
+
+
+# ---------------------------------------------------------------------------
+# D-104 — 목적함수 전환
+# ---------------------------------------------------------------------------
+def test_switch_requires_matching_start():
+    """★ 시작 목적함수가 switch 앞쪽과 다르면 **멈춘다.**
+
+    조용히 다른 실험이 되면 안 된다 (§26.4).
+    """
+    import pytest
+
+    from kernelrule.core.loop import RoundLoop, RoundResult
+
+    loop = RoundLoop.__new__(RoundLoop)
+    loop.cfg = type("C", (), {"objective_switch": "rank->regret",
+                              "switch_window": 3,
+                              "switch_min_improve": 0.01})()
+    loop._objective = "regret"          # ← 어긋난다
+    loop._switched = False
+    loop.rounds = [RoundResult(round=i, best_rank_loss=1.0) for i in range(5)]
+    with pytest.raises(ValueError, match="시작 목적함수"):
+        loop._maybe_switch()
+
+
+def test_switch_fires_only_when_improvement_stalls():
+    """개선이 문턱 미만일 때만 바꾼다. 그리고 **한 번뿐이다.**"""
+    from kernelrule.core.loop import RoundLoop, RoundResult
+
+    calls = []
+    loop = RoundLoop.__new__(RoundLoop)
+    loop.cfg = type("C", (), {"objective_switch": "rank->regret",
+                              "switch_window": 3,
+                              "switch_min_improve": 0.01})()
+    loop._objective, loop._switched = "rank", False
+    loop._switch_to = lambda dst: (calls.append(dst),
+                                   setattr(loop, "_switched", True),
+                                   setattr(loop, "_objective", dst))
+
+    def rounds(vals):
+        return [RoundResult(round=i, best_rank_loss=v)
+                for i, v in enumerate(vals)]
+
+    loop.rounds = rounds([1.00, 0.90, 0.80, 0.70])   # 30% 개선
+    assert loop._maybe_switch() is False and not calls
+    loop.rounds = rounds([1.00, 0.999, 0.998, 0.997])  # 0.3% 개선
+    assert loop._maybe_switch() is True and calls == ["regret"]
+    # ★ 두 번은 안 바뀐다 — 두 번이면 "언제 바꾸나" 가 둘이 된다
+    loop._objective = "rank"
+    assert loop._maybe_switch() is False and calls == ["regret"]
+
+
+def test_switch_needs_enough_rounds():
+    """창 크기보다 라운드가 적으면 판단하지 않는다."""
+    from kernelrule.core.loop import RoundLoop, RoundResult
+
+    loop = RoundLoop.__new__(RoundLoop)
+    loop.cfg = type("C", (), {"objective_switch": "rank->regret",
+                              "switch_window": 3,
+                              "switch_min_improve": 0.01})()
+    loop._objective, loop._switched = "rank", False
+    loop.rounds = [RoundResult(round=i, best_rank_loss=1.0) for i in range(3)]
+    assert loop._maybe_switch() is False

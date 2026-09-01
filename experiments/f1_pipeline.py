@@ -231,7 +231,8 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget):
     #   손실이고 모델은 regret 을 듣는다 — 그것도 조건이므로 조용히
     #   섞이면 안 된다. `config.json` 의 `llm.objective` 로 확인된다.
     return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
-                               objective=getattr(a, "objective", "regret")),
+                               objective=getattr(a, "objective", "regret"),
+                               rule_budget=getattr(a, "rule_budget", None)),
                      feature_names=names, shape_values=svals,
                      registry=registry, budget=budget, cache=False)
 
@@ -622,6 +623,7 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        n_workers=getattr(a, "workers", 0),
                        objective=getattr(a, "objective", "regret"),
                        rank_top_k=getattr(a, "rank_top_k", 100),
+                       rule_budget=getattr(a, "rule_budget", None),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
         table=table, matrix=matrix, splits=splits, llm=llm)
@@ -644,6 +646,8 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            n_workers=a.workers,
                            objective=a.objective,
                            rank_top_k=a.rank_top_k,
+                           objective_switch=a.objective_switch,
+                           rule_budget=a.rule_budget,
                            hypothesis_pool=tuple(a.hypothesis_pool)),
             table=table, matrix=matrix, splits=splits, llm=llm)
         loop.seed(seed_rule["code"], seed_rule["w0"], changes="stage2 씨앗")
@@ -767,6 +771,15 @@ def main() -> None:
                     help="가중치 목적함수. ★ 기본 regret — 지금까지의 모든 "
                          "실행이 그 조건이다. rank 면 아카이브 채택도 "
                          "순위 손실로 한다 (셀 축은 그대로, D-101)")
+    ap.add_argument("--rule-budget", type=int, default=None,
+                    help="항 예산. ★ 기본은 checks.BUDGET(8) — 지금까지의 "
+                         "모든 실행이 그 조건이다. 검사기와 프롬프트가 "
+                         "같은 값을 본다")
+    ap.add_argument("--objective-switch",
+                    choices=("rank->regret", "regret->rank"), default=None,
+                    help="★ 두 순서 실험 (D-104). 직전 3라운드 개선이 1%% "
+                         "미만이면 목적함수를 바꾸고 아카이브를 재정렬한다. "
+                         "전환은 한 번뿐이다")
     ap.add_argument("--rank-top-k", type=int, default=100,
                     help="순위 손실이 볼 참 상위 개수. ★ 사전 등록에 100 을 "
                          "박았다 — 결과를 보고 바꾸지 마라")
@@ -789,6 +802,14 @@ def main() -> None:
                          "가져온다. 형식이 같아서 복사면 된다 — 20호출을 "
                          "아낀다. 가져온 뒤 --stage 2 로 시작하라")
     a = ap.parse_args()
+    if a.objective_switch:
+        # ★ 시작 목적함수는 switch 의 **앞쪽**이어야 한다. 어긋나면
+        #   조용히 다른 실험이 된다 — 여기서 멈춘다 (§26.4).
+        src = a.objective_switch.split("->")[0]
+        if a.objective != src:
+            raise SystemExit(
+                f"--objective {a.objective} 인데 --objective-switch "
+                f"{a.objective_switch} 다. 시작이 {src!r} 여야 한다.")
     if a.seed_source is None:
         a.seed_source = "physics_seeded" if a.condition == "F3" else "rule_writer"
 
