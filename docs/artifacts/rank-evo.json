@@ -1,0 +1,92 @@
+{
+ "seed_tau": [
+  0.10926061243356339,
+  0.3757444908499761
+ ],
+ "rows": [
+  {
+   "run": "f1pipe-F3-rankevo-s0",
+   "rank_loss": 0.2849879736934595,
+   "regret": 1.3103126956014641,
+   "tau_top100": 0.3891021148836024,
+   "tau_all": 0.4209493471912568,
+   "n_cells": 16,
+   "n_terms": 8,
+   "n_config_kinds": 9,
+   "feats": [
+    "has_spill",
+    "is_two_stage",
+    "log_dram_traffic",
+    "log_grid_tiles",
+    "log_inst_total",
+    "log_mainloop_iters",
+    "occupancy_deficit",
+    "pipeline_warmup_frac",
+    "reg_pressure",
+    "sm_idle_cost",
+    "smem_pressure",
+    "spill_magnitude",
+    "split_k_cost",
+    "traffic_amplification",
+    "waves"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-rankevo-s1",
+   "rank_loss": 0.3829190715512619,
+   "regret": 1.565514174380548,
+   "tau_top100": 0.30662218077841996,
+   "tau_all": 0.2692133898418147,
+   "n_cells": 10,
+   "n_terms": 8,
+   "n_config_kinds": 11,
+   "feats": [
+    "edge_waste",
+    "has_spill",
+    "is_two_stage",
+    "log_dram_traffic",
+    "log_inst_total",
+    "log_workspace_bytes",
+    "occupancy_deficit",
+    "pipeline_warmup_frac",
+    "reg_pressure",
+    "sm_idle_cost",
+    "smem_pressure",
+    "spill_magnitude",
+    "split_k_cost",
+    "tail_waste",
+    "tile_aspect_imbalance",
+    "traffic_amplification",
+    "waves"
+   ]
+  },
+  {
+   "run": "f1pipe-F3-rankevo-s2",
+   "rank_loss": 0.29135953906208967,
+   "regret": 1.468255171547857,
+   "tau_top100": 0.39453955798257934,
+   "tau_all": 0.3955865873646575,
+   "n_cells": 12,
+   "n_terms": 8,
+   "n_config_kinds": 9,
+   "feats": [
+    "edge_waste",
+    "has_spill",
+    "is_two_stage",
+    "log_dram_traffic",
+    "log_inst_total",
+    "log_workspace_bytes",
+    "occupancy_deficit",
+    "reg_pressure",
+    "sm_idle_cost",
+    "smem_pressure",
+    "spill_magnitude",
+    "split_k_cost",
+    "tail_waste",
+    "tile_aspect_imbalance",
+    "traffic_amplification",
+    "waves"
+   ]
+  }
+ ]
+}
