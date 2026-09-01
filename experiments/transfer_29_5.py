@@ -60,7 +60,11 @@ TABLES: dict[str, dict] = {
     "5090": {
         "bundle": "datasets/rtx-5090-sm_120-5bb6f403",
         "env_hash": "5bb6f403",
-        "runs": [f"f1pipe-F3-5090sigma-s{i}" for i in range(3)]},
+        # ★ (c) 재생성 6실행. 앞 3개와 뒤 3개가 **같은 2단계 씨앗**을
+        #   쓴다 (`--seed-from`) — 안 그러면 씨앗 규칙이 달라져 조건이
+        #   갈린다 (D-84). 표본 단위는 실행이다 (원칙 28).
+        "runs": ([f"f1pipe-F3-5090sigma-s{i}" for i in range(3)]
+                 + [f"f1pipe-F3-5090sigma-b-s{i}" for i in range(3)])},
     # ★ 4090 표가 오면 여기 세 줄. transfer-prereg 부칙의 세 쌍이 열린다.
     # "4090": {"bundle": "datasets/rtx-4090-...", "env_hash": "...",
     #          "runs": [f"f1pipe-F3-4090sigma-s{i}" for i in range(6)]},
