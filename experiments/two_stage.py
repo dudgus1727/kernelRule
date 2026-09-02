@@ -61,38 +61,54 @@ def _best(run: str, by: str) -> dict:
     return sorted(arc, key=key)[0]
 
 
-def _fit(code, w0, table, matrix, train, objective):
-    """체제별로 맞춘다 — 정준 절차 (§10)."""
+def _fit(code, w0, table, matrix, train, objective, *,
+         rank_top_k: int = TOP_N, rank_lambda: float = 0.0):
+    """체제별로 맞춘다 — 정준 절차 (§10).
+
+    ★ `rank_top_k` / `rank_lambda` 는 **그 실행의 조건**이다. 기본값으로
+    두면 k 스윕·λ 스윕을 전부 k=100·λ=0 으로 재게 된다 (원칙 37).
+    """
     fn = compile_rule(code)
     ws = {}
     for nm in ("short", "long"):
         g = [q for q in train if regime_of(q, table.hw) == nm]
         ws[nm] = fit_weights(fn, matrix, table, Split("train", tuple(g)), w0,
-                             max_evals=300, objective=objective).w
+                             max_evals=300, objective=objective,
+                             rank_top_k=rank_top_k,
+                             rank_lambda=rank_lambda if objective == "rank"
+                             else 0.0).w
     return fn, ws
 
 
-def _measure(fn, ws, table, matrix, shapes) -> tuple:
-    """(regret, 상위100 tau, 전구간 tau) — 전부 같은 형상 집합에서."""
+def _measure(fn, ws, table, matrix, shapes, top_n: int = TOP_N) -> tuple:
+    """(regret, 상위 `top_n` tau, 전구간 tau, **정의 안 되는 형상 수**).
+
+    ★ 네 번째 값을 꼭 보라. 규칙이 상위 `top_n` 안에서 **상수 점수**를
+    내면 tau 가 정의되지 않는다. 그것을 안 세고 중앙값을 내면 `nan` 이
+    번지거나(numpy) 조용히 형상이 빠진다. k=10 에서 실제로 났다 —
+    한 형상에서 점수 고유값이 1개였다.
+    """
     rng = np.random.default_rng(TAU_SEED)
-    regs, tt, ta = [], [], []
+    regs, tt, ta, undef = [], [], [], []
     for p in shapes:
         cand = table.candidates(p)
         w = ws[regime_of(p, table.hw)] if isinstance(ws, dict) else ws
         s = np.asarray(make_score_of(fn, matrix, w)(p, cand), dtype=np.float64)
         t = np.asarray(table.times_of(p))
         regs.append(float(t[cand.top_k(s, 1)[0]] / t.min()))
-        top = np.argsort(t, kind="stable")[:TOP_N]
+        top = np.argsort(t, kind="stable")[:top_n]
         if len(np.unique(t[top])) > 1:
-            tt.append(kendalltau(s[top], t[top], variant="b").statistic)
+            v = kendalltau(s[top], t[top], variant="b").statistic
+            (tt if np.isfinite(v) else undef).append(v)
         idx = rng.choice(len(t), size=min(TAU_SAMPLE, len(t)), replace=False)
         ta.append(kendalltau(s[idx], t[idx], variant="b").statistic)
     return (float(np.exp(np.mean(np.log(regs)))),
             float(np.median(tt)) if tt else float("nan"),
-            float(np.median(ta)))
+            float(np.median(ta)),
+            len(undef))
 
 
-def _floor(table, shapes) -> tuple:
+def _floor(table, shapes, top_n: int = TOP_N) -> tuple:
     """★ 무작위 바닥 (20뽑기 평균). 바닥도 표본이다 (원칙 7)."""
     rng = np.random.default_rng(0)
     R, T1, TA = [], [], []
@@ -102,7 +118,7 @@ def _floor(table, shapes) -> tuple:
             t = np.asarray(table.times_of(p))
             s = rng.random(len(t))
             regs.append(float(t[int(np.argmin(s))] / t.min()))
-            top = np.argsort(t, kind="stable")[:TOP_N]
+            top = np.argsort(t, kind="stable")[:top_n]
             if len(np.unique(t[top])) > 1:
                 tt.append(kendalltau(s[top], t[top], variant="b").statistic)
             idx = rng.choice(len(t), size=min(TAU_SAMPLE, len(t)),
