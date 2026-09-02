@@ -12,6 +12,7 @@ dataclass 로 떨어지되 **검증이 없다는 사실을 명시**한다 — �
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any
 
 from kernelrule.rules.checks import (
@@ -23,7 +24,7 @@ from kernelrule.rules.checks import (
 
 __all__ = ["Hypothesis", "HypothesisSet", "FeatureProposal", "CritiqueOutput",
            "RuleProposal", "SchemaViolation", "validate_rule_proposal",
-           "HAVE_PYDANTIC", "check_banned", "MAX_WEIGHTS",
+           "HAVE_PYDANTIC", "check_banned", "MAX_WEIGHTS", "rule_output_for",
            "N_HYP_MIN", "N_HYP_MAX"]
 
 try:
@@ -120,6 +121,31 @@ N_HYP_MIN, N_HYP_MAX = 2, 8
 MAX_WEIGHTS = LIMITS["budget"]
 
 
+def _desc_code(b: int) -> str:
+    return ("`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
+            "설명이나 마크다운 펜스를 넣지 마라. "
+            f"★ 항은 최대 {b}개이고 각 w[i] 는 정확히 "
+            "한 번만 쓸 수 있다 — 하나의 가중치를 여러 항에 "
+            "재사용해 항을 늘리면 거부된다. "
+            "★ 분기 조건의 비교 상수(`p.roofline_ratio < 1`)는 "
+            "예산에 들지 않는다 — 물리적 경계는 그대로 써라")
+
+
+def _desc_w0(b: int) -> str:
+    return ("가중치 초기값. ★ 대충 내지 마라 — 목적함수가 계단 "
+            "함수라 최적화기가 출발점 근처에서 못 빠져나오는 "
+            "일이 있다. **각 항의 물리적 크기를 반영한 출발점**"
+            "을 줘라. 길이는 코드가 참조하는 최대 인덱스 + 1 "
+            f"이어야 한다. ★ 최대 {b}개. 숫자 "
+            "리터럴과 합산되므로 리터럴을 쓰면 그만큼 줄어든다 "
+            "— 단 분기 비교 상수는 빠진다")
+
+
+def _w0_message(n: int, b: int) -> str:
+    return (f"가중치 {n}개. 예산이 {b}개다 — 숫자 리터럴과 합산된다. "
+            "단 **분기 조건의 비교 상수는 빠진다** (§29.4 / D-78)")
+
+
 @dataclass
 class Hypothesis:
     """자연어 문장. **실행 불가.** 코드를 같이 시키지 않는다 (§11.3)."""
@@ -184,8 +210,15 @@ class RuleProposal:
     meta: dict[str, Any] = field(default_factory=dict)
 
 
-def validate_rule_proposal(obj: Any) -> RuleProposal:
-    """LLM 응답 -> `RuleProposal`. **위반은 예외다. 고쳐서 쓰지 않는다.**"""
+def validate_rule_proposal(obj: Any, *, budget: int | None = None
+                           ) -> RuleProposal:
+    """LLM 응답 -> `RuleProposal`. **위반은 예외다. 고쳐서 쓰지 않는다.**
+
+    ★ `budget` 을 안 주면 `LIMITS["budget"]`(8) 이다. `--rule-budget` 을
+    쓰는 경로는 **반드시 넘겨야 한다** — 안 넘기면 16항 제안이 여기서
+    조용히 거부되고, 실험은 "예산 16 이 효과 없다" 를 재게 된다 (D-107).
+    """
+    _b = int(budget if budget is not None else MAX_WEIGHTS)
     if isinstance(obj, RuleProposal):
         d = {"code": obj.code, "w0": obj.w0, "changes": obj.changes,
              "hypothesis_id": obj.hypothesis_id, "parent_ids": obj.parent_ids,
@@ -209,11 +242,8 @@ def validate_rule_proposal(obj: Any) -> RuleProposal:
         raise SchemaViolation(f"w0 에 숫자가 아닌 값: {e}") from None
     # ★ Pydantic validator 와 **같은 조건**이어야 한다 (§24 / D-26). 여기에
     #   없으면 MockLLM 경로에서만 예산 초과가 통과해 ablation 이 깨진다.
-    if len(w0) > MAX_WEIGHTS:
-        raise SchemaViolation(
-            f"가중치 {len(w0)}개. 예산이 {MAX_WEIGHTS}개다 — 숫자 "
-            "리터럴과 합산된다. 단 **분기 조건의 비교 상수는 빠진다** "
-            "(§29.4 / D-78)")
+    if len(w0) > _b:
+        raise SchemaViolation(_w0_message(len(w0), _b))
     if not all(abs(x) < 1e6 for x in w0):
         raise SchemaViolation("w0 값이 비정상적으로 크다")
     return RuleProposal(code=code, w0=w0, changes=str(d.get("changes", "")),
@@ -288,26 +318,12 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         #   `_rules_edit.md` 를 RuleWriter 에서 뺀 이유와 같다 (§30.10).
         #   교체 지시는 RuleEditor 프롬프트의 `{budget_note}` 가 라운드마다
         #   동적으로 넣는다.
-        code: str = Field(
-            description=("`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
-                         "설명이나 마크다운 펜스를 넣지 마라. "
-                         f"★ 항은 최대 {MAX_WEIGHTS}개이고 각 w[i] 는 정확히 "
-                         "한 번만 쓸 수 있다 — 하나의 가중치를 여러 항에 "
-                         "재사용해 항을 늘리면 거부된다. "
-                         "★ 분기 조건의 비교 상수(`p.roofline_ratio < 1`)는 "
-                         "예산에 들지 않는다 — 물리적 경계는 그대로 써라"))
+        code: str = Field(description=_desc_code(MAX_WEIGHTS))
         # ⚠️ "대략적이면 충분하다" 였다. 프롬프트(`_rules_common.md`)는
         #   §29 정정 뒤 "각 항의 물리적 크기를 반영한 출발점을 주라" 인데
         #   이 설명만 안 따라와서 **같은 요청 안에서 반대를 말하고 있었다.**
         #   목적함수가 계단이라 출발점 근처 평지에서 못 빠져나온다 (D-54).
-        w0: list[float] = Field(
-            description=("가중치 초기값. ★ 대충 내지 마라 — 목적함수가 계단 "
-                         "함수라 최적화기가 출발점 근처에서 못 빠져나오는 "
-                         "일이 있다. **각 항의 물리적 크기를 반영한 출발점**"
-                         "을 줘라. 길이는 코드가 참조하는 최대 인덱스 + 1 "
-                         f"이어야 한다. ★ 최대 {MAX_WEIGHTS}개. 숫자 "
-                         "리터럴과 합산되므로 리터럴을 쓰면 그만큼 줄어든다 "
-                         "— 단 분기 비교 상수는 빠진다"))
+        w0: list[float] = Field(description=_desc_w0(MAX_WEIGHTS))
         # ★ 계보 추적용이다. **비었다고 규칙을 버리지 않는다** — 필수
         #   필드가 많을수록 재시도 소진 확률만 올라간다. 비면 경고를 남긴다.
         changes: str = Field(
@@ -357,10 +373,7 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
             if not v:
                 raise ValueError("w0 가 비었다")
             if len(v) > MAX_WEIGHTS:
-                raise ValueError(
-                    f"가중치 {len(v)}개. 예산이 {MAX_WEIGHTS}개다 — "
-                    "숫자 리터럴과 합산된다. 단 **분기 조건의 비교 상수는 "
-                    "빠진다** (§29.4 / D-78)")
+                raise ValueError(_w0_message(len(v), MAX_WEIGHTS))
             if not all(abs(x) < 1e6 for x in v):
                 raise ValueError("w0 값이 비정상적으로 크다")
             return v
@@ -406,8 +419,60 @@ else:                                               # pragma: no cover
     HypothesisOut = _NoPydantic("HypothesisOut")
 
 
-def rule_output_to_proposal(out) -> RuleProposal:
+def rule_output_to_proposal(out, *, budget: int | None = None
+                            ) -> RuleProposal:
     """`RuleOutput` -> `RuleProposal`. 경계에서 한 번만 변환한다."""
     return validate_rule_proposal({"code": out.code, "w0": list(out.w0),
                                    "changes": out.changes,
-                                   "hypothesis_id": out.hypothesis_id})
+                                   "hypothesis_id": out.hypothesis_id},
+                                  budget=budget)
+
+
+@lru_cache(maxsize=8)
+def rule_output_for(budget: int | None = None):
+    """★ 예산이 **스키마 설명과 검증에도** 들어간 출력 타입 (D-107).
+
+    `RuleOutput` 의 필드 설명은 모델에게 그대로 간다 — `pydantic-ai` 가
+    도구 스키마로 넘긴다. 그 문장이 "★ 항은 최대 8개" 로 굳어 있어서,
+    프롬프트가 "상한 16개" 라고 말해도 **모델은 8개를 냈다.** 예산 16
+    캠페인 3시드 29개 규칙이 전부 8항이었고 스키마 거부는 36라운드
+    내내 0 이었다 — 모델은 시도조차 하지 않았다.
+
+    같은 자리 **네 번째**다: 검사기(D-105) / 딸린 상한(D-106) /
+    프롬프트 파일 / **출력 스키마**.
+    """
+    if not HAVE_PYDANTIC:                           # pragma: no cover
+        return RuleOutput
+    b = int(budget if budget is not None else MAX_WEIGHTS)
+    if b == MAX_WEIGHTS:
+        return RuleOutput
+
+    class _BudgetedRuleOutput(RuleOutput):          # type: ignore[misc]
+        code: str = Field(description=_desc_code(b))
+        w0: list[float] = Field(description=_desc_w0(b))
+
+        # ★ 이름을 부모와 **같게** 둔다. pydantic 은 데코레이터를 이름으로
+        #   모으므로 같은 이름이어야 부모 것을 **대체**한다. 다른 이름을
+        #   쓰면 부모의 8 검사가 그대로 남아 둘 다 돈다.
+        @model_validator(mode="after")
+        def _budget(self):
+            if (m := literal_budget_message(self.code, len(self.w0),
+                                            budget=b)):
+                raise ValueError(m)
+            return self
+
+        @field_validator("w0")
+        @classmethod
+        def _w0(cls, v: list[float]) -> list[float]:
+            if not v:
+                raise ValueError("w0 가 비었다")
+            if len(v) > b:
+                raise ValueError(_w0_message(len(v), b))
+            if not all(abs(x) < 1e6 for x in v):
+                raise ValueError("w0 값이 비정상적으로 크다")
+            return v
+
+    #: 모델에 보이는 타입 이름을 유지한다 — 조건이 아니다.
+    _BudgetedRuleOutput.__name__ = "RuleOutput"
+    _BudgetedRuleOutput.__qualname__ = "RuleOutput"
+    return _BudgetedRuleOutput

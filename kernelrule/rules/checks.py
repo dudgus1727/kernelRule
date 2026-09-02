@@ -232,7 +232,8 @@ def _same_arg_transform(a, b, fn: str) -> bool:
         return False
 
 
-def literal_budget_message(code: str, n_weights: int) -> str | None:
+def literal_budget_message(code: str, n_weights: int,
+                           *, budget: int | None = None) -> str | None:
     """숫자 리터럴 + 가중치가 예산을 넘으면 메시지를, 아니면 `None`.
 
     ★ `weight_reuse_message` 와 같은 이유로 따로 뺐다 — LLM 경계에서
@@ -251,14 +252,15 @@ def literal_budget_message(code: str, n_weights: int) -> str | None:
     counted, branch = _numeric_literals(tree)
     n_lit = len(counted)
     total = n_lit + n_weights
-    if total <= LIMITS["budget"]:
+    b = int(budget if budget is not None else LIMITS["budget"])
+    if total <= b:
         return None
     hint = ""
     if branch:
         hint = (f" (분기 비교 상수 {len(branch)}개는 예산에서 빠졌다 — "
                 "그것은 계속 써도 된다)")
     return (f"숫자 리터럴 {n_lit}개 + 가중치 {n_weights}개 = {total} > "
-            f"{LIMITS['budget']} (§29.4).{hint} 가중치와 **분기 비교가 "
+            f"{b} (§29.4).{hint} 가중치와 **분기 비교가 "
             f"아닌** 숫자 리터럴이 같은 예산을 쓴다 — 상수를 하나 쓰면 "
             f"가중치를 하나 줄여야 한다. 항을 줄이거나, 그 상수를 분기 "
             f"조건의 비교로 옮겨라")

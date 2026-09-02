@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 from pathlib import Path
 
@@ -147,3 +148,82 @@ def test_a_sixteen_term_rule_fits_only_under_the_raised_cap():
         f"노드가 {hi.n_nodes} 뿐이라 상한 검사를 못 건드린다 — "
         "이 시험이 재려던 것을 못 잰다")
     assert hi.ok, f"예산 16 에서도 거부됐다: {hi.violations}"
+
+
+# ---------------------------------------------------------------------------
+# ★ 출력 스키마 (D-107) — 네 번째 자리
+# ---------------------------------------------------------------------------
+#
+# `RuleOutput` 의 필드 설명은 `pydantic-ai` 가 **도구 스키마로 모델에
+# 보낸다.** 거기에 "★ 항은 최대 8개" 가 굳어 있어서, 프롬프트가 "상한
+# 16개" 라고 말해도 예산 16 캠페인의 규칙 29개가 전부 8항이었다.
+# 스키마 거부는 36라운드 내내 0 이었다 — 모델은 시도조차 안 했다.
+
+
+def _twelve_terms() -> str:
+    body = "".join(f"    s = s + f.edge_waste * w[{i}]\n" for i in range(1, 12))
+    return ("def score(f, p, hw, w):\n"
+            "    s = f.reg_pressure * w[0]\n" + body + "    return s")
+
+
+@pytest.mark.parametrize("budget", [8, 16])
+def test_output_schema_states_the_budget(budget):
+    from kernelrule.agents.schemas import rule_output_for
+
+    schema = rule_output_for(budget).model_json_schema()
+    for fld in ("code", "w0"):
+        d = schema["properties"][fld]["description"]
+        assert f"최대 {budget}개" in d, (
+            f"출력 스키마 {fld} 설명이 예산 {budget} 을 안 말한다 — "
+            "모델은 이 문장을 보고 항 수를 정한다 (D-107)")
+
+
+def test_output_schema_validation_follows_the_budget():
+    """★ 설명만 고치고 검증이 8 이면 모델은 시도했다가 거부당한다."""
+    from kernelrule.agents.schemas import rule_output_for
+
+    kw = {"code": _twelve_terms(), "w0": [1.0] * 12, "changes": "",
+          "hypothesis_id": ""}
+    with pytest.raises(Exception, match="12"):
+        rule_output_for(8)(**kw)
+    rule_output_for(16)(**kw)          # 예산 16 에서는 통과해야 한다
+
+
+def test_dict_path_validation_follows_the_budget():
+    """MockLLM / 구조화 출력을 안 쓰는 경로도 같은 예산을 봐야 한다."""
+    from kernelrule.agents.schemas import (
+        SchemaViolation,
+        validate_rule_proposal,
+    )
+
+    d = {"code": _twelve_terms(), "w0": [1.0] * 12}
+    with pytest.raises(SchemaViolation):
+        validate_rule_proposal(d)
+    validate_rule_proposal(d, budget=16)
+
+
+#: ★ 예산 숫자가 나가는 **모든 면**. 하나라도 빠지면 조건이 갈린다.
+#:
+#:   D-105  검사기만 닿았다 (프롬프트 파일 / 사용자 프롬프트)
+#:   D-106  딸린 상한(ast_nodes)이 안 따라왔다
+#:   D-107  출력 스키마 설명이 8 로 굳어 있었다
+def test_all_four_surfaces_say_the_same_budget():
+    from kernelrule.agents.openai_client import assemble_instructions
+    from kernelrule.agents.schemas import rule_output_for
+    from kernelrule.rules.checks import limits_for
+
+    for b in (8, 16):
+        llm = _llm(b)
+        surfaces = {
+            "시스템 프롬프트": assemble_instructions(
+                "rule_editor", objective="rank", budget=llm._budget),
+            "사용자 프롬프트": llm._user_prompt(
+                "rule_editor", "", parent=None, parent_n_terms=0,
+                analyst=False),
+            "출력 스키마": json.dumps(
+                rule_output_for(b).model_json_schema(), ensure_ascii=False),
+        }
+        for name, txt in surfaces.items():
+            assert (f"항 상한 {b}개" in txt or f"{b} 이하" in txt
+                    or f"최대 {b}개" in txt), f"{name} 가 예산 {b} 을 안 말한다"
+        assert limits_for(b)["budget"] == b

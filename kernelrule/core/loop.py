@@ -915,7 +915,10 @@ class RoundLoop:
                         f"{type(raw).__name__}: {str(raw)[:70]}")))
                 continue
             try:
-                prop = validate_rule_proposal(raw)
+                # ★ 예산을 넘긴다 (D-107). 안 넘기면 MockLLM 경로와
+                #   구조화 출력을 안 쓰는 경로에서 16항이 조용히 거부된다.
+                prop = validate_rule_proposal(raw,
+                                              budget=self.cfg.rule_budget)
             except SchemaViolation as e:
                 res.n_rejected_schema += 1
                 res.rejections.append(("schema", str(e)[:90]))

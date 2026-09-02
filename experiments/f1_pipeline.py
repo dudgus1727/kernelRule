@@ -524,7 +524,7 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
     """씨앗 규칙을 만든다. 학습 점수 최고를 고른다 — **홀드아웃은 안 본다**."""
     from kernelrule.agents.schemas import validate_rule_proposal
     from kernelrule.core.splits import is_unsealed
-    from kernelrule.rules.checks import check_rule
+    from kernelrule.rules.checks import check_rule, limits_for
 
     out = d / "stage2-rule-writer"
     (out / "candidates").mkdir(parents=True, exist_ok=True)
@@ -561,10 +561,14 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
                 try:
                     res = llm.complete("rule_writer", "", condition="A",
                                        table_facts=facts, registry=reg)
-                    prop = validate_rule_proposal(res)
+                    prop = validate_rule_proposal(
+                        res, budget=getattr(a, "rule_budget", None))
                     check_rule(prop.code, feature_names=matrix.feature_names(),
                                shape_value_names=matrix.shape_value_names(),
-                               n_weights=len(prop.w0)).raise_if_bad()
+                               n_weights=len(prop.w0),
+                               limits=limits_for(
+                                   getattr(a, "rule_budget", None))
+                               ).raise_if_bad()
                     e = loop.score_only(prop.code, prop.w0)
                     row.update(ok=True, code=prop.code, w0=list(prop.w0),
                                fit_regret=e, attempt=attempt)

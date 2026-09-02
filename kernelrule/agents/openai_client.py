@@ -437,7 +437,7 @@ class OpenAILLM:
             AnalysisOutput,
             CategoryOutput,
             FeatureOutput,
-            RuleOutput,
+            rule_output_for,
         )
 
         # ★ 루프 밖 역할은 `register_role` 로 실험 스크립트가 직접 등록한다
@@ -445,8 +445,13 @@ class OpenAILLM:
         if role in self._extra:
             out, body = self._extra[role]
         else:
-            out = {"analyze": AnalysisOutput, "rule_editor": RuleOutput,
-                   "rule_writer": RuleOutput, "feature": FeatureOutput,
+            # ★ 규칙 역할은 **예산이 든** 출력 타입을 쓴다 (D-107).
+            #   필드 설명이 도구 스키마로 모델에 그대로 간다 — 거기에
+            #   "최대 8개" 가 굳어 있으면 프롬프트가 16 이라고 해도
+            #   모델은 8 을 낸다.
+            _rule_out = rule_output_for(self._budget)
+            out = {"analyze": AnalysisOutput, "rule_editor": _rule_out,
+                   "rule_writer": _rule_out, "feature": FeatureOutput,
                    "categorize": CategoryOutput}[role]
             body = load_prompt(f"role/{role}.md", budget=self._budget)
         # ★ **두 축**으로 나뉜다 (§30.10). 한 축(하드웨어 무관/의존)만으로
@@ -890,6 +895,35 @@ class OpenAILLM:
                  "output_tokens": meta.get("output_tokens"),
                  "seconds": meta.get("seconds")},
                 ensure_ascii=False, indent=1))
+        # ★ **조건**을 남긴다 (pending_fixes 10). 사용자 프롬프트만
+        #   남기면 시스템 프롬프트와 출력 스키마 안의 모순을 산출물로는
+        #   못 찾는다 — D-105 는 시스템 프롬프트 안에, D-107 은 출력
+        #   스키마 안에 있었고 둘 다 로그에 안 남았다.
+        for role in sorted({c.role for c in self.calls}):
+            try:
+                sysp, sch = self._condition_of(role)
+            except Exception as e:                  # pragma: no cover
+                (out / f"_system-{role}.err").write_text(f"{type(e).__name__}: {e}")
+                continue
+            (out / f"_system-{role}.md").write_text(sysp)
+            if sch is not None:
+                (out / f"_schema-{role}.json").write_text(
+                    json.dumps(sch, ensure_ascii=False, indent=1))
+
+    def _condition_of(self, role: str) -> tuple[str, dict | None]:
+        """그 역할이 **실제로 받은** 시스템 프롬프트와 출력 스키마."""
+        from kernelrule.agents.schemas import rule_output_for
+
+        if role in self._extra:
+            return self._extra[role][1], None
+        body = load_prompt(f"role/{role}.md", budget=self._budget)
+        sysp = assemble_instructions(
+            role, objective=self.objective, hw_file=self.cfg.arch_prompt,
+            body=body, budget=self._budget)
+        sch = None
+        if role in ("rule_editor", "rule_writer"):
+            sch = rule_output_for(self._budget).model_json_schema()
+        return sysp, sch
 
 
 def estimate_and_confirm(*, n_rounds: int, n_rules: int, report_chars: int,
