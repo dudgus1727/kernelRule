@@ -310,6 +310,25 @@ LIMITS = {
     "max_lines": 60,
 }
 
+
+def limits_for(budget: int | None) -> dict:
+    """★ 예산에 **따라 움직이는 상한들**. 예산만 올리면 다른 벽에 막힌다.
+
+    실측: 8항 규칙의 AST 노드가 중앙 271 / 최대 383 이다. 상한 400 을
+    그대로 두고 예산만 16 으로 올리면 **16항 규칙은 노드 상한에서
+    거부된다.** 그러면 "예산 16 이 효과가 없다" 가 아니라 "16항을 쓸 수
+    없었다" 를 재게 된다 (D-105 와 같은 자리).
+
+    비례로 올린다 — 8항에 400 이면 16항에 800 이다.
+    """
+    b = int(budget if budget is not None else BUDGET)
+    if b < 1:
+        raise ValueError(f"예산은 1 이상이어야 한다: {b}")
+    k = b / BUDGET
+    return {"budget": b,
+            "ast_nodes": int(round(LIMITS["ast_nodes"] * k)),
+            "max_lines": int(round(LIMITS["max_lines"] * k))}
+
 #: 규칙 소스에 나타나면 안 되는 이름. 정답이거나 탈출 경로다.
 _BANNED_NAMES = frozenset({
     # 정답 (ANSWER_COLS)

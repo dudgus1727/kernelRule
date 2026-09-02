@@ -48,7 +48,7 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import FitError, fit_weights, make_score_of
 from kernelrule.report.diagnostic import build_report
 from kernelrule.rules.checks import BUDGET as _BUDGET
-from kernelrule.rules.checks import check_rule
+from kernelrule.rules.checks import check_rule, limits_for
 
 __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 
@@ -338,7 +338,9 @@ class RoundLoop:
         #: ★ 예산을 검사기에 흘린다. `None` 이면 기본(8) 그대로다.
         self._budget = (cfg.rule_budget if cfg.rule_budget is not None
                         else _BUDGET)
-        self._limits = ({"budget": cfg.rule_budget}
+        # ★ 예산만 올리면 **AST 노드 상한에서 막힌다** (D-106). 상한들을
+        #   한 곳에서 같이 움직인다.
+        self._limits = (limits_for(cfg.rule_budget)
                         if cfg.rule_budget is not None else None)
         self._objective = cfg.objective
         self._switched = False

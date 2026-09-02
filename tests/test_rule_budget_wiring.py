@@ -97,3 +97,53 @@ def test_budget_reaches_the_saturation_notice():
     assert "예산이 찼습니다" not in txt, (
         "예산 16 인데 8항 부모에게 '예산이 찼습니다' 를 보냈다 (D-105)")
     assert "남은 예산: 8항" in txt, txt[:400]
+
+
+# ---------------------------------------------------------------------------
+# ★ 예산에 **딸린** 상한들 (D-106)
+# ---------------------------------------------------------------------------
+#
+# 8항 규칙의 AST 노드가 실측 중앙 271 / 최대 383 인데 상한이 400 이다.
+# 예산만 16 으로 올리면 16항 규칙은 **노드 상한에서 거부된다** — "예산
+# 16 이 효과가 없다" 가 아니라 "16항을 쓸 수 없었다" 를 재게 된다.
+
+
+def test_limits_scale_with_the_budget():
+    from kernelrule.rules.checks import LIMITS, limits_for
+
+    assert limits_for(None) == {**LIMITS, "budget": LIMITS["budget"]}
+    assert limits_for(8)["ast_nodes"] == LIMITS["ast_nodes"]
+    assert limits_for(16)["ast_nodes"] == 2 * LIMITS["ast_nodes"]
+    assert limits_for(16)["max_lines"] == 2 * LIMITS["max_lines"]
+
+
+def test_prompt_states_the_scaled_node_cap():
+    """프롬프트가 상수 400 을 말하면 검사기(800)와 갈린다."""
+    from kernelrule.agents.openai_client import load_prompt
+    from kernelrule.rules.checks import limits_for
+
+    for b in (8, 16):
+        txt = load_prompt("role/_rules_edit.md", budget=b)
+        n = limits_for(b)["ast_nodes"]
+        assert f"AST 노드 {n}개" in txt, f"예산 {b} 에서 노드 상한이 안 맞는다"
+
+
+def test_a_sixteen_term_rule_fits_only_under_the_raised_cap():
+    """★ 실제 16항 규칙으로 확인한다 — 숫자만 맞춰 놓으면 소용없다."""
+    from kernelrule.rules.checks import check_rule, limits_for
+
+    terms = "\n".join(
+        f"    s = s + np.where(p.is_memory_bound, f.log_dram_traffic, "
+        f"f.log_inst_total) * w[{i}]" for i in range(1, 16))
+    code = ("def score(f, p, hw, w):\n"
+            "    s = f.reg_pressure * w[0]\n" + terms + "\n    return s")
+    kw = {"feature_names": ["reg_pressure", "log_dram_traffic",
+                            "log_inst_total"],
+          "shape_value_names": ["is_memory_bound"], "n_weights": 16}
+    lo = check_rule(code, limits=limits_for(8), **kw)
+    hi = check_rule(code, limits=limits_for(16), **kw)
+    assert not lo.ok, "예산 8 에서 16항이 통과하면 검사기가 안 걸러진다"
+    assert hi.n_nodes > limits_for(8)["ast_nodes"], (
+        f"노드가 {hi.n_nodes} 뿐이라 상한 검사를 못 건드린다 — "
+        "이 시험이 재려던 것을 못 잰다")
+    assert hi.ok, f"예산 16 에서도 거부됐다: {hi.violations}"

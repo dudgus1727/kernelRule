@@ -195,14 +195,19 @@ def load_prompt(name: str, *, budget: int | None = None) -> str:
     (`is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
     `load_generated` 에 이은 여섯 번째가 된다).
     """
-    from kernelrule.rules.checks import BUDGET  # 호출 시점에 읽는다
+    from kernelrule.rules.checks import BUDGET, limits_for
 
     p = _PROMPTS / name
     if not p.exists():
         raise FileNotFoundError(f"프롬프트가 없다: {p}")
     txt = _HTML_COMMENT.sub("", p.read_text()).strip() + "\n"
-    return txt.replace("{budget}", str(budget if budget is not None
-                                       else BUDGET))
+    # ★ 예산에 딸린 상한들도 **같이** 채운다 (D-106). `ast_nodes` 를
+    #   상수로 적어 두면 예산 16 에서 "400 이 상한" 이라고 말하면서
+    #   검사기는 800 을 쓴다 — 프롬프트와 검사기가 갈린다.
+    lim = limits_for(budget if budget is not None else BUDGET)
+    for k, v in lim.items():
+        txt = txt.replace("{" + k + "}", str(v))
+    return txt
 
 
 @dataclass
