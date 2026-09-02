@@ -1,0 +1,429 @@
+{
+ "n_holdout": 20,
+ "bind": {
+  "b08": {
+   "spent": [
+    8,
+    8,
+    8,
+    8,
+    7,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    7,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8
+   ],
+   "terms": [
+    8,
+    8,
+    8,
+    8,
+    7,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    7,
+    8,
+    7,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8
+   ],
+   "cap": 8,
+   "n_at_cap": 28
+  },
+  "b16b": {
+   "spent": [
+    16,
+    16,
+    13,
+    15,
+    15,
+    5,
+    14,
+    15,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    15,
+    11,
+    16,
+    16,
+    14,
+    15,
+    15,
+    16,
+    16,
+    16,
+    16,
+    16,
+    15,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16
+   ],
+   "terms": [
+    14,
+    13,
+    10,
+    12,
+    11,
+    5,
+    12,
+    13,
+    13,
+    14,
+    14,
+    11,
+    15,
+    14,
+    12,
+    11,
+    11,
+    11,
+    10,
+    11,
+    12,
+    11,
+    12,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    14,
+    13,
+    15,
+    14
+   ],
+   "cap": 16,
+   "n_at_cap": 21
+  }
+ },
+ "regret": {
+  "b08": {
+   "vals": [
+    [
+     1.1640507852449102,
+     0.03457526257143947,
+     0.2902981130197815
+    ],
+    [
+     1.1328762158045236,
+     0.1511715049095474,
+     0.37274003197024397
+    ],
+    [
+     1.1110833450437894,
+     0.20803159316726427,
+     0.22472824307437145
+    ]
+   ],
+   "med": [
+    1.1328762158045236,
+    0.1511715049095474,
+    0.2902981130197815
+   ]
+  },
+  "b16b": {
+   "vals": [
+    [
+     1.1146306967910395,
+     -0.0794902832985452,
+     0.3668439413296632
+    ],
+    [
+     1.1233114936865682,
+     0.13057903693220457,
+     0.38231583746040376
+    ],
+    [
+     1.138783229737721,
+     -0.042555776030724954,
+     0.2503637455821546
+    ]
+   ],
+   "med": [
+    1.1233114936865682,
+    -0.042555776030724954,
+    0.3668439413296632
+   ]
+  }
+ },
+ "rank": {
+  "b08": {
+   "vals": [
+    [
+     1.5927772929206498,
+     0.3732285297448792,
+     0.4106766427302548
+    ],
+    [
+     1.1710267029151078,
+     0.374138474799552,
+     0.4342303720635662
+    ],
+    [
+     1.6346112499266652,
+     0.3944304023924157,
+     0.3420510358193268
+    ]
+   ],
+   "med": [
+    1.5927772929206498,
+    0.374138474799552,
+    0.4106766427302548
+   ]
+  },
+  "b16b": {
+   "vals": [
+    [
+     1.1996034051046753,
+     0.41377642771407375,
+     0.4521078726691995
+    ],
+    [
+     1.5831811874031954,
+     0.3644061743403182,
+     0.4085896096703382
+    ],
+    [
+     1.5968898288991087,
+     0.3011658086767547,
+     0.40011715909676265
+    ]
+   ],
+   "med": [
+    1.5831811874031954,
+    0.3644061743403182,
+    0.4085896096703382
+   ]
+  }
+ },
+ "floor": [
+  1.8753309737547674,
+  -0.0073294929200223525,
+  4.103292401815745e-05
+ ],
+ "cost": {
+  "b08": {
+   "train": [
+    1.768656688917843,
+    1.2553832965021405,
+    1.636155149738394
+   ],
+   "hold": [
+    1.6624190882215242,
+    1.1699863333109701,
+    1.6280852941698505
+   ],
+   "gap": [
+    -0.10623760069631882,
+    -0.0853969631911704,
+    -0.00806985556854345
+   ],
+   "reach": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "rej": 0.020833333333333332,
+   "n_config": [
+    7,
+    9,
+    7
+   ],
+   "minutes": 66.85895218507697,
+   "feats": [
+    [
+     "edge_waste",
+     "has_spill",
+     "is_two_stage",
+     "log_dram_traffic",
+     "log_inst_total",
+     "log_mainloop_iters",
+     "occupancy_deficit",
+     "pipeline_warmup_frac",
+     "reg_pressure",
+     "sm_idle_cost",
+     "smem_pressure",
+     "spill_magnitude",
+     "split_k_cost",
+     "tile_aspect_imbalance",
+     "traffic_amplification",
+     "waves"
+    ],
+    [
+     "has_spill",
+     "is_two_stage",
+     "log_dram_traffic",
+     "log_grid_tiles",
+     "log_inst_total",
+     "log_mainloop_iters",
+     "occupancy_deficit",
+     "pipeline_warmup_frac",
+     "reg_pressure",
+     "sm_idle_cost",
+     "smem_pressure",
+     "spill_magnitude",
+     "split_k_cost",
+     "traffic_amplification",
+     "waves"
+    ],
+    [
+     "has_spill",
+     "is_two_stage",
+     "log_dram_traffic",
+     "log_inst_total",
+     "log_mainloop_iters",
+     "log_workspace_bytes",
+     "occupancy_deficit",
+     "pipeline_warmup_frac",
+     "reg_pressure",
+     "sm_idle_cost",
+     "smem_pressure",
+     "spill_magnitude",
+     "split_k_cost",
+     "traffic_amplification",
+     "waves"
+    ]
+   ]
+  },
+  "b16b": {
+   "train": [
+    1.2956655948889864,
+    1.5107249034874652,
+    1.7471373702271902
+   ],
+   "hold": [
+    1.229976362368444,
+    1.489083681149035,
+    1.6153554497866727
+   ],
+   "gap": [
+    -0.06568923252054226,
+    -0.021641222338430133,
+    -0.1317819204405175
+   ],
+   "reach": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "rej": 0.032407407407407406,
+   "n_config": [
+    10,
+    7,
+    6
+   ],
+   "minutes": 79.75375858341964,
+   "feats": [
+    [
+     "edge_waste",
+     "has_spill",
+     "is_two_stage",
+     "log_dram_traffic",
+     "log_grid_tiles",
+     "log_inst_total",
+     "log_mainloop_iters",
+     "occupancy_deficit",
+     "pipeline_warmup_frac",
+     "reg_pressure",
+     "sm_idle_cost",
+     "smem_pressure",
+     "spill_magnitude",
+     "split_k_cost",
+     "tile_aspect_imbalance",
+     "traffic_amplification",
+     "waves"
+    ],
+    [
+     "edge_waste",
+     "has_spill",
+     "is_two_stage",
+     "log_dram_traffic",
+     "log_grid_tiles",
+     "log_inst_total",
+     "log_mainloop_iters",
+     "log_workspace_bytes",
+     "occupancy_deficit",
+     "pipeline_warmup_frac",
+     "reg_pressure",
+     "sm_idle_cost",
+     "smem_pressure",
+     "spill_magnitude",
+     "split_k_cost",
+     "tail_waste",
+     "tile_aspect_imbalance",
+     "traffic_amplification",
+     "waves"
+    ],
+    [
+     "edge_waste",
+     "has_spill",
+     "is_two_stage",
+     "log_dram_traffic",
+     "log_grid_tiles",
+     "log_inst_total",
+     "log_mainloop_iters",
+     "log_workspace_bytes",
+     "occupancy_deficit",
+     "pipeline_warmup_frac",
+     "reg_pressure",
+     "sm_idle_cost",
+     "smem_pressure",
+     "spill_magnitude",
+     "split_k_cost",
+     "tail_waste",
+     "tile_aspect_imbalance",
+     "traffic_amplification",
+     "waves"
+    ]
+   ]
+  }
+ }
+}
