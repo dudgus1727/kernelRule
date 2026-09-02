@@ -130,21 +130,79 @@ def _rule_example_for(registry, *, budget: int | None = None) -> str:
 _OBJECTIVE_BLOCKS = {
     "regret": """`regret` = (규칙이 1등으로 고른 config 의 시간) / (그 형상의 전수 최적 시간).
 1.0 이 완벽입니다. 낮을수록 좋습니다.""",
-    "rank": """★ **1등 하나가 아니라 상위권의 순서**로 채점합니다.
+    #: ★ `rank` 는 함수다 — `k` 와 `lambda` 가 실행마다 다르다. 문장에
+    #: 100 을 상수로 박아 두었더니 `--rank-top-k 10` 을 줘도 프롬프트는
+    #: "100개" 라고 말했다 (D-105/D-107 과 같은 자리, 다섯 번째 면).
+    "rank": None,
+}
 
-각 형상에서 실제로 가장 빠른 config 100개를 놓고, 그 안의 모든 쌍 (i, j) 에
+
+def _rank_block(k: int = 100, lam: float = 0.0) -> str:
+    extra = "" if not lam else (
+        f"\n\n★ 여기에 더해, **참 1등을 맞히는 것**에 가중치 {lam:g} 를 "
+        "더 얹습니다.\n1등이 낀 쌍의 손실을 그만큼 더 세게 봅니다 — "
+        "상위권 순서를 지키면서\n**1등도 놓치지 마세요.**")
+    return f"""★ **1등 하나가 아니라 상위권의 순서**로 채점합니다.
+
+각 형상에서 실제로 가장 빠른 config {k}개를 놓고, 그 안의 모든 쌍 (i, j) 에
 대해 **더 빠른 쪽에 더 낮은 점수**를 주었는지 봅니다. 쌍마다 두 시간의
 차이만큼 무게가 붙습니다 — 차이가 큰 쌍을 뒤집으면 손해가 큽니다.
 
 0 이 완벽입니다. 낮을수록 좋습니다.
 
 ⚠️ 측정 노이즈로 구별할 수 없는 쌍은 채점에서 빠집니다. **미세한 차이를
-맞추려 하지 말고 순서를 만드는 물리를 쓰세요.**""",
-}
+맞추려 하지 말고 순서를 만드는 물리를 쓰세요.**{extra}"""
+
+
+#: ★ 실험 B (D-110) — **항 안에서 피처 둘을 곱해도 된다**는 것을 명시한다.
+#: 정적 검사는 원래부터 곱을 막지 않았다 (규칙 531개 중 312개가 이미
+#: 쓰고 있다). 그래서 이것은 "제약을 푸는 것" 이 아니라 **말해 주는
+#: 것**이다 — D-107 에서 배운 대로, 안 실리면 시도가 안 는다.
+#:
+#: ⚠️ 끄면 **빈 문자열**이라 프롬프트가 이전과 바이트까지 같다.
+_PRODUCT_BLOCK = """
+
+## ★ 항의 형태 — 피처를 곱해도 됩니다
+
+한 항 안에서 **피처 둘을 곱할 수 있습니다.** 가중치는 그대로 하나입니다.
+
+```python
+s = s + (f.<이름A> * f.<이름B>) * w[3]           # ✅ 예산 하나
+s = s + f.<이름A> * np.log2(f.<이름B>) * w[4]    # ✅
+```
+
+두 물리량이 **동시에** 나쁠 때만 벌을 주고 싶으면 곱이 맞습니다 —
+더하기는 하나만 나빠도 벌을 줍니다. 해석이 어려워지는 것을 걱정하지
+마세요. **성능이 오르는 형태를 쓰고, 왜 그런지는 나중에 봅니다.**"""
+
+_PRODUCT_NOTE = """
+★ 피처 둘을 곱한 항을 써도 됩니다 — 예산은 항 하나입니다.
+"""
+
+
+def product_block(on: bool) -> str:
+    return _PRODUCT_BLOCK if on else ""
+
+
+def product_note(on: bool) -> str:
+    return _PRODUCT_NOTE if on else ""
+
+
+def objective_block(objective: str, *, rank_top_k: int = 100,
+                    rank_lambda: float = 0.0) -> str:
+    """★ 목표 정의 한 곳 (원칙 2). `k` 와 `lambda` 를 **문장에 넣는다.**"""
+    if objective not in _OBJECTIVE_BLOCKS:
+        raise ValueError(f"알 수 없는 목적함수: {objective!r}")
+    if objective == "rank":
+        return _rank_block(rank_top_k, rank_lambda)
+    return _OBJECTIVE_BLOCKS[objective]
 def assemble_instructions(role: str, *, objective: str = "rank",
                           hw_file: str = "hw/sm_86.md",
                           body: str | None = None,
-                          budget: int | None = None) -> str:
+                          budget: int | None = None,
+                          rank_top_k: int = 100,
+                          rank_lambda: float = 0.0,
+                          product_hint: bool = False) -> str:
     """★ 시스템 프롬프트 조립. **한 곳에서만 한다** (원칙 2).
 
     전에는 `_agent()` 와 `tests/test_prompt_layout.py` 가 각자 조립했다.
@@ -157,12 +215,15 @@ def assemble_instructions(role: str, *, objective: str = "rank",
     if role in _NEEDS_HW:
         parts.append(load_prompt(hw_file, budget=budget))
     if role in _WRITES_RULES:
-        parts.append(load_prompt("role/_rules_common.md", budget=budget))
+        parts.append(load_prompt("role/_rules_common.md", budget=budget)
+                     .replace("{product_block}", product_block(product_hint)))
     if role in _EDITS_RULES:
         parts.append(load_prompt("role/_rules_edit.md", budget=budget).replace(
-            "{objective_block}", _OBJECTIVE_BLOCKS[objective]))
+            "{objective_block}", objective_block(
+                objective, rank_top_k=rank_top_k, rank_lambda=rank_lambda)))
     parts.append(body if body is not None
-                 else load_prompt(f"role/{role}.md", budget=budget))
+                 else load_prompt(f"role/{role}.md", budget=budget)
+                 .replace("{product_note}", product_note(product_hint)))
     return "\n\n---\n\n".join(parts)
 
 
@@ -222,6 +283,12 @@ class LLMConfig:
     #: `{budget}` 이 이 값으로 채워진다 — 검사기와 갈리면 안 되므로
     #: 루프가 같은 값을 `check_rule(limits=...)` 에도 넘긴다.
     rule_budget: int | None = None
+    #: ★ 목표 정의의 **숫자**. 프롬프트가 실행 조건과 같은 말을 해야 한다
+    #: (D-105/D-107). `rank` 목적함수에서만 쓰인다.
+    rank_top_k: int = 100
+    rank_lambda: float = 0.0
+    #: ★ 실험 B (D-110). 곱 항을 **명시**한다. 검사기는 원래 안 막았다.
+    product_hint: bool = False
     # ------------------------------------------------------------------
     # ★ temperature / seed — 둘 다 `None` 이다. 통제할 수 없다 (D-47)
     # ------------------------------------------------------------------
@@ -392,6 +459,9 @@ class OpenAILLM:
         from kernelrule.rules.checks import BUDGET as _CHECK_BUDGET
         self._budget = int(cfg.rule_budget if cfg.rule_budget is not None
                            else _CHECK_BUDGET)
+        self._rank_top_k = int(getattr(cfg, "rank_top_k", 100))
+        self._rank_lambda = float(getattr(cfg, "rank_lambda", 0.0))
+        self._product = bool(getattr(cfg, "product_hint", False))
         self._base = load_prompt("_base.md", budget=self._budget)
         self._hw = load_prompt(cfg.arch_prompt, budget=self._budget)
         #: ★ 목적함수. 프롬프트의 "채점 방식" 절을 정한다 (D-101).
@@ -449,11 +519,13 @@ class OpenAILLM:
             #   필드 설명이 도구 스키마로 모델에 그대로 간다 — 거기에
             #   "최대 8개" 가 굳어 있으면 프롬프트가 16 이라고 해도
             #   모델은 8 을 낸다.
-            _rule_out = rule_output_for(self._budget)
+            _rule_out = rule_output_for(self._budget,
+                                        product_hint=self._product)
             out = {"analyze": AnalysisOutput, "rule_editor": _rule_out,
                    "rule_writer": _rule_out, "feature": FeatureOutput,
                    "categorize": CategoryOutput}[role]
-            body = load_prompt(f"role/{role}.md", budget=self._budget)
+            body = load_prompt(f"role/{role}.md", budget=self._budget) \
+                .replace("{product_note}", product_note(self._product))
         # ★ **두 축**으로 나뉜다 (§30.10). 한 축(하드웨어 무관/의존)만으로
         #   나눴더니 역할별로 필요 없는 것이 공용에 쌓였다 — FeatureWriter 가
         #   regret 정의와 가중치 예산을 매번 받고 있었다.
@@ -471,7 +543,9 @@ class OpenAILLM:
         #   에서 쓰므로 교체할 항도 이전 점수도 없다 (§30.10).
         instructions = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
-            body=body, budget=self.cfg.rule_budget)
+            body=body, budget=self.cfg.rule_budget,
+            rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
+            product_hint=self._product)
         if self.cfg.endpoint not in ("responses", "chat"):
             raise ValueError(
                 f"알 수 없는 엔드포인트: {self.cfg.endpoint!r}. "
@@ -608,7 +682,8 @@ class OpenAILLM:
                 f"⚠️ 예산이 {self._budget}항이므로 합치면 **반드시 버려야 "
                 "합니다.** 무엇을 버렸고 왜 그것을 골랐는지 `changes` 에 "
                 "쓰세요.\n")
-        body = load_prompt("role/rule_editor.md", budget=self._budget)
+        body = load_prompt("role/rule_editor.md", budget=self._budget) \
+            .replace("{product_note}", product_note(self._product))
         return body.format(
             second_parent_block=second,
             n_terms=n_terms, n_weights=n_w, budget_note=note,
@@ -919,10 +994,13 @@ class OpenAILLM:
         body = load_prompt(f"role/{role}.md", budget=self._budget)
         sysp = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
-            body=body, budget=self._budget)
+            body=body, budget=self._budget,
+            rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
+            product_hint=self._product)
         sch = None
         if role in ("rule_editor", "rule_writer"):
-            sch = rule_output_for(self._budget).model_json_schema()
+            sch = rule_output_for(
+                self._budget, product_hint=self._product).model_json_schema()
         return sysp, sch
 
 

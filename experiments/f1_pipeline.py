@@ -232,7 +232,13 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget):
     #   섞이면 안 된다. `config.json` 의 `llm.objective` 로 확인된다.
     return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
                                objective=getattr(a, "objective", "regret"),
-                               rule_budget=getattr(a, "rule_budget", None)),
+                               rule_budget=getattr(a, "rule_budget", None),
+                               # ★ 프롬프트의 목표 정의가 **실행 조건과
+                               #   같은 숫자**를 말해야 한다 (D-105/D-107).
+                               rank_top_k=getattr(a, "rank_top_k", 100),
+                               rank_lambda=getattr(a, "rank_lambda", 0.0),
+                               product_hint=getattr(
+                                   a, "product_hint", False)),
                      feature_names=names, shape_values=svals,
                      registry=registry, budget=budget, cache=False)
 
@@ -627,6 +633,7 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        n_workers=getattr(a, "workers", 0),
                        objective=getattr(a, "objective", "regret"),
                        rank_top_k=getattr(a, "rank_top_k", 100),
+                       rank_lambda=getattr(a, "rank_lambda", 0.0),
                        rule_budget=getattr(a, "rule_budget", None),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
@@ -650,6 +657,7 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            n_workers=a.workers,
                            objective=a.objective,
                            rank_top_k=a.rank_top_k,
+                           rank_lambda=a.rank_lambda,
                            objective_switch=a.objective_switch,
                            rule_budget=a.rule_budget,
                            hypothesis_pool=tuple(a.hypothesis_pool)),
@@ -787,6 +795,19 @@ def main() -> None:
     ap.add_argument("--rank-top-k", type=int, default=100,
                     help="순위 손실이 볼 참 상위 개수. ★ 사전 등록에 100 을 "
                          "박았다 — 결과를 보고 바꾸지 마라")
+    ap.add_argument("--product-hint", action="store_true",
+                    help="★ 실험 B (D-110). 항 안에서 피처 둘을 곱해도 "
+                         "된다고 **명시한다.** 정적 검사는 원래 안 막았다 "
+                         "— 조건은 '푸는 것' 이 아니라 '말해 주는 것' 이다. "
+                         "네 면(시스템/사용자 프롬프트, 출력 스키마, 검사기) "
+                         "에 같이 실린다")
+    ap.add_argument("--rank-lambda", type=float, default=0.0,
+                    help="★ 두 손실의 합 (D-109). "
+                         "L = rank_loss(k) + lambda * rank_loss_top1(k). "
+                         "top1 은 참 1등이 낀 쌍만 — regret 의 부드러운 "
+                         "대리다. ★ 사전 등록에 값 목록을 박고 전부 "
+                         "돌려라. 결과를 보고 목록 밖의 값을 고르는 것이 "
+                         "튜닝이다")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tag", default=None,

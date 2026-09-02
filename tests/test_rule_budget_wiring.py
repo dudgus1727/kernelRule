@@ -227,3 +227,48 @@ def test_all_four_surfaces_say_the_same_budget():
             assert (f"항 상한 {b}개" in txt or f"{b} 이하" in txt
                     or f"최대 {b}개" in txt), f"{name} 가 예산 {b} 을 안 말한다"
         assert limits_for(b)["budget"] == b
+
+
+# ---------------------------------------------------------------------------
+# ★ 목표 정의의 숫자 (k, lambda) 와 곱 항 (D-109 / D-110)
+# ---------------------------------------------------------------------------
+#
+# `rank` 목표 블록이 "config 100개" 를 **상수로** 적고 있었다. `k` 스윕을
+# 그대로 돌렸으면 프롬프트만 100 이라고 말하는 다섯 번째 면이 됐다.
+
+
+@pytest.mark.parametrize("k", [10, 20, 100])
+def test_objective_block_states_the_running_k(k):
+    from kernelrule.agents.openai_client import assemble_instructions
+
+    txt = assemble_instructions("rule_editor", objective="rank", budget=8,
+                                rank_top_k=k)
+    assert f"config {k}개" in txt, f"목표 정의가 k={k} 를 안 말한다"
+    for other in (10, 20, 100):
+        if other != k:
+            assert f"config {other}개" not in txt
+
+
+def test_objective_block_states_lambda_only_when_set():
+    from kernelrule.agents.openai_client import assemble_instructions
+
+    kw = {"objective": "rank", "budget": 8}
+    assert "가중치 1 를" not in assemble_instructions("rule_editor", **kw)
+    on = assemble_instructions("rule_editor", rank_lambda=1.0, **kw)
+    assert "참 1등을 맞히는 것" in on
+
+
+def test_product_hint_is_off_by_default_and_lands_on_every_surface():
+    from kernelrule.agents.openai_client import assemble_instructions
+    from kernelrule.agents.schemas import rule_output_for
+
+    off = assemble_instructions("rule_editor", objective="rank", budget=8)
+    on = assemble_instructions("rule_editor", objective="rank", budget=8,
+                               product_hint=True)
+    assert "{product_block}" not in off and "{product_note}" not in off
+    assert "피처를 곱해도 됩니다" not in off
+    assert "피처를 곱해도 됩니다" in on and "피처 둘을 곱한 항" in on
+    for ph in (False, True):
+        d = rule_output_for(8, product_hint=ph).model_json_schema()
+        has = "곱해도 된다" in d["properties"]["code"]["description"]
+        assert has is ph, f"스키마 product_hint={ph} 인데 곱 문장 {has}"

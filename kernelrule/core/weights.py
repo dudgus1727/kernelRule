@@ -161,7 +161,8 @@ class _Problem:
     **순서가 정해진 뒤** 인덱싱에만 쓰인다.
     """
 
-    __slots__ = ("hw", "items", "k", "_pairs", "n_pairs", "n_dropped")
+    __slots__ = ("hw", "items", "k", "_pairs", "n_pairs", "n_dropped",
+                 "_pairs1", "n_pairs1")
 
     def __init__(self, matrix: FeatureMatrix, table: PerfTable,
                  shapes: Sequence[Problem], k: int) -> None:
@@ -176,44 +177,71 @@ class _Problem:
         self._pairs = None
         self.n_pairs = 0
         self.n_dropped = 0
+        #: ★ 참 1등 대 나머지 쌍 (D-109). `rank_lambda` 가 0 이면 안 만든다.
+        self._pairs1 = None
+        self.n_pairs1 = 0
 
     # -- 순위 손실 (D-101) -------------------------------------------------
-    def build_pairs(self, table: PerfTable, top_k: int) -> None:
+    def _make_pairs(self, table: PerfTable, top_k: int, *,
+                    anchor_best: bool = False) -> tuple[list, int, int]:
         """★ 참 상위 `top_k` 안의 쌍. **노이즈로 못 가르는 쌍은 뺀다.**
 
         가중치는 `|t_j - t_i| / t_best` — **실제 손해**다. 튜닝할 값이
         없고, 노이즈 바닥 이내면 자동으로 0 에 가까워진다.
 
+        `anchor_best` 면 **참 1등이 낀 쌍만** 남긴다 — `regret` 의 부드러운
+        대리다 (D-109). 같은 쌍 집합의 부분집합이므로 정규화가 같고
+        `lambda` 가 순수한 비율이 된다.
+
         ⚠️ `NoiseModel.resolvable` 을 쓴다. 판정을 새로 정의하지 않는다
         (원칙 2).
         """
-        self._pairs = []
-        self.n_pairs = self.n_dropped = 0
+        pairs, n_ok, n_drop = [], 0, 0
         for _f, _info, _cand, t, best in self.items:
             top = np.argsort(t, kind="stable")[:top_k]
             tt = t[top]
             n = len(top)
             iu, ju = np.triu_indices(n, k=1)          # t[iu] <= t[ju]
             if iu.size == 0:
-                self._pairs.append(None)
+                pairs.append(None)
                 continue
             a, b = tt[iu], tt[ju]
             ok = table.noise.resolvable(a, b) & (b > a)
-            self.n_dropped += int((~ok).sum())
+            if anchor_best:
+                ok = ok & (iu == 0)
+            n_drop += int((~ok).sum())
             if not ok.any():
-                self._pairs.append(None)
+                pairs.append(None)
                 continue
             iu, ju = iu[ok], ju[ok]
             w = (tt[ju] - tt[iu]) / best              # ★ 실제 손해
-            self.n_pairs += int(iu.size)
-            self._pairs.append((top, iu, ju, w, float(w.sum())))
+            n_ok += int(iu.size)
+            pairs.append((top, iu, ju, w, float(w.sum())))
+        return pairs, n_ok, n_drop
+
+    def build_pairs(self, table: PerfTable, top_k: int) -> None:
+        self._pairs, self.n_pairs, self.n_dropped = self._make_pairs(
+            table, top_k)
+
+    def build_top1_pairs(self, table: PerfTable, top_k: int) -> None:
+        """★ 참 1등 대 나머지 — `regret` 의 부드러운 대리 (D-109)."""
+        self._pairs1, self.n_pairs1, _ = self._make_pairs(
+            table, top_k, anchor_best=True)
 
     def rank_loss(self, score_fn: ScoreFn, w: np.ndarray) -> float:
         """가중 로지스틱 쌍 손실. **작을수록 좋다** 규약이므로 s_i < s_j."""
         if self._pairs is None:
             raise FitError("build_pairs 를 먼저 불러야 한다.")
+        return self._loss_on(self._pairs, score_fn, w)
+
+    def rank_loss_top1(self, score_fn: ScoreFn, w: np.ndarray) -> float:
+        if self._pairs1 is None:
+            raise FitError("build_top1_pairs 를 먼저 불러야 한다.")
+        return self._loss_on(self._pairs1, score_fn, w)
+
+    def _loss_on(self, pairs, score_fn: ScoreFn, w: np.ndarray) -> float:
         tot = den = 0.0
-        for (f, info, cand, _t, _best), pr in zip(self.items, self._pairs,
+        for (f, info, cand, _t, _best), pr in zip(self.items, pairs,
                                                   strict=True):
             if pr is None:
                 continue
@@ -252,7 +280,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 polish_budget: int = 600,   # ★ 적합 305 의 2배 이내 (D-59)
                 sensitivity_delta: float = 0.5,
                 objective: str = "rank",      # ★ 기본은 rank. D-101
-                rank_top_k: int = 100) -> FittedRule:
+                rank_top_k: int = 100,
+                rank_lambda: float = 0.0) -> FittedRule:
     """구조를 고정하고 가중치만 맞춘다.
 
     `split` 은 **`role="train"` 이어야 한다.** 검증/최종이 목적함수에
@@ -314,6 +343,12 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     if objective not in ("regret", "rank"):
         raise FitError(f"알 수 없는 목적함수: {objective!r}. "
                        "regret | rank 중 하나여야 한다.")
+    if rank_lambda < 0:
+        raise FitError(f"rank_lambda 는 0 이상이어야 한다: {rank_lambda}")
+    if objective != "rank" and rank_lambda:
+        raise FitError(
+            f"rank_lambda={rank_lambda} 인데 objective={objective!r} 다. "
+            "람다는 순위 손실 위에만 얹는다 (D-109).")
     if objective == "rank":
         prob.build_pairs(table, rank_top_k)
         if prob.n_pairs == 0:
@@ -321,13 +356,24 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 "순위 손실에 쓸 쌍이 하나도 없다 — 노이즈 바닥으로 가를 "
                 "수 있는 쌍이 상위 "
                 f"{rank_top_k} 안에 없다. 조용히 진행하지 않는다.")
+        if rank_lambda:
+            prob.build_top1_pairs(table, rank_top_k)
+            if prob.n_pairs1 == 0:
+                raise FitError(
+                    "1등 쌍이 하나도 없다 — 참 1등을 노이즈 바닥으로 "
+                    f"2등과 못 가른다 (상위 {rank_top_k}). "
+                    "조용히 진행하지 않는다.")
 
     def obj(w: np.ndarray) -> float:
         nonlocal n_eval, n_inf, seen_v, seen_w
         n_eval += 1
         wa = np.asarray(w, dtype=np.float64)
-        v = (prob.regret(score_fn, wa) if objective == "regret"
-             else prob.rank_loss(score_fn, wa))
+        if objective == "regret":
+            v = prob.regret(score_fn, wa)
+        else:
+            v = prob.rank_loss(score_fn, wa)
+            if rank_lambda and np.isfinite(v):
+                v += rank_lambda * prob.rank_loss_top1(score_fn, wa)
         if not np.isfinite(v):
             n_inf += 1
             return 1e6      # 이 가중치는 실행 불가. 구조 기각은 아니다.

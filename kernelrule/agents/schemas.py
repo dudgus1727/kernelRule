@@ -121,14 +121,20 @@ N_HYP_MIN, N_HYP_MAX = 2, 8
 MAX_WEIGHTS = LIMITS["budget"]
 
 
-def _desc_code(b: int) -> str:
+#: ★ 실험 B (D-110). 스키마도 프롬프트와 같은 말을 해야 한다 (D-107).
+_PRODUCT_DESC = (" ★ 한 항 안에서 **피처 둘을 곱해도 된다** — "
+                 "`(f.a * f.b) * w[i]` 는 예산 하나다.")
+
+
+def _desc_code(b: int, product: bool = False) -> str:
     return ("`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
             "설명이나 마크다운 펜스를 넣지 마라. "
             f"★ 항은 최대 {b}개이고 각 w[i] 는 정확히 "
             "한 번만 쓸 수 있다 — 하나의 가중치를 여러 항에 "
             "재사용해 항을 늘리면 거부된다. "
             "★ 분기 조건의 비교 상수(`p.roofline_ratio < 1`)는 "
-            "예산에 들지 않는다 — 물리적 경계는 그대로 써라")
+            "예산에 들지 않는다 — 물리적 경계는 그대로 써라"
+            + (_PRODUCT_DESC if product else ""))
 
 
 def _desc_w0(b: int) -> str:
@@ -428,8 +434,9 @@ def rule_output_to_proposal(out, *, budget: int | None = None
                                   budget=budget)
 
 
-@lru_cache(maxsize=8)
-def rule_output_for(budget: int | None = None):
+@lru_cache(maxsize=16)
+def rule_output_for(budget: int | None = None, *,
+                    product_hint: bool = False):
     """★ 예산이 **스키마 설명과 검증에도** 들어간 출력 타입 (D-107).
 
     `RuleOutput` 의 필드 설명은 모델에게 그대로 간다 — `pydantic-ai` 가
@@ -444,11 +451,11 @@ def rule_output_for(budget: int | None = None):
     if not HAVE_PYDANTIC:                           # pragma: no cover
         return RuleOutput
     b = int(budget if budget is not None else MAX_WEIGHTS)
-    if b == MAX_WEIGHTS:
+    if b == MAX_WEIGHTS and not product_hint:
         return RuleOutput
 
     class _BudgetedRuleOutput(RuleOutput):          # type: ignore[misc]
-        code: str = Field(description=_desc_code(b))
+        code: str = Field(description=_desc_code(b, product_hint))
         w0: list[float] = Field(description=_desc_w0(b))
 
         # ★ 이름을 부모와 **같게** 둔다. pydantic 은 데코레이터를 이름으로

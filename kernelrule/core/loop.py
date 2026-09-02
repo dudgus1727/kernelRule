@@ -93,6 +93,10 @@ class LoopConfig:
     #: 순위 손실이고, 옛 조건은 `objective="regret"` 을 명시하면 된다.
     objective: str = "rank"
     rank_top_k: int = 100
+    #: ★ 두 손실의 합 (D-109). `L = rank_loss(k) + lambda * rank_loss_top1(k)`
+    #: `rank_loss_top1` 은 **참 1등이 낀 쌍만** — `regret` 의 부드러운
+    #: 대리다. `regret` 을 직접 넣지 않는다 (계단이라 L-BFGS 를 못 쓴다).
+    rank_lambda: float = 0.0
     #: ★ 두 순서 실험 (D-104). `"rank->regret"` 또는 `"regret->rank"`.
     #: `None` 이면 목적함수가 안 바뀐다 — 지금까지의 동작이다.
     #:
@@ -179,7 +183,8 @@ def _fit_and_score(job: tuple) -> dict:
         fr = fit_weights(fn, c["matrix"], c["table"], c["train"], w0,
                          max_evals=c["max_evals"], val_split=c["val"],
                          objective=c.get("objective", "regret"),
-                         rank_top_k=c.get("rank_top_k", 100))
+                         rank_top_k=c.get("rank_top_k", 100),
+                         rank_lambda=c.get("rank_lambda", 0.0))
     except (FitError, SchemaViolation) as e:
         return {"i": idx, "err": ("fit", str(e)[:90])}
     except Exception as e:                                  # noqa: BLE001
@@ -206,9 +211,16 @@ def _rank_loss_of(fn, c: dict, w) -> float:
         return float("nan")
     from kernelrule.core.weights import _Problem
 
+    k = c.get("rank_top_k", 100)
+    lam = float(c.get("rank_lambda", 0.0) or 0.0)
     pr = _Problem(c["matrix"], c["table"], c["train"].shapes, 1)
-    pr.build_pairs(c["table"], c.get("rank_top_k", 100))
+    pr.build_pairs(c["table"], k)
     v = pr.rank_loss(fn, w)
+    # ★ 채택도 **적합과 같은 목적함수**로 해야 한다 (원칙 37). 람다를
+    #   빼고 고르면 최적화한 것과 다른 것으로 뽑는다.
+    if lam and math.isfinite(v):
+        pr.build_top1_pairs(c["table"], k)
+        v += lam * pr.rank_loss_top1(fn, w)
     return float(v) if math.isfinite(v) else float("nan")
 
 
@@ -546,6 +558,7 @@ class RoundLoop:
                 max_evals=self.cfg.max_evals,
                 objective=self._objective,
                 rank_top_k=self.cfg.rank_top_k,
+                rank_lambda=self.cfg.rank_lambda,
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
                 max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
@@ -662,7 +675,8 @@ class RoundLoop:
                              prop.w0, max_evals=self.cfg.max_evals,
                              val_split=self.splits.val,
                              objective=self._objective,
-                             rank_top_k=self.cfg.rank_top_k)
+                             rank_top_k=self.cfg.rank_top_k,
+                             rank_lambda=self.cfg.rank_lambda)
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
             res.rejections.append(("fit", str(e)[:90]))
@@ -682,6 +696,7 @@ class RoundLoop:
             "rank_loss": _rank_loss_of(fn, {
                 "objective": self._objective,
                 "rank_top_k": self.cfg.rank_top_k,
+                "rank_lambda": self.cfg.rank_lambda,
                 "matrix": self.matrix, "table": self.table,
                 "train": self.splits.train}, fr.w),
             "val_regret": fr.val_regret, "moved": fr.moved,
@@ -1059,6 +1074,7 @@ class RoundLoop:
                         compile_rule(e.code),
                         {"objective": "rank",
                          "rank_top_k": self.cfg.rank_top_k,
+                         "rank_lambda": self.cfg.rank_lambda,
                          "matrix": self.matrix, "table": self.table,
                          "train": self.splits.train}, np.asarray(e.w))
         self.archive = Archive(
