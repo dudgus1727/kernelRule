@@ -179,8 +179,14 @@ def main() -> None:
             for e in _rows(r, "archive.jsonl"):
                 sp_.append(_spent(e["code"], len(e["w"])))
                 tm.append(_n_terms(e["code"]))
-                if e.get("round") == 0:
-                    r0.append(_n_terms(e["code"]))
+            # ★ 1라운드는 **제안**에서 센다 (D-107 의 검사). 아카이브에서
+            #   세면 안 된다 — MAP-Elites 가 뒤 라운드로 갈아치워서
+            #   `round==0` 항목이 남지 않는다 (rb16 에서 실제로 0개였다).
+            for q in _proposals(Path("runs") / r)[:12]:
+                try:
+                    r0.append(_n_terms(q["code"]))
+                except SyntaxError:
+                    continue
         n_at = sum(1 for x in sp_ if x >= cap)
         print(f"  {label:16s} 중앙 {np.median(sp_):4.1f} / 상한 {cap:2d} "
               f"({n_at:2d}/{len(sp_):2d} 상한)   "
@@ -226,6 +232,7 @@ def main() -> None:
             verdict = f"구분 불가 ({d:+.4f} < {DELTA})"
         print(f"  {label:16s} {m:8.4f}   {min(v):.4f}~{max(v):.4f}   "
               f"{d:+11.4f}  {verdict}")
+        print(f"  {'':16s} 시드별 " + "  ".join(f"{x:.4f}" for x in v))
     print(f"\n  {'참고: 옛 적합기':16s} {OLD_BASELINE:8.4f}   "
           "← Nelder-Mead 200/600 의 예산 8. ★ 판정에 안 쓴다 (원칙 4)")
     print("  ★ 판정은 **시드 범위**로 읽는다 — 3시드는 유의성이 안 나온다")
