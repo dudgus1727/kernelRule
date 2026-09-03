@@ -26,6 +26,9 @@ test = ["pytest>=8"]
 #   설치된 것을 그대로 적는다 — `pydantic-ai-slim[openai]` 이 `pydantic_ai`
 #   모듈을 제공하고, 전체 `pydantic-ai` 는 그 상위 집합이다.
 llm = ["pydantic>=2", "pydantic-ai-slim[openai]>=2", "openai>=1"]
+# ★ 적합기 추가 팔 전용 (D-123). 핵심 경로는 없어도 돈다 —
+# `fit_weights(method="cma")` 일 때만 import 하고 없으면 FitError 다.
+fit = ["cma>=4"]
 
 [tool.setuptools.packages.find]
 include = ["kernelrule*"]

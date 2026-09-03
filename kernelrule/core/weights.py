@@ -75,6 +75,10 @@ class FittedRule:
     #: `max_evals` 와 견줄 수 없다 — 견주면 다듬기가 켜진 순간 상한 경고가
     #: **항상** 뜬다. 상한에 닿았는지는 이 값으로 본다.
     n_fit_evals: int = 0
+    #: ★ 대리 손실로 **초기점만** 만드는 데 쓴 평가 수 (`init_objective`).
+    #: `n_evals` 에는 더해져 있고 `n_fit_evals` 에는 없다 — 상한 판정은
+    #: 참 목적함수의 평가로만 한다. 예산 비교에는 `n_evals` 를 쓴다.
+    n_init_evals: int = 0
 
     @property
     def moved(self) -> bool:
@@ -282,6 +286,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 objective: str = "rank",      # ★ 기본은 rank. D-101
                 rank_top_k: int = 100,
                 rank_lambda: float = 0.0,
+                init_objective: str | None = None,
+                init_evals: int = 0,
                 bounds: list | None = None) -> FittedRule:
     """구조를 고정하고 가중치만 맞춘다.
 
@@ -309,6 +315,22 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
 
     `"rank"` 에서도 `fit_regret` 은 계속 `regret` 으로 계산해 기록한다 —
     **채점 기준은 안 바꾼다** (사전 등록 `rank-evo-prereg.md` §3).
+
+    ## `init_objective` — 대리 손실로 **초기점만** 만든다
+
+    ```
+    init_objective="rank_top1"   1단계: rank_loss_top1 로 L-BFGS-B
+                                 (`init_evals` 회). 미분 가능하다
+                                 2단계: 그 점에서 **regret 으로** 본 적합
+    ```
+
+    ⚠️ **채택은 regret 이다.** 1단계 값은 반환값에 남지 않고 `best_v` /
+    `fit_regret` / 다듬기 전부가 참 목적함수로 다시 잰다. 조건이 섞이므로
+    쓸 때 사전 등록에 명시한다 — "초기점 생성에만 쓰고 채택은 regret@1"
+    (`fitter-regret-prereg.md` §2).
+
+    `objective="regret"` 에서만 받는다. 순위 손실 경로에서 순위 손실로
+    초기점을 만드는 것은 같은 목적함수를 두 번 부르는 것이다.
     """
     if not isinstance(split, Split):
         raise SplitError(
@@ -381,18 +403,30 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                     f"2등과 못 가른다 (상위 {rank_top_k}). "
                     "조용히 진행하지 않는다.")
 
-    def obj(w: np.ndarray) -> float:
-        nonlocal n_eval, n_inf, seen_v, seen_w
-        n_eval += 1
+    def value_at(w: np.ndarray) -> float:
+        """★ **적합하는 목적함수**의 값. 세지 않는다.
+
+        ⚠️ 다듬기도 이것을 쓴다 (D-122). 예전에는 `_polish` 안에
+        `prob.regret` 이 박혀 있어서, `objective="rank"` 일 때 **순위 손실
+        기준값과 regret 을 견주고** 있었다 — regret(1.2) > 순위 손실(0.24)
+        이라 어떤 걸음도 채택되지 않아 다듬기가 조용히 아무것도 안 했다.
+        목적함수 값 함수를 **한 곳에만** 둔다 (원칙 2).
+        """
         # ★ **경계 안으로 접어서** 잰다. Nelder-Mead 는 경계를 모르고
         #   다듬기도 마찬가지라, 여기서 접어야 한 곳에서만 강제된다.
         wa = _proj(np.asarray(w, dtype=np.float64))
         if objective == "regret":
-            v = prob.regret(score_fn, wa)
-        else:
-            v = prob.rank_loss(score_fn, wa)
-            if rank_lambda and np.isfinite(v):
-                v += rank_lambda * prob.rank_loss_top1(score_fn, wa)
+            return prob.regret(score_fn, wa)
+        v = prob.rank_loss(score_fn, wa)
+        if rank_lambda and np.isfinite(v):
+            v += rank_lambda * prob.rank_loss_top1(score_fn, wa)
+        return v
+
+    def obj(w: np.ndarray) -> float:
+        nonlocal n_eval, n_inf, seen_v, seen_w
+        n_eval += 1
+        wa = _proj(np.asarray(w, dtype=np.float64))
+        v = value_at(wa)
         if not np.isfinite(v):
             n_inf += 1
             return 1e6      # 이 가중치는 실행 불가. 구조 기각은 아니다.
@@ -401,16 +435,60 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         return v
 
     m = method.lower()
-    if m not in ("nelder-mead", "neldermead", "powell"):
+    if m not in ("nelder-mead", "neldermead", "powell", "cma"):
         raise FitError(f"알 수 없는 최적화기: {method!r}. "
-                       "nelder-mead | powell 중 하나여야 한다.")
+                       "nelder-mead | powell | cma 중 하나여야 한다.")
+
+    # ★ 대리 손실로 **초기점만** 만든다. 여기서 나온 값은 아무 데도 남지
+    #   않는다 — 아래 `best_v` 부터 전부 참 목적함수로 다시 잰다.
+    n_init = 0
+    start0 = w0.copy()
+    if init_objective is not None:
+        if init_objective != "rank_top1":
+            raise FitError(
+                f"알 수 없는 초기점 목적함수: {init_objective!r}. "
+                "rank_top1 뿐이다.")
+        if objective != "regret":
+            raise FitError(
+                f"init_objective 는 regret 경로에만 쓴다 "
+                f"(objective={objective!r}). 순위 손실로 적합하면서 순위 "
+                "손실로 초기점을 만드는 것은 같은 것을 두 번 부르는 것이다.")
+        if init_evals <= 0:
+            raise FitError(
+                f"init_objective={init_objective!r} 인데 init_evals="
+                f"{init_evals} 다. 예산을 명시해야 한다 — 초기점 단계도 "
+                "evals 예산을 쓴다 (팔 비교의 공정성).")
+        prob.build_top1_pairs(table, rank_top_k)
+        if prob.n_pairs1 == 0:
+            raise FitError(
+                "1등 쌍이 하나도 없다 — 참 1등을 노이즈 바닥으로 2등과 "
+                f"못 가른다 (상위 {rank_top_k}). 조용히 진행하지 않는다.")
+        seen_s = float("inf")
+        seen_sw = w0.copy()
+
+        def _sobj(x: np.ndarray) -> float:
+            nonlocal n_init, seen_s, seen_sw
+            n_init += 1
+            xa = _proj(np.asarray(x, dtype=np.float64))
+            v = prob.rank_loss_top1(score_fn, xa)
+            if not np.isfinite(v):
+                return 1e6
+            if v < seen_s:
+                seen_s, seen_sw = v, xa.copy()
+            return v
+
+        from scipy.optimize import minimize as _min_init
+        _min_init(_sobj, w0, method="L-BFGS-B", bounds=bounds,
+                  options={"maxiter": 500, "maxfun": init_evals})
+        if np.isfinite(seen_s):
+            start0 = _proj(seen_sw)
 
     # ★ 재시작이 필요하다. 목적함수가 **계단 함수**라 단순 심플렉스는
     #   평평한 지대에서 수축해 멈춘다 (§29.2). 실제로 초기값에서 한 발도
     #   못 움직이는 경우가 나온다. 매 재시작마다 심플렉스를 다시 부풀리고,
     #   몇 개는 무작위 출발점에서 시작한다. 시드가 고정이라 결정론적이다.
-    best_w = w0.copy()
-    best_v = obj(w0)
+    best_w = start0.copy()
+    best_v = obj(best_w)
     #: 실제로 시작한 재시작 횟수. 아래에서 **세어서 경고한다**.
     n_started = 0
     if objective == "rank":
@@ -447,7 +525,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         before_v, before_n = best_v, n_eval
         start = best_w if r == 0 else best_w + rng.normal(
             0.0, 0.35 * np.maximum(np.abs(best_w), 1.0))
-        res = _minimize_once(obj, start, m, per, r)
+        res = _minimize_once(obj, start, m, per, r, bounds=bounds)
         obj(np.asarray(res.x, dtype=np.float64))
         if seen_v < best_v:                 # ★ res.x 가 아니라 '본 것 중 최선'
             best_v, best_w = seen_v, seen_w.copy()
@@ -472,7 +550,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     n_fit = n_eval          # ★ 다듬기 전. 상한 판정은 이 값으로 한다.
     w = _proj(best_w)
     if polish:
-        w, best_v, n_pol = _polish(prob, score_fn, w, best_v, polish_budget)
+        w, best_v, n_pol = _polish(prob, score_fn, w, best_v, polish_budget,
+                                   value=value_at)
         n_eval += n_pol
         # ★ 다듬기는 경계를 모른다. **여기서 한 번 더 접는다** — 접힌
         #   값으로 아래 regret/민감도를 다시 재므로 보고값과 반환값이
@@ -499,10 +578,13 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     #       쓰게 돼 있어 그것도 언제나 참이다. **잘리는 순간까지 개선 중**
     #       이었을 때만 경고한다. 그래야 "수렴 전 중단" 이 사실이 된다.
     hit_cap = n_fit >= max_evals and cut_while_improving
-    out = FittedRule(w=w, w0=w0, fit_regret=fit_regret, n_evals=n_eval,
+    out = FittedRule(w=w, w0=w0, fit_regret=fit_regret,
+                     # ★ 예산 비교는 이 값으로 한다 — 초기점 단계도 센다.
+                     n_evals=n_eval + n_init,
                      n_infeasible=n_inf, sensitivity=sens,
                      seconds=time.perf_counter() - t0, val_regret=val,
-                     method=m, contrib=contrib, n_fit_evals=n_fit)
+                     method=m, contrib=contrib, n_fit_evals=n_fit,
+                     n_init_evals=n_init)
     if warn_invariants:
         msgs = out.invariants()
         if hit_cap:
@@ -545,7 +627,7 @@ _PAIR_SIGNS = ((+1.0, +1.0), (+1.0, -1.0), (-1.0, +1.0), (-1.0, -1.0))
 
 
 def _polish(prob, score_fn: ScoreFn, w: np.ndarray, base: float,
-            budget: int, *, pairs: bool = True
+            budget: int, *, pairs: bool = True, value=None
             ) -> tuple[np.ndarray, float, int]:
     """★ 좌표 하강으로 다듬는다 (D-55, D-59 강화).
 
@@ -568,13 +650,22 @@ def _polish(prob, score_fn: ScoreFn, w: np.ndarray, base: float,
     ⚠️ **훈련 형상만 본다** — `prob` 이 학습 분할로 만들어진다. 홀드아웃이
     들어오는 인자가 없고 `test_polish_only_sees_the_training_split` 이
     그것을 고정한다 (§29.7).
+
+    ## ★ `value` — 적합하는 목적함수를 받는다 (D-122)
+
+    `None` 이면 `prob.regret` 이다. **`objective="rank"` 로 부를 때는
+    반드시 넘겨야 한다** — 안 넘기면 순위 손실 기준값과 regret 을 견주게
+    되고, 값의 자릿수가 달라 어떤 걸음도 채택되지 않는다. 그 상태로
+    D-101~D-112 의 순위 손실 실행 전부가 **다듬기 없이** 돌았다.
     """
+    val = value if value is not None else (
+        lambda t: prob.regret(score_fn, t))
     w = w.copy()
     n_ev = 0
 
     def try_step(t: np.ndarray) -> bool:
         nonlocal base, w, n_ev
-        v = prob.regret(score_fn, t)
+        v = val(t)
         n_ev += 1
         if np.isfinite(v) and v < base - 1e-12:
             base, w = v, t
@@ -606,11 +697,55 @@ def _polish(prob, score_fn: ScoreFn, w: np.ndarray, base: float,
     return w, base, n_ev
 
 
-def _minimize_once(obj, start, method: str, budget: int, r: int):
+def _cma_once(obj, start: np.ndarray, budget: int, r: int, *,
+              bounds: list | None = None):
+    """CMA-ES 한 번 (D-123). **초기 스텝을 Nelder-Mead 와 같게 준다.**
+
+    `sigma0=1.0` 에 `CMA_stds` 로 좌표별 스텝을 주면 `_minimize_once` 의
+    심플렉스 스텝과 같은 크기에서 출발한다 — 팔 비교에서 스텝 크기가
+    교락이 되지 않는다.
+
+    ⚠️ **예산을 정확히 맞추지 못한다.** 세대 단위로 끝나므로 몇 회
+    넘긴다 (16차원 popsize 12 -> 최대 11회). 실제 평가 수를 보고한다
+    (`n_evals`) — 예산이 같았다고 가정하지 않는다 (원칙 38).
+    """
+    try:
+        import cma as _cma
+    except ImportError as e:      # pragma: no cover - 선택 의존성
+        raise FitError(
+            "method='cma' 인데 `cma` 패키지가 없다. "
+            "`pip install cma` (pyproject 의 `fit` 추가 그룹). "
+            "조용히 다른 최적화기로 넘어가지 않는다.") from e
+
+    step = SIMPLEX_SCALE * (0.5 ** r) * np.maximum(np.abs(start), 1.0)
+    opts = {"CMA_stds": [float(x) for x in step], "maxfevals": int(budget),
+            "verbose": -9, "seed": int(_RESTART_SEED + r), "verb_log": 0,
+            "verb_disp": 0}
+    if bounds is not None:
+        opts["bounds"] = [[float(b[0]) for b in bounds],
+                          [float(b[1]) for b in bounds]]
+    es = _cma.CMAEvolutionStrategy([float(x) for x in start], 1.0, opts)
+    es.optimize(obj)
+    xb = es.result.xbest
+    x = np.asarray(xb if xb is not None else start, dtype=np.float64)
+    return _Res(x)
+
+
+@dataclass(frozen=True, slots=True)
+class _Res:
+    """`scipy` 결과 객체의 자리를 메운다 — 부르는 쪽은 `.x` 만 본다."""
+
+    x: np.ndarray
+
+
+def _minimize_once(obj, start, method: str, budget: int, r: int, *,
+                   bounds: list | None = None):
     """재시작 한 번. 심플렉스를 **다시 부풀려서** 시작한다."""
     from scipy.optimize import minimize
 
     start = np.asarray(start, dtype=np.float64)
+    if method == "cma":
+        return _cma_once(obj, start, budget, r, bounds=bounds)
     if method == "powell":
         return minimize(obj, start, method="Powell",
                         options={"maxfev": budget, "xtol": 1e-4, "ftol": 1e-6})

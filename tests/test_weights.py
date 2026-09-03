@@ -86,12 +86,49 @@ def test_bad_initial_weights_would_have_lost_a_good_structure(known):
 
 
 def test_fit_never_worse_than_initial(known):
-    """계단 함수라 Nelder-Mead 가 초기값보다 나쁜 곳에 멈출 수 있다."""
+    """계단 함수라 Nelder-Mead 가 초기값보다 나쁜 곳에 멈출 수 있다.
+
+    ★ `objective="regret"` 를 **명시한다** (D-122). 이 불변식은 "적합하는
+    목적함수" 의 성질이고, 순위 손실로 적합하면 regret 은 나빠질 수 있다
+    (아래 `test_rank_fit_may_worsen_regret`).
+    """
     t, m, score = known
     w0 = W_TRUE.copy()
-    fr = fit_weights(score, m, t, _all_train(t), w0, max_evals=30)
+    fr = fit_weights(score, m, t, _all_train(t), w0, max_evals=30,
+                     objective="regret")
     base = evaluate(make_order_fn(score, m, w0), t, ks=(1,)).at(1)
     assert fr.fit_regret <= base + 1e-12
+
+
+def test_rank_fit_never_worse_than_initial_in_rank_loss(known):
+    """★ 같은 불변식을 **순위 손실 쪽에서** 지킨다 (D-122).
+
+    다듬기가 목적함수를 몰랐을 때는 이 검사가 의미가 없었다 — 다듬기가
+    아무것도 안 해서 자동으로 성립했다 (원칙 38).
+    """
+    from kernelrule.core.weights import _Problem
+
+    t, m, score = known
+    w0 = np.array([1.0, 1.0, 1.0])
+    fr = fit_weights(score, m, t, _all_train(t), w0, max_evals=120,
+                     objective="rank", warn_invariants=False)
+    pr = _Problem(m, t, _all_train(t).shapes, 1)
+    pr.build_pairs(t, 100)
+    assert pr.rank_loss(score, fr.w) <= pr.rank_loss(score, w0) + 1e-12
+
+
+def test_rank_fit_may_worsen_regret(known):
+    """★ 순위 손실로 적합하면 regret 이 **나빠질 수 있다** (D-122).
+
+    참 계수에서 출발해 순위 손실을 낮추면 regret 이 1.0 에서 올라간다.
+    "채점은 regret, 학습은 순위 손실" 의 대가이고, D-118 이 잰 벽과 같은
+    방향이다. 이것을 **문서가 아니라 시험으로** 붙들어 둔다.
+    """
+    t, m, score = known
+    w0 = W_TRUE.copy()
+    fr = fit_weights(score, m, t, _all_train(t), w0, max_evals=120,
+                     objective="rank", warn_invariants=False)
+    assert fr.fit_regret >= 1.0 - 1e-12
 
 
 def test_weight_fit_uses_train_split_only(known):
@@ -251,14 +288,40 @@ def test_polish_never_worsens_training_regret(known):
 
     받아들이는 조건이 `v < base` 라 구조적으로 그렇다. 이 검사가 깨지면
     다듬기가 훈련 아닌 것을 보고 있다는 뜻이다 (§29.7).
+
+    ★ `objective="regret"` 를 명시한다 (D-122) — 기본값(`rank`)으로
+    부르면 이 검사는 **다듬기가 regret 을 안 보기 때문에** 통과한다.
     """
     t, m, score = known
     tr = _all_train(t)
     a = fit_weights(score, m, t, tr, [1.0, 1.0, 1.0], max_evals=120,
-                    warn_invariants=False)
+                    objective="regret", warn_invariants=False, polish=False)
     b = fit_weights(score, m, t, tr, [1.0, 1.0, 1.0], max_evals=120,
-                    warn_invariants=False, polish=True)
+                    objective="regret", warn_invariants=False, polish=True)
     assert b.fit_regret <= a.fit_regret + 1e-12
+
+
+def test_polish_actually_runs_on_the_rank_path(known):
+    """★ 순위 손실 경로에서 다듬기가 **일을 하는가** (D-122).
+
+    예전에는 `_polish` 안에 `prob.regret` 이 박혀 있어서, 순위 손실
+    기준값(0.24)과 regret(1.2)을 견주고 있었다 — 어떤 걸음도 채택되지
+    않아 **600 평가를 쓰고 아무것도 안 했다.** 실측으로 확인했다:
+    `polish=True` 와 `False` 의 `w` 가 완전히 같았다.
+
+    원칙 38 의 자리다 — 검사(`test_polish_never_worsens_training_regret`)가
+    통과했지만 검사 대상이 안 돌고 있었다.
+    """
+    t, m, score = known
+    tr = _all_train(t)
+    a = fit_weights(score, m, t, tr, [1.0, 1.0, 1.0], max_evals=60,
+                    objective="rank", polish=False, warn_invariants=False)
+    b = fit_weights(score, m, t, tr, [1.0, 1.0, 1.0], max_evals=60,
+                    objective="rank", polish=True, polish_budget=600,
+                    warn_invariants=False)
+    assert not np.array_equal(a.w, b.w), (
+        "순위 손실 경로에서 다듬기가 가중치를 하나도 안 바꿨다 — "
+        "목적함수가 안 넘어가고 있다")
 
 
 def test_polish_only_sees_the_training_split(known):
