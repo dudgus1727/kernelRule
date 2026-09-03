@@ -161,7 +161,7 @@ def test_power_hint_lands_on_every_surface_and_is_off_by_default():
     assert "{power_block}" not in off and "{power_note}" not in off
     assert "지수 자리에 둘 수 있습니다" not in off
     assert "지수 자리에 둘 수 있습니다" in on   # 시스템
-    assert "지수를 맞출 수 있습니다" in on       # 사용자 프롬프트 쪽 주석
+    assert "np.power(f.<이름>, w[i])` 로 **바꿔도 됩니다**" in on
     for ph in (False, True):
         d = rule_output_for(8, power_hint=ph).model_json_schema()
         has = "지수 자리" in d["properties"]["code"]["description"]
