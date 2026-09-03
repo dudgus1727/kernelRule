@@ -38,10 +38,24 @@ hw       ★ 번들 env.json 에서 생성 (D-113). check_hw_prompt 가 확인�
 ```
 
 ```
-python3 experiments/f1_pipeline.py F3 --stage 2 \
+python3 experiments/f1_pipeline.py F3 \
+  --seed-source rule_writer --n-rule-writer 10 \
   --bundle datasets/rtx-5090-sm_120-5bb6f403 --env-hash 5bb6f403 \
-  --n-rule-writer 10 --n-seeds 3 --rounds 12 --workers 6 --tag 5090sigma-hw
+  --n-seeds 3 --rounds 12 --workers 6 --tag 5090sigma-hw
 ```
+
+⚠️ **정정 (돌리기 전, LLM 0회).** 처음에 `--stage 2` 와 기본
+`--seed-source` 로 적었다. 둘 다 틀렸다:
+
+```
+--stage 2          ★ 2단계'만' 돈다 (stages = (a.stage,)). 3단계가 안 돈다
+--seed-source      F3 의 기본은 `physics_seeded` — RuleWriter 를 아예 안 부른다
+                   그러면 씨앗이 **손씨앗**이고 (c) 가 아니다
+```
+
+`--stage` 를 안 주면 F3 는 1단계를 자동으로 건너뛰고 (2, 3) 을 돈다.
+그대로 돌렸다가 `n_tries: 0 / source: physics_seeded` 로 끝났고 **LLM
+호출은 0회**였다 — 산출물을 지우고 다시 시작했다.
 
 ⚠️ **옛 (c) 결과를 지우지 않는다.** 조건 오류로 표시하고 남긴다.
 
