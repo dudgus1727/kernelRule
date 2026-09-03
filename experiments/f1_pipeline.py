@@ -218,9 +218,25 @@ def _base_registry(condition: str) -> FeatureRegistry:
     raise ValueError(f"알 수 없는 조건: {condition!r}. F0/F1/F1-K/F2/F3")
 
 
-def _make_llm(a, *, registry: FeatureRegistry, budget: Budget):
+def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
+              table=None):
     """★ `registry` 는 필수다 — 어느 피처 목록이 프롬프트에 들어가는지가
-    실험 조건 자체다 (§30.9). MockLLM 도 같은 목록을 받는다."""
+    실험 조건 자체다 (§30.9). MockLLM 도 같은 목록을 받는다.
+
+    ★ `table` 은 **하드웨어 사실을 어느 번들에서 만들지**를 정한다
+    (D-113). 안 넘기면 RuleWriter 를 부를 때 실패한다 — 기본값으로
+    떨어지면 다른 GPU 의 사실이 조용히 간다.
+    """
+    hw_text = None
+    if table is not None:
+        from kernelrule.agents.hwprompt import (
+            check_hw_prompt,
+            hw_prompt_from_bundle,
+        )
+        hw_text, _facts = hw_prompt_from_bundle(
+            a.bundle, env_hash=getattr(a, "env_hash", None))
+        # ★ 만든 것과 이 표가 같은 하드웨어인가. 되돌려서 확인한다.
+        check_hw_prompt(hw_text, table.hw, float(table.noise.tick_ms))
     names = sorted(n for n in registry._items if not registry[n].shape_level)
     svals = sorted(n for n in registry._items if registry[n].shape_level)
     if a.dry_run:
@@ -240,7 +256,8 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget):
                                product_hint=getattr(
                                    a, "product_hint", False),
                                power_hint=getattr(
-                                   a, "power_hint", False)),
+                                   a, "power_hint", False),
+                               hw_text=hw_text),
                      feature_names=names, shape_values=svals,
                      registry=registry, budget=budget, cache=False)
 
@@ -297,7 +314,8 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
     if prior_lines:                       # 이어받은 이력을 앞에 둔다
         log.write_text("\n".join(prior_lines) + "\n")
 
-    llm = _make_llm(a, registry=gen, budget=Budget(max_calls=a.n_features * 4))
+    llm = _make_llm(a, registry=gen, budget=Budget(max_calls=a.n_features * 4),
+                    table=table)
     hw_alt = alt_hw(table.hw)
     rejects: dict[str, int] = {}
     t0 = time.perf_counter()
@@ -548,7 +566,8 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
                                           "source": "physics_seeded"})
         return chosen
 
-    llm = _make_llm(a, registry=reg, budget=Budget(max_calls=a.n_rule_writer * 3))
+    llm = _make_llm(a, registry=reg, budget=Budget(max_calls=a.n_rule_writer * 3),
+                    table=table)
     facts = TableFacts.compute(table, splits.train)
     loop = _loop(a, table, matrix, splits, llm, run_id=f"arch-{a.condition}")
     rows: list[dict] = []
@@ -649,7 +668,7 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                     max_output_tokens=8_000_000)
     for s in range(a.n_seeds):
         run_id = f"{d.name}-s{s}"
-        llm = _make_llm(a, registry=reg, budget=budget)
+        llm = _make_llm(a, registry=reg, budget=budget, table=table)
         loop = RoundLoop(
             cfg=LoopConfig(run_id=run_id, max_rounds=a.rounds,
                            n_rules_per_round=12, seed=100 + a.seed + s,

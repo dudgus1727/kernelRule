@@ -1,0 +1,173 @@
+"""★ 하드웨어 사실 프롬프트를 **번들에서 만든다** (D-113).
+
+## 왜 파일로 두면 안 되나
+
+`hw/` 에 손으로 쓴 `sm_86.md` 하나뿐이었고 `LLMConfig.arch_prompt` 의
+기본값이 그것으로 **고정**돼 있었다. `f1_pipeline` 은 그 값을 바꾸지
+않았다. 그래서 5090 표로 RuleWriter 를 돌린 §29.5 (c) 재생성이
+**A6000 하드웨어 사실을 받았다.**
+
+```
+RuleWriter 가 받은 것   A6000 / SM 84 / L2 6 MB / ridge 159.1 / 눈금 1.024us
+실제 5090              SM 170 / L2 96 MB / ridge 117.9 / 눈금 0.016us
+```
+
+조건이 코드에 상수로 박혀 있었고, 그 상수가 조건이라는 것을 아무도 안
+봤다. 원칙 2 의 또 다른 형태다.
+
+## 무엇이 arch 무관이고 무엇이 번들에서 오나
+
+```
+실행 모델 절      arch 무관 — CTA 배분 / 타일 경계 / split-K / stages
+숫자             전부 env.json 에서
+측정 한계 절      ★ 눈금과 "커널 길이별 몇 %" 표를 tick_ms 로 **계산**한다
+```
+
+`hw/sm_86.md` 는 **지우지 않고 둔다** — 2026-09-03 이전 실행의 조건이
+그 파일이고, 지우면 그 실행들을 되짚을 수 없다.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+from kernelrule.core.types import Hardware, hardware_from_env
+
+__all__ = ["render_hw_prompt", "hw_prompt_from_bundle", "check_hw_prompt",
+           "HwPromptError"]
+
+
+class HwPromptError(ValueError):
+    """번들과 프롬프트가 갈렸다. **조용히 진행하지 않는다** (§26.4)."""
+
+
+#: 눈금 표에 쓸 커널 길이 [ms]. 짧은 쪽 하나는 실제 관측 범위 하한이다.
+_TICK_ROWS = (0.014, 0.5, 1.3)
+
+
+def _fmt_bytes(n: int) -> str:
+    if n >= 1 << 20:
+        return f"{n / (1 << 20):.0f} MB"
+    return f"{n / (1 << 10):.0f} KB"
+
+
+def render_hw_prompt(hw: Hardware, *, tick_ms: float, env: dict) -> str:
+    """`Hardware` + 눈금 -> 프롬프트 본문. **손으로 쓰지 않는다.**"""
+    if tick_ms <= 0:
+        raise HwPromptError(f"tick_ms 가 {tick_ms} 다. 눈금 절을 못 만든다.")
+    spec_t = env.get("peak_tflops_f16_spec")
+    spec_b = env.get("bandwidth_gbps_spec")
+    sm_mhz = env.get("locked_mhz") or env.get("sm_clock_mhz")
+    mem_mhz = env.get("mem_clock_used_mhz") or env.get("mem_clock_mhz")
+    at_sm = f" @{sm_mhz:.0f}MHz" if sm_mhz else ""
+    at_mem = f" @{mem_mhz:.0f}MHz" if mem_mhz else ""
+    spec_line = ""
+    if spec_t and spec_b:
+        spec_line = (f"**실효값입니다.** 스펙({spec_t:.1f} TFLOP/s, "
+                     f"{spec_b:.0f} GB/s)이 아니라 클럭을 고정한 상태의 "
+                     "관측값입니다.\n이 보정이 없으면 memory-bound 판정이 "
+                     "어긋납니다.\n")
+    rows = "\n".join(
+        f"  {ms * 1000:>5.0f} us 커널   한 눈금이 {tick_ms / ms:7.3%}"
+        for ms in _TICK_ROWS)
+    return f"""# 하드웨어 사실 — 기억에서 꺼내지 말고 아래를 쓰세요
+
+이 프로젝트에서 기억에 의존해 네 번 틀렸습니다 (ScaleType 의미, split-K
+제약, swizzle 호환성, serial 부분합 타입). 아래가 대상 하드웨어입니다.
+
+```
+GPU        {hw.name} ({hw.arch})
+SM         {hw.sm_count}개
+smem       블록당 {_fmt_bytes(hw.smem_per_block)} ({hw.smem_per_block:,} B)
+스레드      SM 당 최대 {hw.max_threads_per_sm:,}
+레지스터    SM 당 {hw.regs_per_sm:,}
+L2         {_fmt_bytes(hw.l2_bytes)}
+실효 성능   {hw.peak_tflops_f16:.1f} TFLOP/s{at_sm}   \
+{hw.bandwidth_gbps:.1f} GB/s{at_mem}
+ridge      {hw.ridge_point:.1f} FLOP/byte
+```
+
+{spec_line}
+## 실행 모델
+
+```
+CTA 가 SM 에 배분되고, 마지막 wave 에서 SM 일부가 논다.
+
+타일은 형상 경계를 넘어도 그 부분을 **전부 계산한다.**
+  M=1 에 128행 타일이면 일의 99.2% 가 버려진다.
+
+split-K 는 K 를 나눠 타일 수를 늘리되 리덕션 비용이 붙는다.
+  serial   파티션마다 fp16 으로 D 를 왕복한다 (정밀도 손실)
+  parallel 부분합 M*N*sk 개를 DRAM 에 쓰고 다시 읽는다
+
+stages=2 (MmaPipelined) 와 stages>=3 (multistage) 는 **다른 커널 계열**이다.
+alignment 가 16바이트를 못 맞추면 cp.async 를 못 써서 2단만 가능하다.
+```
+
+## 측정의 한계 — 이것이 판단에 영향을 줍니다
+
+```
+시간은 CUDA 이벤트 타이머의 눈금({tick_ms * 1000:.3f} us) 단위로만 기록된다.
+그보다 작은 차이는 **측정으로 구분할 수 없다.**
+
+짧은 커널일수록 그 눈금이 상대적으로 크다:
+{rows}
+```
+
+**이것은 하드웨어와 타이머의 성질입니다.** 어느 GPU 로 가도
+같은 형태로 나타납니다 (눈금 값 자체는 다를 수 있습니다).
+
+**눈금 안의 차이는 존재하지 않는 것과 같습니다.** 그 아래를 겨냥해
+규칙을 정교하게 만드는 것은 노이즈를 배우는 일입니다. 그보다 **확실히
+지는 경로**를 막는 편이 낫습니다.
+"""
+
+
+def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
+                          tick_ms: float | None = None) -> tuple[str, dict]:
+    """번들 경로 -> (프롬프트 본문, 사실 요약). **유일한 진입점**이다."""
+    p = Path(bundle) / "env.json"
+    if not p.exists():
+        raise HwPromptError(
+            f"{p} 가 없다. 하드웨어 사실을 만들 수 없으므로 진행하지 "
+            "않는다 — 기본값으로 떨어지면 다른 GPU 의 사실이 간다 (D-113).")
+    env = json.loads(p.read_text())
+    hw = hardware_from_env(env)
+    if tick_ms is None:
+        from kerneltab.core.bundle import load_bundle
+
+        from kernelrule.core.noise import NoiseModel
+
+        # ★ `PerfTable` 과 **같은 진입점**을 쓴다 (원칙 2). 눈금을 여기서
+        #   따로 읽으면 표가 쓰는 값과 갈릴 수 있다.
+        b = load_bundle(str(bundle), verify=True)
+        if env_hash and not str(b.env_hash).startswith(str(env_hash)):
+            raise HwPromptError(
+                f"env_hash 불일치. 요청 {env_hash!r}, 번들 "
+                f"{str(b.env_hash)[:16]!r}")
+        tick_ms = float(NoiseModel.from_bundle(b).tick_ms)
+    txt = render_hw_prompt(hw, tick_ms=tick_ms, env=env)
+    return txt, {"name": hw.name, "arch": hw.arch, "sm_count": hw.sm_count,
+                 "l2_bytes": hw.l2_bytes, "ridge_point": hw.ridge_point,
+                 "tick_ms": tick_ms, "source": str(p)}
+
+
+def check_hw_prompt(text: str, hw: Hardware, tick_ms: float) -> None:
+    """프롬프트가 **이 표의** 하드웨어를 말하는가. 아니면 예외 (§26.4).
+
+    ★ 이름과 눈금 둘 다 본다. 이름만 보면 같은 GPU 의 다른 번들(다른
+    타이머 눈금)이 통과한다.
+    """
+    if hw.name not in text:
+        raise HwPromptError(
+            f"하드웨어 프롬프트가 {hw.name!r} 를 말하지 않는다. "
+            "다른 GPU 의 사실이 가고 있다 (D-113).")
+    m = re.search(r"눈금\(([\d.]+) us\)", text)
+    if not m:
+        raise HwPromptError("하드웨어 프롬프트에 눈금 절이 없다.")
+    got, want = float(m.group(1)), tick_ms * 1000
+    if abs(got - want) > 0.5e-3 * max(1.0, want):
+        raise HwPromptError(
+            f"프롬프트의 눈금 {got} us 가 번들의 {want:.3f} us 와 다르다.")

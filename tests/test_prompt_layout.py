@@ -24,15 +24,24 @@ ROLES = ("analyze", "rule_editor", "feature", "rule_writer")
 PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 
 
+#: ★ 2026-09-03 이전 실행의 하드웨어 사실. **지우지 않는다** — 그
+#: 실행들의 조건이 이 파일이다. 새 실행은 번들에서 생성한다 (D-113).
+FROZEN_HW = "hw/sm_86.md"
+
+
 def _instructions(role: str, *, objective: str = "rank") -> str:
     """★ `_agent()` 와 **같은 함수**를 부른다 (원칙 2).
 
     전에는 여기서 조립을 다시 썼다. `{objective_block}` 이 생기자
     시험 쪽만 안 채워져서 갈렸다 — 조립은 한 곳에서만 한다.
+
+    ★ `hw_file` 을 **명시한다.** 기본값이 사라졌기 때문이고(D-113),
+    시험이 기본값에 기대고 있으면 그 기본값이 조건이라는 것을 못 본다.
     """
     from kernelrule.agents.openai_client import assemble_instructions
 
-    return assemble_instructions(role, objective=objective)
+    return assemble_instructions(role, objective=objective,
+                                 hw_file=FROZEN_HW)
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +64,7 @@ def test_feature_prompt_has_no_rule_material():
 
 def test_feature_and_rule_editor_prompts_have_no_hardware_constants():
     """★ hw 를 안 보면 그 프롬프트는 **GPU 무관**해진다 (§16.2)."""
-    hw = load_prompt("hw/sm_86.md")
+    hw = load_prompt(FROZEN_HW)
     marks = [m for m in ("RTX A6000", "sm_86", "84", "101376") if m in hw]
     assert marks, "하드웨어 파일에서 표식을 못 찾았다 — 검사가 무의미하다"
     for role in ("feature", "rule_editor"):
@@ -76,7 +85,8 @@ def test_rule_writers_get_the_budget():
     for role in ("rule_editor", "rule_writer"):
         assert "w[0]" in _instructions(role), f"{role} 에 규칙 형태가 없다"
         for b in (8, 16):
-            body = assemble_instructions(role, objective="rank", budget=b)
+            body = assemble_instructions(role, objective="rank", budget=b,
+                                         hw_file=FROZEN_HW)
             assert f"항 상한 {b}개" in body or f"{b} 이하" in body, (
                 f"{role}: 예산 {b} 이 안 보인다")
 
@@ -195,7 +205,7 @@ def test_hw_block_does_not_reference_cases():
     """★ `hw/*.md` 는 이제 **RuleWriter 만** 받는데 RuleWriter 는 사례를
     안 받는다. "사례에 붙은 ... 을 보세요" 는 없는 것을 가리킨다 (§30.10).
     """
-    hw = load_prompt("hw/sm_86.md")
+    hw = load_prompt(FROZEN_HW)
     assert "사례에 붙은" not in hw
     arch = _instructions("rule_writer")
     assert "사례 없음" in arch, "역할 파일이 바뀌었다 — 검사가 무의미하다"

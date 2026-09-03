@@ -5777,3 +5777,84 @@ weight_bounds 는 지수가 없으면 None — 옛 실행이 안 바뀐다 (원�
 
 가드는 **힌트와 무관하게** 정적 검사와 LLM 경계 양쪽에 건다. 거부율
 3.7% 로 정상 제안을 막지 않는다.
+
+## D-113  §29.5 (c) 재생성이 **A6000 하드웨어 사실을 받았다**
+
+```python
+# openai_client.py  (2026-09-03 이전)
+arch_prompt: str = "hw/sm_86.md"      # ★ 기본값. 아무도 안 바꾼다
+# f1_pipeline.py
+OpenAILLM(LLMConfig(model=a.model, concurrency=6, ...))   # arch_prompt 없음
+```
+
+`hw/` 에 `sm_86.md` 하나뿐이라 **다른 아키텍처는 애초에 고를 수
+없었다.** 5090 표로 RuleWriter 를 돌린 §29.5 (c) 재생성이 A6000 사실을
+받았다.
+
+```
+RuleWriter 가 받은 것   A6000 / SM 84 / L2 6 MB / ridge 159.1 / 눈금 1.024us
+실제 5090              SM 170 / L2 96 MB / ridge 117.9 / 눈금 0.016us
+```
+
+**조건이 코드에 상수로 박혀 있었고, 그 상수가 조건이라는 것을 아무도 안
+봤다.** 원칙 2 의 또 다른 형태다.
+
+### 확인 — 산출물이 그것을 기록하고 있었다
+
+`runs/f1pipe-F3-5090sigma-s{0,1,2}` 와 `-b-s{0,1,2}` 여섯 개 전부
+`config.json` 의 `llm.arch_prompt == "hw/sm_86.md"` 다. **기록은
+있었고 아무도 안 읽었다.**
+
+### 흔적 — 숫자는 안 샜고, **산문이 셋 중 둘을 움직였다**
+
+씨앗 후보 10개의 숫자 리터럴은 전부 `w[i]` 첨자(0~7)뿐이다 — `84` /
+`6 MB` / `1.024` 같은 A6000 상수는 **하나도 안 들어갔다.**
+
+그런데 측정 한계 절("짧은 형상용으로 정교하게 만들지 마라")의 영향은
+보인다:
+
+```
+try03   if p.can_use_cp_async and p.log_sol_ms > 0:      ← 채택된 씨앗
+try04   np.where(p.log_sol_ms < -3, ...)
+```
+
+2/10 이 **형상 길이로 가른다.** 그 절의 근거인 눈금이 5090 에서는
+1/64(1.024us -> 0.016us)이므로, 5090 에서는 그 조언 자체가 약하다.
+**(c) 의 1.0485 는 그 조건에서 나온 값이다.**
+
+### 고침 — 번들에서 생성한다
+
+`kernelrule/agents/hwprompt.py`:
+
+```
+render_hw_prompt(hw, tick_ms, env)   실행 모델 절은 arch 무관 공통,
+                                     숫자와 눈금 표는 전부 env.json 에서 계산
+hw_prompt_from_bundle(bundle)        ★ 유일한 진입점
+check_hw_prompt(text, hw, tick_ms)   이름과 눈금 **둘 다** 본다
+```
+
+```
+LLMConfig.arch_prompt   기본값 제거 (None). hw_text 를 새로 둔다
+assemble_instructions   RuleWriter 인데 hw 가 없으면 **예외** (§26.4)
+f1_pipeline._make_llm   table 을 받아 번들에서 만들고 check_hw_prompt
+config.json             llm.hw_text 에 sha256 + GPU 이름
+llm_calls/_system-*.md  본문이 그대로 남는다 (pending_fixes 10)
+```
+
+`hw/sm_86.md` 는 **지우지 않는다** — 2026-09-03 이전 실행의 조건이 그
+파일이다. HTML 주석으로 "얼린 파일" 표시만 붙였다 (모델에는 안 간다).
+
+### 시험 9개 — ★ 되돌려서 잡는지 확인했다
+
+```
+기본값 없이 RuleWriter 조립 -> 예외
+A6000 프롬프트를 5090 표에 붙이면 -> 예외
+같은 GPU 인데 눈금만 다르면 -> 예외   (이름만 보면 통과한다)
+생성한 A6000 프롬프트가 옛 파일의 숫자를 재현하는가
+5090 프롬프트에 A6000 의 눈금 비율(7.314%)이 없는가
+```
+
+### 남은 것
+
+(c) 를 맞는 hw 로 다시 돌린다 (`docs/artifacts/c-rerun-prereg.md`).
+**옛 (c) 결과는 지우지 않고 조건 오류로 표시한다.**

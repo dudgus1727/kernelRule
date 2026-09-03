@@ -251,7 +251,8 @@ def objective_block(objective: str, *, rank_top_k: int = 100,
         return _rank_block(rank_top_k, rank_lambda)
     return _OBJECTIVE_BLOCKS[objective]
 def assemble_instructions(role: str, *, objective: str = "rank",
-                          hw_file: str = "hw/sm_86.md",
+                          hw_file: str | None = None,
+                          hw_text: str | None = None,
                           body: str | None = None,
                           budget: int | None = None,
                           rank_top_k: int = 100,
@@ -268,7 +269,15 @@ def assemble_instructions(role: str, *, objective: str = "rank",
         raise ValueError(f"알 수 없는 목적함수: {objective!r}")
     parts = [load_prompt("_base.md", budget=budget)]
     if role in _NEEDS_HW:
-        parts.append(load_prompt(hw_file, budget=budget))
+        # ★ 조용한 기본값을 두지 않는다 (D-113). 없으면 실패다 (§26.4).
+        if hw_text is None and hw_file is None:
+            raise ValueError(
+                f"역할 {role!r} 은 하드웨어 사실을 받아야 하는데 "
+                "`hw_text` 도 `hw_file` 도 없다. 번들에서 생성해 넘겨라 "
+                "(`kernelrule.agents.hwprompt.hw_prompt_from_bundle`). "
+                "기본값으로 떨어지면 다른 GPU 의 사실이 간다 (D-113).")
+        parts.append(hw_text if hw_text is not None
+                     else load_prompt(hw_file, budget=budget))
     if role in _WRITES_RULES:
         parts.append(load_prompt("role/_rules_common.md", budget=budget)
                      .replace("{product_block}", product_block(product_hint))
@@ -379,7 +388,13 @@ class LLMConfig:
     max_retries: int = 3
     #: 동시 호출 상한. rate limit 에 걸리면 줄이되 **로그에 남긴다.**
     concurrency: int = 6
-    arch_prompt: str = "hw/sm_86.md"
+    #: ★ 하드웨어 사실. **기본값을 두지 않는다** (D-113). 기본값이
+    #: `"hw/sm_86.md"` 로 고정돼 있어서 5090 실행이 A6000 사실을 받았다.
+    #: 둘 중 하나는 있어야 하고, RuleWriter 를 부를 때 없으면 **실패**다.
+    #:   `hw_text`     번들에서 생성한 본문 (권장 — `hwprompt` 모듈)
+    #:   `arch_prompt` 파일 경로. 옛 실행을 되짚을 때만 쓴다
+    arch_prompt: str | None = None
+    hw_text: str | None = None
     #: ★ OpenAI 엔드포인트. **`config.json` 에 남는다** — 섞이면 비교가
     #: 깨지므로 나중에 확인할 수 있어야 한다 (D-31, D-44).
     #:
@@ -418,7 +433,23 @@ class LLMConfig:
     feature_detail: str = "full"
 
     def to_dict(self) -> dict:
-        return dict(self.__dict__)
+        """`config.json` 에 기록될 형태.
+
+        ★ `hw_text` 는 본문 전체가 아니라 **해시와 첫 줄**로 남긴다.
+        조건을 되짚기에는 충분하고, 본문은 `llm_calls/_system-*.md` 에
+        이미 그대로 있다 (pending_fixes 10 에서 넣었다).
+        """
+        import hashlib
+
+        d = dict(self.__dict__)
+        t = d.pop("hw_text", None)
+        d["hw_text"] = None if t is None else {
+            "sha256": hashlib.sha256(t.encode()).hexdigest()[:16],
+            "n_chars": len(t),
+            "gpu": next((ln.split("GPU")[1].strip()
+                         for ln in t.split("\n") if ln.startswith("GPU")),
+                        "?")}
+        return d
 
 
 @dataclass
@@ -523,7 +554,12 @@ class OpenAILLM:
         self._product = bool(getattr(cfg, "product_hint", False))
         self._power = bool(getattr(cfg, "power_hint", False))
         self._base = load_prompt("_base.md", budget=self._budget)
-        self._hw = load_prompt(cfg.arch_prompt, budget=self._budget)
+        # ★ 하드웨어 사실은 **없어도 여기서 안 죽는다** — RuleWriter 를
+        #   부를 때 죽는다. Analyst/RuleEditor/FeatureWriter 는 안 받으므로
+        #   (§16.2) 표 없이 만드는 호출을 막을 이유가 없다.
+        self._hw = (cfg.hw_text if cfg.hw_text is not None
+                    else (load_prompt(cfg.arch_prompt, budget=self._budget)
+                          if cfg.arch_prompt else None))
         #: ★ 목적함수. 프롬프트의 "채점 방식" 절을 정한다 (D-101).
         self.objective = getattr(cfg, "objective", "regret")
         if self.objective not in _OBJECTIVE_BLOCKS:
@@ -605,6 +641,7 @@ class OpenAILLM:
         #   에서 쓰므로 교체할 항도 이전 점수도 없다 (§30.10).
         instructions = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
+            hw_text=self.cfg.hw_text,
             body=body, budget=self.cfg.rule_budget,
             rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
             product_hint=self._product, power_hint=self._power)
@@ -1057,6 +1094,7 @@ class OpenAILLM:
         body = load_prompt(f"role/{role}.md", budget=self._budget)
         sysp = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
+            hw_text=self.cfg.hw_text,
             body=body, budget=self._budget,
             rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
             product_hint=self._product, power_hint=self._power)
