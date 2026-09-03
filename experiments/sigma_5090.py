@@ -31,6 +31,7 @@ import numpy as np
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.canonical import canonical_score
 from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.runset import assert_same_condition
 from kernelrule.core.splits import Split, SplitSet
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
@@ -81,6 +82,9 @@ def main() -> None:
           f"{len(sp.val.shapes)}  ({sp.kind})")
     print("  절차: 학습 점수로 아카이브에서 1개 -> 체제별 재적합 -> 홀드아웃\n")
 
+    # ★ 묶음의 조건이 하나인가 (D-120). σ 는 **한 조건의** 시드 폭이다 —
+    #   두 조건을 섞으면 그것은 조건 간 차이지 시드 폭이 아니다.
+    assert_same_condition(a.runs, label="σ 를 재는 묶음")
     hold, train = [], []
     for r in a.runs:
         f = Path("runs") / r / "archive.jsonl"

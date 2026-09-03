@@ -41,6 +41,7 @@ import numpy as np
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.crosstable import bound_flipped, common_shapes
 from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.runset import assert_same_condition
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import geomean
 from kernelrule.core.splits import Split, SplitSet, regime_of
@@ -63,8 +64,10 @@ TABLES: dict[str, dict] = {
         # ★ (c) 재생성 6실행. 앞 3개와 뒤 3개가 **같은 2단계 씨앗**을
         #   쓴다 (`--seed-from`) — 안 그러면 씨앗 규칙이 달라져 조건이
         #   갈린다 (D-84). 표본 단위는 실행이다 (원칙 28).
-        "runs": ([f"f1pipe-F3-5090sigma-s{i}" for i in range(3)]
-                 + [f"f1pipe-F3-5090sigma-b-s{i}" for i in range(3)])},
+        # ⚠️ 2026-09-03 정정 (D-119): 뒤 셋(`-b-`)은 `physics_seeded`
+        #    **손씨앗**이라 "5090 에서 처음부터" 가 아니다. (c) 에서 뺀다.
+        #    옛 값 1.0485 는 그 여섯의 중앙이고 `c-ladder.md` §0 에 남겼다.
+        "runs": [f"f1pipe-F3-5090sigma-s{i}" for i in range(3)]},
     # ★ 4090 표가 오면 여기 세 줄. transfer-prereg 부칙의 세 쌍이 열린다.
     # "4090": {"bundle": "datasets/rtx-4090-...", "env_hash": "...",
     #          "runs": [f"f1pipe-F3-4090sigma-s{i}" for i in range(6)]},
@@ -143,6 +146,10 @@ def main() -> None:
         raise SystemExit("같은 표끼리는 전이가 아니다.")
     S, D = TABLES[src], TABLES[dst]
     SRC_RUNS, DST_RUNS = S["runs"], D["runs"]
+    # ★ 묶음의 조건이 하나인지 **여기서** 본다 (D-120). 나중에 보면
+    #   "있었는데 안 봤다" 가 된다 (원칙 39).
+    assert_same_condition(SRC_RUNS, label=f"{a.pair[0]} (c) 재생성")
+    assert_same_condition(DST_RUNS, label=f"{a.pair[1]} (c) 재생성")
     missing = [r for r in SRC_RUNS + DST_RUNS
                if not (Path("runs") / r / "archive.jsonl").exists()]
     if missing:

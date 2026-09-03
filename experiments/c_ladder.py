@@ -36,6 +36,7 @@ from sigma_5090 import _splits
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.canonical import canonical_score
 from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.runset import assert_same_condition
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.splits import Split, regime_of
 from kernelrule.core.table import PerfTable
@@ -124,6 +125,9 @@ def main() -> None:
     print(f"  {'':30s} {'중앙':>8} {'범위':>19}")
     med: dict[str, float] = {}
     for label, tag in [*ARMS, MIXED]:
+        # ★ 각 단 **안에서** 조건이 하나여야 한다 (D-120)
+        assert_same_condition([f"f1pipe-F3-{tag}-s{i}" for i in range(3)],
+                              label=label)
         h = []
         for i in range(3):
             e = _arc_best(f"f1pipe-F3-{tag}-s{i}")
