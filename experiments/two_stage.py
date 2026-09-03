@@ -62,11 +62,18 @@ def _best(run: str, by: str) -> dict:
 
 
 def _fit(code, w0, table, matrix, train, objective, *,
-         rank_top_k: int = TOP_N, rank_lambda: float = 0.0):
+         rank_top_k: int = TOP_N, rank_lambda: float = 0.0,
+         method: str = "nelder-mead", n_restarts: int = 4):
     """체제별로 맞춘다 — 정준 절차 (§10).
 
     ★ `rank_top_k` / `rank_lambda` 는 **그 실행의 조건**이다. 기본값으로
     두면 k 스윕·λ 스윕을 전부 k=100·λ=0 으로 재게 된다 (원칙 37).
+
+    ★ `method` / `n_restarts` 도 조건이다 (D-123). 기본값은 **지금까지의
+    모든 보고서**가 쓴 값이라 기존 산출물은 한 글자도 안 바뀐다 (원칙 36).
+    16항 규칙을 재는 보고서는 `method="cma", n_restarts=1` 을 줘야 한다 —
+    Nelder-Mead 는 16차원에서 도달률이 92% 다 (D-77·D-123). 안 주면
+    "예산 16 이 나쁘다" 가 아니라 **재는 쪽 적합기의 실패**를 잰다.
     """
     fn = compile_rule(code)
     ws = {}
@@ -74,6 +81,7 @@ def _fit(code, w0, table, matrix, train, objective, *,
         g = [q for q in train if regime_of(q, table.hw) == nm]
         ws[nm] = fit_weights(fn, matrix, table, Split("train", tuple(g)), w0,
                              max_evals=300, objective=objective,
+                             method=method, n_restarts=n_restarts,
                              rank_top_k=rank_top_k,
                              rank_lambda=rank_lambda if objective == "rank"
                              else 0.0).w
