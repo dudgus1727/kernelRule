@@ -11,6 +11,7 @@ dataclass 로 떨어지되 **검증이 없다는 사실을 명시**한다 — �
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any
@@ -119,6 +120,12 @@ N_HYP_MIN, N_HYP_MAX = 2, 8
 
 #: 가중치 상한. **`rules.checks.LIMITS` 가 유일한 출처다** (D-26) —
 #: 스키마와 정적 검사가 어긋나면 한쪽만 통과하는 규칙이 생긴다.
+#: ★ 가설 문장에 들어가면 안 되는 **형상 크기** (D-114).
+#: `4096x4096` 같은 곱셈 표기와 `M = 4096` 같은 지목을 잡는다. 세 자리
+#: 미만은 안 잡는다 — `stages=3` 같은 config 값을 오탐한다.
+_SHAPE_SIZE = re.compile(r"\d{3,6}\s*[x*×]\s*\d{3,6}"
+                         r"|\b[MNK]\s*=\s*\d{3,6}\b")
+
 MAX_WEIGHTS = LIMITS["budget"]
 
 
@@ -310,6 +317,16 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
             if "def " in v or "return " in v or "w[" in v:
                 raise ValueError(
                     "가설에 코드를 쓰지 마라. 자연어 문장이어야 한다 (§11.3)")
+            # ★ 형상 크기를 문장에 담지 마라 (D-114). `claim` 은
+            #   `json.dumps` 로 RuleEditor 에 통째로 간다 — "M=4096 에서"
+            #   가 거기 있으면 그것을 그대로 리터럴로 옮겨 적을 수 있다.
+            #   `p.M > 1024` 는 정적 검사가 막지만 **가설 문장은 안 거친다.**
+            if _SHAPE_SIZE.search(v):
+                raise ValueError(
+                    "가설에 형상 크기를 쓰지 마라 (예: 'M=4096', "
+                    "'4096x4096'). 체제로 말하라 — 'waves < 1 인 형상' "
+                    "처럼. 크기를 그대로 옮기면 그 형상 하나만 겨냥하는 "
+                    "규칙이 된다 (§29.4).")
             return v
 
     class AnalysisOutput(BaseModel):

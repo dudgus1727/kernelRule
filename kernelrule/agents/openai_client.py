@@ -234,6 +234,17 @@ def power_note(on: bool) -> str:
     return _POWER_NOTE if on else ""
 
 
+#: ★ RuleEditor 에게 무의미한 가설 필드 (D-114). `evidence_cases` 는
+#: 진단 리포트의 **사례 번호**라 RuleEditor 는 그 사례를 못 본다 —
+#: 의미 없는 정수 목록이 토큰만 쓰고, 최악의 경우 그 번호를 형상
+#: 지목으로 오해할 여지를 남긴다.
+_EDITOR_DROPS = ("evidence_cases",)
+
+
+def _for_editor(hyp: dict) -> dict:
+    return {k: v for k, v in hyp.items() if k not in _EDITOR_DROPS}
+
+
 def product_block(on: bool) -> str:
     return _PRODUCT_BLOCK if on else ""
 
@@ -753,7 +764,8 @@ class OpenAILLM:
                 + ("\n".join(f"- {h}" for h in applied)
                    or "(아직 없음 — 첫 라운드다)")
                 + "\n\n## 이번 가설\n\n"
-                + (json.dumps(hyp, ensure_ascii=False, indent=1) if hyp else
+                + (json.dumps(_for_editor(hyp), ensure_ascii=False, indent=1)
+                   if hyp else
                    "(가설 없음. 부모를 개선할 방향을 스스로 찾아라)"))
             inputs_hyp = ("이번에 반영할 가설 하나\n"
                           "현재 규칙에 이미 반영된 가설들\n")

@@ -158,3 +158,74 @@ def test_w0_description_agrees_with_the_prompt():
     assert "대략적이면 충분" not in d, "프롬프트와 반대를 말한다"
     assert "대충 내지 마라" in d
     assert "대충 내지는 마세요" in load_prompt("role/_rules_common.md")
+
+
+# ---------------------------------------------------------------------------
+# ★ 표에서 나온 것이 규칙으로 새는 좁은 길 (D-114)
+# ---------------------------------------------------------------------------
+#
+# 정적 검사는 `p.M > 1024` 를 막는다. 그런데 **가설 문장은 그 검사를 안
+# 거친다** — `claim` 이 `json.dumps` 로 RuleEditor 에 통째로 가고,
+# 거기에 "M=4096 에서" 가 있으면 그것을 리터럴로 옮겨 적을 수 있다.
+
+
+@pytest.mark.parametrize("claim", [
+    "M=4096 에서 split-K 가 항상 진다",
+    "4096x4096 형상에서 tail 이 커진다",
+    "N = 11008 인 형상만 다르게 다뤄야 한다",
+])
+def test_hypothesis_claim_refuses_shape_sizes(claim):
+    import kernelrule.agents.schemas as S
+
+    if not S.HAVE_PYDANTIC:                              # pragma: no cover
+        pytest.skip("pydantic 없음")
+    with pytest.raises(Exception, match="형상 크기"):
+        S.HypothesisOut(claim=claim, evidence_cases=[1])
+
+
+@pytest.mark.parametrize("claim", [
+    "waves < 1 인 형상에서 tail 이 커진다",
+    "stages=3 인 config 이 짧은 형상에서 진다",
+    "split_k=8 이면 리덕션이 지배한다",
+])
+def test_hypothesis_claim_allows_regimes_and_config_values(claim):
+    """★ 오탐을 본다 — 세 자리 미만 config 값은 잡으면 안 된다."""
+    import kernelrule.agents.schemas as S
+
+    if not S.HAVE_PYDANTIC:                              # pragma: no cover
+        pytest.skip("pydantic 없음")
+    assert S.HypothesisOut(claim=claim, evidence_cases=[1]).claim == claim
+
+
+def test_evidence_cases_do_not_reach_the_rule_editor():
+    """사례 번호는 RuleEditor 가 볼 수 없는 것을 가리킨다."""
+    import os
+
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.features import FeatureRegistry
+
+    os.environ.setdefault("OPENAI_API_KEY", "t")
+    llm = OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
+                    registry=FeatureRegistry("F1"))
+    hyp = {"claim": "짧은 형상에서 진다", "evidence_cases": [17, 23, 41],
+           "affected_regime": "waves < 1", "id": "H9"}
+    txt = llm._user_prompt("rule_editor", "", parent=None, parent_n_terms=0,
+                           hypothesis=hyp, analyst=True)
+    assert "짧은 형상에서 진다" in txt and "waves < 1" in txt
+    assert "evidence_cases" not in txt and "17" not in txt.split("## 이번 가설")[1][:400]
+
+
+def test_prompt_no_longer_names_the_optimizer():
+    """순위 경로는 L-BFGS-B 다. 이름을 적으면 또 갈린다 (pending 12)."""
+    from kernelrule.agents.openai_client import load_prompt
+
+    txt = load_prompt("role/_rules_common.md", budget=8)
+    assert "Nelder-Mead" not in txt
+    assert "수치 최적화기가" in txt
+
+
+def test_n_candidates_is_described_as_enumeration_not_performance():
+    from kernelrule.agents.openai_client import load_prompt
+
+    txt = load_prompt("role/_rules_common.md", budget=8)
+    assert "p.n_candidates" in txt and "성능이 아니라 열거 정보" in txt
