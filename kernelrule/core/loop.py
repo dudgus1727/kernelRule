@@ -48,7 +48,7 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import FitError, fit_weights, make_score_of
 from kernelrule.report.diagnostic import build_report
 from kernelrule.rules.checks import BUDGET as _BUDGET
-from kernelrule.rules.checks import check_rule, limits_for
+from kernelrule.rules.checks import check_rule, limits_for, weight_bounds
 
 __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 
@@ -184,7 +184,8 @@ def _fit_and_score(job: tuple) -> dict:
                          max_evals=c["max_evals"], val_split=c["val"],
                          objective=c.get("objective", "regret"),
                          rank_top_k=c.get("rank_top_k", 100),
-                         rank_lambda=c.get("rank_lambda", 0.0))
+                         rank_lambda=c.get("rank_lambda", 0.0),
+                         bounds=weight_bounds(code, len(w0)))
     except (FitError, SchemaViolation) as e:
         return {"i": idx, "err": ("fit", str(e)[:90])}
     except Exception as e:                                  # noqa: BLE001
@@ -367,6 +368,8 @@ class RoundLoop:
         self._rule_seq = 0
         self._seen_code: dict[str, float] = {}      # 캐시 (§15.4)
         self._feats = matrix.feature_names()
+        #: ★ 지수 자리 가드용 (D-112). 축이 늘면 같이 갱신한다.
+        self._fmins = matrix.feature_mins()
         self._shape_vals = matrix.shape_value_names()
         self._short_mask, self._long_mask = self._regime_masks()
         # ★ 풀은 **생성자에서** 만든다 (D-95). `fork` 는 스레드가 도는 중이면
@@ -492,6 +495,7 @@ class RoundLoop:
                 # ★ 열을 지금 만든다. 안 하면 규칙이 이름을 써도 KeyError 다.
                 self.matrix.invalidate(f.name)
                 self._feats = self.matrix.feature_names()
+                self._fmins = self.matrix.feature_mins()
                 self._shape_vals = self.matrix.shape_value_names()
                 # ★ 워커는 fork 시점의 행렬을 들고 있다 — 새 열을 못 본다.
                 #   풀을 버리고 다시 만든다. 안 하면 **워커가 낡은 행렬로
@@ -626,6 +630,7 @@ class RoundLoop:
         """
         rep = check_rule(prop.code, limits=self._limits,
                          feature_names=self._feats,
+                         feature_mins=self._fmins,
                          shape_value_names=self._shape_vals,
                          n_weights=len(prop.w0))
         if not rep.ok:
@@ -676,7 +681,8 @@ class RoundLoop:
                              val_split=self.splits.val,
                              objective=self._objective,
                              rank_top_k=self.cfg.rank_top_k,
-                             rank_lambda=self.cfg.rank_lambda)
+                             rank_lambda=self.cfg.rank_lambda,
+                             bounds=weight_bounds(prop.code, len(prop.w0)))
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
             res.rejections.append(("fit", str(e)[:90]))
@@ -749,12 +755,17 @@ class RoundLoop:
         틀린다.
         """
         def feats(code: str) -> set:
+            # ★ `except Exception` 이었다. 2026-09-03 에 `self._fmins` 를
+            #   추가하면서 그 `AttributeError` 를 삼켜 피처 집합이 **빈 채로**
+            #   지나갔다 — 관찰 장치가 조용히 0 이 되는 자리다. 규칙이
+            #   못 읽히는 경우만 삼킨다.
             try:
                 return check_rule(code, limits=self._limits,
-                                 feature_names=self._feats,
+                                  feature_names=self._feats,
+                                  feature_mins=self._fmins,
                                   shape_value_names=self._shape_vals,
                                   n_weights=self._budget).features_used
-            except Exception:                               # noqa: BLE001
+            except SyntaxError:
                 return set()
         a, b, c = feats(codes[0]), feats(codes[1]), feats(child)
         only_a, only_b = a - b, b - a
@@ -868,6 +879,7 @@ class RoundLoop:
                 # 부모의 항 수를 세어 프롬프트에 넣는다 (교체 프레임)
                 pr = check_rule(ps[0].code, limits=self._limits,
                                 feature_names=self._feats,
+                                feature_mins=self._fmins,
                                 shape_value_names=self._shape_vals,
                                 n_weights=len(ps[0].w))
                 n_terms = pr.n_terms

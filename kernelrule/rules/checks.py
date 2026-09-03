@@ -28,6 +28,8 @@ from dataclasses import dataclass, field
 
 __all__ = ["BUDGET", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
            "weight_reuse_message", "literal_budget_message",
+           "exponent_message", "exponent_indices", "weight_bounds",
+           "EXPONENT_BOUNDS",
            "identity_transform_message", "noop_term_message"]
 
 
@@ -266,6 +268,119 @@ def literal_budget_message(code: str, n_weights: int,
             f"조건의 비교로 옮겨라")
 
 
+#: ★ 지수 자리 가중치의 경계 (D-112). **하이퍼파라미터가 아니라
+#: 정규화다** — 튜닝하려고 둔 값이 아니라 발산과 오버플로를 막는
+#: 물리적 상한이다.
+#:
+#:   하한 0    음수 지수는 `f.* == 0` 에서 `inf` 다. 그리고 모든 피처가
+#:             "클수록 나쁨" 이라 음수 지수는 방향을 뒤집는다 (§8.2).
+#:   상한 4    정규화된 피처의 4제곱보다 빠르게 자라는 벌은 매끄러운
+#:             물리 반응이 아니라 사실상 문턱이고, 문턱은 `np.where` 가
+#:             이미 한다. 즉 **표현력을 안 뺀다.**
+#:
+#: 값을 쓸어보지 않는다. 쓸어보면 그때부터 하이퍼파라미터다.
+EXPONENT_BOUNDS = (0.0, 4.0)
+
+
+def _exponent_sites(tree) -> list[tuple[int, object]]:
+    """`(가중치 인덱스, 밑 노드)` — `np.power(밑, w[i])` 와 `밑 ** w[i]`."""
+    out = []
+    for n in ast.walk(tree):
+        base = expo = None
+        if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Pow):
+            base, expo = n.left, n.right
+        elif (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+              and n.func.attr == "power" and len(n.args) == 2):
+            base, expo = n.args
+        if expo is None:
+            continue
+        if (isinstance(expo, ast.Subscript)
+                and isinstance(expo.value, ast.Name) and expo.value.id == "w"
+                and isinstance(expo.slice, ast.Constant)
+                and isinstance(expo.slice.value, int)):
+            out.append((int(expo.slice.value), base))
+    return out
+
+
+def exponent_indices(code: str) -> frozenset[int]:
+    """지수 자리에 쓰인 `w[i]` 의 인덱스."""
+    try:
+        tree = ast.parse(code.strip())
+    except SyntaxError:
+        return frozenset()
+    return frozenset(i for i, _ in _exponent_sites(tree))
+
+
+def weight_bounds(code: str, n_weights: int) -> list[tuple] | None:
+    """가중치별 경계. **지수 자리가 없으면 `None`** — 기존 규칙은 그대로다.
+
+    ★ `None` 을 돌려주는 것이 중요하다. 경계를 항상 붙이면 지수를 안 쓰는
+    옛 실행까지 조용히 다른 조건이 된다 (원칙 36).
+    """
+    idx = exponent_indices(code)
+    if not idx:
+        return None
+    lo, hi = EXPONENT_BOUNDS
+    inf = float("inf")
+    return [(lo, hi) if i in idx else (-inf, inf)
+            for i in range(n_weights)]
+
+
+def exponent_message(code: str,
+                     feature_mins: dict | None = None) -> str | None:
+    """지수 자리의 **수치 가드**. 위반이면 메시지, 아니면 `None`.
+
+    ```
+    np.power(x, w) 에서
+      x < 0 이고 w 가 정수가 아니면   nan
+      x = 0 이고 w < 0 이면           inf
+      x 가 크고 w 가 크면             오버플로
+    ```
+
+    앞의 둘은 **밑을 묶어서** 막는다 — 밑은 `f.<이름>` **하나**여야 하고
+    그 축의 선언 범위 최소가 0 이상이어야 한다. 셋째는 지수 상한
+    `EXPONENT_BOUNDS` 가 막는다.
+
+    ★ `weight_reuse_message` 와 같은 이유로 따로 뺐다 — LLM 경계에서
+    재시도를 걸어야 모델이 무엇이 틀렸는지 듣는다.
+    """
+    try:
+        tree = ast.parse(code.strip())
+    except SyntaxError:
+        return None
+    for n in ast.walk(tree):
+        if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Pow):
+            e = n.right
+        elif (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+              and n.func.attr == "power" and len(n.args) == 2):
+            e = n.args[1]
+        else:
+            continue
+        ok_w = (isinstance(e, ast.Subscript) and isinstance(e.value, ast.Name)
+                and e.value.id == "w")
+        if not ok_w and _touches_weight(e):
+            return ("지수 자리에는 `w[i]` **하나만** 쓸 수 있다. 식을 "
+                    "지수로 올리면 경계를 못 붙이고 발산한다.")
+    for _i, base in _exponent_sites(tree):
+        if not (isinstance(base, ast.Attribute)
+                and isinstance(base.value, ast.Name)
+                and base.value.id == "f"):
+            return ("`np.power` 의 **밑은 `f.<이름>` 하나**여야 한다. "
+                    "식을 밑으로 쓰면 음수가 될 수 있고 그러면 `nan` 이 "
+                    "된다 — 그것은 규칙을 조용히 쓸모없게 만든다.")
+        if feature_mins is not None:
+            m = feature_mins.get(base.attr)
+            if m is not None and m < 0:
+                return (f"`f.{base.attr}` 는 음수가 될 수 있다(범위 최소 "
+                        f"{m}). 지수의 밑으로 쓰면 `nan` 이 된다.")
+    return None
+
+
+def _touches_weight(node) -> bool:
+    return any(isinstance(m, ast.Name) and m.id == "w"
+               for m in ast.walk(node))
+
+
 def weight_reuse_message(code: str) -> str | None:
     """`w[i]` 를 여러 항에 재사용했으면 그 메시지를, 아니면 `None`.
 
@@ -412,7 +527,8 @@ class CheckReport:
 
 
 def check_rule(code: str, *, feature_names, shape_value_names,
-               n_weights: int, limits: dict | None = None) -> CheckReport:
+               n_weights: int, limits: dict | None = None,
+               feature_mins: dict | None = None) -> CheckReport:
     """`score(f, p, hw, w)` 소스를 검사한다.
 
     `n_weights` 는 LLM 이 제시한 `W0` 의 길이다. **리터럴 예산에 합산된다.**
@@ -546,6 +662,12 @@ def check_rule(code: str, *, feature_names, shape_value_names,
             if not _is_subscript_base(tree, node):
                 bad("w 를 통째로 쓰지 마라. 인덱스 접근만 허용된다 (§8.1)")
                 break
+
+    # -- ★ 지수 자리 가드 (D-112) ------------------------------------------
+    #    밑이 음수가 될 수 있으면 `nan` 이고, 그것은 거부가 아니라
+    #    **조용한 무력화**다 — 점수가 통째로 못 쓰게 된다.
+    if (m := exponent_message(code, feature_mins)) is not None:
+        bad(m)
 
     # -- ★ 가중치 재사용 금지 — 리터럴 예산 우회를 막는다 -------------------
     #

@@ -17,6 +17,7 @@ from typing import Any
 
 from kernelrule.rules.checks import (
     LIMITS,
+    exponent_message,
     literal_budget_message,
     noop_term_message,
     weight_reuse_message,
@@ -125,8 +126,14 @@ MAX_WEIGHTS = LIMITS["budget"]
 _PRODUCT_DESC = (" ★ 한 항 안에서 **피처 둘을 곱해도 된다** — "
                  "`(f.a * f.b) * w[i]` 는 예산 하나다.")
 
+#: ★ 실험 (b) (D-112). 가중치를 **지수 자리**에 둘 수 있다.
+_POWER_DESC = (" ★ 가중치를 **지수 자리**에 둬도 된다 — "
+               "`np.power(f.a, w[i]) * w[j]`. 밑은 `f.<이름>` 하나여야 "
+               "하고, 지수 가중치는 0~4 로 묶인다.")
 
-def _desc_code(b: int, product: bool = False) -> str:
+
+def _desc_code(b: int, product: bool = False,
+               power: bool = False) -> str:
     return ("`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
             "설명이나 마크다운 펜스를 넣지 마라. "
             f"★ 항은 최대 {b}개이고 각 w[i] 는 정확히 "
@@ -134,7 +141,8 @@ def _desc_code(b: int, product: bool = False) -> str:
             "재사용해 항을 늘리면 거부된다. "
             "★ 분기 조건의 비교 상수(`p.roofline_ratio < 1`)는 "
             "예산에 들지 않는다 — 물리적 경계는 그대로 써라"
-            + (_PRODUCT_DESC if product else ""))
+            + (_PRODUCT_DESC if product else "")
+            + (_POWER_DESC if power else ""))
 
 
 def _desc_w0(b: int) -> str:
@@ -371,6 +379,11 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
             #   여기서 막지 않으면 예산 하나가 그냥 버려진다 (§26.4).
             if (m := noop_term_message(v)) is not None:
                 raise ValueError(m)
+            # ★ 지수 자리 가드 (D-112). **힌트와 무관하게 항상 건다** —
+            #   조건이 아니라 수치 안전이다. 여기서 걸어야 모델이 이유를
+            #   듣고 고쳐 낸다.
+            if (m := exponent_message(v)) is not None:
+                raise ValueError(m)
             return v
 
         @field_validator("w0")
@@ -436,7 +449,7 @@ def rule_output_to_proposal(out, *, budget: int | None = None
 
 @lru_cache(maxsize=16)
 def rule_output_for(budget: int | None = None, *,
-                    product_hint: bool = False):
+                    product_hint: bool = False, power_hint: bool = False):
     """★ 예산이 **스키마 설명과 검증에도** 들어간 출력 타입 (D-107).
 
     `RuleOutput` 의 필드 설명은 모델에게 그대로 간다 — `pydantic-ai` 가
@@ -451,11 +464,11 @@ def rule_output_for(budget: int | None = None, *,
     if not HAVE_PYDANTIC:                           # pragma: no cover
         return RuleOutput
     b = int(budget if budget is not None else MAX_WEIGHTS)
-    if b == MAX_WEIGHTS and not product_hint:
+    if b == MAX_WEIGHTS and not product_hint and not power_hint:
         return RuleOutput
 
     class _BudgetedRuleOutput(RuleOutput):          # type: ignore[misc]
-        code: str = Field(description=_desc_code(b, product_hint))
+        code: str = Field(description=_desc_code(b, product_hint, power_hint))
         w0: list[float] = Field(description=_desc_w0(b))
 
         # ★ 이름을 부모와 **같게** 둔다. pydantic 은 데코레이터를 이름으로

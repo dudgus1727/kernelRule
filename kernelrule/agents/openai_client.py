@@ -180,6 +180,53 @@ _PRODUCT_NOTE = """
 """
 
 
+#: * 실험 (b) (D-112) — **가중치를 지수 자리에** 둘 수 있다.
+#: 이것만이 아직 안 건드린 형태다: 지금까지 넓힌 것은 항 수 / 노드 수 /
+#: 곱이고, **가중치가 선형 자리에만 있다**는 것은 그대로였다.
+#:
+#: 끄면 **빈 문자열**이라 프롬프트가 이전과 바이트까지 같다.
+_POWER_BLOCK = """
+
+## ★ 항의 형태 — 가중치를 지수 자리에 둘 수 있습니다
+
+지금까지 가중치는 항에 **곱해지기만** 했습니다. **지수로도 쓸 수
+있습니다.**
+
+```python
+s = s + np.power(f.<이름>, w[3]) * w[4]     # ✅ 예산 둘 (w[3], w[4])
+```
+
+무엇이 달라지나: `f.a * w[3]` 은 "얼마나 세게 벌을 줄까" 만 정합니다.
+`np.power(f.a, w[3])` 은 **"얼마나 빠르게 나빠지는가"** 를 정합니다 —
+1 보다 크면 커질수록 가속하고, 1 보다 작으면 완만해집니다.
+
+두 가지 제약이 있습니다. **수치가 무너지지 않게 하는 것**이지 표현력을
+빼는 것이 아닙니다.
+
+```
+1. 밑은 `f.<이름>` 하나여야 한다
+   식을 밑으로 쓰면 음수가 될 수 있고, 음수의 실수 거듭제곱은 nan 이다
+2. 지수 가중치는 0~4 로 묶인다
+   0 보다 작으면 f == 0 에서 inf 이고, 방향이 뒤집힌다
+   4 보다 빠른 것은 매끄러운 물리가 아니라 문턱이고, 문턱은 np.where 가 한다
+```
+
+**어느 축이 "천천히 나빠지고" 어느 축이 "갑자기 나빠지는지" 를
+생각해서 쓰세요.**"""
+
+_POWER_NOTE = """
+★ `np.power(f.<이름>, w[i])` 로 지수를 맞출 수 있습니다 (지수는 0~4).
+"""
+
+
+def power_block(on: bool) -> str:
+    return _POWER_BLOCK if on else ""
+
+
+def power_note(on: bool) -> str:
+    return _POWER_NOTE if on else ""
+
+
 def product_block(on: bool) -> str:
     return _PRODUCT_BLOCK if on else ""
 
@@ -202,7 +249,8 @@ def assemble_instructions(role: str, *, objective: str = "rank",
                           budget: int | None = None,
                           rank_top_k: int = 100,
                           rank_lambda: float = 0.0,
-                          product_hint: bool = False) -> str:
+                          product_hint: bool = False,
+                          power_hint: bool = False) -> str:
     """★ 시스템 프롬프트 조립. **한 곳에서만 한다** (원칙 2).
 
     전에는 `_agent()` 와 `tests/test_prompt_layout.py` 가 각자 조립했다.
@@ -216,14 +264,16 @@ def assemble_instructions(role: str, *, objective: str = "rank",
         parts.append(load_prompt(hw_file, budget=budget))
     if role in _WRITES_RULES:
         parts.append(load_prompt("role/_rules_common.md", budget=budget)
-                     .replace("{product_block}", product_block(product_hint)))
+                     .replace("{product_block}", product_block(product_hint))
+                     .replace("{power_block}", power_block(power_hint)))
     if role in _EDITS_RULES:
         parts.append(load_prompt("role/_rules_edit.md", budget=budget).replace(
             "{objective_block}", objective_block(
                 objective, rank_top_k=rank_top_k, rank_lambda=rank_lambda)))
     parts.append(body if body is not None
                  else load_prompt(f"role/{role}.md", budget=budget)
-                 .replace("{product_note}", product_note(product_hint)))
+                 .replace("{product_note}", product_note(product_hint))
+                 .replace("{power_note}", power_note(power_hint)))
     return "\n\n---\n\n".join(parts)
 
 
@@ -289,6 +339,8 @@ class LLMConfig:
     rank_lambda: float = 0.0
     #: ★ 실험 B (D-110). 곱 항을 **명시**한다. 검사기는 원래 안 막았다.
     product_hint: bool = False
+    #: * 실험 (b) (D-112). 가중치를 지수 자리에 둘 수 있다고 명시한다.
+    power_hint: bool = False
     # ------------------------------------------------------------------
     # ★ temperature / seed — 둘 다 `None` 이다. 통제할 수 없다 (D-47)
     # ------------------------------------------------------------------
@@ -462,6 +514,7 @@ class OpenAILLM:
         self._rank_top_k = int(getattr(cfg, "rank_top_k", 100))
         self._rank_lambda = float(getattr(cfg, "rank_lambda", 0.0))
         self._product = bool(getattr(cfg, "product_hint", False))
+        self._power = bool(getattr(cfg, "power_hint", False))
         self._base = load_prompt("_base.md", budget=self._budget)
         self._hw = load_prompt(cfg.arch_prompt, budget=self._budget)
         #: ★ 목적함수. 프롬프트의 "채점 방식" 절을 정한다 (D-101).
@@ -520,12 +573,14 @@ class OpenAILLM:
             #   "최대 8개" 가 굳어 있으면 프롬프트가 16 이라고 해도
             #   모델은 8 을 낸다.
             _rule_out = rule_output_for(self._budget,
-                                        product_hint=self._product)
+                                        product_hint=self._product,
+                                        power_hint=self._power)
             out = {"analyze": AnalysisOutput, "rule_editor": _rule_out,
                    "rule_writer": _rule_out, "feature": FeatureOutput,
                    "categorize": CategoryOutput}[role]
             body = load_prompt(f"role/{role}.md", budget=self._budget) \
-                .replace("{product_note}", product_note(self._product))
+                .replace("{product_note}", product_note(self._product)) \
+                .replace("{power_note}", power_note(self._power))
         # ★ **두 축**으로 나뉜다 (§30.10). 한 축(하드웨어 무관/의존)만으로
         #   나눴더니 역할별로 필요 없는 것이 공용에 쌓였다 — FeatureWriter 가
         #   regret 정의와 가중치 예산을 매번 받고 있었다.
@@ -545,7 +600,7 @@ class OpenAILLM:
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
             body=body, budget=self.cfg.rule_budget,
             rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
-            product_hint=self._product)
+            product_hint=self._product, power_hint=self._power)
         if self.cfg.endpoint not in ("responses", "chat"):
             raise ValueError(
                 f"알 수 없는 엔드포인트: {self.cfg.endpoint!r}. "
@@ -683,7 +738,8 @@ class OpenAILLM:
                 "합니다.** 무엇을 버렸고 왜 그것을 골랐는지 `changes` 에 "
                 "쓰세요.\n")
         body = load_prompt("role/rule_editor.md", budget=self._budget) \
-            .replace("{product_note}", product_note(self._product))
+            .replace("{product_note}", product_note(self._product)) \
+            .replace("{power_note}", power_note(self._power))
         return body.format(
             second_parent_block=second,
             n_terms=n_terms, n_weights=n_w, budget_note=note,
@@ -996,11 +1052,12 @@ class OpenAILLM:
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
             body=body, budget=self._budget,
             rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
-            product_hint=self._product)
+            product_hint=self._product, power_hint=self._power)
         sch = None
         if role in ("rule_editor", "rule_writer"):
             sch = rule_output_for(
-                self._budget, product_hint=self._product).model_json_schema()
+                self._budget, product_hint=self._product,
+                power_hint=self._power).model_json_schema()
         return sysp, sch
 
 

@@ -10,7 +10,7 @@
 ```
 
 ## ★ 예산 — 항 상한 {budget}개
-{product_note}
+{product_note}{power_note}
 ```
 부모 규칙: 현재 {n_terms}항 / 가중치 {n_weights}개 (상한 {budget})
 {budget_note}

@@ -238,7 +238,9 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget):
                                rank_top_k=getattr(a, "rank_top_k", 100),
                                rank_lambda=getattr(a, "rank_lambda", 0.0),
                                product_hint=getattr(
-                                   a, "product_hint", False)),
+                                   a, "product_hint", False),
+                               power_hint=getattr(
+                                   a, "power_hint", False)),
                      feature_names=names, shape_values=svals,
                      registry=registry, budget=budget, cache=False)
 
@@ -795,6 +797,12 @@ def main() -> None:
     ap.add_argument("--rank-top-k", type=int, default=100,
                     help="순위 손실이 볼 참 상위 개수. ★ 사전 등록에 100 을 "
                          "박았다 — 결과를 보고 바꾸지 마라")
+    ap.add_argument("--power-hint", action="store_true",
+                    help="★ 실험 (b) (D-112). 가중치를 **지수 자리**에 둘 "
+                         "수 있다고 명시한다. 밑은 f.<이름> 하나, 지수 "
+                         "가중치는 EXPONENT_BOUNDS(0~4) 로 묶인다 — "
+                         "하이퍼파라미터가 아니라 정규화다. 가드는 힌트와 "
+                         "무관하게 항상 걸린다")
     ap.add_argument("--product-hint", action="store_true",
                     help="★ 실험 B (D-110). 항 안에서 피처 둘을 곱해도 "
                          "된다고 **명시한다.** 정적 검사는 원래 안 막았다 "

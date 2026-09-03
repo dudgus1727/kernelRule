@@ -755,6 +755,10 @@ def test_cross_lineage_counts_mixing_not_just_presence():
     #   집합이 빈 채로 지나간다 — 실제로 그렇게 걸렸다.
     loop._budget = 8
     loop._limits = None
+    # ★ 지수 자리 가드용 축 최소값 (D-112). 이것을 안 넣었을 때 `feats`
+    #   의 `except Exception` 이 `AttributeError` 를 삼켜 **또** 빈 집합이
+    #   나왔다 — 그래서 그 except 를 `SyntaxError` 로 좁혔다.
+    loop._fmins = {}
 
     def _code(*fs):
         body = " + ".join(f"f.{x} * w[{i}]" for i, x in enumerate(fs))

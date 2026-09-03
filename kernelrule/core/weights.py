@@ -281,7 +281,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 sensitivity_delta: float = 0.5,
                 objective: str = "rank",      # ★ 기본은 rank. D-101
                 rank_top_k: int = 100,
-                rank_lambda: float = 0.0) -> FittedRule:
+                rank_lambda: float = 0.0,
+                bounds: list | None = None) -> FittedRule:
     """구조를 고정하고 가중치만 맞춘다.
 
     `split` 은 **`role="train"` 이어야 한다.** 검증/최종이 목적함수에
@@ -323,6 +324,22 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
             f"val_split 의 role 이 {val_split.role!r} 다. 'val' 이어야 한다.")
 
     w0 = np.asarray(list(w0), dtype=np.float64)
+    # ★ 가중치별 경계 (D-112). `None` 이면 아무것도 안 바뀐다 — 지수 자리를
+    #   안 쓰는 규칙은 옛 실행과 **같은 조건**이어야 한다 (원칙 36).
+    if bounds is None:
+        def _proj(x):
+            return x
+    else:
+        if len(bounds) != w0.size:
+            raise FitError(
+                f"bounds 길이 {len(bounds)} != 가중치 {w0.size}")
+        _blo = np.array([b[0] for b in bounds], dtype=np.float64)
+        _bhi = np.array([b[1] for b in bounds], dtype=np.float64)
+
+        def _proj(x):
+            return np.clip(x, _blo, _bhi)
+
+        w0 = _proj(w0)
     if w0.ndim != 1 or w0.size == 0:
         raise FitError(f"W0 형태가 잘못됐다: {w0.shape}")
     if not np.all(np.isfinite(w0)):
@@ -367,7 +384,9 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     def obj(w: np.ndarray) -> float:
         nonlocal n_eval, n_inf, seen_v, seen_w
         n_eval += 1
-        wa = np.asarray(w, dtype=np.float64)
+        # ★ **경계 안으로 접어서** 잰다. Nelder-Mead 는 경계를 모르고
+        #   다듬기도 마찬가지라, 여기서 접어야 한 곳에서만 강제된다.
+        wa = _proj(np.asarray(w, dtype=np.float64))
         if objective == "regret":
             v = prob.regret(score_fn, wa)
         else:
@@ -409,7 +428,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
             start = (best_w if r == 0 else best_w + np.random.default_rng(
                 _RESTART_SEED + r).normal(
                     0.0, 0.35 * np.maximum(np.abs(best_w), 1.0)))
-            _min(obj, start, method="L-BFGS-B",
+            _min(obj, _proj(start), method="L-BFGS-B", bounds=bounds,
                  options={"maxiter": 500,
                           "maxfun": max(20, max_evals // n_restarts)})
             if seen_v < best_v:
@@ -451,10 +470,14 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
             f"({n_inf}/{n_eval}). 구조를 기각한다.")
 
     n_fit = n_eval          # ★ 다듬기 전. 상한 판정은 이 값으로 한다.
-    w = best_w
+    w = _proj(best_w)
     if polish:
         w, best_v, n_pol = _polish(prob, score_fn, w, best_v, polish_budget)
         n_eval += n_pol
+        # ★ 다듬기는 경계를 모른다. **여기서 한 번 더 접는다** — 접힌
+        #   값으로 아래 regret/민감도를 다시 재므로 보고값과 반환값이
+        #   같은 가중치에서 나온다.
+        w = _proj(w)
     # ★ 채점 기준은 언제나 regret 이다 — `objective="rank"` 여도 그렇다.
     #   "채점은 regret, 학습은 순위 손실" (rank-evo-prereg.md §3)
     fit_regret = float(prob.regret(score_fn, w))

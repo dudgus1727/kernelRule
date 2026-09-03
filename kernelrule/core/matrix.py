@@ -156,6 +156,15 @@ class FeatureMatrix:
     def shape_value_names(self) -> list[str]:
         return sorted(next(iter(self._info.values())))
 
+    def feature_mins(self) -> dict:
+        """축별 **선언 범위의 최소**. 지수 자리 가드가 쓴다 (D-112).
+
+        ★ 선언 범위이지 관측 범위가 아니다. 관측으로 판정하면 이 표에서
+        우연히 양수였던 축이 다른 표에서 음수가 될 수 있다.
+        """
+        return {n: float(self.registry[n].expected_range[0])
+                for n in self.registry.names(shape_level=False)}
+
     def column(self, name: str) -> np.ndarray:
         """모든 형상을 이어붙인 열. GBDT 베이스라인/상관 분석용."""
         return np.concatenate([self._cols[p.key][name]
