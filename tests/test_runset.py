@@ -22,12 +22,19 @@ from kernelrule.core.runset import (
 
 
 def _mk(root, run, *, source="rule_writer-try00", code="def score(): ...",
-        objective="regret", budget=8, model="m", campaign=None):
+        objective="regret", budget=8, model="m", campaign=None,
+        fit_method=None, fit_restarts=None):
+    """`fit_method=None` 이면 **키 자체를 안 쓴다** — 옛 실행의 모양이다."""
     d = root / run
     (d).mkdir(parents=True, exist_ok=True)
+    loop = {"objective": objective, "rank_top_k": 100,
+            "rank_lambda": 0.0, "feature_condition": "F3"}
+    if fit_method is not None:
+        loop["fit_method"] = fit_method
+    if fit_restarts is not None:
+        loop["fit_restarts"] = fit_restarts
     (d / "config.json").write_text(json.dumps({
-        "loop": {"objective": objective, "rank_top_k": 100,
-                 "rank_lambda": 0.0, "feature_condition": "F3"},
+        "loop": loop,
         "split": {"kind": "nk11008"},
         "rule_constraints": {"budget": budget},
         "llm": {"model": model, "arch_prompt": None,
@@ -115,3 +122,43 @@ def test_run_condition_reads_the_hardware_prompt_identity():
     if not (Path("runs") / r / "config.json").exists():
         pytest.skip("실행 없음")
     assert run_condition(r)["hw"] is not None
+
+
+# ---------------------------------------------------------------------------
+# ★ 적합기 조건 (D-123)
+# ---------------------------------------------------------------------------
+def test_old_run_without_fit_method_reads_as_nelder_mead(tmp_path):
+    """★ 옛 실행에는 키가 없다. **없음 = nelder-mead** 다 — 그때 코드가
+    그것뿐이었다. 봐주는 것이 아니라 사실을 채우는 것이다.
+    """
+    _mk(tmp_path, "old-s0")
+    assert run_condition("old-s0", tmp_path)["fit_method"] == "nelder-mead"
+    assert run_condition("old-s0", tmp_path)["fit_restarts"] == 4
+
+
+def test_old_run_groups_with_an_explicit_nelder_mead_run(tmp_path):
+    """옛 실행과 `fit_method="nelder-mead"` 를 적은 실행은 **같은 조건**이다."""
+    _mk(tmp_path, "camp-s0")
+    _mk(tmp_path, "camp-s1", fit_method="nelder-mead", fit_restarts=4)
+    got = assert_same_condition(["camp-s0", "camp-s1"], root=tmp_path)
+    assert got["fit_method"] == "nelder-mead"
+
+
+def test_mixed_fitter_fails(tmp_path):
+    """★ CMA 실행과 옛 실행을 한 묶음에 넣으면 실패한다 (D-123).
+
+    §3 에서 예산 8 팔과 16 팔을 같은 적합기로 돌려야 하고, 옛 기준선
+    (1.0762)은 다른 적합기다 — 나란히 놓으면 여기서 걸린다.
+    """
+    _mk(tmp_path, "camp-s0", fit_method="cma", fit_restarts=1)
+    _mk(tmp_path, "camp-s1")
+    with pytest.raises(RunSetError, match="fit_method"):
+        assert_same_condition(["camp-s0", "camp-s1"], root=tmp_path)
+
+
+def test_same_method_but_different_restarts_fails(tmp_path):
+    """재시작 수도 조건이다 — CMA 는 1, Nelder-Mead 는 4 다."""
+    _mk(tmp_path, "camp-s0", fit_method="cma", fit_restarts=1)
+    _mk(tmp_path, "camp-s1", fit_method="cma", fit_restarts=4)
+    with pytest.raises(RunSetError, match="fit_restarts"):
+        assert_same_condition(["camp-s0", "camp-s1"], root=tmp_path)

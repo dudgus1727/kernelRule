@@ -655,6 +655,9 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        objective=getattr(a, "objective", "regret"),
                        rank_top_k=getattr(a, "rank_top_k", 100),
                        rank_lambda=getattr(a, "rank_lambda", 0.0),
+                       fit_method=getattr(a, "fit_method", "nelder-mead"),
+                       fit_restarts=getattr(a, "fit_restarts", 4),
+                       max_evals=getattr(a, "max_evals", 200),
                        rule_budget=getattr(a, "rule_budget", None),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
@@ -679,6 +682,9 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            objective=a.objective,
                            rank_top_k=a.rank_top_k,
                            rank_lambda=a.rank_lambda,
+                           fit_method=a.fit_method,
+                           fit_restarts=a.fit_restarts,
+                           max_evals=a.max_evals,
                            objective_switch=a.objective_switch,
                            rule_budget=a.rule_budget,
                            hypothesis_pool=tuple(a.hypothesis_pool)),
@@ -804,6 +810,18 @@ def main() -> None:
                     help="가중치 목적함수. ★ 기본 regret — 지금까지의 모든 "
                          "실행이 그 조건이다. rank 면 아카이브 채택도 "
                          "순위 손실로 한다 (셀 축은 그대로, D-101)")
+    ap.add_argument("--fit-method", choices=("nelder-mead", "cma"),
+                    default="nelder-mead",
+                    help="가중치 적합기. ★ 기본 nelder-mead — 지금까지의 "
+                         "모든 실행이 그 조건이다. cma 는 §2 관문이 고른 "
+                         "팔이고 (D-123) `cma` 패키지가 필요하다. "
+                         "★ config.json 에 남고 묶음 검사가 본다")
+    ap.add_argument("--fit-restarts", type=int, default=4,
+                    help="적합 재시작 수. ★ CMA-ES 는 1 이다 — 예산을 넷으로 "
+                         "쪼개면 세대가 여섯 번뿐이라 CMA 가 아니다")
+    ap.add_argument("--max-evals", type=int, default=200,
+                    help="적합 평가 상한. ★ 기본 200 — 지금까지의 모든 "
+                         "실행이 그 값이다. §2 관문은 300 에서 쟀다")
     ap.add_argument("--rule-budget", type=int, default=None,
                     help="항 예산. ★ 기본은 checks.BUDGET(8) — 지금까지의 "
                          "모든 실행이 그 조건이다. 검사기와 프롬프트가 "
@@ -854,6 +872,19 @@ def main() -> None:
                          "가져온다. 형식이 같아서 복사면 된다 — 20호출을 "
                          "아낀다. 가져온 뒤 --stage 2 로 시작하라")
     a = ap.parse_args()
+    # ★ `cma` 가 없으면 **지금** 멈춘다 (원칙 1). 500호출 뒤 첫 적합에서
+    #   FitError 를 보는 것은 늦다.
+    if a.fit_method == "cma":
+        try:
+            import cma  # noqa: F401
+        except ImportError:
+            raise SystemExit(
+                "--fit-method cma 인데 `cma` 패키지가 없다. "
+                "`pip install cma` (pyproject 의 `fit` 추가 그룹).") from None
+        if a.fit_restarts != 1:
+            print(f"  ⚠️ --fit-method cma 인데 --fit-restarts "
+                  f"{a.fit_restarts} 다. §2 관문이 통과한 조건은 1 이다 "
+                  f"(fitter-regret-prereg.md §2).")
     if a.objective_switch:
         # ★ 시작 목적함수는 switch 의 **앞쪽**이어야 한다. 어긋나면
         #   조용히 다른 실험이 된다 — 여기서 멈춘다 (§26.4).

@@ -44,7 +44,14 @@ ROOT = Path("runs")
 #: 비교할 조건 키. **여기 없는 것은 안 본다** — 늘릴 때 시험도 같이 는다.
 KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
         "rule_budget", "product_hint", "power_hint", "hw", "split_kind",
-        "feature_condition", "model")
+        "feature_condition", "model", "fit_method", "fit_restarts")
+
+#: ★ 새로 생긴 키의 **옛 기본값** (D-123). 옛 실행의 `config.json` 에는
+#: 이 키가 없는데, 그때 코드가 하던 것이 이 값이다 — 그러므로 "없음" 을
+#: 이 값으로 메우는 것은 봐주기가 아니라 **사실을 채우는 것**이다.
+#: 새 키를 KEYS 에 넣을 때만 여기에 적는다. 값이 있는 실행끼리는
+#: 그대로 견준다.
+_OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4}
 
 
 class RunSetError(ValueError):
@@ -79,6 +86,12 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         "split_kind": (c.get("split") or {}).get("kind"),
         "feature_condition": loop.get("feature_condition"),
         "model": llm.get("model") or llm.get("class"),
+        # ★ 적합기 (D-123). 옛 실행에는 키가 없고, 그때는 Nelder-Mead
+        #   4재시작뿐이었다 — `_OLD_DEFAULTS` 로 메운다.
+        "fit_method": loop.get(
+            "fit_method", _OLD_DEFAULTS["fit_method"]),
+        "fit_restarts": loop.get(
+            "fit_restarts", _OLD_DEFAULTS["fit_restarts"]),
         "seed_source": None, "seed_sha": None,
     }
     ch = r / _campaign(run) / "stage2-rule-writer" / "chosen.json"

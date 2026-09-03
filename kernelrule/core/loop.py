@@ -97,6 +97,13 @@ class LoopConfig:
     #: `rank_loss_top1` 은 **참 1등이 낀 쌍만** — `regret` 의 부드러운
     #: 대리다. `regret` 을 직접 넣지 않는다 (계단이라 L-BFGS 를 못 쓴다).
     rank_lambda: float = 0.0
+    #: ★ 적합기 (D-123). 기본 `"nelder-mead"` — **지금까지의 모든 실행**이다.
+    #: `"cma"` 는 §2 관문이 고른 팔이다 (16차원 도달률 100%, `cma` 패키지 필요).
+    #: ★ 조건이므로 `config.json` 에 남기고 묶음 검사가 본다 (원칙 39).
+    fit_method: str = "nelder-mead"
+    #: 적합 재시작 수. CMA-ES 는 1 이다 — 예산을 넷으로 쪼개면 세대가
+    #: 여섯 번뿐이라 CMA 가 아니다 (`fitter-regret-prereg.md` §2).
+    fit_restarts: int = 4
     #: ★ 두 순서 실험 (D-104). `"rank->regret"` 또는 `"regret->rank"`.
     #: `None` 이면 목적함수가 안 바뀐다 — 지금까지의 동작이다.
     #:
@@ -185,6 +192,8 @@ def _fit_and_score(job: tuple) -> dict:
                          objective=c.get("objective", "regret"),
                          rank_top_k=c.get("rank_top_k", 100),
                          rank_lambda=c.get("rank_lambda", 0.0),
+                         method=c.get("fit_method", "nelder-mead"),
+                         n_restarts=c.get("fit_restarts", 4),
                          bounds=weight_bounds(code, len(w0)))
     except (FitError, SchemaViolation) as e:
         return {"i": idx, "err": ("fit", str(e)[:90])}
@@ -563,6 +572,8 @@ class RoundLoop:
                 objective=self._objective,
                 rank_top_k=self.cfg.rank_top_k,
                 rank_lambda=self.cfg.rank_lambda,
+                fit_method=self.cfg.fit_method,
+                fit_restarts=self.cfg.fit_restarts,
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
                 max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
@@ -682,6 +693,8 @@ class RoundLoop:
                              objective=self._objective,
                              rank_top_k=self.cfg.rank_top_k,
                              rank_lambda=self.cfg.rank_lambda,
+                             method=self.cfg.fit_method,
+                             n_restarts=self.cfg.fit_restarts,
                              bounds=weight_bounds(prop.code, len(prop.w0)))
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
@@ -1201,6 +1214,8 @@ class RoundLoop:
                      #   분기 비교 상수 면제 전후는 같은 계열이 아니다.
                      # ★ 목적함수 전환 (D-104). **조건이므로 남긴다.**
                      "objective": self.cfg.objective,
+                     "fit_method": self.cfg.fit_method,
+                     "fit_restarts": self.cfg.fit_restarts,
                      "objective_switch": self.cfg.objective_switch,
                      "switch_round": self.switch_round,
                      "final_objective": self._objective,
