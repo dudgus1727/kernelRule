@@ -208,11 +208,18 @@ def test_evidence_cases_do_not_reach_the_rule_editor():
     llm = OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
                     registry=FeatureRegistry("F1"))
     hyp = {"claim": "짧은 형상에서 진다", "evidence_cases": [17, 23, 41],
-           "affected_regime": "waves < 1", "id": "H9"}
+           "affected_regime": "waves < 1", "id": "H9",
+           "proposed_direction": "tail 항을 세게",
+           "measurable_with": ["tail_waste"]}
     txt = llm._user_prompt("rule_editor", "", parent=None, parent_n_terms=0,
                            hypothesis=hyp, analyst=True)
-    assert "짧은 형상에서 진다" in txt and "waves < 1" in txt
-    assert "evidence_cases" not in txt and "17" not in txt.split("## 이번 가설")[1][:400]
+    block = txt.split("## 이번 가설")[1][:600]
+    # ★ 허용 목록만 간다 (D-117)
+    for keep in ("짧은 형상에서 진다", "tail 항을 세게", "tail_waste"):
+        assert keep in block, keep
+    # 나머지는 Analyst 기록용 — `hypotheses.jsonl` 에는 남는다
+    for drop in ("evidence_cases", "affected_regime", "waves < 1", "H9"):
+        assert drop not in block, drop
 
 
 def test_prompt_no_longer_names_the_optimizer():

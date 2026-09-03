@@ -43,8 +43,12 @@ class HwPromptError(ValueError):
     """번들과 프롬프트가 갈렸다. **조용히 진행하지 않는다** (§26.4)."""
 
 
-#: 눈금 표에 쓸 커널 길이 [ms]. 짧은 쪽 하나는 실제 관측 범위 하한이다.
-_TICK_ROWS = (0.014, 0.5, 1.3)
+#: 눈금 표에 쓸 **참고** 길이 [ms].
+#:
+#: 판정은 이 목록이 아니라 `min_ms` — **그 표의 실제 최소 best_ms** — 에서
+#: 한다 (D-117). 14us 가 관측 하한인 것은 A6000 뿐이고, 표에 없는 길이에서
+#: 판정하면 그것은 표와 무관한 기준이다 (원칙 2).
+_TICK_ROWS = (0.5, 1.3)
 
 
 def _fmt_bytes(n: int) -> str:
@@ -53,16 +57,20 @@ def _fmt_bytes(n: int) -> str:
     return f"{n / (1 << 10):.0f} KB"
 
 
-def render_hw_prompt(hw: Hardware, *, noise, env: dict) -> str:
+def render_hw_prompt(hw: Hardware, *, noise, env: dict,
+                     min_ms: float) -> str:
     """`Hardware` + 노이즈 모델 -> 프롬프트 본문. **손으로 쓰지 않는다.**
 
     ★ 측정 한계 절의 **결론이 표마다 다르다** (D-116). 노이즈 바닥은
     `max(통계항, 눈금항)` 인데 어느 쪽이 이기는지가 표마다 갈린다:
 
     ```
-    A6000   14us 에서 눈금 7.31% vs 통계 2.72%   -> ★ 눈금이 한계다
-    5090    14us 에서 눈금 0.11% vs 통계 0.13%   -> 눈금은 한계가 아니다
+    A6000   11.3us 에서 눈금 9.09% vs 통계 3.36%   -> ★ 눈금이 한계다
+    5090    28.7us 에서 눈금 0.06% vs 통계 0.10%   -> 눈금은 한계가 아니다
     ```
+
+    ★ 판정하는 길이는 **그 표의 최소 `best_ms`** 다 (`min_ms`). 표에 없는
+    길이에서 판정하면 표와 무관한 기준이 된다 (D-117).
 
     5090 에 A6000 의 결론("짧은 형상은 눈금 안에 묻힌다")을 그대로
     보내면 **틀린 경고**다. 판정은 `NoiseModel` 이 이미 들고 있는 두 항을
@@ -83,13 +91,18 @@ def render_hw_prompt(hw: Hardware, *, noise, env: dict) -> str:
                      f"{spec_b:.0f} GB/s)이 아니라 클럭을 고정한 상태의 "
                      "관측값입니다.\n이 보정이 없으면 memory-bound 판정이 "
                      "어긋납니다.\n")
+    if not (min_ms and min_ms > 0):
+        raise HwPromptError(
+            f"min_ms 가 {min_ms} 다. 이 표의 **가장 짧은 커널**에서 "
+            "판정해야 한다 (D-117).")
+    lens = (min_ms, *_TICK_ROWS)
     rows = "\n".join(
-        f"  {ms * 1000:>5.0f} us 커널   눈금 {noise.tick_pct(ms):7.3%}"
+        f"  {ms * 1000:>6.1f} us 커널   눈금 {noise.tick_pct(ms):7.3%}"
         f"   통계 {noise.sigma(ms):7.3%}"
-        for ms in _TICK_ROWS)
-    # ★ 어느 항이 한계인가 — 관측 범위의 **가장 짧은 쪽**에서 본다.
-    short = min(_TICK_ROWS)
-    tick_binds = noise.tick_pct(short) > noise.sigma(short)
+        + ("   ← 이 표의 최솟값" if ms == min_ms else "")
+        for ms in lens)
+    # ★ 어느 항이 한계인가 — **이 표의 가장 짧은 커널**에서 본다.
+    tick_binds = noise.tick_pct(min_ms) > noise.sigma(min_ms)
     limit_note = (
         """**눈금 안의 차이는 존재하지 않는 것과 같습니다.** 그 아래를 겨냥해
 규칙을 정교하게 만드는 것은 노이즈를 배우는 일입니다. 그보다 **확실히
@@ -156,9 +169,14 @@ alignment 가 16바이트를 못 맞추면 cp.async 를 못 써서 2단만 가�
 """
 
 
-def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None
+def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
+                          table=None, min_ms: float | None = None
                           ) -> tuple[str, dict]:
-    """번들 경로 -> (프롬프트 본문, 사실 요약). **유일한 진입점**이다."""
+    """번들 경로 -> (프롬프트 본문, 사실 요약). **유일한 진입점**이다.
+
+    ★ `table` 이나 `min_ms` 중 하나는 있어야 한다 (D-117) — 눈금 판정을
+    **그 표의 가장 짧은 커널**에서 하기 때문이다. 기본값을 두지 않는다.
+    """
     p = Path(bundle) / "env.json"
     if not p.exists():
         raise HwPromptError(
@@ -179,15 +197,22 @@ def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None
             f"{str(b.env_hash)[:16]!r}")
     noise = NoiseModel.from_bundle(b)
     tick_ms = float(noise.tick_ms)
-    txt = render_hw_prompt(hw, noise=noise, env=env)
-    short = min(_TICK_ROWS)
+    if min_ms is None:
+        if table is None:
+            raise HwPromptError(
+                "`table` 도 `min_ms` 도 없다. 눈금이 한계인지를 **그 표의 "
+                "가장 짧은 커널**에서 판정해야 한다 (D-117).")
+        min_ms = float(min(table.best_time(q) for q in table.shapes()))
+    txt = render_hw_prompt(hw, noise=noise, env=env, min_ms=min_ms)
     return txt, {"name": hw.name, "arch": hw.arch, "sm_count": hw.sm_count,
                  "l2_bytes": hw.l2_bytes, "ridge_point": hw.ridge_point,
                  "tick_ms": tick_ms, "source": str(p),
                  # ★ 조건이므로 남긴다 — 측정 한계 절의 **결론**이 갈린다.
-                 "tick_binds": bool(noise.tick_pct(short) > noise.sigma(short)),
-                 "tick_pct_at_14us": float(noise.tick_pct(short)),
-                 "sigma_at_14us": float(noise.sigma(short))}
+                 "min_ms": float(min_ms),
+                 "tick_binds": bool(noise.tick_pct(min_ms)
+                                    > noise.sigma(min_ms)),
+                 "tick_pct_at_min": float(noise.tick_pct(min_ms)),
+                 "sigma_at_min": float(noise.sigma(min_ms))}
 
 
 def check_hw_prompt(text: str, hw: Hardware, tick_ms: float) -> None:

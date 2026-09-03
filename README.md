@@ -53,9 +53,11 @@ experiments/README.md       스크립트 ↔ artifact 매핑
       ★ 순위 축의 벽 — 여섯 방향에서 밀었고 안 움직였다 (D-104~D-112)
 
 미확정 5090 (c) 재생성 — ★ A6000 하드웨어 사실을 받고 돌았다 (D-113).
-      다시 잰다
-      Instrumenter (§11.4) 미구현 — 피처를 **정의하는** 단계
-      Architect A 조건 (표 없이 구조) 미구현
+      사다리 세 팔로 다시 잰다 (숫자 / 경고 절을 하나씩)
+      ★ regret@k 로 벽을 다시 재는 중 (regret-at-k-prereg.md)
+      design.md 를 현재/역사로 못 나눴다 (pending_fixes 13)
+      셀 축 재설계로 D-42 를 다시 시험 (pending_fixes 7)
+      가중치를 형상마다 하나로 두는 것 (pending_fixes 11 — 유보 붙음)
 ```
 
 **관문은 단일 임계값이 아니라 비용-성능 표다** (§9.2c). regret 한 칸만 보고

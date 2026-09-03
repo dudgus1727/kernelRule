@@ -74,7 +74,7 @@ def test_generated_prompt_matches_its_bundle(bundle, env_hash):
     from kernelrule.agents.hwprompt import check_hw_prompt, hw_prompt_from_bundle
 
     t = _table(bundle, env_hash)
-    txt, facts = hw_prompt_from_bundle(bundle, env_hash=env_hash)
+    txt, facts = hw_prompt_from_bundle(bundle, env_hash=env_hash, table=t)
     check_hw_prompt(txt, t.hw, float(t.noise.tick_ms))
     assert facts["arch"] == t.hw.arch
     assert f"{t.hw.sm_count}개" in txt
@@ -89,7 +89,8 @@ def test_generated_a6000_prompt_reproduces_the_frozen_numbers():
     """
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
-    txt, _ = hw_prompt_from_bundle(*A6000[:1], env_hash=A6000[1])
+    txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
+                                   table=_table(*A6000))
     for want in ("84개", "101,376 B", "6 MB", "116.1 TFLOP/s",
                  "729.7 GB/s", "159.1 FLOP/byte", "눈금(1.024 us)"):
         assert want in txt, f"옛 파일의 {want!r} 를 재현 못 한다"
@@ -119,7 +120,7 @@ def test_same_gpu_but_wrong_tick_is_refused():
     )
 
     t = _table(*A6000)
-    txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1])
+    txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1], table=t)
     check_hw_prompt(txt, t.hw, float(t.noise.tick_ms))       # 맞으면 통과
     with pytest.raises(HwPromptError, match="눈금"):
         check_hw_prompt(txt, t.hw, float(t.noise.tick_ms) * 4)
@@ -129,10 +130,12 @@ def test_tick_table_is_computed_not_hardcoded():
     """5090 의 눈금은 A6000 의 1/64 다 — 표가 그것을 반영해야 한다."""
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
-    a, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1])
-    g, _ = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1])
-    assert "7.314%" in a, "A6000 의 14us 행이 바뀌었다"
-    assert "7.314%" not in g, (
+    a, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
+                                 table=_table(*A6000))
+    g, _ = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1],
+                                 table=_table(*G5090))
+    assert "9.091%" in a, "A6000 의 최솟값 행이 바뀌었다"
+    assert "9.091%" not in g, (
         "5090 프롬프트가 A6000 의 눈금 비율을 말한다 — 상수로 박혀 있다")
 
 
@@ -148,8 +151,10 @@ def test_tick_table_is_computed_not_hardcoded():
 def test_tick_advisory_follows_which_term_binds():
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
-    a, fa = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1])
-    g, fg = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1])
+    a, fa = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
+                                  table=_table(*A6000))
+    g, fg = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1],
+                                  table=_table(*G5090))
 
     assert fa["tick_binds"] is True and fg["tick_binds"] is False
     # A6000 — 눈금이 한계다
@@ -165,7 +170,8 @@ def test_both_noise_terms_are_shown():
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
     for bundle, env_hash in (A6000, G5090):
-        txt, _ = hw_prompt_from_bundle(bundle, env_hash=env_hash)
+        txt, _ = hw_prompt_from_bundle(bundle, env_hash=env_hash,
+                                       table=_table(bundle, env_hash))
         assert "눈금 " in txt and "통계 " in txt
         assert "노이즈 바닥은 두 항 중 **큰 쪽**이다" in txt
 
@@ -174,6 +180,22 @@ def test_binding_term_is_recorded_as_a_condition():
     """조건이므로 산출물에 남아야 한다 (원칙 39)."""
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
-    _, f = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1])
-    for k in ("tick_binds", "tick_pct_at_14us", "sigma_at_14us"):
+    _, f = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1],
+                                 table=_table(*G5090))
+    for k in ("tick_binds", "tick_pct_at_min", "sigma_at_min", "min_ms"):
         assert k in f
+
+
+def test_judgement_point_comes_from_the_table_not_a_constant():
+    """★ 표에 없는 길이에서 판정하면 표와 무관한 기준이다 (D-117)."""
+    import pytest as _pt
+
+    from kernelrule.agents.hwprompt import HwPromptError, hw_prompt_from_bundle
+
+    with _pt.raises(HwPromptError, match="min_ms"):
+        hw_prompt_from_bundle(A6000[0], env_hash=A6000[1])   # 둘 다 없다
+    for bundle, env_hash in (A6000, G5090):
+        t = _table(bundle, env_hash)
+        _, f = hw_prompt_from_bundle(bundle, env_hash=env_hash, table=t)
+        want = float(min(t.best_time(q) for q in t.shapes()))
+        assert abs(f["min_ms"] - want) < 1e-12

@@ -234,15 +234,20 @@ def power_note(on: bool) -> str:
     return _POWER_NOTE if on else ""
 
 
-#: ★ RuleEditor 에게 무의미한 가설 필드 (D-114). `evidence_cases` 는
-#: 진단 리포트의 **사례 번호**라 RuleEditor 는 그 사례를 못 본다 —
-#: 의미 없는 정수 목록이 토큰만 쓰고, 최악의 경우 그 번호를 형상
-#: 지목으로 오해할 여지를 남긴다.
-_EDITOR_DROPS = ("evidence_cases",)
+#: ★ RuleEditor 에게 보낼 가설 필드 — **허용 목록**이다 (D-117).
+#:
+#: 처음에는 거부 목록(`evidence_cases` 만 뺀다)이었다. 그러면 Analyst
+#: 스키마에 필드가 하나 늘 때마다 **자동으로 새어 나간다.** 그리고
+#: 형상 크기 validator 는 `claim` 에만 걸려 있어서 `risk` /
+#: `affected_regime` 는 안 거친다.
+#:
+#: 나머지(`evidence_cases` `risk` `affected_regime` `id`)는 Analyst
+#: 기록용이고 `hypotheses.jsonl` 에 그대로 남는다 — 버리는 것이 아니다.
+_EDITOR_KEEPS = ("claim", "measurable_with", "proposed_direction")
 
 
 def _for_editor(hyp: dict) -> dict:
-    return {k: v for k, v in hyp.items() if k not in _EDITOR_DROPS}
+    return {k: hyp[k] for k in _EDITOR_KEEPS if k in hyp}
 
 
 def product_block(on: bool) -> str:

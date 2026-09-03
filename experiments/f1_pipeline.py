@@ -234,7 +234,7 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
             hw_prompt_from_bundle,
         )
         hw_text, _facts = hw_prompt_from_bundle(
-            a.bundle, env_hash=getattr(a, "env_hash", None))
+            a.bundle, env_hash=getattr(a, "env_hash", None), table=table)
         # ★ 만든 것과 이 표가 같은 하드웨어인가. 되돌려서 확인한다.
         check_hw_prompt(hw_text, table.hw, float(table.noise.tick_ms))
     names = sorted(n for n in registry._items if not registry[n].shape_level)

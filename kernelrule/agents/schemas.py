@@ -329,6 +329,17 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
                     "규칙이 된다 (§29.4).")
             return v
 
+        # ★ `claim` 만 검사하면 새는 자리가 남는다 (D-117). RuleEditor 에
+        #   실제로 가는 필드 전부에 같은 검사를 건다.
+        @field_validator("proposed_direction")
+        @classmethod
+        def _direction_no_shape_size(cls, v: str) -> str:
+            if v and _SHAPE_SIZE.search(v):
+                raise ValueError(
+                    "제안 방향에 형상 크기를 쓰지 마라 (예: 'M=4096'). "
+                    "체제로 말하라 — 'waves < 1 인 형상' 처럼.")
+            return v
+
     class AnalysisOutput(BaseModel):
         hypotheses: list[HypothesisOut] = Field(
             description=f"{N_HYP_MIN}~{N_HYP_MAX}개. 서로 다른 실패 모드를 "
