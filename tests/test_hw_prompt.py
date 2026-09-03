@@ -134,3 +134,46 @@ def test_tick_table_is_computed_not_hardcoded():
     assert "7.314%" in a, "A6000 의 14us 행이 바뀌었다"
     assert "7.314%" not in g, (
         "5090 프롬프트가 A6000 의 눈금 비율을 말한다 — 상수로 박혀 있다")
+
+
+# ---------------------------------------------------------------------------
+# ★ 측정 한계 절의 **결론**이 표마다 다르다 (D-116)
+# ---------------------------------------------------------------------------
+#
+# 노이즈 바닥은 `max(통계항, 눈금항)` 인데 어느 쪽이 이기는지가 갈린다.
+# 5090 에 A6000 의 결론("짧은 형상은 눈금 안에 묻힌다")을 보내면 **틀린
+# 경고**다 — 5090 은 어느 길이에서도 통계 항이 더 크다.
+
+
+def test_tick_advisory_follows_which_term_binds():
+    from kernelrule.agents.hwprompt import hw_prompt_from_bundle
+
+    a, fa = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1])
+    g, fg = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1])
+
+    assert fa["tick_binds"] is True and fg["tick_binds"] is False
+    # A6000 — 눈금이 한계다
+    assert "눈금 안의 차이는 존재하지 않는 것과 같습니다" in a
+    assert "이 표에서는 눈금이 한계가 아닙니다" not in a
+    # 5090 — 눈금이 한계가 아니다
+    assert "이 표에서는 눈금이 한계가 아닙니다" in g
+    assert "눈금 안의 차이는 존재하지 않는 것과 같습니다" not in g
+
+
+def test_both_noise_terms_are_shown():
+    """★ 두 항을 다 보여야 모델이 **왜** 그런지 안다."""
+    from kernelrule.agents.hwprompt import hw_prompt_from_bundle
+
+    for bundle, env_hash in (A6000, G5090):
+        txt, _ = hw_prompt_from_bundle(bundle, env_hash=env_hash)
+        assert "눈금 " in txt and "통계 " in txt
+        assert "노이즈 바닥은 두 항 중 **큰 쪽**이다" in txt
+
+
+def test_binding_term_is_recorded_as_a_condition():
+    """조건이므로 산출물에 남아야 한다 (원칙 39)."""
+    from kernelrule.agents.hwprompt import hw_prompt_from_bundle
+
+    _, f = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1])
+    for k in ("tick_binds", "tick_pct_at_14us", "sigma_at_14us"):
+        assert k in f

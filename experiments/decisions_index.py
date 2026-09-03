@@ -38,9 +38,10 @@ _SUPERSEDED: dict[int, tuple[str, str]] = {
 def _entries(text: str) -> list[tuple[int, str, str]]:
     """`(번호, 제목, 헤더 원문)`. 앵커는 **헤더 원문**에서 만든다."""
     out = []
-    # ★ 두 형태가 다 있다 — `## D-1. 제목` (옛것) 과 `## D-77  제목`.
-    #   하나만 잡으면 25개가 조용히 빠진다.
-    for m in re.finditer(r"^## D-(\d+)\.?\s+(.+)$", text, re.M):
+    # ★ 형식은 `## D-N  제목` **하나**다 (2026-09-03 통일). 옛 `## D-1.`
+    #   형식을 정규식으로 같이 받다가 25개를 빠뜨렸다 — 정규식을 늘리는
+    #   것보다 **형식을 하나로 만드는 것**이 맞다 (원칙 2).
+    for m in re.finditer(r"^## D-(\d+)\s+(.+)$", text, re.M):
         out.append((int(m.group(1)), m.group(2).strip(),
                     m.group(0)[3:].strip()))
     return out
@@ -83,11 +84,20 @@ def main() -> None:
     block = BEGIN + "\n" + build(body) + END + "\n\n"
     new = body[:i] + block + body[i:] if BEGIN not in text else \
         text[:text.index(BEGIN)] + block + text[text.index(END) + len(END):].lstrip("\n")
+    # ★ **개수를 센다** (원칙 38). 정규식이 못 잡는 형식이 새로 생기면
+    #   "갈렸다" 로는 안 잡힌다 — 양쪽이 똑같이 빠지기 때문이다.
+    body_only = text[text.index(END) + len(END):] if END in text else text
+    n_head = len(re.findall(r"^## D-", body_only, re.M))
+    n_idx = len(_entries(body_only))
+    if n_head != n_idx:
+        sys.exit(f"본문의 `## D-` 헤더 {n_head}개 중 {n_idx}개만 색인에 "
+                 f"들어간다. 헤더 형식이 `## D-N  제목` 이 아닌 것이 "
+                 f"{n_head - n_idx}개 있다 — 형식을 고쳐라 (D-116).")
     if a.check:
         if new != text:
             sys.exit("decisions.md 색인이 갈렸다. "
                      "`python3 experiments/decisions_index.py` 를 돌려라.")
-        print("색인 최신")
+        print(f"색인 최신 ({n_idx}개, 본문 헤더와 일치)")
         return
     DOC.write_text(new)
     print(f"색인 {len(_entries(body))}줄 갱신")

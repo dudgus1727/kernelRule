@@ -53,8 +53,22 @@ def _fmt_bytes(n: int) -> str:
     return f"{n / (1 << 10):.0f} KB"
 
 
-def render_hw_prompt(hw: Hardware, *, tick_ms: float, env: dict) -> str:
-    """`Hardware` + 눈금 -> 프롬프트 본문. **손으로 쓰지 않는다.**"""
+def render_hw_prompt(hw: Hardware, *, noise, env: dict) -> str:
+    """`Hardware` + 노이즈 모델 -> 프롬프트 본문. **손으로 쓰지 않는다.**
+
+    ★ 측정 한계 절의 **결론이 표마다 다르다** (D-116). 노이즈 바닥은
+    `max(통계항, 눈금항)` 인데 어느 쪽이 이기는지가 표마다 갈린다:
+
+    ```
+    A6000   14us 에서 눈금 7.31% vs 통계 2.72%   -> ★ 눈금이 한계다
+    5090    14us 에서 눈금 0.11% vs 통계 0.13%   -> 눈금은 한계가 아니다
+    ```
+
+    5090 에 A6000 의 결론("짧은 형상은 눈금 안에 묻힌다")을 그대로
+    보내면 **틀린 경고**다. 판정은 `NoiseModel` 이 이미 들고 있는 두 항을
+    비교해서 하고, 여기서 새 기준을 만들지 않는다 (원칙 2).
+    """
+    tick_ms = float(noise.tick_ms)
     if tick_ms <= 0:
         raise HwPromptError(f"tick_ms 가 {tick_ms} 다. 눈금 절을 못 만든다.")
     spec_t = env.get("peak_tflops_f16_spec")
@@ -70,8 +84,24 @@ def render_hw_prompt(hw: Hardware, *, tick_ms: float, env: dict) -> str:
                      "관측값입니다.\n이 보정이 없으면 memory-bound 판정이 "
                      "어긋납니다.\n")
     rows = "\n".join(
-        f"  {ms * 1000:>5.0f} us 커널   한 눈금이 {tick_ms / ms:7.3%}"
+        f"  {ms * 1000:>5.0f} us 커널   눈금 {noise.tick_pct(ms):7.3%}"
+        f"   통계 {noise.sigma(ms):7.3%}"
         for ms in _TICK_ROWS)
+    # ★ 어느 항이 한계인가 — 관측 범위의 **가장 짧은 쪽**에서 본다.
+    short = min(_TICK_ROWS)
+    tick_binds = noise.tick_pct(short) > noise.sigma(short)
+    limit_note = (
+        """**눈금 안의 차이는 존재하지 않는 것과 같습니다.** 그 아래를 겨냥해
+규칙을 정교하게 만드는 것은 노이즈를 배우는 일입니다. 그보다 **확실히
+지는 경로**를 막는 편이 낫습니다."""
+        if tick_binds else
+        """★ **이 표에서는 눈금이 한계가 아닙니다.** 위 표에서 보듯 어느
+길이에서도 통계 항이 더 큽니다 — 즉 한계를 정하는 것은 타이머가 아니라
+**반복 측정으로 줄어드는 산포**입니다. 짧은 형상이라고 해서 특별히 못
+맞추는 것이 아닙니다.
+
+노이즈 바닥(둘 중 큰 쪽) 아래를 겨냥하지 마세요. 그것은 여전히
+노이즈를 배우는 일입니다.""")
     return f"""# 하드웨어 사실 — 기억에서 꺼내지 말고 아래를 쓰세요
 
 이 프로젝트에서 기억에 의존해 네 번 틀렸습니다 (ScaleType 의미, split-K
@@ -112,21 +142,22 @@ alignment 가 16바이트를 못 맞추면 cp.async 를 못 써서 2단만 가�
 시간은 CUDA 이벤트 타이머의 눈금({tick_ms * 1000:.3f} us) 단위로만 기록된다.
 그보다 작은 차이는 **측정으로 구분할 수 없다.**
 
-짧은 커널일수록 그 눈금이 상대적으로 크다:
+노이즈 바닥은 두 항 중 **큰 쪽**이다:
+  눈금   tick/t          반복 측정해도 안 줄어든다 (분해 한계)
+  통계   sigma_abs/t + sigma_rel   반복하면 평균으로 줄어든다
+
 {rows}
 ```
 
 **이것은 하드웨어와 타이머의 성질입니다.** 어느 GPU 로 가도
-같은 형태로 나타납니다 (눈금 값 자체는 다를 수 있습니다).
+같은 형태로 나타납니다 — 다만 **어느 항이 이기는지는 표마다 다릅니다.**
 
-**눈금 안의 차이는 존재하지 않는 것과 같습니다.** 그 아래를 겨냥해
-규칙을 정교하게 만드는 것은 노이즈를 배우는 일입니다. 그보다 **확실히
-지는 경로**를 막는 편이 낫습니다.
+{limit_note}
 """
 
 
-def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
-                          tick_ms: float | None = None) -> tuple[str, dict]:
+def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None
+                          ) -> tuple[str, dict]:
     """번들 경로 -> (프롬프트 본문, 사실 요약). **유일한 진입점**이다."""
     p = Path(bundle) / "env.json"
     if not p.exists():
@@ -135,23 +166,28 @@ def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
             "않는다 — 기본값으로 떨어지면 다른 GPU 의 사실이 간다 (D-113).")
     env = json.loads(p.read_text())
     hw = hardware_from_env(env)
-    if tick_ms is None:
-        from kerneltab.core.bundle import load_bundle
+    from kerneltab.core.bundle import load_bundle
 
-        from kernelrule.core.noise import NoiseModel
+    from kernelrule.core.noise import NoiseModel
 
-        # ★ `PerfTable` 과 **같은 진입점**을 쓴다 (원칙 2). 눈금을 여기서
-        #   따로 읽으면 표가 쓰는 값과 갈릴 수 있다.
-        b = load_bundle(str(bundle), verify=True)
-        if env_hash and not str(b.env_hash).startswith(str(env_hash)):
-            raise HwPromptError(
-                f"env_hash 불일치. 요청 {env_hash!r}, 번들 "
-                f"{str(b.env_hash)[:16]!r}")
-        tick_ms = float(NoiseModel.from_bundle(b).tick_ms)
-    txt = render_hw_prompt(hw, tick_ms=tick_ms, env=env)
+    # ★ `PerfTable` 과 **같은 진입점**을 쓴다 (원칙 2). 여기서 따로 읽으면
+    #   표가 쓰는 계수와 갈릴 수 있다.
+    b = load_bundle(str(bundle), verify=True)
+    if env_hash and not str(b.env_hash).startswith(str(env_hash)):
+        raise HwPromptError(
+            f"env_hash 불일치. 요청 {env_hash!r}, 번들 "
+            f"{str(b.env_hash)[:16]!r}")
+    noise = NoiseModel.from_bundle(b)
+    tick_ms = float(noise.tick_ms)
+    txt = render_hw_prompt(hw, noise=noise, env=env)
+    short = min(_TICK_ROWS)
     return txt, {"name": hw.name, "arch": hw.arch, "sm_count": hw.sm_count,
                  "l2_bytes": hw.l2_bytes, "ridge_point": hw.ridge_point,
-                 "tick_ms": tick_ms, "source": str(p)}
+                 "tick_ms": tick_ms, "source": str(p),
+                 # ★ 조건이므로 남긴다 — 측정 한계 절의 **결론**이 갈린다.
+                 "tick_binds": bool(noise.tick_pct(short) > noise.sigma(short)),
+                 "tick_pct_at_14us": float(noise.tick_pct(short)),
+                 "sigma_at_14us": float(noise.sigma(short))}
 
 
 def check_hw_prompt(text: str, hw: Hardware, tick_ms: float) -> None:
