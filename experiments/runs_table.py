@@ -37,7 +37,9 @@ END = "<!-- RUNS:END -->"
 #: 정준값이 **어느 산출물의 어디에** 있나. 값은 여기 안 적는다 (원칙 2).
 #: `(파일, 키 경로, 집계)` — 집계 `med` 는 리스트의 중앙값.
 CANON: dict[str, tuple[str, tuple, str]] = {
-    "F3rw-p8": ("conclusion.json", ("f1_vs_human", "human_median"), "one"),
+    # ★ 옛 정본. 새 정본(F3rw-p8)은 재측정이 끝나면 산출물이 생긴다
+    "F3rw-p8-old": ("conclusion.json", ("f1_vs_human", "human_median"),
+                    "one"),
     "F1rw-p8": ("conclusion.json", ("f1_vs_human", "f1_median"), "one"),
     # `f1k` 는 conclusion.json 안의 **옛 키**다 (개명 전 이름, D-128)
     "F2rw-p8": ("conclusion.json", ("f1k", "median"), "one"),  # D-128
@@ -50,6 +52,13 @@ CANON: dict[str, tuple[str, tuple, str]] = {
 }
 #: 표에서 빼는 접두. **지우지 않는다** — 이름으로 표시만 한다.
 DROP = ("x-",)
+#: ★ 폐기(재측정 대상) 태그와 이유. 표에 **상태로 남긴다** (D-129 §3-2).
+RETIRED = {
+    "F3rw-p8-cma": "p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다",
+    "F3rw-p8-prod": "p8 인데 CMA. 재측정 대상",
+    "F3rw-p8-pow": "p8 인데 CMA. 재측정 대상",
+    "F3rw-p8-old": "옛 정본 — 옛 프롬프트·라운드12·patience10 (D-129)",
+}
 
 
 def _canon(tag: str) -> tuple[str, str]:
@@ -124,6 +133,7 @@ def _rows() -> list[dict]:
                              int(one("parameters")))["fit_method"]),
             "rounds": "~".join(map(str, nr)),
             "gpu": gpu, "canon": val, "canon_src": src,
+            "retired": RETIRED.get(tag, ""),
             "objective": one("objective")})
     return rows
 
@@ -131,15 +141,17 @@ def _rows() -> list[dict]:
 def render() -> str:
     rows = _rows()
     head = ("| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | "
-            "라운드 | 표 | 정준값 | 정준값 출처 |")
-    L = [BEGIN, "", head, "|---|--:|---|---|--:|---|---|---|---|--:|---|"]
+            "라운드 | 표 | 정준값 | 출처 | 상태 |")
+    L = [BEGIN, "", head,
+         "|---|--:|---|---|--:|---|---|---|---|--:|---|---|"]
     for r in rows:
         L.append(
             f"| `{r['tag']}` | {r['n']} | {r['features']}/{r['condition']} |"
             f" {r['seed']} | {r['parameters']} | {r['hint']} | {r['fitter']} |"
             f" {r['rounds']} | {r['gpu']} | {r['canon'] or '—'} |"
             f" {r['canon_src'] or '—'} |"
-            + ("  ⚠️" if r["off_rule"] else ""))
+            + (f" ⛔ 폐기 — {r['retired']} |" if r["retired"]
+               else " ⚠️ 적합기 규칙 밖 |" if r["off_rule"] else " |"))
     L += ["", END]
     return "\n".join(L)
 

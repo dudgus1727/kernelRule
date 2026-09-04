@@ -759,7 +759,12 @@ def main() -> None:
                          "**대조군**이 된다 — 같은 프롬프트로 사람 24개와 "
                          "F1 라이브러리를 비교할 수 있다")
     ap.add_argument("--n-seeds", type=int, default=3)
-    ap.add_argument("--rounds", type=int, default=12)
+    ap.add_argument("--rounds", type=int, default=24,
+                    help="라운드 상한. ★ 2026-09-04 (D-129): 12 -> 24. "
+                         "12 는 검증 안 된 값이었고 6시드 중 2개가 마지막 "
+                         "3라운드에서 아직 유의하게 개선됐다 (D-127). "
+                         "patience=3 이 실제 종료를 정한다 — 라운드는 "
+                         "**상한**이지 조건이 아니다")
     # ★ Analyst -> FeatureWriter 경로 (D-75). **0 이 기본 = 꺼짐** — 지금까지의
     #   실행과 같은 조건이다. 켜면 그 시점 이후 실행은 **별도 계열**이다.
     # ★ 다른 캠페인의 씨앗을 그대로 쓴다 (D-83). 한 캠페인의 6실행은 2단계
@@ -811,9 +816,11 @@ def main() -> None:
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tag", default=None,
-                    help="산출물 디렉토리 접미사. ★ 같은 조건을 다른 설정으로 "
-                         "두 번 돌릴 때 **반드시** 주라 — 안 주면 같은 "
-                         "디렉토리에 겹쳐 써서 앞 실행이 사라진다")
+                    help="★ 산출물 디렉토리 **이름 그대로** (D-128 태그 규칙: "
+                         "<피처><씨앗>-p<파라미터>[-<표현력>][-<실험명>], "
+                         "예: F3rw-p8 / F3rw-p16 / F3rw-p8-prod). 안 주면 "
+                         "옛 이름으로 떨어지고 같은 디렉토리에 겹쳐 쓸 수 "
+                         "있다 — 새 캠페인은 **반드시** 주라")
     ap.add_argument("--dry-run", action="store_true",
                     help="MockLLM 으로 배관만 확인한다. LLM 호출 0회")
     ap.add_argument("--stage", type=int, choices=(1, 2, 3),
@@ -845,8 +852,12 @@ def main() -> None:
     if a.seed_source is None:
         a.seed_source = "human_guided" if a.condition == "F3" else "rule_writer"
 
-    tag = a.tag or ("mock" if a.dry_run else a.model)
-    d = OUT / f"f1pipe-{a.condition}-{tag}"
+    # ★ `--tag` 는 **디렉토리 이름 그대로**다 (D-128 의 태그 규칙).
+    #   전에는 `f1pipe-<조건>-<태그>` 로 조립해서 태그 규칙을 못 지켰다.
+    #   `--tag` 가 없을 때만 옛 이름으로 떨어진다.
+    tag = a.tag
+    d = OUT / tag if tag else OUT / (
+        f"f1pipe-{a.condition}-" + ("mock" if a.dry_run else a.model))
     # ★ 겹쳐 쓰기를 막는다. LLM 호출은 다시 만들 수 없다 (D-33).
     if d.exists() and any(d.iterdir()) and a.stage in (None, 1):
         raise SystemExit(

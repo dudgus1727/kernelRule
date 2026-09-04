@@ -35,7 +35,7 @@ GROUPS = [("F3rw-p8", "F3rw-p8", 6),
           ("F1rw-p8", "F1rw-p8", 6),
           ("F2rw-p8", "F2rw-p8", 6)]
 #: 검토할 patience. **바꾸지 않는다** — "그랬다면 언제 멈췄을까" 만 본다.
-PATIENCES = (3, 4, 10)
+PATIENCES = (3, 5, 7, 10)
 #: 판정에 쓰는 "마지막 3라운드" (0부터 세는 파일의 round 필드)
 LAST3 = (9, 10, 11)
 
@@ -160,6 +160,48 @@ def main() -> None:
     in3 = [r for r, v in main_g.items() if v["sig_in_last3"]]
     late_cell = [r for r, v in main_g.items()
                  if v["last_new_cell"] is not None and v["last_new_cell"] >= 9]
+    # ------------------------------------------------ patience 고르기 (D-129)
+    import statistics as _st
+    print("=" * 96)
+    print("★ patience 별 — 가정 종료 라운드와 **놓칠 개선** "
+          "(사전 등록 patience-prereg.md)")
+    print("=" * 96)
+    pat: dict = {}
+    for tag, g in out["groups"].items():
+        print(f"\n  {tag}")
+        for n in PATIENCES:
+            miss, stops = [], []
+            for v in g.values():
+                e = v["stops"][n]
+                stops.append(e)
+                # ★ 그때 멈췄으면 잃었을 양. 끝까지 간 시드는 0 이다
+                miss.append(0.0 if e is None else v["vals"][e] - v["vals"][-1])
+            early = sum(1 for e in stops if e is not None)
+            med, mx = _st.median(miss), max(miss)
+            pat.setdefault(tag, {})[n] = {
+                "stops": stops, "miss": miss, "median": med, "max": mx,
+                "n_early": early}
+            print(f"    patience {n:2d}  종료 "
+                  + " ".join("-" if e is None else f"r{e:<2d}" for e in stops)
+                  + f"   12 전 종료 {early}/{len(stops)}"
+                  + f"   ★ 놓칠 개선 중앙 {med:+.4f}  최대 {mx:+.4f}")
+        cum = [v["vals"][6] - v["vals"][-1] for v in g.values()]
+        print(f"    ★ r6 -> r11 누적 개선  중앙 {_st.median(cum):+.4f}  "
+              + " ".join(f"{c:+.4f}" for c in cum))
+        pat[tag]["cum_r6_r11"] = cum
+    out["patience"] = pat
+
+    SIGMA = 0.0124
+    main = pat["F3rw-p8"]
+    ok = [n for n in PATIENCES if main[n]["median"] < SIGMA]
+    pick = min(ok) if ok else max(PATIENCES)
+    print(f"\n  ★ 고른 patience = {pick}  "
+          + (f"(놓칠 개선 중앙 {main[pick]['median']:+.4f} < σ {SIGMA})"
+             if ok else
+             f"— ⚠️ 어느 값도 σ {SIGMA} 아래가 아니다. 큰 쪽으로 간다"))
+    out["patience_pick"] = pick
+
+    print()
     print("=" * 96)
     print("★ 판정 — 사전 등록 §2 의 셋 중에서")
     print("=" * 96)

@@ -25,27 +25,28 @@ F3hg-p8-d75-a  human_guided 씨앗
 
 <!-- RUNS:BEGIN — experiments/runs_table.py 가 만든다 -->
 
-| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | 라운드 | 표 | 정준값 | 정준값 출처 |
-|---|--:|---|---|--:|---|---|---|---|--:|---|
-| `F1rw-p8` | 6 | 16/? | rule_writer-try09 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | 1.1195 | conclusion.json |
-| `F2rw-p8` | 6 | 17/? | rule_writer-try01 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | 1.1288 | conclusion.json |
-| `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — |
-| `F3hg-p8-d75-b` | 6 | 19/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — |
-| `F3rw-p16` | 3 | 19/F3 | rule_writer-try05 | 16 | 기본 | cma/1/300 | 12 | a6000 | 1.0906 | expressive-regret.json |
-| `F3rw-p8` | 6 | 19/? | rule_writer-try05 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | 1.0762 | conclusion.json |
-| `F3rw-p8-4090` | 3 | 19/F3 | rule_writer-try00 | 8 | 기본 | nelder-mead/4/200 | 12 | 4090 | 1.0493 | sigma-4090.json |
-| `F3rw-p8-5090` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | 5090 | 1.0611 | c-ladder.json |
-| `F3rw-p8-abl-analyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — |
-| `F3rw-p8-abl-noanalyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — |
-| `F3rw-p8-abl-shuffled` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — |
-| `F3rw-p8-cma` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | cma/1/300 | 12 | a6000 | 1.0987 | expressive-regret.json |  ⚠️
-| `F3rw-p8-cross` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — |
-| `F3rw-p8-d75` | 6 | 21/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — |
-| `F3rw-p8-pow` | 3 | 19/F3 | rule_writer-try05 | 8 | 지수 | cma/1/300 | 12 | a6000 | 1.0839 | expressive-regret.json |  ⚠️
-| `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | 곱 | cma/1/300 | 12 | a6000 | 1.0840 | expressive-regret.json |  ⚠️
-| `luna` | 3 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — |
-| `lunaNAMES` | 6 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — |
-| `verify` | 2 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 6 | a6000 | — | — |
+| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | 라운드 | 표 | 정준값 | 출처 | 상태 |
+|---|--:|---|---|--:|---|---|---|---|--:|---|---|
+| `F1rw-p8` | 6 | 16/? | rule_writer-try09 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | 1.1195 | conclusion.json | |
+| `F2rw-p8` | 6 | 17/? | rule_writer-try01 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | 1.1288 | conclusion.json | |
+| `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — | |
+| `F3hg-p8-d75-b` | 6 | 19/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — | |
+| `F3rw-p16` | 3 | 19/F3 | rule_writer-try05 | 16 | 기본 | cma/1/300 | 12 | a6000 | 1.0906 | expressive-regret.json | |
+| `F3rw-p8` | 1 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 1 | a6000 | — | — | |
+| `F3rw-p8-4090` | 3 | 19/F3 | rule_writer-try00 | 8 | 기본 | nelder-mead/4/200 | 12 | 4090 | 1.0493 | sigma-4090.json | |
+| `F3rw-p8-5090` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | 5090 | 1.0611 | c-ladder.json | |
+| `F3rw-p8-abl-analyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — | |
+| `F3rw-p8-abl-noanalyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — | |
+| `F3rw-p8-abl-shuffled` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — | |
+| `F3rw-p8-cma` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | cma/1/300 | 12 | a6000 | 1.0987 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다 |
+| `F3rw-p8-cross` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — | |
+| `F3rw-p8-d75` | 6 | 21/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — | |
+| `F3rw-p8-old` | 6 | 19/? | rule_writer-try05 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | 1.0762 | conclusion.json | ⛔ 폐기 — 옛 정본 — 옛 프롬프트·라운드12·patience10 (D-129) |
+| `F3rw-p8-pow` | 3 | 19/F3 | rule_writer-try05 | 8 | 지수 | cma/1/300 | 12 | a6000 | 1.0839 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
+| `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | 곱 | cma/1/300 | 12 | a6000 | 1.0840 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
+| `luna` | 3 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — | |
+| `lunaNAMES` | 6 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — | |
+| `verify` | 2 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 6 | a6000 | — | — | |
 
 <!-- RUNS:END -->
 

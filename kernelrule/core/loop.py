@@ -59,8 +59,13 @@ class LoopConfig:
     n_rules_per_round: int = 12
     max_rounds: int = 20
     max_evals: int = 200
-    #: 종료: 이만큼 연속으로 유의한 개선이 없고 새 셀도 없으면 멈춘다
-    patience: int = 10
+    #: 종료: 이만큼 연속으로 유의한 개선이 없고 새 셀도 없으면 멈춘다.
+    #: ★ 2026-09-04 (D-129): 10 -> **3**. 10 은 12라운드에서 판정 창이
+    #: 둘뿐이라 **한 번도 안 걸렸다** (6시드 전부). 3 이면 5/6 이 12 전에
+    #: 멈추고, 그때 잃는 양이 중앙 0.0000 · 최대 0.0060 으로 시드 폭
+    #: σ(0.0124) 아래다 (`patience-prereg.md` 의 기준으로 골랐다).
+    #: ⚠️ 조건 변경이다 — 옛 실행은 10 으로 돌았고 `config.json` 에 남아 있다.
+    patience: int = 3
     seed: int = 0
     sandbox_first_seen: bool = True
     out_dir: str = "runs"
