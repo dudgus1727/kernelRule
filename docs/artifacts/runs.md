@@ -36,7 +36,7 @@ F3hg-p8-d75-a  human_guided 씨앗
 | `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — | |
 | `F3hg-p8-d75-b` | 6 | 19/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — | |
 | `F3rw-p16` | 3 | 19/F3 | rule_writer-try05 | 16 | 기본 | cma/1/300 | 12 | a6000 | 1.0906 | expressive-regret.json | |
-| `F3rw-p8` | 1 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | — | — | |
+| `F3rw-p8` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 5~6~7 | a6000 | 1.0944 | canon-p8.json | |
 | `F3rw-p8-4090` | 3 | 19/F3 | rule_writer-try00 | 8 | 기본 | nelder-mead/4/200 | 12 | 4090 | 1.0493 | sigma-4090.json | |
 | `F3rw-p8-5090` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | 5090 | 1.0611 | c-ladder.json | |
 | `F3rw-p8-abl-analyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | — | — | |

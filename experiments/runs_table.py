@@ -38,6 +38,8 @@ END = "<!-- RUNS:END -->"
 #: `(파일, 키 경로, 집계)` — 집계 `med` 는 리스트의 중앙값.
 CANON: dict[str, tuple[str, tuple, str]] = {
     # ★ 옛 정본. 새 정본(F3rw-p8)은 재측정이 끝나면 산출물이 생긴다
+    "F3rw-p8": ("canon-p8.json", ("holdout_regret",), "med"),
+    # ★ 옛 정본 (D-131 이후 폐기). 값은 conclusion.json 이 갖는다
     "F3rw-p8-old": ("conclusion.json", ("f1_vs_human", "human_median"),
                     "one"),
     "F1rw-p8": ("conclusion.json", ("f1_vs_human", "f1_median"), "one"),
