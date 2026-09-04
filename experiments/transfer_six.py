@@ -139,6 +139,31 @@ def main() -> None:
           "평균하면 1 근처로 뭉갠다")
     print("  ★ 상관계수를 내지 않는다. 쌍이 셋이다 (원칙 27)")
 
+    # ------------------------------------------------- ★ 사후 관측 (대상별)
+    print("\n" + "=" * 96)
+    print("★ 사후 관측 — 손해가 **대상 표**로 갈린다  ⚠️ 사전 등록에 없다")
+    print("=" * 96)
+    print(f"  {'대상 표':10s} {'(c) 원주민':>10s} {'기준선 physics':>14s} "
+          f"{'(a)-(c) 출처별':>26s} {'(b)-(c) 출처별':>26s}")
+    by_dst: dict = {}
+    for s_, d_ in DIRS:
+        k = f"{s_}->{d_}"
+        if k in rows:
+            by_dst.setdefault(d_, []).append((s_, rows[k]))
+    for d_, items in by_dst.items():
+        c = items[0][1]["c"]
+        base = items[0][1]["baseline"]
+        aa = "  ".join(f"{s_}:{w['a_minus_c']:+.4f}" for s_, w in items)
+        bb = "  ".join(f"{s_}:{w['b_minus_c']:+.4f}" for s_, w in items)
+        print(f"  {d_:10s} {c:10.4f} {base:14.4f} {aa:>26s} {bb:>26s}")
+        per_pair[f"dst:{d_}"] = {
+            "c": c, "baseline": base,
+            "a_minus_c": {s_: w["a_minus_c"] for s_, w in items},
+            "b_minus_c": {s_: w["b_minus_c"] for s_, w in items}}
+    print("\n  ★ 두 출처가 같은 대상에서 **거의 같은 손해**를 낸다 —")
+    print("     손해는 출처가 아니라 대상의 성질로 보인다")
+    print("  ⚠️ 대상 셋 x 출처 둘이다. 사전 등록에 없던 자름이라 **관측**이다")
+
     Path(a.out).write_text(json.dumps(
         {"delta": DELTA, "dirs": rows, "pairs": per_pair,
          "missing": missing}, ensure_ascii=False, indent=1))
