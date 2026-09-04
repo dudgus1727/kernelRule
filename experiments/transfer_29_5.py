@@ -21,7 +21,7 @@
 ## ★ 기준선 — 사전 등록의 대체안을 쓴다
 
 `nvMatmulHeuristics` 가 이 환경에 없다 (import 실패). 사전 등록이
-미리 적어 둔 대로 **5090 에서 재적합한 `physics_seeded`** 를 쓴다.
+미리 적어 둔 대로 **5090 에서 재적합한 `human_guided`** 를 쓴다.
 결과를 보고 고른 것이 아니다.
 
 ## ★ 뒤집힌 형상을 포함/제외 양쪽으로
@@ -64,7 +64,7 @@ TABLES: dict[str, dict] = {
         # ★ (c) 재생성 6실행. 앞 3개와 뒤 3개가 **같은 2단계 씨앗**을
         #   쓴다 (`--seed-from`) — 안 그러면 씨앗 규칙이 달라져 조건이
         #   갈린다 (D-84). 표본 단위는 실행이다 (원칙 28).
-        # ⚠️ 2026-09-03 정정 (D-119): 뒤 셋(`-b-`)은 `physics_seeded`
+        # ⚠️ 2026-09-03 정정 (D-119): 뒤 셋(`-b-`)은 `human_guided`
         #    **손씨앗**이라 "5090 에서 처음부터" 가 아니다. (c) 에서 뺀다.
         #    옛 값 1.0485 는 그 여섯의 중앙이고 `c-ladder.md` §0 에 남겼다.
         # ★ 2026-09-04 정정 (D-126): 사다리의 **새 (c)** 로 바꿨다.
@@ -188,7 +188,7 @@ def main() -> None:
           f"뒤집힘 제외 {len(hold_nf)}형상")
     print(f"  {dst} 학습 {len(spB.train.shapes)}형상 — (b) 재적합에 쓴다")
     print("  ★ 기준선: nvMatmulHeuristics 없음 -> 사전 등록의 대체안"
-          f" ({dst} 재적합 physics_seeded)\n")
+          f" ({dst} 재적합 human_guided)\n")
 
     res: dict = {"a": [], "b": [], "c": [], "a_nf": [], "b_nf": [],
                  "c_nf": [], "src": []}
@@ -226,8 +226,8 @@ def main() -> None:
         print(f"  {run:26s} (c) {vc:.4f}"
               f"                 [뒤집힘 제외 {vc_nf:.4f}]", flush=True)
 
-    from kernelrule.rules.physics_seeded import CODE as PS_CODE
-    from kernelrule.rules.physics_seeded import W0 as PS_W0
+    from kernelrule.rules.human_guided import CODE as PS_CODE
+    from kernelrule.rules.human_guided import W0 as PS_W0
     fn, ws = _fit_per_regime(PS_CODE, list(PS_W0), B, mB,
                              list(spB.train.shapes))
     base = _score_on(fn, ws, B, mB, hold)
@@ -242,13 +242,13 @@ def main() -> None:
     print(_row("(b) 재적합", res["b"]))
     print(_row("(c) 재생성", res["c"]))
     # ★ 여기도 쌍마다 다르다 (위 두 자리와 같은 실수를 세 번째로 하지 않는다)
-    print(f"  {f'★ 기준선 physics_seeded({dst} 재적합)':34s} {base:.4f}")
+    print(f"  {f'★ 기준선 human_guided({dst} 재적합)':34s} {base:.4f}")
     print(f"\n홀드아웃 {len(hold_nf)}형상 (뒤집힘 제외)")
     print("-" * 78)
     print(_row("(a) 완전 이식", res["a_nf"]))
     print(_row("(b) 재적합", res["b_nf"]))
     print(_row("(c) 재생성", res["c_nf"]))
-    print(f"  {'★ 기준선 physics_seeded':34s} {base_nf:.4f}")
+    print(f"  {'★ 기준선 human_guided':34s} {base_nf:.4f}")
 
     res["pair"] = [src, dst]
     res["ridge"] = [A.hw.ridge_point, B.hw.ridge_point]

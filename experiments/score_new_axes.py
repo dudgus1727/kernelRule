@@ -27,8 +27,8 @@ from kernelrule.core.splits import Split, SplitSet
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 from kernelrule.features.loader import extended_registry
-from kernelrule.rules.physics_seeded import CODE as PS
-from kernelrule.rules.physics_seeded import W0 as PS_W0
+from kernelrule.rules.human_guided import CODE as PS
+from kernelrule.rules.human_guided import W0 as PS_W0
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
@@ -99,7 +99,7 @@ def main() -> None:
     print(f"  {'벤더 ★관문':14s} {'':11s} {'':8s} {v.at(1):13.4f}")
     ps = canonical_score(PS, PS_W0, table=table, matrix=mats["A-base"],
                          splits=splits)
-    print(f"  {'physics_seeded':14s} {ps.in_sample:11.4f} {'':8s} "
+    print(f"  {'human_guided':14s} {ps.in_sample:11.4f} {'':8s} "
           f"{ps.holdout:13.4f}")
 
     print(f"\n{'=' * 78}")

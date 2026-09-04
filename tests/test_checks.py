@@ -138,20 +138,20 @@ def test_shape_level_if_is_allowed():
     assert chk(code, 2).ok
 
 
-def test_physics_seeded_rule_obeys_the_same_constraints():
+def test_human_guided_rule_obeys_the_same_constraints():
     """★ 사람 기준선도 규칙과 **동일한 제약**을 받는다 (§9.4).
 
     같은 조건이어야 비교가 공정하다.
     """
     import kernelrule.features.physical  # noqa: F401  등록
     from kernelrule.features import REGISTRY
-    from kernelrule.rules.physics_seeded import CODE, W0
+    from kernelrule.rules.human_guided import CODE, W0
 
     r = check_rule(CODE, feature_names=REGISTRY.names(shape_level=False),
                    shape_value_names=REGISTRY.names(shape_level=True),
                    n_weights=len(W0))
     assert r.ok, r.violations
-    assert r.budget_used <= LIMITS["budget"]
+    assert r.parameters_used <= LIMITS["parameters"]
 
 
 # ---------------------------------------------------------------------------
@@ -286,11 +286,11 @@ def test_the_actual_evasive_rule_is_now_rejected():
     assert not r.ok and any("재사용" in v for v in r.violations)
 
 
-def test_physics_seeded_rule_uses_one_weight_per_term():
+def test_human_guided_rule_uses_one_weight_per_term():
     """사람 기준선이 새 규칙을 만족하는지 회귀로 고정한다."""
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.features import REGISTRY
-    from kernelrule.rules.physics_seeded import CODE, W0
+    from kernelrule.rules.human_guided import CODE, W0
 
     r = check_rule(CODE, feature_names=REGISTRY.names(shape_level=False),
                    shape_value_names=REGISTRY.names(shape_level=True),
@@ -349,7 +349,7 @@ def test_both_budget_counters_agree():
     갈리면 경계는 통과시키고 정적 검사가 조용히 버린다 — 그때 모델은
     무엇이 틀렸는지 끝내 듣지 못한다.
     """
-    from kernelrule.rules.checks import BUDGET, literal_budget_message
+    from kernelrule.rules.checks import PARAMETERS, literal_parameter_message
 
     cases = [
         ("def score(f, p, hw, w):\n    return f.waves * w[0]\n", 1),
@@ -364,10 +364,10 @@ def test_both_budget_counters_agree():
         r = check_rule(code, feature_names=FEAT,
                        shape_value_names=SHAPE | {"roofline_ratio"},
                        n_weights=nw)
-        over_static = r.budget_used > BUDGET
-        over_llm = literal_budget_message(code, nw) is not None
+        over_static = r.parameters_used > PARAMETERS
+        over_llm = literal_parameter_message(code, nw) is not None
         assert over_static == over_llm, (
-            f"두 계수기가 갈렸다: 정적 {r.budget_used}/{BUDGET} vs "
+            f"두 계수기가 갈렸다: 정적 {r.parameters_used}/{PARAMETERS} vs "
             f"경계 {over_llm}\n{code}")
 
 

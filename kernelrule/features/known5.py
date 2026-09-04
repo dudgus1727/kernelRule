@@ -1,4 +1,7 @@
-"""★ F1-K 조건의 시작 라이브러리 — **공개 지식 다섯** (§30.17).
+"""★ F2 조건의 시작 라이브러리 — **공개 지식 다섯** (§30.17).
+
+★ 2026-09-04 개명: 이 조건의 옛 이름은 `F1-K` 였다 (D-128). 모듈
+이름은 그대로다 — 내용이 "공개 지식 5개" 이고 조건 이름과 별개다.
 
 ## 왜 다섯을 주나
 
@@ -74,7 +77,7 @@ from kernelrule.features import shape_feature as _shape_feature
 
 __all__ = ["KNOWN5", "SOURCES", "source_of"]
 
-#: F1-K 의 시작 레지스트리. **다섯만 들어간다** — 나머지 19개는 F3 조건이다.
+#: F2 의 시작 레지스트리. **다섯만 들어간다** — 나머지 19개는 F3 조건이다.
 KNOWN5 = FeatureRegistry("known5")
 
 #: 피처 -> 공개 출처. 프롬프트의 설명 끝에 붙는다.
@@ -91,7 +94,7 @@ def source_of(name: str) -> str:
     """출처. 없으면 예외 — **출처를 못 대는 피처는 여기 못 들어온다.**"""
     if name not in SOURCES:
         raise KeyError(
-            f"{name!r} 의 공개 출처가 없다. F1-K 의 시작 라이브러리는 "
+            f"{name!r} 의 공개 출처가 없다. F2 의 시작 라이브러리는 "
             "'이 표 없이도 아는 것' 만 담는다 (§30.17).")
     return SOURCES[name]
 

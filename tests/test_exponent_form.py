@@ -155,7 +155,7 @@ def test_power_hint_lands_on_every_surface_and_is_off_by_default():
     from kernelrule.agents.schemas import rule_output_for
 
     os.environ.setdefault("OPENAI_API_KEY", "t")
-    kw = {"objective": "rank", "budget": 8}
+    kw = {"objective": "rank", "parameters": 8}
     off = assemble_instructions("rule_editor", **kw)
     on = assemble_instructions("rule_editor", power_hint=True, **kw)
     assert "{power_block}" not in off and "{power_note}" not in off

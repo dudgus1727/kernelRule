@@ -59,7 +59,7 @@ def test_mixed_seed_source_fails(tmp_path):
     for i in range(3):
         _mk(tmp_path, f"a-s{i}")
     for i in range(3):
-        _mk(tmp_path, f"b-s{i}", source="physics_seeded", code="other")
+        _mk(tmp_path, f"b-s{i}", source="human_guided", code="other")
     runs = [f"a-s{i}" for i in range(3)] + [f"b-s{i}" for i in range(3)]
     with pytest.raises(RunSetError, match="seed_source"):
         assert_same_condition(runs, root=tmp_path, label="(c) 재생성")
@@ -110,7 +110,7 @@ def test_real_c_arms_are_clean_and_the_recorded_six_are_not():
         pytest.skip("5090 실행 없음")
     assert_same_condition(ok, label="(c)")
     mixed = ok + [f"f1pipe-F3-5090sigma-b-s{i}" for i in range(3)]
-    with pytest.raises(RunSetError, match="physics_seeded"):
+    with pytest.raises(RunSetError, match="human_guided"):
         assert_same_condition(mixed, label="기록된 (c) 여섯")
 
 

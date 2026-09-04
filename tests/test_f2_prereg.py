@@ -1,4 +1,4 @@
-"""F1-K 사전 등록 — 문서와 코드가 갈리지 않는가 (원칙 2).
+"""F2 사전 등록 — 문서와 코드가 갈리지 않는가 (원칙 2).
 
 사전 등록은 **문서**로 읽히고 **코드**로 실행된다. 문서만 고치고 코드를
 안 고치면 "사전 등록대로 했다" 가 거짓이 된다.
@@ -13,13 +13,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "experiments"))
 
 DOC = (Path(__file__).resolve().parents[1]
-       / "docs" / "artifacts" / "f1k-preregistration.md")
+       / "docs" / "artifacts" / "f2-preregistration.md")
 
 
 @pytest.fixture(scope="module")
 def pre():
     import f1_pipeline
-    return f1_pipeline.F1K_PREREG
+    return f1_pipeline.F2_PREREG
 
 
 def test_doc_says_it_was_written_before_any_llm_call():

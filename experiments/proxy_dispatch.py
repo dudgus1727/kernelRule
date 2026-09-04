@@ -37,8 +37,8 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 from kernelrule.features.physical import log_sol_ms
-from kernelrule.rules.physics_seeded import CODE as PS
-from kernelrule.rules.physics_seeded import W0 as PS_W0
+from kernelrule.rules.human_guided import CODE as PS
+from kernelrule.rules.human_guided import W0 as PS_W0
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
@@ -128,7 +128,7 @@ def main() -> None:
         i_s = {p: i for i, p in enumerate(e_s.shapes)}
         per = np.array([e_f.regret[i_f[p], 0] if p in i_f
                         else e_s.regret[i_s[p], 0] for p in shapes])
-        print(f"\n  physics_seeded 체제별 재적합 — 경계 {name}")
+        print(f"\n  human_guided 체제별 재적합 — 경계 {name}")
         print(f"    빠른 {len(fast):2d}형상 {e_f.at(1):.4f} | "
               f"느린 {len(slow):2d}형상 {e_s.at(1):.4f} | "
               f"전체61 {geomean(per):.4f}")

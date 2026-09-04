@@ -216,7 +216,7 @@ def test_hypothesis_count_desc_and_validator_share_one_constant():
 def test_weight_cap_has_one_source_of_truth():
     from kernelrule.agents.schemas import MAX_WEIGHTS
     from kernelrule.rules.checks import LIMITS
-    assert LIMITS["budget"] == MAX_WEIGHTS
+    assert LIMITS["parameters"] == MAX_WEIGHTS
 
 
 def test_mock_and_real_paths_enforce_the_same_budget():
@@ -288,7 +288,7 @@ def test_changes_is_optional():
 
 
 # ---------------------------------------------------------------------------
-# FeatureWriter — F0~F3 조건 (§11.4)
+# FeatureWriter — F1~F3 조건 (§11.4)
 # ---------------------------------------------------------------------------
 # 근본 질문은 "LLM 이 물리량을 **만들** 수 있나" 다. 그러려면 조건마다
 # 무엇을 주는지가 엄밀해야 한다 — F1 에 기존 피처 이름이 하나라도 새면
@@ -303,7 +303,7 @@ def _feat_client():
                      registry=REGISTRY, cache=False), REGISTRY
 
 
-@pytest.mark.parametrize("cond", ["F0", "F1"])
+@pytest.mark.parametrize("cond", ["F1"])
 def test_f0_f1_leak_no_existing_feature_name(cond):
     """★ 원시 값 조건에 기존 피처 이름이 들어가면 안 된다."""
     c, reg = _feat_client()
@@ -325,9 +325,9 @@ def test_unknown_condition_is_rejected():
 
 
 def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
-    """D-35 — **F0/F1 의** 형태 예시가 실제 피처를 건네주면 안 된다.
+    """D-35 — **F1 의** 형태 예시가 실제 피처를 건네주면 안 된다.
 
-    공개 지식을 주는 조건(F1-K/F2/F3)은 실제 피처를 코드까지 보여준다 —
+    공개 지식을 주는 조건(F2/F3)은 실제 피처를 코드까지 보여준다 —
     그것이 조건의 정의다 (§30.17). 그쪽은 `examples/known5.md` 다.
     """
     from kernelrule.agents.openai_client import load_prompt
@@ -340,20 +340,20 @@ def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
 
 
 def test_prompts_never_hardcode_the_budget_number(monkeypatch):
-    """★ 예산 숫자의 출처는 `checks.BUDGET` **하나**다.
+    """★ 예산 숫자의 출처는 `checks.PARAMETERS` **하나**다.
 
     프롬프트 다섯 파일과 스키마와 검사기가 각자 8 을 적고 있었다. 바꾸면
     하나를 빠뜨린다 — `is_reference` / `top_k` / `DEFAULT_MODEL` /
     `REGISTRY` / `load_generated` 에 이은 여섯 번째가 된다.
 
-    `checks.BUDGET` 을 바꿨을 때 프롬프트가 따라 바뀌면 단일 출처다.
+    `checks.PARAMETERS` 을 바꿨을 때 프롬프트가 따라 바뀌면 단일 출처다.
     """
     from kernelrule.agents.openai_client import load_prompt
     from kernelrule.rules import checks
 
     files = ["role/_rules_common.md", "role/_rules_edit.md",
              "role/rule_editor.md", "role/rule_writer.md"]
-    monkeypatch.setattr(checks, "BUDGET", 16)
+    monkeypatch.setattr(checks, "PARAMETERS", 16)
     for f in files:
         txt = load_prompt(f)
         assert "{budget}" not in txt, f"{f}: 치환이 안 됐다"

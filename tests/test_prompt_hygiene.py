@@ -226,7 +226,7 @@ def test_prompt_no_longer_names_the_optimizer():
     """순위 경로는 L-BFGS-B 다. 이름을 적으면 또 갈린다 (pending 12)."""
     from kernelrule.agents.openai_client import load_prompt
 
-    txt = load_prompt("role/_rules_common.md", budget=8)
+    txt = load_prompt("role/_rules_common.md", parameters=8)
     assert "Nelder-Mead" not in txt
     assert "수치 최적화기가" in txt
 
@@ -234,5 +234,5 @@ def test_prompt_no_longer_names_the_optimizer():
 def test_n_candidates_is_described_as_enumeration_not_performance():
     from kernelrule.agents.openai_client import load_prompt
 
-    txt = load_prompt("role/_rules_common.md", budget=8)
+    txt = load_prompt("role/_rules_common.md", parameters=8)
     assert "p.n_candidates" in txt and "성능이 아니라 열거 정보" in txt

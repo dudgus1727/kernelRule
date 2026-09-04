@@ -85,7 +85,7 @@ def test_rule_writers_get_the_budget():
     for role in ("rule_editor", "rule_writer"):
         assert "w[0]" in _instructions(role), f"{role} 에 규칙 형태가 없다"
         for b in (8, 16):
-            body = assemble_instructions(role, objective="rank", budget=b,
+            body = assemble_instructions(role, objective="rank", parameters=b,
                                          hw_file=FROZEN_HW)
             assert f"항 상한 {b}개" in body or f"{b} 이하" in body, (
                 f"{role}: 예산 {b} 이 안 보인다")
@@ -177,9 +177,9 @@ def test_base_is_not_duplicated_into_role_files():
 # 예시가 답을 건네주지 않는가 (D-35)
 # ---------------------------------------------------------------------------
 def test_feature_examples_are_from_another_domain():
-    """★ **F0/F1 에서는** GEMM config 축을 건드리는 예시가 답을 건네준다.
+    """★ **F1 에서는** GEMM config 축을 건드리는 예시가 답을 건네준다.
 
-    F1-K/F2/F3 는 공개 지식을 주는 것이 조건의 정의이므로 실제 피처를
+    F2/F3 는 공개 지식을 주는 것이 조건의 정의이므로 실제 피처를
     코드까지 보여준다 (§30.17) — 그쪽은 `examples/known5.md` 이고 이
     검사의 대상이 아니다.
     """
@@ -253,23 +253,23 @@ def test_no_prompt_hardcodes_a_registry_feature_name():
             if n in body:
                 bad.append(f"  {rel}: {n}")
     assert not bad, (
-        "프롬프트가 실제 피처 이름을 박아 뒀다 — F0/F1 에서는 레지스트리에 "
+        "프롬프트가 실제 피처 이름을 박아 뒀다 — F1 에서는 레지스트리에 "
         "없는 이름이고 물리를 지목한다 (D-35). `f.<이름>` 같은 자리표시자를 "
         "써라. 공개 지식을 주는 조건의 예시면 `_KNOWN_BY_DESIGN` 에 "
-        "넣되 **그 파일이 F0/F1 에 안 간다는 것**을 확인하라:\n"
+        "넣되 **그 파일이 F1 에 안 간다는 것**을 확인하라:\n"
         + "\n".join(bad))
 
 
-def test_known_by_design_files_never_reach_f0_or_f1():
-    """★ 예외 파일이 정말 F0/F1 에 안 가는가 — 예외의 전제를 검사한다."""
+def test_known_by_design_files_never_reach_f1():
+    """★ 예외 파일이 정말 F1 에 안 가는가 — 예외의 전제를 검사한다."""
     from kernelrule.agents.openai_client import _EXAMPLES
 
-    for cond in ("F0", "F1"):
+    for cond in ("F1",):
         assert f"examples/{_EXAMPLES[cond]}.md" not in _KNOWN_BY_DESIGN, cond
 
 
 # ---------------------------------------------------------------------------
-# ★ F1-K — 공개 지식 다섯으로 시작하는 조건 (§30.17)
+# ★ F2 — 공개 지식 다섯으로 시작하는 조건 (§30.17)
 # ---------------------------------------------------------------------------
 def _feature_prompt(condition: str):
     import os
@@ -307,17 +307,17 @@ _MEASURED = ("이 표에서", "최적 0회", "최적으로 뽑힌", "rel 중앙"
 
 def test_f1k_prompt_has_no_measurement():
     """★ 이번 작업의 가장 중요한 지점 — `has_spill` 의 표 관측을 빼는 것."""
-    body = _feature_prompt("F1-K")
+    body = _feature_prompt("F2")
     hit = [m for m in _MEASURED if m in body]
     assert not hit, (
-        f"F1-K 프롬프트에 측정 서술이 있다: {hit}\n"
+        f"F2 프롬프트에 측정 서술이 있다: {hit}\n"
         "표 없이 알 수 있는 것만 남긴다 (§12.3, §30.17).")
 
 
 def test_f1k_shows_the_five_with_sources():
     import kernelrule.features.known5 as K
 
-    body = _feature_prompt("F1-K")
+    body = _feature_prompt("F2")
     for n in K.KNOWN5._items:
         assert f"f.{n}" in body or f"p.{n}" in body, f"{n} 이 안 뜬다"
     assert body.count("출처:") >= 5, "출처가 다섯 미만이다"
@@ -330,16 +330,16 @@ def test_f1k_does_not_leak_the_other_nineteen():
     import kernelrule.features.known5 as K
     from kernelrule.features import REGISTRY
 
-    body = _feature_prompt("F1-K")
+    body = _feature_prompt("F2")
     rest = sorted(set(REGISTRY._items) - set(K.KNOWN5._items))
     leak = [n for n in rest if re.search(rf"\b{re.escape(n)}\b", body)]
     assert not leak, f"나머지 19개가 샜다: {leak}"
 
 
 def test_examples_differ_by_condition():
-    """F0/F1 은 무관 도메인, 공개 지식을 주는 조건은 실제 피처 (D-35)."""
+    """F1 은 무관 도메인, 공개 지식을 주는 조건은 실제 피처 (D-35)."""
     f1 = _feature_prompt("F1")
-    f1k = _feature_prompt("F1-K")
+    f1k = _feature_prompt("F2")
     assert "branch_divergence_cost" in f1 and "queue_backlog" in f1
     assert "branch_divergence_cost" not in f1k
     assert "def tail_waste" in f1k and "다시 만들지 마세요" in f1k
@@ -413,7 +413,7 @@ def test_internal_notes_never_reach_the_model():
     assert not bad, ("주석이 걷히지 않는다:\n" + "\n".join(bad))
 
     # 렌더링된 전문에도 없어야 한다
-    for cond in ("F0", "F1", "F1-K", "F2", "F3"):
+    for cond in ("F1", "F2", "F3"):
         body = _feature_prompt(cond)
         assert "<!--" not in body, cond
         for tag in ("§30.", "D-45", "D-47", "D-63"):

@@ -1,7 +1,7 @@
-"""F0~F3 파이프라인의 배관 (§30.9).
+"""F1~F3 파이프라인의 배관 (§30.9).
 
 **실험 결과가 아니라 배관을 시험한다.** 조건이 정하는 것은 하나뿐이다 —
-어느 레지스트리가 세 단계 전부에 들어가는가. F0/F1 에서 사람이 쓴 24개가
+어느 레지스트리가 세 단계 전부에 들어가는가. F1 에서 사람이 쓴 24개가
 하나라도 새면 "LLM 이 피처를 만들 수 있는가" 라는 질문 자체가 무너진다.
 """
 from __future__ import annotations
@@ -23,18 +23,34 @@ def pipe():
     return f1_pipeline
 
 
-@pytest.mark.parametrize("cond", ["F0", "F1"])
+@pytest.mark.parametrize("cond", ["F1"])
 def test_f0_f1_start_from_an_empty_registry(pipe, cond):
     """★ 사람이 쓴 것이 **하나도** 없어야 한다."""
     r = pipe._base_registry(cond)
     assert not r._items, f"{cond} 출발 레지스트리가 비어 있지 않다: {sorted(r._items)}"
 
 
-def test_f2_is_exactly_the_declared_base(pipe):
+def test_f2_is_the_public_knowledge_five(pipe):
+    """★ F2 = **공개 지식 다섯** (D-128 개명 전 이름은 `F1-K`).
+
+    옛 `F2`(원시 물리량 5개, `F2_BASE`)는 실행이 0회라 삭제했다. 이름이
+    같으므로 **무엇이 F2 인지**를 시험으로 고정한다 — 갈리면 여기서 잡는다.
+    """
+    from kernelrule.features.known5 import KNOWN5
+
     r = pipe._base_registry("F2")
-    assert sorted(r._items) == sorted(pipe.F2_BASE)
-    # 기초 5개는 **사람이 쓴 것**이다 — F2 의 정의가 그렇다
+    assert sorted(r._items) == sorted(KNOWN5._items)
+    assert len(r._items) == 5
+    # 이름은 24개 안에 있지만 **정리본**이다 — 표 관측을 뺀 docstring (§12.3)
     assert set(r._items) <= set(REGISTRY._items)
+    assert sorted(r._items) != sorted(REGISTRY._items)
+
+
+def test_no_alias_for_the_old_condition_names(pipe):
+    """★ alias 를 두지 않는다 (D-128). 옛 이름은 **에러**여야 한다."""
+    for old in ("F0", "F1-K", "F1K"):
+        with pytest.raises(ValueError, match="알 수 없는 조건"):
+            pipe._base_registry(old)
 
 
 def test_f3_is_the_human_24(pipe):
@@ -75,7 +91,7 @@ def test_architect_mock_refuses_an_empty_feature_list():
 def test_regime_split_does_not_need_the_registry():
     """★ 체제는 (형상, 하드웨어)의 성질이다 — 피처 목록의 성질이 아니다.
 
-    전에는 `info.log_sol_ms` 를 읽어서 F0/F1 레지스트리로는 루프도 리포트도
+    전에는 `info.log_sol_ms` 를 읽어서 F1 레지스트리로는 루프도 리포트도
     통째로 죽었다. `regime_of` 로 모았다 (원칙 2).
     """
     import ast
@@ -91,7 +107,7 @@ def test_regime_split_does_not_need_the_registry():
                     and node.value.id in ("info", "f", "feats")):
                 bad.append(f"  {rel}:{node.lineno} {node.value.id}.{node.attr}")
     assert not bad, (
-        "체제 판정이 레지스트리 피처를 읽는다 — F0/F1 에서 죽는다 "
+        "체제 판정이 레지스트리 피처를 읽는다 — F1 에서 죽는다 "
         "(§30.9). `core.splits.regime_of` 를 써라:\n" + "\n".join(bad))
 
 

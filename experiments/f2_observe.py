@@ -1,6 +1,6 @@
-"""★ F1-K 3단계 관찰 — 사전 등록한 항목 셋. LLM 0회.
+"""★ F2 3단계 관찰 — 사전 등록한 항목 셋. LLM 0회.
 
-    python3 experiments/f1k_observe.py
+    python3 experiments/f2_observe.py
 
 ```
 1. 7항 씨앗이 8항이 되는가 (언제?)
@@ -8,7 +8,7 @@
    여유가 있어도 채운다면 "7항 시작이 이점이 아니다" 가 된다
 
 2. np.where 선택 구조가 살아남는가
-   physics_seeded 에 없던 형태다. 유지되면 F1-K 라이브러리의 고유 기여다
+   씨앗에 없던 형태다. 유지되면 F2 라이브러리의 고유 기여다
    버려지면 changes 필드에서 이유를 읽는다
 
 3. 새 축 7개가 진화 후에도 쓰이는가
@@ -62,11 +62,11 @@ def structure(code: str) -> dict:
     }
 
 
-def main(tag: str = "f1pipe-F1-K-k1") -> None:
+def main(tag: str = "F2rw-p8") -> None:
     seed = json.loads(Path(f"runs/{tag}/stage2-rule-writer/chosen.json").read_text())
     s0 = structure(seed["code"])
     print("=" * 78)
-    print("F1-K 3단계 관찰 — 사전 등록 항목")
+    print("F2 3단계 관찰 — 사전 등록 항목")
     print("=" * 78)
     print(f"  씨앗 {seed['source']}  {s0['n_terms']}항  "
           f"if {s0['if']}  where-선택 {s0['where_select']}\n")

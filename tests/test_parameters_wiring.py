@@ -3,14 +3,15 @@
 `--rule-budget 16` 으로 캠페인 하나를 돌렸는데, 검사기만 16 이었고
 **시스템 프롬프트의 역할 파일과 사용자 프롬프트는 8 로 렌더링됐다.**
 같은 프롬프트 안에서 `_rules_common.md` 는 "16 이하", `rule_editor.md` 는
-"항 상한 8개" 라고 말하고 있었다. 규칙 36개 전부가 8항에서 멈췄고,
+"항 상한 8개" 라고 말하고 있었다 (문구는 D-128 에서 "파라미터 상한 N개" 로
+바뀌었다 — 검사하는 것은 **네 면이 같은 숫자를 말하는가** 다). 규칙 36개 전부가 8항에서 멈췄고,
 "예산을 늘려도 항이 안 는다" 로 읽힐 뻔했다.
 
 원인은 자리가 여럿이었다는 것이다 (원칙 23):
 
-    load_prompt(..., budget=)   `assemble_instructions` 만 넘기고 있었다
+    load_prompt(..., parameters=)   `assemble_instructions` 만 넘기고 있었다
     load_prompt("role/...")     `_agent` 와 `_optimize_prompt` 는 안 넘겼다
-    checks.BUDGET               사용자 프롬프트가 **직접 import** 했다
+    checks.PARAMETERS               사용자 프롬프트가 **직접 import** 했다
 
 옛 시험 `test_rule_writers_get_the_budget` 은 `"8" in body` 였다 — 8 은
 피처 설명에도 나오므로 16 으로 바꿔도 통과한다. **바뀌는 값을 상수로
@@ -34,31 +35,31 @@ def test_every_load_prompt_call_passes_the_budget():
     bad = [n.lineno for n in ast.walk(tree)
            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
            and n.func.id == "load_prompt"
-           and "budget" not in {k.arg for k in n.keywords}]
+           and "parameters" not in {k.arg for k in n.keywords}]
     assert not bad, (
-        f"`budget=` 없이 부르는 자리가 있다: {SRC.name} 줄 {bad}. "
-        "기본값으로 떨어지면 `rule_budget` 을 무시한다 (D-105).")
+        f"`parameters=` 없이 부르는 자리가 있다: {SRC.name} 줄 {bad}. "
+        "기본값으로 떨어지면 `parameters` 을 무시한다 (D-105).")
 
 
-#: `checks.BUDGET` 을 읽어도 되는 함수. 그 밖에서 읽으면 `rule_budget`
+#: `checks.PARAMETERS` 을 읽어도 되는 함수. 그 밖에서 읽으면 `parameters`
 #: 을 무시한다 — 조건이 조용히 8 로 돌아간다.
-_MAY_READ_BUDGET = {"load_prompt", "__init__"}
+_MAY_READ_PARAMETERS = {"load_prompt", "__init__"}
 
 
 def test_only_two_functions_read_the_module_constant():
-    """★ `checks.BUDGET` 을 읽는 자리를 **센다**. 유효 예산은 하나다."""
+    """★ `checks.PARAMETERS` 을 읽는 자리를 **센다**. 유효 예산은 하나다."""
     tree = ast.parse(SRC.read_text())
     bad = []
     for fn in ast.walk(tree):
         if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
             continue
-        if fn.name in _MAY_READ_BUDGET:
+        if fn.name in _MAY_READ_PARAMETERS:
             continue
         for n in ast.walk(fn):
             if isinstance(n, ast.Name) and n.id in ("BUDGET", "_CHECK_BUDGET"):
                 bad.append((fn.name, n.lineno))
     assert not bad, (
-        f"`checks.BUDGET` 을 직접 읽는 자리: {bad}. "
+        f"`checks.PARAMETERS` 을 직접 읽는 자리: {bad}. "
         "`self._budget` 하나만 봐야 한다 (D-105).")
 
 
@@ -67,7 +68,7 @@ def _llm(budget: int | None):
     from kernelrule.features import FeatureRegistry
 
     os.environ.setdefault("OPENAI_API_KEY", "t")
-    return OpenAILLM(LLMConfig(rule_budget=budget), feature_names=[],
+    return OpenAILLM(LLMConfig(parameters=budget), feature_names=[],
                      shape_values=[], registry=FeatureRegistry("F1"))
 
 
@@ -79,13 +80,14 @@ def test_user_and_system_prompts_agree_on_the_budget(budget):
     llm = _llm(budget)
     other = 16 if budget == 8 else 8
     sys_p = assemble_instructions("rule_editor", objective="rank",
-                                  budget=llm._budget)
+                                  parameters=llm._parameters)
     usr_p = llm._user_prompt("rule_editor", "", parent=None,
                              parent_n_terms=0, analyst=False)
     for name, txt in (("시스템", sys_p), ("사용자", usr_p)):
-        assert f"항 상한 {budget}개" in txt or f"{budget} 이하" in txt, (
+        assert (f"파라미터 상한 {budget}개" in txt
+                or f"{budget} 이하" in txt), (
             f"{name} 프롬프트에 예산 {budget} 이 안 보인다")
-        assert f"항 상한 {other}개" not in txt, (
+        assert f"파라미터 상한 {other}개" not in txt, (
             f"{name} 프롬프트가 {other} 를 말한다 — 조건이 갈렸다 (D-105)")
 
 
@@ -112,7 +114,7 @@ def test_budget_reaches_the_saturation_notice():
 def test_limits_scale_with_the_budget():
     from kernelrule.rules.checks import LIMITS, limits_for
 
-    assert limits_for(None) == {**LIMITS, "budget": LIMITS["budget"]}
+    assert limits_for(None) == LIMITS
     assert limits_for(8)["ast_nodes"] == LIMITS["ast_nodes"]
     assert limits_for(16)["ast_nodes"] == 2 * LIMITS["ast_nodes"]
     assert limits_for(16)["max_lines"] == 2 * LIMITS["max_lines"]
@@ -124,7 +126,7 @@ def test_prompt_states_the_scaled_node_cap():
     from kernelrule.rules.checks import limits_for
 
     for b in (8, 16):
-        txt = load_prompt("role/_rules_edit.md", budget=b)
+        txt = load_prompt("role/_rules_edit.md", parameters=b)
         n = limits_for(b)["ast_nodes"]
         assert f"AST 노드 {n}개" in txt, f"예산 {b} 에서 노드 상한이 안 맞는다"
 
@@ -199,7 +201,7 @@ def test_dict_path_validation_follows_the_budget():
     d = {"code": _twelve_terms(), "w0": [1.0] * 12}
     with pytest.raises(SchemaViolation):
         validate_rule_proposal(d)
-    validate_rule_proposal(d, budget=16)
+    validate_rule_proposal(d, parameters=16)
 
 
 #: ★ 예산 숫자가 나가는 **모든 면**. 하나라도 빠지면 조건이 갈린다.
@@ -216,7 +218,7 @@ def test_all_four_surfaces_say_the_same_budget():
         llm = _llm(b)
         surfaces = {
             "시스템 프롬프트": assemble_instructions(
-                "rule_editor", objective="rank", budget=llm._budget),
+                "rule_editor", objective="rank", parameters=llm._parameters),
             "사용자 프롬프트": llm._user_prompt(
                 "rule_editor", "", parent=None, parent_n_terms=0,
                 analyst=False),
@@ -224,9 +226,9 @@ def test_all_four_surfaces_say_the_same_budget():
                 rule_output_for(b).model_json_schema(), ensure_ascii=False),
         }
         for name, txt in surfaces.items():
-            assert (f"항 상한 {b}개" in txt or f"{b} 이하" in txt
+            assert (f"파라미터 상한 {b}개" in txt or f"{b} 이하" in txt
                     or f"최대 {b}개" in txt), f"{name} 가 예산 {b} 을 안 말한다"
-        assert limits_for(b)["budget"] == b
+        assert limits_for(b)["parameters"] == b
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +243,7 @@ def test_all_four_surfaces_say_the_same_budget():
 def test_objective_block_states_the_running_k(k):
     from kernelrule.agents.openai_client import assemble_instructions
 
-    txt = assemble_instructions("rule_editor", objective="rank", budget=8,
+    txt = assemble_instructions("rule_editor", objective="rank", parameters=8,
                                 rank_top_k=k)
     assert f"config {k}개" in txt, f"목표 정의가 k={k} 를 안 말한다"
     for other in (10, 20, 100):
@@ -252,7 +254,7 @@ def test_objective_block_states_the_running_k(k):
 def test_objective_block_states_lambda_only_when_set():
     from kernelrule.agents.openai_client import assemble_instructions
 
-    kw = {"objective": "rank", "budget": 8}
+    kw = {"objective": "rank", "parameters": 8}
     assert "가중치 1 를" not in assemble_instructions("rule_editor", **kw)
     on = assemble_instructions("rule_editor", rank_lambda=1.0, **kw)
     assert "참 1등을 맞히는 것" in on
@@ -262,8 +264,8 @@ def test_product_hint_is_off_by_default_and_lands_on_every_surface():
     from kernelrule.agents.openai_client import assemble_instructions
     from kernelrule.agents.schemas import rule_output_for
 
-    off = assemble_instructions("rule_editor", objective="rank", budget=8)
-    on = assemble_instructions("rule_editor", objective="rank", budget=8,
+    off = assemble_instructions("rule_editor", objective="rank", parameters=8)
+    on = assemble_instructions("rule_editor", objective="rank", parameters=8,
                                product_hint=True)
     assert "{product_block}" not in off and "{product_note}" not in off
     assert "피처를 곱해도 됩니다" not in off

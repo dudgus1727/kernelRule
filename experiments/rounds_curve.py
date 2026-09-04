@@ -30,9 +30,10 @@ from kernelrule.core.weights import make_score_of
 from kernelrule.features import REGISTRY
 
 #: (새 태그, 옛 디렉토리 접두, 시드 수)
-GROUPS = [("F3rw-p8", "f1pipe-F3-arch24", 6),
-          ("F1rw-p8", "f1pipe-F1-free-roofline", 6),
-          ("F2rw-p8", "f1pipe-F1-K-k1", 6)]
+#: (태그, 실행 디렉토리 접두, 시드 수). D-128 개명 뒤 둘이 같다.
+GROUPS = [("F3rw-p8", "F3rw-p8", 6),
+          ("F1rw-p8", "F1rw-p8", 6),
+          ("F2rw-p8", "F2rw-p8", 6)]
 #: 검토할 patience. **바꾸지 않는다** — "그랬다면 언제 멈췄을까" 만 본다.
 PATIENCES = (3, 4, 10)
 #: 판정에 쓰는 "마지막 3라운드" (0부터 세는 파일의 round 필드)

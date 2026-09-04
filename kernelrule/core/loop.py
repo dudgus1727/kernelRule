@@ -47,7 +47,7 @@ from kernelrule.core.splits import SplitSet
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import FitError, fit_weights, make_score_of
 from kernelrule.report.diagnostic import build_report
-from kernelrule.rules.checks import BUDGET as _BUDGET
+from kernelrule.rules.checks import PARAMETERS as _PARAMETERS
 from kernelrule.rules.checks import check_rule, limits_for, weight_bounds
 
 __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
@@ -71,7 +71,7 @@ class LoopConfig:
     #: 계산하고, 캐시 키가 레지스트리 해시라 라운드마다 바뀌면 캐시가 안
     #: 듣는다. 1~2 를 넘기지 마라.
     max_new_features_per_round: int = 0
-    #: FeatureWriter 조건 (F0/F1/F1-K/F2/F3). 루프 밖 1단계와 **같은 조건**을
+    #: FeatureWriter 조건 (F1/F2/F3). 루프 밖 1단계와 **같은 조건**을
     #: 줘야 한다 — 다르면 라운드 안에서 조건이 바뀐다.
     feature_condition: str = "F3"
     #: ★ §16.1 대조군 C (D-91) — Analyst 를 끄되 **다른 실행·다른 라운드의
@@ -110,9 +110,9 @@ class LoopConfig:
     #: **전환 시점은 하이퍼파라미터가 아니라 중단 조건이다** — 직전
     #: `switch_window` 라운드의 개선이 `switch_min_improve` 미만이면
     #: 바꾼다. 근거: s2 가 r5~r9 에서 0.2945 -> 0.2915 (1.0%) 로 평평했다.
-    #: ★ 항 예산 (D-104). `None` 이면 `checks.BUDGET`(8) — 지금까지의 동작.
+    #: ★ 파라미터 상한 (D-104). `None` 이면 `checks.PARAMETERS`(8) — 지금까지의 동작.
     #: 검사기·프롬프트가 **같은 값**을 봐야 한다 (원칙 2).
-    rule_budget: int | None = None
+    parameters: int | None = None
     objective_switch: str | None = None
     switch_min_improve: float = 0.01
     switch_window: int = 3
@@ -358,12 +358,12 @@ class RoundLoop:
         self.bests: list[dict] = []
         #: ★ 목적함수 전환 상태 (D-104). `switch_round` 는 안 바뀌면 -1.
         #: ★ 예산을 검사기에 흘린다. `None` 이면 기본(8) 그대로다.
-        self._budget = (cfg.rule_budget if cfg.rule_budget is not None
-                        else _BUDGET)
+        self._budget = (cfg.parameters if cfg.parameters is not None
+                        else _PARAMETERS)
         # ★ 예산만 올리면 **AST 노드 상한에서 막힌다** (D-106). 상한들을
         #   한 곳에서 같이 움직인다.
-        self._limits = (limits_for(cfg.rule_budget)
-                        if cfg.rule_budget is not None else None)
+        self._limits = (limits_for(cfg.parameters)
+                        if cfg.parameters is not None else None)
         self._objective = cfg.objective
         self._switched = False
         self.switch_round = -1
@@ -958,7 +958,7 @@ class RoundLoop:
                 # ★ 예산을 넘긴다 (D-107). 안 넘기면 MockLLM 경로와
                 #   구조화 출력을 안 쓰는 경로에서 16항이 조용히 거부된다.
                 prop = validate_rule_proposal(raw,
-                                              budget=self.cfg.rule_budget)
+                                              parameters=self.cfg.parameters)
             except SchemaViolation as e:
                 res.n_rejected_schema += 1
                 res.rejections.append(("schema", str(e)[:90]))
@@ -1220,9 +1220,9 @@ class RoundLoop:
                      "switch_round": self.switch_round,
                      "final_objective": self._objective,
                      "rule_constraints": {
-                         "budget": (self.cfg.rule_budget
-                                    if self.cfg.rule_budget is not None
-                                    else _BUDGET),
+                         "budget": (self.cfg.parameters
+                                    if self.cfg.parameters is not None
+                                    else _PARAMETERS),
                          "branch_constants_exempt": True}}
         llm_cfg = getattr(self.llm, "cfg", None)
         if llm_cfg is not None and hasattr(llm_cfg, "to_dict"):

@@ -3,7 +3,7 @@
 ## 왜
 
 `transfer_29_5.TABLES["5090"]["runs"]` 가 여섯 실행을 (c) 로 묶었는데
-뒤 셋이 `physics_seeded` **손씨앗**이었다. "5090 표에서 처음부터" 가
+뒤 셋이 `human_guided` **손씨앗**이었다. "5090 표에서 처음부터" 가
 아닌 것이 (c) 에 섞여 있었고, 그 사실은 `chosen.json` 의 `source` 에
 **적혀 있었다.** 아무도 안 읽었다.
 
@@ -21,7 +21,7 @@ D-119   씨앗 source 가 chosen.json 에 있었고 안 읽었다
 ```
 씨앗       stage2 `chosen.json` 의 source + 코드 해시
 목적함수   objective / rank_top_k / rank_lambda
-형태       rule_budget / product_hint / power_hint
+형태       parameters / product_hint / power_hint
 하드웨어   arch_prompt 또는 hw_text 해시   ← D-113 이 여기였다
 분할·조건  split.kind / feature_condition / 모델
 ```
@@ -43,7 +43,7 @@ ROOT = Path("runs")
 
 #: 비교할 조건 키. **여기 없는 것은 안 본다** — 늘릴 때 시험도 같이 는다.
 KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
-        "rule_budget", "product_hint", "power_hint", "hw", "split_kind",
+        "parameters", "product_hint", "power_hint", "hw", "split_kind",
         "feature_condition", "model", "fit_method", "fit_restarts")
 
 #: ★ 새로 생긴 키의 **옛 기본값** (D-123). 옛 실행의 `config.json` 에는
@@ -72,6 +72,7 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         raise RunSetError(f"{cfg_p} 가 없다. 조건을 읽을 수 없다.")
     c = json.loads(cfg_p.read_text())
     loop, llm = c.get("loop", {}), c.get("llm", {})
+    rc = c.get("rule_constraints") or {}
     hw = llm.get("hw_text")
     hw_id = (hw.get("sha256") if isinstance(hw, dict)
              else llm.get("arch_prompt"))
@@ -79,7 +80,10 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         "objective": loop.get("objective"),
         "rank_top_k": loop.get("rank_top_k"),
         "rank_lambda": loop.get("rank_lambda"),
-        "rule_budget": (c.get("rule_constraints") or {}).get("budget"),
+        # ★ D-128 개명: `budget` -> `parameters`. 저장소의 옛 산출물은
+        #   변환했지만, 밖에서 받은 옛 실행이 있을 수 있어 둘 다 읽는다.
+        "parameters": (rc.get("parameters") if rc.get("parameters") is not None
+                       else rc.get("budget")),
         "product_hint": llm.get("product_hint"),
         "power_hint": llm.get("power_hint"),
         "hw": hw_id,

@@ -96,7 +96,7 @@ def main(n_proposals: int = 20, condition: str = "F1",
     print(f"F1 — FeatureWriter 조건 {condition}, 제안 {n_proposals}회  [{model}]")
     print("=" * 78)
     print("  ★ 원시 값만 준다. 기존 피처 이름은 프롬프트에 하나도 없다"
-          if condition in ("F0", "F1") else "  기존 피처를 보여준다")
+          if condition == "F1" else "  기존 피처를 보여준다")
     print()
 
     # ★ 기준 열을 **누적**한다. 전에는 채택할 때마다 생성 레지스트리 전체로

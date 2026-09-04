@@ -37,8 +37,8 @@ from kernelrule.core.splits import Split, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
-from kernelrule.rules.physics_seeded import CODE as PS
-from kernelrule.rules.physics_seeded import W0 as PS_W0
+from kernelrule.rules.human_guided import CODE as PS
+from kernelrule.rules.human_guided import W0 as PS_W0
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
@@ -88,7 +88,7 @@ def main() -> None:
                 reg[p], tol[p] = e.regret[i, 0], e.tol[i]
         return reg, tol
 
-    cands: list[tuple[str, str, list]] = [("physics_seeded", PS, PS_W0)]
+    cands: list[tuple[str, str, list]] = [("human_guided", PS, PS_W0)]
     for cond, model in (("A", "gpt-5.4"), ("B", "gpt-5.4"),
                         ("A", "gpt-5.4-mini-2026-03-17")):
         r = _best(RUNS / f"architect-{cond}-{model}" / "tries.jsonl")

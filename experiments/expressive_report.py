@@ -50,7 +50,7 @@ from kernelrule.rules.checks import _numeric_literals
 
 #: (태그, 라벨, 이 팔이 기준선과 **다른 것**)
 ARMS = [("rb08", "예산 8 (기준선)", None),
-        ("rb16", "예산 16", "rule_budget"),
+        ("rb16", "예산 16", "parameters"),
         ("rprod", "곱 힌트", "product_hint"),
         ("rpow", "지수 힌트", "power_hint")]
 SEEDS = 3
@@ -131,7 +131,7 @@ def _condition_table(out: dict) -> None:
     for tag, label, diff in ARMS:
         cond = assert_same_condition(_runs(tag), label=f"{label} ({tag})")
         c = cond or run_condition(_runs(tag)[0])
-        print(f"  {label:16s} 예산 {str(c['rule_budget']):>3s}  "
+        print(f"  {label:16s} 예산 {str(c['parameters']):>3s}  "
               f"목적 {c['objective']:6s}  적합기 {c['fit_method']}/"
               f"{c['fit_restarts']}  곱 {str(c['product_hint']):5s}  "
               f"지수 {str(c['power_hint']):5s}  씨앗 {str(c['seed_sha'])[:8]}")
@@ -174,7 +174,7 @@ def main() -> None:
           f"{'★ 1라운드 항 수':>18}")
     for tag, label, _ in ARMS:
         sp_, tm, r0 = [], [], []
-        cap = out["condition"][tag]["rule_budget"]
+        cap = out["condition"][tag]["parameters"]
         for r in _runs(tag):
             for e in _rows(r, "archive.jsonl"):
                 sp_.append(_spent(e["code"], len(e["w"])))

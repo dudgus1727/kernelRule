@@ -45,7 +45,7 @@ def test_rule_writer_without_hardware_facts_fails():
     from kernelrule.agents.openai_client import assemble_instructions
 
     with pytest.raises(ValueError, match="하드웨어 사실"):
-        assemble_instructions("rule_writer", objective="rank", budget=8)
+        assemble_instructions("rule_writer", objective="rank", parameters=8)
 
 
 def test_roles_without_hardware_still_assemble():
@@ -53,7 +53,7 @@ def test_roles_without_hardware_still_assemble():
     from kernelrule.agents.openai_client import assemble_instructions
 
     for role in ("rule_editor", "feature", "analyze"):
-        assert assemble_instructions(role, objective="rank", budget=8)
+        assert assemble_instructions(role, objective="rank", parameters=8)
 
 
 def test_llm_config_has_no_default_hardware():

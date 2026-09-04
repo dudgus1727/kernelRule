@@ -26,8 +26,8 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 
-__all__ = ["BUDGET", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
-           "weight_reuse_message", "literal_budget_message",
+__all__ = ["PARAMETERS", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
+           "weight_reuse_message", "literal_parameter_message",
            "exponent_message", "exponent_indices", "weight_bounds",
            "EXPONENT_BOUNDS",
            "identity_transform_message", "noop_term_message"]
@@ -234,8 +234,8 @@ def _same_arg_transform(a, b, fn: str) -> bool:
         return False
 
 
-def literal_budget_message(code: str, n_weights: int,
-                           *, budget: int | None = None) -> str | None:
+def literal_parameter_message(code: str, n_weights: int,
+                           *, parameters: int | None = None) -> str | None:
     """숫자 리터럴 + 가중치가 예산을 넘으면 메시지를, 아니면 `None`.
 
     ★ `weight_reuse_message` 와 같은 이유로 따로 뺐다 — LLM 경계에서
@@ -254,7 +254,8 @@ def literal_budget_message(code: str, n_weights: int,
     counted, branch = _numeric_literals(tree)
     n_lit = len(counted)
     total = n_lit + n_weights
-    b = int(budget if budget is not None else LIMITS["budget"])
+    b = int(parameters if parameters is not None
+            else LIMITS["parameters"])
     if total <= b:
         return None
     hint = ""
@@ -416,19 +417,19 @@ def weight_reuse_message(code: str) -> str | None:
 #:
 #: ⚠️ **8 은 임의로 정한 숫자이고 검증하지 않았다** (§29.4). 8 vs 16 을
 #: 재려 했으나 적합기가 16차원에서 버티지 못해 멈췄다 (D-77).
-BUDGET = 8
+PARAMETERS = 8
 
 LIMITS = {
     #: 가중치 개수 + **분기 비교가 아닌** 숫자 리터럴 (D-78).
     #: 가중치를 예산에 넣는 이유는 §29.4 — 가중치가 많으면 어떤 구조든
     #: 비슷한 regret 에 도달해 구조 비교가 무의미해진다.
-    "budget": BUDGET,
+    "parameters": PARAMETERS,
     "ast_nodes": 400,
     "max_lines": 60,
 }
 
 
-def limits_for(budget: int | None) -> dict:
+def limits_for(parameters: int | None) -> dict:
     """★ 예산에 **따라 움직이는 상한들**. 예산만 올리면 다른 벽에 막힌다.
 
     실측: 8항 규칙의 AST 노드가 중앙 271 / 최대 383 이다. 상한 400 을
@@ -438,11 +439,11 @@ def limits_for(budget: int | None) -> dict:
 
     비례로 올린다 — 8항에 400 이면 16항에 800 이다.
     """
-    b = int(budget if budget is not None else BUDGET)
+    b = int(parameters if parameters is not None else PARAMETERS)
     if b < 1:
         raise ValueError(f"예산은 1 이상이어야 한다: {b}")
-    k = b / BUDGET
-    return {"budget": b,
+    k = b / PARAMETERS
+    return {"parameters": b,
             "ast_nodes": int(round(LIMITS["ast_nodes"] * k)),
             "max_lines": int(round(LIMITS["max_lines"] * k))}
 
@@ -503,7 +504,7 @@ class CheckReport:
     branch_constants: list[float] = field(default_factory=list)
 
     @property
-    def budget_used(self) -> int:
+    def parameters_used(self) -> int:
         return self.n_literals + self.n_weights
 
     def raise_if_bad(self) -> CheckReport:
@@ -518,7 +519,7 @@ class CheckReport:
         bc = (f", 분기상수 {self.branch_constants}(면제)"
               if self.branch_constants else "")
         return (f"[{head}] 리터럴 {self.n_literals} + 가중치 {self.n_weights} "
-                f"= {self.budget_used}/{LIMITS['budget']}{bc}, "
+                f"= {self.parameters_used}/{LIMITS['parameters']}{bc}, "
                 f"항 {self.n_terms}, "
                 f"노드 {self.n_nodes}/{LIMITS['ast_nodes']}, "
                 f"피처 {sorted(self.features_used)}"
@@ -579,7 +580,7 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     term_sigs: list[str] = []
 
     # ★ 리터럴은 `_numeric_literals` **하나**가 센다 — LLM 경계
-    #   (`literal_budget_message`) 와 여기가 따로 세면 갈린다 (D-37 계열).
+    #   (`literal_parameter_message`) 와 여기가 따로 세면 갈린다 (D-37 계열).
     #   `w[0]` 의 `0` 은 거기서 빠진다: 가중치는 `n_weights` 로 이미 예산에
     #   들어가 있어서, 안 빼면 항마다 두 번 세어 예산이 반토막 난다.
     _counted, _branch = _numeric_literals(tree)
@@ -707,9 +708,9 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     if (m := identity_transform_message(code)):
         bad(m)
 
-    if rep.budget_used > lim["budget"]:
+    if rep.parameters_used > lim["parameters"]:
         bad(f"리터럴 {rep.n_literals} + 가중치 {rep.n_weights} = "
-            f"{rep.budget_used} > {lim['budget']} (§29.4). "
+            f"{rep.parameters_used} > {lim['parameters']} (§29.4). "
             + (f"분기 비교 상수 {rep.branch_constants} 는 이미 면제됐다"
                if rep.branch_constants else
                "분기 조건의 비교 상수는 예산에서 빠진다 (D-78)"))

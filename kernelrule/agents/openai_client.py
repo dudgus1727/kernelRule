@@ -81,12 +81,15 @@ def classify_violation(msg: str) -> str:
     return "other"
 
 
-#: 피처 조건. `F1-K` 는 **공개 지식 다섯**으로 시작한다 (§30.17).
-_CONDITIONS = frozenset({"F0", "F1", "F1-K", "F2", "F3"})
+#: 피처 조건 셋 (D-128). `F2` 는 **공개 지식 다섯**으로 시작한다
+#: (§30.17). 옛 이름 `F0`(피처 없음)·옛 `F2`(원시 5개)는 실행이 0회라
+#: 삭제했고, 옛 `F1-K` 가 지금의 `F2` 다. **alias 를 두지 않는다.**
+_CONDITIONS = frozenset({"F1", "F2", "F3"})
 
 #: 조건 -> **피처** 예시 파일. 답을 건네지 않아야 하는 조건은 무관 도메인.
-_EXAMPLES = {"F0": "other_domain", "F1": "other_domain",
-             "F1-K": "known5", "F2": "known5", "F3": "known5"}
+#: ★ 조건이 프롬프트 **예시**를 고른다 — 잘못 옮기면 모델이 다른 예시를
+#: 받고 그것이 조건 변경이다 (D-128 의 개명에서 가장 조심한 자리).
+_EXAMPLES = {"F1": "other_domain", "F2": "known5", "F3": "known5"}
 
 #: `examples/rule_known.md` 가 **이름으로 부르는** 피처들.
 #: 이 넷이 레지스트리에 다 있어야 그 예시를 쓸 수 있다 (§30.20).
@@ -94,7 +97,7 @@ _RULE_EXAMPLE_NEEDS = ("tail_waste", "has_spill", "occupancy_deficit",
                        "roofline_ratio")
 
 
-def _rule_example_for(registry, *, budget: int | None = None) -> str:
+def _rule_example_for(registry, *, parameters: int | None = None) -> str:
     """규칙 예시를 **레지스트리를 보고** 고른다 (§30.20).
 
     RuleWriter 의 `condition` 은 A/B(표 관측 유무)라 피처 조건과 축이
@@ -113,7 +116,7 @@ def _rule_example_for(registry, *, budget: int | None = None) -> str:
     ok = names.issuperset(_RULE_EXAMPLE_NEEDS)
     return load_prompt(
         f"examples/{'rule_known' if ok else 'rule_other_domain'}.md",
-        budget=budget)
+        parameters=parameters)
 
 #: 하드웨어 사실(`hw/*.md`)을 받는 역할. **RuleWriter 뿐이다.**
 #:
@@ -270,7 +273,7 @@ def assemble_instructions(role: str, *, objective: str = "rank",
                           hw_file: str | None = None,
                           hw_text: str | None = None,
                           body: str | None = None,
-                          budget: int | None = None,
+                          parameters: int | None = None,
                           rank_top_k: int = 100,
                           rank_lambda: float = 0.0,
                           product_hint: bool = False,
@@ -283,7 +286,7 @@ def assemble_instructions(role: str, *, objective: str = "rank",
     """
     if objective not in _OBJECTIVE_BLOCKS:
         raise ValueError(f"알 수 없는 목적함수: {objective!r}")
-    parts = [load_prompt("_base.md", budget=budget)]
+    parts = [load_prompt("_base.md", parameters=parameters)]
     if role in _NEEDS_HW:
         # ★ 조용한 기본값을 두지 않는다 (D-113). 없으면 실패다 (§26.4).
         if hw_text is None and hw_file is None:
@@ -293,17 +296,17 @@ def assemble_instructions(role: str, *, objective: str = "rank",
                 "(`kernelrule.agents.hwprompt.hw_prompt_from_bundle`). "
                 "기본값으로 떨어지면 다른 GPU 의 사실이 간다 (D-113).")
         parts.append(hw_text if hw_text is not None
-                     else load_prompt(hw_file, budget=budget))
+                     else load_prompt(hw_file, parameters=parameters))
     if role in _WRITES_RULES:
-        parts.append(load_prompt("role/_rules_common.md", budget=budget)
+        parts.append(load_prompt("role/_rules_common.md", parameters=parameters)
                      .replace("{product_block}", product_block(product_hint))
                      .replace("{power_block}", power_block(power_hint)))
     if role in _EDITS_RULES:
-        parts.append(load_prompt("role/_rules_edit.md", budget=budget).replace(
+        parts.append(load_prompt("role/_rules_edit.md", parameters=parameters).replace(
             "{objective_block}", objective_block(
                 objective, rank_top_k=rank_top_k, rank_lambda=rank_lambda)))
     parts.append(body if body is not None
-                 else load_prompt(f"role/{role}.md", budget=budget)
+                 else load_prompt(f"role/{role}.md", parameters=parameters)
                  .replace("{product_note}", product_note(product_hint))
                  .replace("{power_note}", power_note(power_hint)))
     return "\n\n---\n\n".join(parts)
@@ -325,29 +328,29 @@ _EDITS_RULES = frozenset({"rule_editor"})
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
-def load_prompt(name: str, *, budget: int | None = None) -> str:
-    """프롬프트를 읽는다. **HTML 주석은 걷어내고 `{budget}` 를 채운다.**
+def load_prompt(name: str, *, parameters: int | None = None) -> str:
+    """프롬프트를 읽는다. **HTML 주석은 걷어내고 `{parameters}` 를 채운다.**
 
     `<!-- ... -->` 는 "왜 이렇게 썼나" 를 남기는 자리다. 그것이 모델에
     가면 (1) 토큰을 쓰고 (2) 내부 결정 번호가 새고 (3) 조건에 따라서는
     답을 건네줄 수도 있다.
 
-    ★ 예산 숫자는 **프롬프트에 직접 쓰지 않는다.** `{budget}` 로 쓰면
-    여기서 `checks.BUDGET` 으로 채워진다. 프롬프트 다섯 파일과 스키마와
+    ★ 파라미터 수는 **프롬프트에 직접 쓰지 않는다.** `{parameters}` 로 쓰면
+    여기서 `checks.PARAMETERS` 로 채워진다. 프롬프트 다섯 파일과 스키마와
     검사기가 각자 숫자를 적고 있었고, 그러면 바꿀 때 하나를 빠뜨린다
     (`is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
     `load_generated` 에 이은 여섯 번째가 된다).
     """
-    from kernelrule.rules.checks import BUDGET, limits_for
+    from kernelrule.rules.checks import PARAMETERS, limits_for
 
     p = _PROMPTS / name
     if not p.exists():
         raise FileNotFoundError(f"프롬프트가 없다: {p}")
     txt = _HTML_COMMENT.sub("", p.read_text()).strip() + "\n"
-    # ★ 예산에 딸린 상한들도 **같이** 채운다 (D-106). `ast_nodes` 를
-    #   상수로 적어 두면 예산 16 에서 "400 이 상한" 이라고 말하면서
+    # ★ 파라미터 수에 딸린 상한들도 **같이** 채운다 (D-106). `ast_nodes` 를
+    #   상수로 적어 두면 파라미터 16 에서 "400 이 상한" 이라고 말하면서
     #   검사기는 800 을 쓴다 — 프롬프트와 검사기가 갈린다.
-    lim = limits_for(budget if budget is not None else BUDGET)
+    lim = limits_for(parameters if parameters is not None else PARAMETERS)
     for k, v in lim.items():
         txt = txt.replace("{" + k + "}", str(v))
     return txt
@@ -361,10 +364,10 @@ class LLMConfig:
     #: ★ 목표 정의를 정한다 (D-101). `config.json` 에 남아야 조건이 기록된다.
     #: RuleEditor 의 "채점 방식" 절만 바뀐다 — RuleWriter 는 안 받는다.
     objective: str = "regret"
-    #: ★ 항 예산 (D-104). `None` 이면 `checks.BUDGET`(8). 프롬프트의
-    #: `{budget}` 이 이 값으로 채워진다 — 검사기와 갈리면 안 되므로
+    #: ★ 파라미터 상한 (D-104). `None` 이면 `checks.PARAMETERS`(8). 프롬프트의
+    #: `{parameters}` 가 이 값으로 채워진다 — 검사기와 갈리면 안 되므로
     #: 루프가 같은 값을 `check_rule(limits=...)` 에도 넘긴다.
-    rule_budget: int | None = None
+    parameters: int | None = None
     #: ★ 목표 정의의 **숫자**. 프롬프트가 실행 조건과 같은 말을 해야 한다
     #: (D-105/D-107). `rank` 목적함수에서만 쓰인다.
     rank_top_k: int = 100
@@ -525,7 +528,7 @@ class OpenAILLM:
         #   (§30.9). 이제는 호출부가 반드시 명시한다.
         if registry is None:
             raise ValueError(
-                "OpenAILLM(registry=...) 는 필수다. F0~F3 조건에서 어느 "
+                "OpenAILLM(registry=...) 는 필수다. F1~F3 조건에서 어느 "
                 "피처 목록이 프롬프트에 들어가는지가 실험 자체다 (§26.4).")
         # ★ 같은 판정이 두 곳에 있으면 갈린다 (원칙 2). `feature_names` 는
         #   정적 검사가 쓰고 `registry` 는 프롬프트가 쓴다 — 어긋나면 LLM 이
@@ -559,34 +562,34 @@ class OpenAILLM:
         #: 안다 — 루프에 없는 역할이 여기 남으면 "언젠가 켤 것" 으로 읽힌다.
         self._extra: dict[str, tuple] = {}
         # ★ 유효 항 예산. **여기서 한 번 정하고 모든 자리에 넘긴다**
-        #   (원칙 2). 전에는 `load_prompt` 의 기본값과 `checks.BUDGET`
-        #   직접 import 가 각자 정했고, `rule_budget=16` 을 줘도
+        #   (원칙 2). 전에는 `load_prompt` 의 기본값과 `checks.PARAMETERS`
+        #   직접 import 가 각자 정했고, `parameters=16` 을 줘도
         #   **사용자 프롬프트와 역할 파일은 8 로 렌더링됐다** (D-105).
-        from kernelrule.rules.checks import BUDGET as _CHECK_BUDGET
-        self._budget = int(cfg.rule_budget if cfg.rule_budget is not None
-                           else _CHECK_BUDGET)
+        from kernelrule.rules.checks import PARAMETERS as _CHECK_PARAMETERS
+        self._parameters = int(cfg.parameters if cfg.parameters is not None
+                           else _CHECK_PARAMETERS)
         self._rank_top_k = int(getattr(cfg, "rank_top_k", 100))
         self._rank_lambda = float(getattr(cfg, "rank_lambda", 0.0))
         self._product = bool(getattr(cfg, "product_hint", False))
         self._power = bool(getattr(cfg, "power_hint", False))
-        self._base = load_prompt("_base.md", budget=self._budget)
+        self._base = load_prompt("_base.md", parameters=self._parameters)
         # ★ 하드웨어 사실은 **없어도 여기서 안 죽는다** — RuleWriter 를
         #   부를 때 죽는다. Analyst/RuleEditor/FeatureWriter 는 안 받으므로
         #   (§16.2) 표 없이 만드는 호출을 막을 이유가 없다.
         self._hw = (cfg.hw_text if cfg.hw_text is not None
-                    else (load_prompt(cfg.arch_prompt, budget=self._budget)
+                    else (load_prompt(cfg.arch_prompt, parameters=self._parameters)
                           if cfg.arch_prompt else None))
         #: ★ 목적함수. 프롬프트의 "채점 방식" 절을 정한다 (D-101).
         self.objective = getattr(cfg, "objective", "regret")
         if self.objective not in _OBJECTIVE_BLOCKS:
             raise ValueError(f"알 수 없는 목적함수: {self.objective!r}")
         self._rules = load_prompt("role/_rules_common.md",
-                                  budget=self._budget)
+                                  parameters=self._parameters)
         # ★ 조립은 `assemble_instructions` 한 곳에서 한다 (원칙 2).
         #   아래 넷은 **프롬프트 존재 확인용**으로만 읽는다 — 파일이
         #   없으면 첫 호출이 아니라 여기서 죽어야 한다.
         self._edit = load_prompt("role/_rules_edit.md",
-                                 budget=self._budget)
+                                 parameters=self._parameters)
         # ⚠️ `asyncio.Semaphore` 를 여기서 만들면 **첫 이벤트 루프에
         #    바인딩된다.** 루프는 라운드마다 `asyncio.run()` 을 새로 부르므로
         #    두 번째 라운드부터 "bound to a different event loop" 로 죽는다.
@@ -631,13 +634,13 @@ class OpenAILLM:
             #   필드 설명이 도구 스키마로 모델에 그대로 간다 — 거기에
             #   "최대 8개" 가 굳어 있으면 프롬프트가 16 이라고 해도
             #   모델은 8 을 낸다.
-            _rule_out = rule_output_for(self._budget,
+            _rule_out = rule_output_for(self._parameters,
                                         product_hint=self._product,
                                         power_hint=self._power)
             out = {"analyze": AnalysisOutput, "rule_editor": _rule_out,
                    "rule_writer": _rule_out, "feature": FeatureOutput,
                    "categorize": CategoryOutput}[role]
-            body = load_prompt(f"role/{role}.md", budget=self._budget) \
+            body = load_prompt(f"role/{role}.md", parameters=self._parameters) \
                 .replace("{product_note}", product_note(self._product)) \
                 .replace("{power_note}", power_note(self._power))
         # ★ **두 축**으로 나뉜다 (§30.10). 한 축(하드웨어 무관/의존)만으로
@@ -658,7 +661,7 @@ class OpenAILLM:
         instructions = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
             hw_text=self.cfg.hw_text,
-            body=body, budget=self.cfg.rule_budget,
+            body=body, parameters=self.cfg.parameters,
             rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
             product_hint=self._product, power_hint=self._power)
         if self.cfg.endpoint not in ("responses", "chat"):
@@ -747,15 +750,15 @@ class OpenAILLM:
         #   예산이 `role/_rules.md`(시스템)에만 있으면 긴 컨텍스트에서 희석된다.
         n_terms = int(kw.get("parent_n_terms") or 0)
         n_w = len(parent.w0) if parent else 0
-        # ★ `checks.BUDGET` 을 직접 읽으면 `rule_budget` 을 무시한다
-        #   (D-105). 유효 예산은 `self._budget` 하나뿐이다.
-        if n_terms >= self._budget:
+        # ★ `checks.PARAMETERS` 을 직접 읽으면 `parameters` 을 무시한다
+        #   (D-105). 유효 예산은 `self._parameters` 하나뿐이다.
+        if n_terms >= self._parameters:
             note = ("\n★ 예산이 찼습니다. 항을 추가하지 마세요.\n"
                     "  이번 가설을 반영하려면 **가장 덜 중요한 항 하나를 "
                     "지우고**\n  그 자리에 넣으세요. 무엇을 지웠고 왜 그것을 "
                     "골랐는지\n  `changes` 에 쓰세요.")
         else:
-            note = f"남은 예산: {self._budget - n_terms}항"
+            note = f"남은 예산: {self._parameters - n_terms}항"
         # ★ Analyst 가 꺼져 있으면 **가설 절 자체를 안 만든다** (§16.1, D-89).
         #   "## 이번 가설\n\n(가설 없음)" 처럼 빈 자리를 남기면 모델이
         #   "가설이 있는데 비어 있다" 로 읽어 다른 조건이 된다. 진단
@@ -795,15 +798,15 @@ class OpenAILLM:
                 f"두 번째 부모의 가중치: {list(p2.w0)}\n\n"
                 "**각각의 좋은 항을 골라 하나로 만드세요.** 한쪽을 그대로 "
                 "베끼지 마세요 — 그러면 교차가 아닙니다.\n\n"
-                f"⚠️ 예산이 {self._budget}항이므로 합치면 **반드시 버려야 "
+                f"⚠️ 예산이 {self._parameters}항이므로 합치면 **반드시 버려야 "
                 "합니다.** 무엇을 버렸고 왜 그것을 골랐는지 `changes` 에 "
                 "쓰세요.\n")
-        body = load_prompt("role/rule_editor.md", budget=self._budget) \
+        body = load_prompt("role/rule_editor.md", parameters=self._parameters) \
             .replace("{product_note}", product_note(self._product)) \
             .replace("{power_note}", power_note(self._power))
         return body.format(
             second_parent_block=second,
-            n_terms=n_terms, n_weights=n_w, budget_note=note,
+            n_terms=n_terms, n_weights=n_w, parameters_note=note,
             feature_block=fl, hypothesis_block=hyp_block,
             inputs_hyp=inputs_hyp, one_change_hyp=one_change,
             applied_warning=applied_warn,
@@ -840,7 +843,7 @@ class OpenAILLM:
                 "TableFacts.compute(table, splits.train) 을 넘겨라 (§12.3).")
 
         # ★ 넘겨받은 레지스트리를 쓴다. 전에는 `self.registry` 고정이라
-        #   F1/F1-K 처럼 다른 라이브러리로 부를 때 어긋날 수 있었다 (§30.9).
+        #   F1/F2 처럼 다른 라이브러리로 부를 때 어긋날 수 있었다 (§30.9).
         reg = registry if registry is not None else self.registry
         extra = getattr(table_facts, "by_feature", None) if table_facts else None
         block = render_features(reg, include_observed=condition == "B",
@@ -860,9 +863,9 @@ class OpenAILLM:
         #   `condition` 이 A/B(표 관측 유무)라 피처 조건과 축이 다르다 —
         #   레지스트리가 사람 24개면 실제 이름을 써도 되고, F0/F1
         #   레지스트리면 무관 도메인을 써야 한다.
-        rule_ex = _rule_example_for(reg, budget=self._budget)
+        rule_ex = _rule_example_for(reg, parameters=self._parameters)
         return load_prompt("role/rule_writer.md",
-                           budget=self._budget).format(
+                           parameters=self._parameters).format(
             rule_example_block=rule_ex,
             table_note=note, feature_block=block, aggregate_block=agg)
 
@@ -879,20 +882,19 @@ class OpenAILLM:
         from kernelrule.features.generated import field_block
 
         return load_prompt("role/categorize.md",
-                           budget=self._budget).format(
+                           parameters=self._parameters).format(
             field_block=field_block(), n_min=n_min, n_max=n_max)
 
     def _feature_prompt(self, *, condition: str = "F1", task: str = "",
                         registry=None, **_kw) -> str:
-        """F0~F3 — **피처를 얼마나 주느냐**가 조건이다.
+        """F1~F3 — **피처를 얼마나 주느냐**가 조건이다. 0 -> 5 -> 24 다.
 
-            F0  없음        물리를 처음부터 코드로 옮길 수 있나
-            F1  원시 값만    파생 물리량을 만들 수 있나   ★ 근본 질문
-            F2  기초 5개     그 위에 쌓을 수 있나
-            F3  전부        조합만 (= 지금까지의 모든 실행)
+            F1  0개에서 시작   파생 물리량을 만들 수 있나   ★ 근본 질문
+            F2  공개 지식 5개  그 위에 쌓을 수 있나  (D-128 개명 전 `F1-K`)
+            F3  사람 24개     조합만 (= 지금까지의 모든 실행)
 
         ⚠️ 형태 예시는 **이 문제와 무관한 것**을 쓴다. `optimize.md` 의
-        출력 예시가 `physics_seeded` 축약판이라 "씨앗 없음" 조건에 씨앗이
+        출력 예시가 `human_guided` 축약판이라 "씨앗 없음" 조건에 씨앗이
         들어간 일이 있다 (D-35).
         """
         from kernelrule.features import render_features
@@ -902,9 +904,7 @@ class OpenAILLM:
             raise ValueError(
                 f"알 수 없는 조건: {condition!r}. {sorted(_CONDITIONS)}")
         reg = registry if registry is not None else self.registry
-        if condition == "F0":
-            block = ("## 이미 있는 피처\n\n**없습니다.** 처음부터 만드세요.")
-        elif condition == "F1":
+        if condition == "F1":
             block = ("## 이미 있는 피처\n\n**없습니다.** 위 원시 값만으로 "
                      "물리량을 유도하세요.\n\n★ 이것이 이 조건의 요점입니다 "
                      "— 파생량을 스스로 만들 수 있는지를 봅니다.")
@@ -913,16 +913,16 @@ class OpenAILLM:
                 raise ValueError(f"조건 {condition} 은 레지스트리가 필요하다")
             block = ("## 이미 있는 피처 — **중복되면 폐기됩니다**\n\n"
                      + render_features(reg, include_observed=False))
-        # ★ 예시는 **조건마다 다르다** (§30.17). F0/F1 은 답을 건네지
-        #   않으려 무관 도메인을 쓰고, 공개 지식을 주는 조건(F1-K/F2/F3)은
+        # ★ 예시는 **조건마다 다르다** (§30.17). F1 은 답을 건네지
+        #   않으려 무관 도메인을 쓰고, 공개 지식을 주는 조건(F2/F3)은
         #   실제 피처를 코드까지 보여준다 — 그것이 조건의 정의이므로
         #   D-35 의 조심이 여기서는 불필요하다.
         example = load_prompt(f"examples/{_EXAMPLES[condition]}.md",
-                              budget=self._budget)
-        return load_prompt("role/feature.md", budget=self._budget).format(
+                              parameters=self._parameters)
+        return load_prompt("role/feature.md", parameters=self._parameters).format(
             field_block=field_block(), feature_block=block,
             example_block=example,
-            area_block=load_prompt("areas.md", budget=self._budget),
+            area_block=load_prompt("areas.md", parameters=self._parameters),
             task_block=task or ("## 이번에 만들 것\n\n피처 하나를 제안하세요."))
 
     # -- 루프 밖 역할 등록 (D-92) -----------------------------------------
@@ -1108,17 +1108,17 @@ class OpenAILLM:
 
         if role in self._extra:
             return self._extra[role][1], None
-        body = load_prompt(f"role/{role}.md", budget=self._budget)
+        body = load_prompt(f"role/{role}.md", parameters=self._parameters)
         sysp = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
             hw_text=self.cfg.hw_text,
-            body=body, budget=self._budget,
+            body=body, parameters=self._parameters,
             rank_top_k=self._rank_top_k, rank_lambda=self._rank_lambda,
             product_hint=self._product, power_hint=self._power)
         sch = None
         if role in ("rule_editor", "rule_writer"):
             sch = rule_output_for(
-                self._budget, product_hint=self._product,
+                self._parameters, product_hint=self._product,
                 power_hint=self._power).model_json_schema()
         return sysp, sch
 

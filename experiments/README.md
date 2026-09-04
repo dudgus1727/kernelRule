@@ -75,7 +75,7 @@ python3 experiments/f1_pipeline.py F1 --stage 2      # 1단계 산출물 재사�
 조건이 정하는 것은 **어느 레지스트리가 세 단계 전부에 들어가는가** 하나다.
 
 ```
-F3  사람 24개 + physics_seeded 씨앗   1단계를 건너뛴다 (조건이 그렇다)
+F3  사람 24개 + human_guided 씨앗   1단계를 건너뛴다 (조건이 그렇다)
 F2  기초 5개 + FeatureWriter
 F1  원시 값만 -> FeatureWriter -> RuleWriter 씨앗
 F0  피처 없음

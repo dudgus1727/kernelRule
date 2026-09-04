@@ -19,7 +19,7 @@ from typing import Any
 from kernelrule.rules.checks import (
     LIMITS,
     exponent_message,
-    literal_budget_message,
+    literal_parameter_message,
     noop_term_message,
     weight_reuse_message,
 )
@@ -126,7 +126,7 @@ N_HYP_MIN, N_HYP_MAX = 2, 8
 _SHAPE_SIZE = re.compile(r"\d{3,6}\s*[x*×]\s*\d{3,6}"
                          r"|\b[MNK]\s*=\s*\d{3,6}\b")
 
-MAX_WEIGHTS = LIMITS["budget"]
+MAX_WEIGHTS = LIMITS["parameters"]
 
 
 #: ★ 실험 B (D-110). 스키마도 프롬프트와 같은 말을 해야 한다 (D-107).
@@ -232,15 +232,15 @@ class RuleProposal:
     meta: dict[str, Any] = field(default_factory=dict)
 
 
-def validate_rule_proposal(obj: Any, *, budget: int | None = None
+def validate_rule_proposal(obj: Any, *, parameters: int | None = None
                            ) -> RuleProposal:
     """LLM 응답 -> `RuleProposal`. **위반은 예외다. 고쳐서 쓰지 않는다.**
 
-    ★ `budget` 을 안 주면 `LIMITS["budget"]`(8) 이다. `--rule-budget` 을
+    ★ `parameters` 를 안 주면 `LIMITS["parameters"]`(8) 이다. `--parameters` 를
     쓰는 경로는 **반드시 넘겨야 한다** — 안 넘기면 16항 제안이 여기서
     조용히 거부되고, 실험은 "예산 16 이 효과 없다" 를 재게 된다 (D-107).
     """
-    _b = int(budget if budget is not None else MAX_WEIGHTS)
+    _b = int(parameters if parameters is not None else MAX_WEIGHTS)
     if isinstance(obj, RuleProposal):
         d = {"code": obj.code, "w0": obj.w0, "changes": obj.changes,
              "hypothesis_id": obj.hypothesis_id, "parent_ids": obj.parent_ids,
@@ -359,7 +359,7 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         # ⚠️ 이 스키마는 **RuleEditor 와 RuleWriter 가 함께 쓴다.** 설명에
         #   부모 이야기를 넣으면 RuleWriter 가 없는 부모를 찾는다 —
         #   `_rules_edit.md` 를 RuleWriter 에서 뺀 이유와 같다 (§30.10).
-        #   교체 지시는 RuleEditor 프롬프트의 `{budget_note}` 가 라운드마다
+        #   교체 지시는 RuleEditor 프롬프트의 `{parameters_note}` 가 라운드마다
         #   동적으로 넣는다.
         code: str = Field(description=_desc_code(MAX_WEIGHTS))
         # ⚠️ "대략적이면 충분하다" 였다. 프롬프트(`_rules_common.md`)는
@@ -382,7 +382,7 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
             통과하고 합이 9가 된다. 실제로 RuleWriter 제안 3개가 연속으로
             여기서 폐기됐고 모델은 이유를 듣지 못했다.
             """
-            if (m := literal_budget_message(self.code, len(self.w0))):
+            if (m := literal_parameter_message(self.code, len(self.w0))):
                 raise ValueError(m)
             return self
 
@@ -467,17 +467,17 @@ else:                                               # pragma: no cover
     HypothesisOut = _NoPydantic("HypothesisOut")
 
 
-def rule_output_to_proposal(out, *, budget: int | None = None
+def rule_output_to_proposal(out, *, parameters: int | None = None
                             ) -> RuleProposal:
     """`RuleOutput` -> `RuleProposal`. 경계에서 한 번만 변환한다."""
     return validate_rule_proposal({"code": out.code, "w0": list(out.w0),
                                    "changes": out.changes,
                                    "hypothesis_id": out.hypothesis_id},
-                                  budget=budget)
+                                  parameters=parameters)
 
 
 @lru_cache(maxsize=16)
-def rule_output_for(budget: int | None = None, *,
+def rule_output_for(parameters: int | None = None, *,
                     product_hint: bool = False, power_hint: bool = False):
     """★ 예산이 **스키마 설명과 검증에도** 들어간 출력 타입 (D-107).
 
@@ -492,7 +492,7 @@ def rule_output_for(budget: int | None = None, *,
     """
     if not HAVE_PYDANTIC:                           # pragma: no cover
         return RuleOutput
-    b = int(budget if budget is not None else MAX_WEIGHTS)
+    b = int(parameters if parameters is not None else MAX_WEIGHTS)
     if b == MAX_WEIGHTS and not product_hint and not power_hint:
         return RuleOutput
 
@@ -505,8 +505,8 @@ def rule_output_for(budget: int | None = None, *,
         #   쓰면 부모의 8 검사가 그대로 남아 둘 다 돈다.
         @model_validator(mode="after")
         def _budget(self):
-            if (m := literal_budget_message(self.code, len(self.w0),
-                                            budget=b)):
+            if (m := literal_parameter_message(self.code, len(self.w0),
+                                            parameters=b)):
                 raise ValueError(m)
             return self
 

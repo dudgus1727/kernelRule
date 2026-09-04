@@ -9,7 +9,7 @@
 지금까지의 모든 진화 실행은 **사람이 만든 재료를 조합**한 것이었다.
 
     피처   `features/physical.py` 의 24개   <- 사람이 물리 문서를 보고 씀
-    씨앗   `rules/physics_seeded.py`        <- 사람이 씀. 그 24개 중 6개를 씀
+    씨앗   `rules/human_guided.py`        <- 사람이 씀. 그 24개 중 6개를 씀
     루프   24개 중 8개 고르기
 
 `experiments/feature_writer.py` 로 "LLM 이 피처를 만들 수 있다" 는 확인했다.
@@ -30,10 +30,14 @@
 
 ## 조건
 
-    F3  REGISTRY(24개) + physics_seeded 씨앗   = 지금까지의 모든 실행
-    F2  기초 5개 + FeatureWriter 로 확장
-    F1  원시 값만 -> FeatureWriter -> RuleWriter 씨앗   ★ 근본 질문
-    F0  피처 없음 -> FeatureWriter 가 전부
+    F3  REGISTRY(사람 24개) + 씨앗            = 지금까지의 모든 실행
+    F2  ★ 공개 지식 5개 + FeatureWriter 로 확장   (2026-09-04 개명, 구 F1-K)
+    F1  0개에서 시작 -> FeatureWriter -> RuleWriter 씨앗   ★ 근본 질문
+
+**0 -> 5 -> 24 사다리다.** 셋 다 돌았다.
+
+★ 옛 이름 `F0`(피처 없음)과 옛 `F2`(원시 물리량 5개)는 **삭제했다** —
+둘 다 실행이 0회다. 옛 `F1-K` 가 지금의 `F2` 다 (D-128).
 
 F3 도 **이 경로로** 돌아야 한다. 다른 스크립트로 돌리면 경로 차이가
 결과에 섞인다 (§26.2).
@@ -69,16 +73,11 @@ BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 BUNDLE_HASH = "c63710df"
 OUT = Path("runs")
 
-#: F2 의 "기초 5개". **여기 한 곳에서만 정한다** — 흩어지면 갈린다 (원칙 2).
-#: 원시 값에 가장 가까운 것들이다. 파생 물리량은 하나도 없다.
-F2_BASE = ("log_grid_tiles", "log_mainloop_iters", "smem_pressure",
-           "reg_pressure", "is_memory_bound")
-
-#: ★ F1-K 사전 등록. `docs/artifacts/f1k-preregistration.md` 와 **같은
-#: 내용**이고 `tests/test_f1k_prereg.py` 가 갈리지 않는지 검사한다.
+#: ★ F2 사전 등록. `docs/artifacts/f2-preregistration.md` 와 **같은
+#: 내용**이고 `tests/test_f2_prereg.py` 가 갈리지 않는지 검사한다.
 #: **LLM 을 한 번도 안 부른 상태에서 박았다** — 실행 직전에 쓰면 배관을
 #: 만들며 생긴 감이 기준에 스며든다 (D-50).
-F1K_PREREG = {
+F2_PREREG = {
     "purpose": ("알려진 축을 주면 새 축을 더 만드나. 그리고 라이브러리가 "
                 "좋아지나"),
     "expected": ("새 축 개수가 F1 보다 많다 (재발견에 예산을 안 쓰므로). "
@@ -114,7 +113,7 @@ F1K_PREREG = {
                   "모델을 바꾸지 않는다 (D-45, 원칙 25)",
                   "결과를 보고 프롬프트를 고치지 않는다 (§12.3d)"],
     "threshold_rationale": ("절반은 '실험이 성립하는 최소 요건' 이지 F1 "
-                            "실측(80%) 대비로 조인 것이 아니다. F1-K 는 "
+                            "실측(80%) 대비로 조인 것이 아니다. F2 는 "
                             "다섯을 줬으니 중복 거부가 늘 수 있고 그것은 "
                             "정상 동작이다"),
     "budget_calls": 990,
@@ -193,29 +192,27 @@ def _splits(table: PerfTable) -> SplitSet:
 
 
 def _base_registry(condition: str) -> FeatureRegistry:
-    """조건이 정하는 **출발 레지스트리**. F0/F1 은 비어 있다."""
-    if condition in ("F0", "F1"):
-        return FeatureRegistry(f"{condition}-empty")
-    if condition == "F1-K":
+    """조건이 정하는 **출발 레지스트리**. `F1` 은 비어 있다.
+
+    ★ 조건은 셋이다 (D-128). 0 -> 5 -> 24 사다리이고 alias 를 두지 않는다.
+    """
+    if condition == "F1":
+        return FeatureRegistry("F1-empty")
+    if condition == "F2":
         # ★ 공개 지식 다섯 (§30.17). `physical.py` 의 원본이 아니라
         #   **표 관측을 뺀 정리본**이다 — 원본 docstring 에는 "이 표에서
         #   스필 커널은 최적 0회" 같은 측정 결과가 있다 (§12.3).
         from kernelrule.features.known5 import KNOWN5
-        r = FeatureRegistry("F1-K-known5")
+        r = FeatureRegistry("F2-known5")
         for n in sorted(KNOWN5._items):
             r.add(KNOWN5[n])
-        return r
-    if condition == "F2":
-        r = FeatureRegistry("F2-base")
-        for n in F2_BASE:
-            r.add(REGISTRY[n])
         return r
     if condition == "F3":
         r = FeatureRegistry("F3-human24")
         for n in sorted(REGISTRY._items):
             r.add(REGISTRY[n])
         return r
-    raise ValueError(f"알 수 없는 조건: {condition!r}. F0/F1/F1-K/F2/F3")
+    raise ValueError(f"알 수 없는 조건: {condition!r}. F1/F2/F3")
 
 
 def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
@@ -248,7 +245,7 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
     #   섞이면 안 된다. `config.json` 의 `llm.objective` 로 확인된다.
     return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
                                objective=getattr(a, "objective", "regret"),
-                               rule_budget=getattr(a, "rule_budget", None),
+                               parameters=getattr(a, "parameters", None),
                                # ★ 프롬프트의 목표 정의가 **실행 조건과
                                #   같은 숫자**를 말해야 한다 (D-105/D-107).
                                rank_top_k=getattr(a, "rank_top_k", 100),
@@ -472,7 +469,7 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
     return gen
 
 
-#: `physics_seeded` 가 쓰는 여섯 항. **여기 한 곳에서만 적는다** (원칙 2).
+#: `human_guided` 가 쓰는 여섯 항. **여기 한 곳에서만 적는다** (원칙 2).
 _SEED_TERMS = ("traffic_amplification", "sm_idle_cost", "smem_pressure",
                "has_spill", "split_k_cost", "pipeline_warmup_frac")
 
@@ -555,15 +552,15 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
     out = d / "stage2-rule-writer"
     (out / "candidates").mkdir(parents=True, exist_ok=True)
 
-    if a.condition == "F3" and a.seed_source == "physics_seeded":
+    if a.condition == "F3" and a.seed_source == "human_guided":
         # ★ F3 는 정의상 손씨앗을 쓴다. 그래도 **같은 경로**를 밟는다.
-        from kernelrule.rules.physics_seeded import CODE, W0
-        chosen = {"source": "physics_seeded", "code": CODE, "w0": list(W0),
+        from kernelrule.rules.human_guided import CODE, W0
+        chosen = {"source": "human_guided", "code": CODE, "w0": list(W0),
                   "fit_regret": None,
                   "why": "F3 는 손씨앗이 조건이다 (지금까지의 모든 실행)"}
         _dump_json(out / "chosen.json", chosen)
         _dump_json(out / "summary.json", {"condition": "F3", "n_tries": 0,
-                                          "source": "physics_seeded"})
+                                          "source": "human_guided"})
         return chosen
 
     llm = _make_llm(a, registry=reg, budget=Budget(max_calls=a.n_rule_writer * 3),
@@ -589,12 +586,12 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
                     res = llm.complete("rule_writer", "", condition="A",
                                        table_facts=facts, registry=reg)
                     prop = validate_rule_proposal(
-                        res, budget=getattr(a, "rule_budget", None))
+                        res, parameters=getattr(a, "parameters", None))
                     check_rule(prop.code, feature_names=matrix.feature_names(),
                                shape_value_names=matrix.shape_value_names(),
                                n_weights=len(prop.w0),
                                limits=limits_for(
-                                   getattr(a, "rule_budget", None))
+                                   getattr(a, "parameters", None))
                                ).raise_if_bad()
                     e = loop.score_only(prop.code, prop.w0)
                     row.update(ok=True, code=prop.code, w0=list(prop.w0),
@@ -658,7 +655,7 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        fit_method=getattr(a, "fit_method", "nelder-mead"),
                        fit_restarts=getattr(a, "fit_restarts", 4),
                        max_evals=getattr(a, "max_evals", 200),
-                       rule_budget=getattr(a, "rule_budget", None),
+                       parameters=getattr(a, "parameters", None),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
         table=table, matrix=matrix, splits=splits, llm=llm)
@@ -686,7 +683,7 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            fit_restarts=a.fit_restarts,
                            max_evals=a.max_evals,
                            objective_switch=a.objective_switch,
-                           rule_budget=a.rule_budget,
+                           parameters=a.parameters,
                            hypothesis_pool=tuple(a.hypothesis_pool)),
             table=table, matrix=matrix, splits=splits, llm=llm)
         loop.seed(seed_rule["code"], seed_rule["w0"], changes="stage2 씨앗")
@@ -738,7 +735,7 @@ def _install_signal_handlers() -> None:
 def main() -> None:
     _install_signal_handlers()
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("condition", choices=("F0", "F1", "F1-K", "F2", "F3"))
+    ap.add_argument("condition", choices=("F1", "F2", "F3"))
     ap.add_argument("--n-features", type=int, default=20,
                     help="자유 생성(--no-categorize)일 때만 쓰인다. "
                          "영역 기반이면 개수가 영역 수에서 유도된다")
@@ -765,9 +762,9 @@ def main() -> None:
                          "이므로 비교표에 섞지 마라")
     ap.set_defaults(categorize=False)
     ap.add_argument("--n-rule-writer", type=int, default=10)
-    ap.add_argument("--seed-source", choices=("rule_writer", "physics_seeded"),
+    ap.add_argument("--seed-source", choices=("rule_writer", "human_guided"),
                     default=None,
-                    help="씨앗을 어디서. 기본은 F3 면 physics_seeded, "
+                    help="씨앗을 어디서. 기본은 F3 면 human_guided, "
                          "나머지는 architect. ★ F3 에 architect 를 주면 "
                          "**대조군**이 된다 — 같은 프롬프트로 사람 24개와 "
                          "F1 라이브러리를 비교할 수 있다")
@@ -822,8 +819,8 @@ def main() -> None:
     ap.add_argument("--max-evals", type=int, default=200,
                     help="적합 평가 상한. ★ 기본 200 — 지금까지의 모든 "
                          "실행이 그 값이다. §2 관문은 300 에서 쟀다")
-    ap.add_argument("--rule-budget", type=int, default=None,
-                    help="항 예산. ★ 기본은 checks.BUDGET(8) — 지금까지의 "
+    ap.add_argument("--parameters", type=int, default=None,
+                    help="파라미터 상한 (가중치 + 숫자 리터럴). ★ 기본은 checks.PARAMETERS(8) — 지금까지의 "
                          "모든 실행이 그 조건이다. 검사기와 프롬프트가 "
                          "같은 값을 본다")
     ap.add_argument("--objective-switch",
@@ -894,7 +891,7 @@ def main() -> None:
                 f"--objective {a.objective} 인데 --objective-switch "
                 f"{a.objective_switch} 다. 시작이 {src!r} 여야 한다.")
     if a.seed_source is None:
-        a.seed_source = "physics_seeded" if a.condition == "F3" else "rule_writer"
+        a.seed_source = "human_guided" if a.condition == "F3" else "rule_writer"
 
     tag = a.tag or ("mock" if a.dry_run else a.model)
     d = OUT / f"f1pipe-{a.condition}-{tag}"
@@ -987,7 +984,7 @@ def main() -> None:
         "registry": {"name": reg.name, "n": len(reg._items),
                      "names": sorted(reg._items)},
         "human_features_present": sorted(set(reg._items) & set(REGISTRY._items))
-        if a.condition in ("F0", "F1") else "N/A (F2/F3 는 의도적으로 포함)"})
+        if a.condition == "F1" else "N/A (F2/F3 는 의도적으로 포함)"})
 
     # 2단계 — ★ 뒤 단계를 안 돌 거면 **읽지도 않는다.** 전에는 `--stage 1`
     #   인데도 `chosen.json` 을 읽어서 FileNotFoundError 로 죽었다. 1단계

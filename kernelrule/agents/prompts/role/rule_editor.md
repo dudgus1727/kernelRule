@@ -9,14 +9,14 @@
 {inputs_hyp}사용 가능한 피처 목록
 ```
 
-## ★ 예산 — 항 상한 {budget}개
+## ★ 파라미터 상한 {parameters}개
 {product_note}{power_note}
 ```
-부모 규칙: 현재 {n_terms}항 / 가중치 {n_weights}개 (상한 {budget})
-{budget_note}
+부모 규칙: 현재 {n_terms}항 / 가중치 {n_weights}개 (상한 {parameters})
+{parameters_note}
 ```
 
-위 "절대 규칙" 의 예산이 이번 부모에 적용된 모습입니다. 남은 여유가
+위 "절대 규칙" 의 파라미터가 이번 부모에 적용된 모습입니다. 남은 여유가
 없으면 항을 늘리지 말고 덜 중요한 항을 버리세요.
 
 ## 출력

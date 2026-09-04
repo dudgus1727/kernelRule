@@ -1,6 +1,6 @@
 """★ 거부된 제안을 **고친 검사기로 다시 검사한다**. LLM 0회.
 
-    python3 experiments/revalidate.py runs/f1pipe-F1-K-k1/stage1-features
+    python3 experiments/revalidate.py runs/F2rw-p8/stage1-features
 
 ## 왜 재제안이 아니라 재검사인가
 
@@ -103,4 +103,4 @@ def main(stage1: str) -> None:
 
 if __name__ == "__main__":
     main(sys.argv[1] if len(sys.argv) > 1
-         else "runs/f1pipe-F1-K-k1/stage1-features")
+         else "runs/F2rw-p8/stage1-features")
