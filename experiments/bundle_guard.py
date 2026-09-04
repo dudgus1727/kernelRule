@@ -41,15 +41,42 @@ def _close(a: float, b: float) -> bool:
     return approx_equal(a, b, tol=_TOL)
 
 
+def _close_at(value: float, expect_str: str) -> tuple[bool, float]:
+    """★ **예고값의 자릿수까지** 맞는가 (D-125).
+
+    릴리즈 노트는 반올림한 값을 적는다 — 4090 은 `sigma_abs 0.000743` 인데
+    번들은 `0.0007433368963633708` 이다. `tol=1e-12` 로 견주면 **멀쩡한
+    번들이 거부된다** (실제로 그랬다).
+
+    허용오차를 예고 문자열의 소수 자릿수에서 만든다: `0.000743` 이면
+    반올림 폭 5e-7. **느슨하게 푸는 것이 아니라 예고된 정밀도까지만
+    본다** — 자릿수를 더 주면 더 엄격해진다. A6000 계수 검사(`_close`)는
+    그대로 엄격하다.
+    """
+    t = expect_str.strip().lower()
+    if "e" in t:
+        mant, _, exp = t.partition("e")
+        dec = len(mant.partition(".")[2]) - int(exp)
+    else:
+        dec = len(t.partition(".")[2])
+    tol = 0.5 * 10.0 ** (-dec) if dec > 0 else 0.5
+    from kernelrule.core.numerics import approx_equal
+
+    return approx_equal(value, float(t), tol=tol), tol
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("bundle")
     ap.add_argument("--env-hash", required=True)
     ap.add_argument("--expect-rows", type=int)
-    ap.add_argument("--expect-tick-ms", type=float,
-                    help="예고된 눈금 (5090 이면 0.000032)")
-    ap.add_argument("--expect-sigma-abs-ms", type=float,
-                    help="예고된 절대 노이즈")
+    # ★ `type=float` 로 받지 않는다 — **적어 준 자릿수**가 허용오차다
+    #   (D-125). 문자열로 받아야 "0.000743" 의 정밀도를 알 수 있다.
+    ap.add_argument("--expect-tick-ms",
+                    help="예고된 눈금 (5090 이면 0.000032). ★ 적어 준 "
+                         "자릿수까지 본다 — 릴리즈 노트는 반올림값이다")
+    ap.add_argument("--expect-sigma-abs-ms",
+                    help="예고된 절대 노이즈. ★ 적어 준 자릿수까지 본다")
     # ★ schema_version 3 에서 새로 생긴 것들. 예고값이 있으면 맞춘다.
     ap.add_argument("--expect-env-hash-v2",
                     help="예고된 env_hash_v2 (접두 일치)")
@@ -95,12 +122,16 @@ def main() -> None:
                     "대체값이 쓰이고 그것은 A6000 눈금이다")
 
     # 3) 예고값과 맞는가
-    if a.expect_tick_ms is not None and tick is not None \
-            and not _close(float(tick), a.expect_tick_ms):
-        bad.append(f"tick_ms {tick} != 예고 {a.expect_tick_ms}")
-    if a.expect_sigma_abs_ms is not None and sig is not None \
-            and not _close(float(sig), a.expect_sigma_abs_ms):
-        bad.append(f"sigma_abs_ms {sig} != 예고 {a.expect_sigma_abs_ms}")
+    for name, got, want in (("tick_ms", tick, a.expect_tick_ms),
+                            ("sigma_abs_ms", sig, a.expect_sigma_abs_ms)):
+        if want is None or got is None:
+            continue
+        ok, tol = _close_at(float(got), want)
+        if ok:
+            print(f"  ✓ {name} {got} = 예고 {want} (자릿수 허용 ±{tol:g})")
+        else:
+            bad.append(f"{name} {got} != 예고 {want} "
+                       f"(자릿수 허용 ±{tol:g})")
     if a.expect_rows is not None and meta.get("n_rows") != a.expect_rows:
         warn.append(f"행 수 {meta.get('n_rows')} != 예고 {a.expect_rows}")
 
