@@ -1,0 +1,17 @@
+{
+ "_note": "겹침만 센다. 전이 수치는 여기 없다",
+ "base": "datasets/rtx-a6000-sm_86-c63710df",
+ "other": "datasets/rtx-4090-sm_89-ad95d455",
+ "report": {
+  "n_shapes_a": 66,
+  "n_shapes_b": 64,
+  "n_shapes_common": 50,
+  "n_axis_a": 1634,
+  "n_axis_b": 2090,
+  "n_axis_common": 1634,
+  "n_bound_flipped": 0,
+  "ridge_a": 159.10648211593806,
+  "ridge_b": 159.8750127019612
+ },
+ "bound_flipped": []
+}

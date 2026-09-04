@@ -1,0 +1,39 @@
+{
+ "_note": "겹침만 센다. 전이 수치는 여기 없다",
+ "base": "datasets/rtx-4090-sm_89-ad95d455",
+ "other": "datasets/rtx-5090-sm_120-5bb6f403",
+ "report": {
+  "n_shapes_a": 64,
+  "n_shapes_b": 66,
+  "n_shapes_common": 53,
+  "n_axis_a": 2090,
+  "n_axis_b": 2090,
+  "n_axis_common": 2090,
+  "n_bound_flipped": 3,
+  "ridge_a": 159.8750127019612,
+  "ridge_b": 117.85477744504763
+ },
+ "bound_flipped": [
+  {
+   "M": 128,
+   "N": 4096,
+   "K": 11008,
+   "a_memory_bound": true,
+   "b_memory_bound": false
+  },
+  {
+   "M": 128,
+   "N": 12288,
+   "K": 4096,
+   "a_memory_bound": true,
+   "b_memory_bound": false
+  },
+  {
+   "M": 128,
+   "N": 11008,
+   "K": 4096,
+   "a_memory_bound": true,
+   "b_memory_bound": false
+  }
+ ]
+}
