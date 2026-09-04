@@ -67,10 +67,17 @@ TABLES: dict[str, dict] = {
         # ⚠️ 2026-09-03 정정 (D-119): 뒤 셋(`-b-`)은 `physics_seeded`
         #    **손씨앗**이라 "5090 에서 처음부터" 가 아니다. (c) 에서 뺀다.
         #    옛 값 1.0485 는 그 여섯의 중앙이고 `c-ladder.md` §0 에 남겼다.
-        "runs": [f"f1pipe-F3-5090sigma-s{i}" for i in range(3)]},
-    # ★ 4090 표가 오면 여기 세 줄. transfer-prereg 부칙의 세 쌍이 열린다.
-    # "4090": {"bundle": "datasets/rtx-4090-...", "env_hash": "...",
-    #          "runs": [f"f1pipe-F3-4090sigma-s{i}" for i in range(6)]},
+        # ★ 2026-09-04 정정 (D-126): 사다리의 **새 (c)** 로 바꿨다.
+        #    `5090sigma-s*` 는 hw 숫자·경고가 둘 다 A6000 이었다 (D-113·116).
+        #    `5090sigma-hw2-s*` 가 번들에서 생성한 5090 hw 를 받은 것이고,
+        #    4090 (c) 와 **같은 판**이다. 옛 값은 지우지 않는다 —
+        #    `transfer-29-5.md` 와 `c-ladder.md` 에 그대로 있다.
+        "runs": [f"f1pipe-F3-5090sigma-hw2-s{i}" for i in range(3)]},
+    "4090": {
+        "bundle": "datasets/rtx-4090-sm_89-ad95d455",
+        "env_hash": "ad95d455",
+        # ★ (c) 재생성 3시드. 5090 새 (c) 와 **명령이 같다** (표만 다르다).
+        "runs": [f"f1pipe-F3-4090sigma-s{i}" for i in range(3)]},
 }
 
 
@@ -176,11 +183,12 @@ def main() -> None:
     print(f"  ridge {A.hw.ridge_point:.1f} -> {B.hw.ridge_point:.1f}  "
           f"({B.hw.ridge_point / A.hw.ridge_point:.2f}배)   "
           f"SM {A.hw.sm_count} -> {B.hw.sm_count}")
-    print(f"  홀드아웃 {len(hold)}형상 (공통 53 안)   "
+    # ★ 쌍마다 다르다. 하드코딩하면 다른 쌍에서 **거짓말을 한다**.
+    print(f"  홀드아웃 {len(hold)}형상 (공통 {len(common)} 안)   "
           f"뒤집힘 제외 {len(hold_nf)}형상")
-    print(f"  5090 학습 {len(spB.train.shapes)}형상 — (b) 재적합에 쓴다")
+    print(f"  {dst} 학습 {len(spB.train.shapes)}형상 — (b) 재적합에 쓴다")
     print("  ★ 기준선: nvMatmulHeuristics 없음 -> 사전 등록의 대체안"
-          " (5090 재적합 physics_seeded)\n")
+          f" ({dst} 재적합 physics_seeded)\n")
 
     res: dict = {"a": [], "b": [], "c": [], "a_nf": [], "b_nf": [],
                  "c_nf": [], "src": []}
@@ -233,7 +241,8 @@ def main() -> None:
     print(_row("(a) 완전 이식", res["a"]))
     print(_row("(b) 재적합", res["b"]))
     print(_row("(c) 재생성", res["c"]))
-    print(f"  {'★ 기준선 physics_seeded(5090 재적합)':34s} {base:.4f}")
+    # ★ 여기도 쌍마다 다르다 (위 두 자리와 같은 실수를 세 번째로 하지 않는다)
+    print(f"  {f'★ 기준선 physics_seeded({dst} 재적합)':34s} {base:.4f}")
     print(f"\n홀드아웃 {len(hold_nf)}형상 (뒤집힘 제외)")
     print("-" * 78)
     print(_row("(a) 완전 이식", res["a_nf"]))
