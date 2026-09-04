@@ -35,9 +35,9 @@ from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 
 #: 주 대상 — regret 진화 6구조. D-77·D-123 이 쓴 것과 **같은 여섯**이다.
-MAIN = ("arch24 6구조", [f"f1pipe-F3-arch24-s{i}" for i in range(6)])
+MAIN = ("arch24 6구조", [f"F3rw-p8-s{i}" for i in range(6)])
 #: 부차 — §3 의 예산 8 팔. CMA 로 진화한 구조다. **따로** 본다.
-SIDE = ("rb08 3구조 (CMA 진화)", [f"f1pipe-F3-rb08-s{i}" for i in range(3)])
+SIDE = ("rb08 3구조 (CMA 진화)", [f"F3rw-p8-cma-s{i}" for i in range(3)])
 
 ARMS = [("NM", "nelder-mead", 4), ("CMA", "cma", 1)]
 REPORT_KS = (1, 10, 50, 100)

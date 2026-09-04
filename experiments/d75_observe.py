@@ -1,6 +1,6 @@
 """★ 검증 실행 관찰 — D-75 경로와 D-78 분기 상수. **LLM 호출 0회**.
 
-    python3 experiments/d75_observe.py runs/f1pipe-F3-d78d75v1-s0
+    python3 experiments/d75_observe.py runs/x-probe-d78d75v1-s0
 
 사전 등록: `docs/artifacts/d75-verification-prereg.md` 의 여섯 항목.
 **성능은 안 본다** — 2라운드 1시드는 시드 폭 안이다.

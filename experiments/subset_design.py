@@ -49,7 +49,7 @@ from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
-SRC_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 KS = (2, 4, 8, 10, 12)
 STRATEGIES = ("sol", "ridge", "sol+ridge", "layer")
 #: 파국의 문턱. 사전 등록에 박았다.

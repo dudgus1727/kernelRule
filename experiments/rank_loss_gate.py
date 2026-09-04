@@ -64,7 +64,7 @@ from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
-SRC_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 N_POS = 32          # 참 상위 K개
 N_NEG = 256         # 순위 구간별로 고르게
 TEMP = 1.0          # ★ 고정. 위 docstring 참고

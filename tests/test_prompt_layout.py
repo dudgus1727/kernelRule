@@ -305,7 +305,7 @@ _MEASURED = ("이 표에서", "최적 0회", "최적으로 뽑힌", "rel 중앙"
              "13.6", "37.2", "26% 어긋", "정답 집합")
 
 
-def test_f1k_prompt_has_no_measurement():
+def test_f2_prompt_has_no_measurement():
     """★ 이번 작업의 가장 중요한 지점 — `has_spill` 의 표 관측을 빼는 것."""
     body = _feature_prompt("F2")
     hit = [m for m in _MEASURED if m in body]
@@ -314,7 +314,7 @@ def test_f1k_prompt_has_no_measurement():
         "표 없이 알 수 있는 것만 남긴다 (§12.3, §30.17).")
 
 
-def test_f1k_shows_the_five_with_sources():
+def test_f2_shows_the_five_with_sources():
     import kernelrule.features.known5 as K
 
     body = _feature_prompt("F2")
@@ -323,7 +323,7 @@ def test_f1k_shows_the_five_with_sources():
     assert body.count("출처:") >= 5, "출처가 다섯 미만이다"
 
 
-def test_f1k_does_not_leak_the_other_nineteen():
+def test_f2_does_not_leak_the_other_nineteen():
     """★ 나머지 19개는 F3 조건이다."""
     import re
 
@@ -339,10 +339,10 @@ def test_f1k_does_not_leak_the_other_nineteen():
 def test_examples_differ_by_condition():
     """F1 은 무관 도메인, 공개 지식을 주는 조건은 실제 피처 (D-35)."""
     f1 = _feature_prompt("F1")
-    f1k = _feature_prompt("F2")
+    f2 = _feature_prompt("F2")
     assert "branch_divergence_cost" in f1 and "queue_backlog" in f1
-    assert "branch_divergence_cost" not in f1k
-    assert "def tail_waste" in f1k and "다시 만들지 마세요" in f1k
+    assert "branch_divergence_cost" not in f2
+    assert "def tail_waste" in f2 and "다시 만들지 마세요" in f2
 
 
 def test_areas_are_fixed_and_do_not_name_features():

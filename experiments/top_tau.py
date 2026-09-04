@@ -54,7 +54,7 @@ from kernelrule.features import REGISTRY
 
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
-SRC_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 TOP_N = 100
 MIN_UNIQ = (1, 30, 50)      # 1 = 통제 없음(정의 가능한 것만)
 N_DRAWS = 20

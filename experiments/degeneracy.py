@@ -37,7 +37,7 @@ from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
-SRC_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 PCTS = (1.0, 5.0, 10.0)
 #: 전 구간 tau 는 후보 2만개면 쌍이 2억이라 표본으로 근사한다. **고정 시드.**
 TAU_SAMPLE = 4000

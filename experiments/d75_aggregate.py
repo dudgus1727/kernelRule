@@ -1,12 +1,12 @@
 """★ 실행 단위 집계 — D-75 요구 빈도와 D-78 분기 상수. **LLM 호출 0회**.
 
-    python3 experiments/d75_aggregate.py 'f1pipe-F3-d75run3-s*'
+    python3 experiments/d75_aggregate.py 'F3hg-p8-d75-b-s*'
 
 **표본 하나 = 실행 하나다** (원칙 28). 한 실행의 가설/제안은 같은 씨앗과
 계보에서 나오므로 독립이 아니다 — 제안 단위로 세면 n 이 부풀고 한 실행의
 습관이 모집단 비율로 읽힌다 (D-79 철회, D-80).
 
-기준선은 `f1pipe-F3-arch24-s*` 6실행이다 — 같은 조건(F3 사람24), 같은
+기준선은 `F3rw-p8-s*` 6실행이다 — 같은 조건(F3 사람24), 같은
 모델(`gpt-5.6-luna` medium), 같은 라운드 구간.
 """
 
@@ -17,7 +17,7 @@ import ast
 import json
 from pathlib import Path
 
-BASELINE = "f1pipe-F3-arch24-s*"
+BASELINE = "F3rw-p8-s*"
 #: 옛 실행은 12라운드다. 새 실행이 4라운드면 **같은 구간만** 본다 (원칙 4).
 MAX_ROUND = 3
 #: 실행당 optimize 호출 상한 = 라운드 x 12.

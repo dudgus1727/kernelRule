@@ -48,7 +48,7 @@ def test_f2_is_the_public_knowledge_five(pipe):
 
 def test_no_alias_for_the_old_condition_names(pipe):
     """★ alias 를 두지 않는다 (D-128). 옛 이름은 **에러**여야 한다."""
-    for old in ("F0", "F1-K", "F1K"):
+    for old in ("F0", "F1-K", "F1K"):   # 전부 D-128 이 없앤 이름이다
         with pytest.raises(ValueError, match="알 수 없는 조건"):
             pipe._base_registry(old)
 

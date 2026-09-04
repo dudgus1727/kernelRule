@@ -452,18 +452,36 @@ def test_cap_warning_needs_actual_improvement_at_cutoff(known):
 # ---------------------------------------------------------------------------
 # D-101 — 순위 손실
 # ---------------------------------------------------------------------------
-def test_objective_default_is_rank(known):
-    """★ 기본은 `"rank"` 다 (2026-09-01 정정).
+def test_objective_default_is_regret(known):
+    """★ 기본이 다시 `"regret"` 이다 (D-128).
 
-    처음에는 `"regret"` 을 기본으로 뒀다 — "기존 결과가 통과한 경로라
-    조용히 달라지면 안 된다" 는 이유였다. 그런데 **지금 하는 실험이
-    순위 손실**이고, 옛 조건은 명시하면 된다.
+    ```
+    ~09-01  regret   지금까지의 모든 결과가 통과한 경로
+     09-01  rank     그때 하는 실험이 순위 손실이었다 (D-101)
+    ★09-04  regret   순위 손실은 틀린 목적함수로 결론났다 (D-118·D-121)
+    ```
+
+    `"rank"` 는 **함수로는 남는다** — 지표로 쓰고, 옛 실행 재현에 쓴다.
     """
     t, m, score = known
     a = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60)
     b = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
-                    objective="rank")
+                    objective="regret")
     assert np.array_equal(a.w, b.w)
+    r = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
+                    objective="rank", warn_invariants=False)
+    assert not np.array_equal(a.w, r.w), "objective 분기가 안 돈다"
+
+
+def test_loop_refuses_the_rank_objective():
+    """★ 진화 경로는 순위 손실을 **거부한다** (D-128). 조용히 안 넘어간다."""
+    import pytest as _pytest
+
+    from kernelrule.core.loop import LoopConfig, RoundLoop
+
+    with _pytest.raises(ValueError, match="regret 뿐이다"):
+        RoundLoop(cfg=LoopConfig(run_id="x", objective="rank"),
+                  table=None, matrix=None, splits=None, llm=None)
 
 
 def test_explicit_regret_still_reproduces_the_old_path(known):

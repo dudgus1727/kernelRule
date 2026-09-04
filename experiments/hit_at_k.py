@@ -52,7 +52,7 @@ from kernelrule.features import REGISTRY
 
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
-SRC_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 PCTS = (0.5, 1.0, 2.0, 5.0, 10.0)
 
 

@@ -33,8 +33,8 @@ from kernelrule.features import REGISTRY
 
 KS = (10, 20, 50)
 N_DRAWS = 20
-REG_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
-RANK_RUNS = [f"f1pipe-F3-rankevo-s{i}" for i in range(3)]
+REG_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
+RANK_RUNS = [f"x-rank-rankevo-s{i}" for i in range(3)]
 
 
 def _best(run: str, by: str) -> dict:

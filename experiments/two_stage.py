@@ -36,8 +36,8 @@ from kernelrule.features import REGISTRY
 
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
-RANK_RUNS = [f"f1pipe-F3-rankevo-s{i}" for i in range(3)]
-REG_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+RANK_RUNS = [f"x-rank-rankevo-s{i}" for i in range(3)]
+REG_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 TOP_N, TAU_SAMPLE, TAU_SEED, N_DRAWS = 100, 4000, 12345, 20
 
 

@@ -89,9 +89,11 @@ class LoopConfig:
     #: **아카이브 채택도 그것으로 한다** (셀 축은 안 바뀐다).
     #: `regret` 은 그 경우에도 계속 계산해서 기록한다 (사전 등록 §4 —
     #: 판정에는 안 쓰고 두 진화를 나란히 놓을 때 쓴다).
-    #: ★ 2026-09-01 정정: 기본을 `"rank"` 로 바꿨다. 지금 하는 실험이
-    #: 순위 손실이고, 옛 조건은 `objective="regret"` 을 명시하면 된다.
-    objective: str = "rank"
+    #: ★ 2026-09-04 (D-128): 기본이 다시 `"regret"` 이고, **`"rank"` 는
+    #: 거부한다** — 순위 손실은 틀린 목적함수로 결론났다 (D-118·D-121).
+    #: 필드 자체는 남긴다: 옛 `config.json` 을 읽어야 한다.
+    #: 순위 손실·tau 는 **지표로는** 그대로 쓴다 (`weights.rank_loss` 등).
+    objective: str = "regret"
     rank_top_k: int = 100
     #: ★ 두 손실의 합 (D-109). `L = rank_loss(k) + lambda * rank_loss_top1(k)`
     #: `rank_loss_top1` 은 **참 1등이 낀 쌍만** — `regret` 의 부드러운
@@ -327,6 +329,14 @@ class RoundResult:
 class RoundLoop:
     def __init__(self, *, cfg: LoopConfig, table: PerfTable,
                  matrix: FeatureMatrix, splits: SplitSet, llm) -> None:
+        # ★ 진화 경로에서 순위 손실을 뺀다 (D-128). **맨 먼저** 본다 —
+        #   뒤에서 걸리면 표를 다 읽은 뒤에 죽는다 (원칙 1).
+        if cfg.objective != "regret" or cfg.objective_switch is not None:
+            raise ValueError(
+                f"진화 목적함수는 regret 뿐이다 (objective={cfg.objective!r}, "
+                f"objective_switch={cfg.objective_switch!r}). 순위 손실은 "
+                "틀린 목적함수로 결론났다 (D-118·D-121) — 지표로만 쓴다. "
+                "옛 실행을 재현하려면 그 커밋으로 돌아가라 (D-128).")
         self.cfg = cfg
         self.table = table
         self.matrix = matrix
@@ -1220,9 +1230,9 @@ class RoundLoop:
                      "switch_round": self.switch_round,
                      "final_objective": self._objective,
                      "rule_constraints": {
-                         "budget": (self.cfg.parameters
-                                    if self.cfg.parameters is not None
-                                    else _PARAMETERS),
+                         "parameters": (self.cfg.parameters
+                                        if self.cfg.parameters is not None
+                                        else _PARAMETERS),
                          "branch_constants_exempt": True}}
         llm_cfg = getattr(self.llm, "cfg", None)
         if llm_cfg is not None and hasattr(llm_cfg, "to_dict"):

@@ -283,7 +283,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 polish: bool = True,          # ★ D-55/D-56, 기본 켜짐
                 polish_budget: int = 600,   # ★ 적합 305 의 2배 이내 (D-59)
                 sensitivity_delta: float = 0.5,
-                objective: str = "rank",      # ★ 기본은 rank. D-101
+                objective: str = "regret",    # ★ D-128: 다시 regret
                 rank_top_k: int = 100,
                 rank_lambda: float = 0.0,
                 init_objective: str | None = None,
@@ -297,7 +297,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     `val_split` 은 적합이 끝난 뒤 **보고용으로만** 채점된다. 목적함수에
     관여하지 않는다 — 격차(`FittedRule.gap`)를 라운드마다 기록하기 위한 것이다.
 
-    ## ★ `objective` — 기본은 `"rank"` 다 (D-101)
+    ## ★ `objective` — 기본은 `"regret"` 다 (D-128 에서 되돌렸다)
 
     ```
     "rank"    ★ 기본. 참 상위 `rank_top_k` 안의 가중 쌍 손실.
@@ -305,13 +305,18 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     "regret"  argmin 하나의 상대 시간. 계단 함수라 Nelder-Mead + 재시작
     ```
 
-    ### 왜 기본을 바꿨나 (2026-09-01 정정)
+    ### 기본이 두 번 바뀌었다 — 지금은 `"regret"` 이다
 
-    처음에는 `"regret"` 을 기본으로 뒀다. 이유는 "지금까지의 모든 결과가
-    통과한 경로라 조용히 달라지면 안 된다" 였다. **그런데 지금 하는
-    실험이 순위 손실이다** — 그것이 기본이어야 한다. 옛 결과를 재현할
-    때 `objective="regret"` 을 명시하면 되고, **그 재현이 드물지 지금
-    실험이 매번**이다.
+    ```
+    ~2026-09-01   "regret"   지금까지의 모든 결과가 통과한 경로
+     2026-09-01   "rank"     그때 하는 실험이 순위 손실이었다 (D-101)
+    ★2026-09-04   "regret"   순위 손실은 **틀린 목적함수**로 결론났다
+                             (D-118·D-121). 진화 경로에서 뺀다 (D-128)
+    ```
+
+    ⚠️ `"rank"` 는 **함수로는 남는다** — `rank_loss` / `rank_loss_top1` /
+    `tau` 는 지표로 쓰고, 옛 실행을 재현하려면 명시해서 부르면 된다.
+    **진화 루프는 거부한다** (`LoopConfig`).
 
     `"rank"` 에서도 `fit_regret` 은 계속 `regret` 으로 계산해 기록한다 —
     **채점 기준은 안 바꾼다** (사전 등록 `rank-evo-prereg.md` §3).

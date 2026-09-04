@@ -79,7 +79,7 @@ argsort / rankdata / sorted 를 쓰기 전에 "동률이면 무엇으로 가르�
 ```
 
 이것을 안 지켜서 결론이 **세 번** 뒤집혔다. 정적 top-1 1.394(덮개 산물),
-벤더 1.088(status 필터), 그리고 `1.0680` 이 `physics_seeded` 가 아니라
+벤더 1.088(status 필터), 그리고 `1.0680` 이 `human_guided`(개명 전 `physics_seeded`, D-128) 가 아니라
 <!-- ★ 정본 수치가 아니다. 정본은 artifacts/conclusion.md 의
      '★ 정본 성능 수치' 절 하나뿐이다 (2026-09-03). -->
 `evolved` 의 값이었던 것.
@@ -722,7 +722,7 @@ D-78 에서 분기 비교 상수를 예산에서 뺐다. **검사기만 고치�
 
 반대 방향도 같다. 제약을 **조일** 때 프롬프트를 안 고치면 모델은 왜
 거부당하는지 모르고 같은 실수를 반복한다 — `weight_reuse_message` 와
-`literal_budget_message` 를 LLM 경계로 뺀 이유가 그것이다.
+`literal_parameter_message`(개명 전 `literal_budget_message`, D-128) 를 LLM 경계로 뺀 이유가 그것이다.
 
 → D-78, D-35, §30.10
 

@@ -117,7 +117,7 @@ def non_llm_breakdown() -> None:
     from kernelrule.core.loop import LoopConfig, RoundLoop
 
     seed = json.loads(
-        (RUNS / "f1pipe-F3-arch24" / "stage2-rule-writer"
+        (RUNS / "F3rw-p8" / "stage2-rule-writer"
          / "chosen.json").read_text())
     cfg = LoopConfig(run_id="profile", n_rules_per_round=12, max_rounds=1,
                      seed=0, out_dir="/tmp")
@@ -191,7 +191,7 @@ def parallel_speedup(workers: int = 6) -> None:
         train=Split("train", tuple(p for p in sh if 11008 not in (p.N, p.K))),
         val=Split("val", tuple(p for p in sh if 11008 in (p.N, p.K))))
     seed = json.loads(
-        (RUNS / "f1pipe-F3-arch24" / "stage2-rule-writer"
+        (RUNS / "F3rw-p8" / "stage2-rule-writer"
          / "chosen.json").read_text())
 
     out = {}

@@ -274,3 +274,52 @@ def test_product_hint_is_off_by_default_and_lands_on_every_surface():
         d = rule_output_for(8, product_hint=ph).model_json_schema()
         has = "곱해도 된다" in d["properties"]["code"]["description"]
         assert has is ph, f"스키마 product_hint={ph} 인데 곱 문장 {has}"
+
+
+# ---------------------------------------------------------------------------
+# ★ 적합기는 **파라미터 수가 정한다** (D-128)
+# ---------------------------------------------------------------------------
+def test_fitter_is_derived_from_the_parameter_count():
+    """8 이하면 Nelder-Mead, 넘으면 CMA. **한 곳에서만 정한다.**
+
+    근거: 8차원에서는 두 적합기가 구분 불가고(D-125), 16차원에서는
+    Nelder-Mead 도달률이 92% 로 미달이다 (D-77·D-123).
+    """
+    from kernelrule.rules.checks import PARAMETERS, fitter_for
+
+    for n in (None, 4, 8):
+        f = fitter_for(n)
+        assert f == {"fit_method": "nelder-mead", "fit_restarts": 4,
+                     "max_evals": 200}, n
+    for n in (9, 16, 32):
+        f = fitter_for(n)
+        assert f == {"fit_method": "cma", "fit_restarts": 1,
+                     "max_evals": 300}, n
+    assert fitter_for(PARAMETERS)["fit_method"] == "nelder-mead"
+
+
+def test_fitter_keys_are_loopconfig_fields():
+    """★ `**fitter_for(n)` 이 그대로 펼쳐져야 한다 — 갈릴 자리를 안 만든다."""
+    import dataclasses
+
+    from kernelrule.core.loop import LoopConfig
+    from kernelrule.rules.checks import fitter_for
+
+    fields = {f.name for f in dataclasses.fields(LoopConfig)}
+    assert set(fitter_for(8)) <= fields
+    cfg = LoopConfig(run_id="x", parameters=16, **fitter_for(16))
+    assert (cfg.fit_method, cfg.fit_restarts, cfg.max_evals) == ("cma", 1, 300)
+
+
+def test_pipeline_has_no_fitter_or_rank_flags():
+    """★ `--fit-method` / `--objective` 는 **사라졌다** (D-128).
+
+    적합기는 파라미터에서 유도하고, 진화 목적함수는 regret 뿐이다.
+    플래그가 남아 있으면 "조건을 손으로 줄 수 있다" 가 되어 규칙이 샌다.
+    """
+    src = (Path(__file__).resolve().parents[1]
+           / "experiments" / "f1_pipeline.py").read_text()
+    for flag in ('"--fit-method"', '"--fit-restarts"', '"--max-evals"',
+                 '"--objective"', '"--objective-switch"', '"--rank-top-k"',
+                 '"--rank-lambda"'):
+        assert flag not in src, f"{flag} 가 아직 있다"

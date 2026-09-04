@@ -1,7 +1,7 @@
 """★ `cross` 관찰 — 사전 등록 `docs/artifacts/cross-prereg.md`. LLM 0회.
 
-    python3 experiments/cross_observe.py --runs f1pipe-F3-cross1-s{0,1,2} \\
-                                         --control f1pipe-F3-abl-B-s{0,1,2}
+    python3 experiments/cross_observe.py --runs F3rw-p8-cross-s{0,1,2} \\
+                                         --control F3rw-p8-abl-analyst-s{0,1,2}
 
 ## 네 가지
 

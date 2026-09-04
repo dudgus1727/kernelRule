@@ -39,9 +39,9 @@ VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
 
 #: 두 팔. `(실행 접두사, 라이브러리 만드는 법)`
 ARMS = {
-    "F1 21개": ("f1pipe-F1-free-roofline-s",
-                "runs/f1pipe-F1-free-roofline/stage1-features/proposals.jsonl"),
-    "사람 24개": ("f1pipe-F3-arch24-s", None),
+    "F1 21개": ("F1rw-p8-s",
+                "runs/F1rw-p8/stage1-features/proposals.jsonl"),
+    "사람 24개": ("F3rw-p8-s", None),
 }
 
 

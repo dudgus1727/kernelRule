@@ -51,10 +51,10 @@ import numpy as np
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 #: 사람 24개 라이브러리 팔. 예산 실험의 기준선 팔과 같은 실행들이다.
-RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 #: ★ 순위 손실 진화 3실행 (D-101). `--objective rank` 일 때 쓴다 —
 #: 그 경로를 재려면 그 경로가 만든 구조로 재야 한다.
-RANK_RUNS = [f"f1pipe-F3-rankevo-s{i}" for i in range(3)]
+RANK_RUNS = [f"x-rank-rankevo-s{i}" for i in range(3)]
 N_PROBE = 4000
 PROBE_LO, PROBE_HI = 0.05, 50.0
 #: 재적합 도달률의 무작위 출발 횟수. 한 번이 적합 한 번이라 비싸다.

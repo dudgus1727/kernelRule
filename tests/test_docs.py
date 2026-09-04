@@ -31,3 +31,19 @@ def test_canonical_numbers_live_in_one_place():
     for n in ("1.0650", "1.0737", "1.0762", "1.0797"):
         assert n not in readme, (
             f"README 에 성능 수치 {n} 이 있다 — 정본은 conclusion.md 다")
+
+
+def test_runs_table_is_not_stale():
+    """★ `runs.md` 가 실행 산출물과 갈리지 않았는가 (D-128).
+
+    표를 손으로 쓰면 갈린다 — `decisions_index.py` 와 같은 방식으로
+    **생성물**로 두고 여기서 검사한다.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    r = subprocess.run([sys.executable, "experiments/runs_table.py", "--check"],
+                       cwd=root, capture_output=True, text=True, check=False)
+    assert r.returncode == 0, r.stdout + r.stderr

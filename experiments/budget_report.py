@@ -8,7 +8,7 @@ regret 이 1.6 대다.
 
 보조 함수는 `two_stage.py` 것을 쓴다 (원칙 2).
 
-⚠️ `runs/f1pipe-F3-b16` 은 **폐기했다** (D-107 — 출력 스키마가 8 로
+⚠️ `runs/x-rank-b16` 은 **폐기했다** (D-107 — 출력 스키마가 8 로
 굳어 있어 규칙 29개가 전부 8항이었다). 여기 16 팔은 `b16b` 다.
 """
 
@@ -115,7 +115,9 @@ def main() -> None:
             for e in _rows(d, "archive.jsonl"):
                 sp_.append(_spent(e["code"], len(e["w"])))
                 tm.append(_n_terms(e["code"]))
-        cap = lim["rule_constraints"]["budget"]
+        # ★ D-128 개명. 옛 산출물은 변환했지만 둘 다 읽는다.
+        _rc = lim["rule_constraints"]
+        cap = _rc.get("parameters", _rc.get("budget"))
         n_at = sum(1 for x in sp_ if x >= cap)
         print(f"  {label:16s} 중앙 {np.median(sp_):4.1f} / 상한 {cap:2d}   "
               f"상한까지 쓴 규칙 {n_at:2d}/{len(sp_):2d}   중앙 "

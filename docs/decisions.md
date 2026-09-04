@@ -147,6 +147,7 @@
 - [D-125](#d-125-적합기는-범인이-아니다-그리고-번들-검사기가-반올림-예고값에-걸렸다)  적합기는 범인이 아니다 — 그리고 번들 검사기가 **반올림 예고값**에 걸렸다
 - [D-126](#d-126-세-쌍-여섯-방향-전이-손해는-출처가-아니라-대상이-정한다)  세 쌍 여섯 방향 — 전이 손해는 **출처가 아니라 대상**이 정한다
 - [D-127](#d-127-12라운드는-부족하다-그런데-부족한-양이-시드-폭보다-작다)  12라운드는 **부족하다** — 그런데 부족한 양이 시드 폭보다 작다
+- [D-128](#d-128-이름-체계-정리-alias-를-하나도-안-남긴다)  이름 체계 정리 — alias 를 하나도 안 남긴다
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 정본은 "status 전체 + 합집합 덮개" 다
@@ -6956,3 +6957,118 @@ s0 r10 개선 0.0060 · s4 r11 개선 0.0055
 
 `new_cell_recent` 가 거의 항상 참이라 patience 만 줄여도 안 멈춘다.
 그리고 patience 변경은 **조건 변경**이라 별도 사전 등록이 필요하다.
+
+## D-128  이름 체계 정리 — alias 를 하나도 안 남긴다
+
+**날짜** 2026-09-04
+**재현** `python3 -m pytest tests/test_no_old_names.py tests/test_parameters_wiring.py`
+(LLM 0회)
+**표** [artifacts/runs.md](artifacts/runs.md) — ★ **생성물이다**
+**대응표** [glossary.md](../glossary.md) 의 "개명 대응표"
+
+이름이 **주장을 하고 있었고**, 그 위에 결론이 쌓였다. 여섯을 한 번에 고쳤다.
+
+### 1. 피처 조건을 셋으로 — `F1-K` -> `F2`, `F0`·옛 `F2` 삭제
+
+```
+F1  0개에서 시작   1.1195
+F2  공개 지식 5개   1.1288   ← 옛 F1-K. 내용은 그대로다
+F3  사람 24개      1.0762
+★ 0 -> 5 -> 24 사다리. 옛 이름은 그것을 안 보여줬다
+옛 F0(피처 없음)·옛 F2(원시 물리량 5개)는 **실행이 0회**라 삭제
+```
+
+★ `_EXAMPLES` 를 특히 조심했다 — **조건이 프롬프트 예시를 고른다.**
+잘못 옮기면 모델이 다른 예시를 받고 그것이 조건 변경이다.
+파일도 옮겼다 (`f1k_observe.py` -> `f2_observe.py`, `test_f1k_prereg.py`,
+`f1k-preregistration.md`, `f1k-stage1.md`). `known5.py` 는 **그대로** —
+내용이 "공개 지식 5개" 이고 조건 이름과 별개다.
+
+### 2. `physics_seeded` -> `human_guided`
+
+```
+handwritten      "사람이 썼다"        ⛔ LLM 이 썼다
+physics_seeded   "물리에서 나왔다"     ⛔ 표를 보고 **네 판** 고쳤다
+★ human_guided   사람 지도 + 표 피드백 + LLM
+```
+
+docstring 에 실제 이력을 적었다 — **사람 지적 3회 / 표 4판
+(1.776 -> 1.428 -> 1.221 -> 1.192)**. 이름이 또 주장하지 않게.
+
+### 3. `architect-tryNN` -> `rule_writer-tryNN`
+
+역할 개명(D-9Y) 때 `chosen.json` 의 문자열이 안 따라왔다. **35개 변환**
+하고 `_renamed` 로 개명 이력을 산출물 안에 남겼다.
+
+### 4. `rule_budget` -> `parameters` (네 면 전부)
+
+```
+checks.PARAMETERS / LIMITS["parameters"] / limits_for(parameters)
+literal_parameter_message / CheckReport.parameters_used
+프롬프트 {budget} -> {parameters},  "예산" -> "파라미터"
+config.json 106개의 rule_constraints.budget -> parameters
+```
+
+⚠️ **프롬프트 문구가 바뀐다 = 조건 변경이다.** 새 실행은 "파라미터 상한
+N개" 를 받는다. 옛 실행과 나란히 놓을 때 이 줄을 적어야 한다 (원칙 4).
+
+### 5. `objective="rank"` 를 진화 경로에서 뺀다
+
+```
+★ 거부한다   LoopConfig 가 rank / objective_switch 를 받으면 예외 (맨 먼저)
+★ 사라졌다   --objective / --objective-switch / --rank-top-k / --rank-lambda
+★ 되돌렸다   fit_weights 의 기본이 다시 "regret" (2026-09-01 에 rank 였다)
+★ 남는다     rank_loss / rank_loss_top1 / tau — **지표로 쓴다**
+★ 남는다     config 스키마의 objective 필드 — 옛 실행을 읽어야 한다
+```
+
+`pending_fixes` 14 를 닫았다 — rank 로 다시 적합할 일이 없다. 다만
+**`wall.md` 의 순위 수치가 "다듬기 없음" 조건**이라는 것은 남긴다 (D-122).
+
+### 6. 적합기를 파라미터 수에 종속 — `fitter_for(n)`
+
+```
+<= 8   nelder-mead / 재시작 4 / 적합 200     8차원은 두 적합기가 구분 불가 (D-125)
+>  8   cma         / 재시작 1 / 적합 300     16차원은 NM 이 92% 미달 (D-77·D-123)
+```
+
+`--fit-method` 를 **없앴다** — 손으로 줄 수 있으면 규칙이 샌다. 키 이름을
+`LoopConfig` 필드와 같게 두어 `**fitter_for(n)` 으로 펼친다 (원칙 2).
+
+⚠️ **옛 실행 셋이 이 규칙과 다르다** — `F3rw-p8-cma`/`-prod`/`-pow` 가
+파라미터 8인데 CMA 로 돌았다 (D-124). `runs.md` 에서 ⚠️ 로 표시된다.
+
+### 7. 태그 규칙 + 실행 디렉토리 163개 이동
+
+```
+<피처><씨앗>-p<파라미터>[-<표현력>][-<실험명>]
+F3rw-p8 · F3rw-p16 · F3rw-p8-prod · F3hg-p8-d75-a · F3rw-p8-4090
+★ 표(GPU)·계승·코드 판은 태그에 안 넣는다 — config.json 이 갖는다
+★ 폐기는 `x-` 접두로 — 지우지 않고 표에서만 뺀다 (순위 계열 19개 등)
+```
+
+⚠️ **지시문의 매핑에서 하나 벗어났다.** `arch24` 와 `rb08` 을 같은 태그로
+두라고 했는데 **`F3rw-p8` 과 `F3rw-p8-cma` 로 나눴다** — 둘은 적합기가
+다르고(NM 200 vs CMA 300), 같은 태그로 두면 (1) 디렉토리 이름이 충돌하고
+(2) `runset.assert_same_condition` 이 그 묶음을 거부한다. **조건이 다른
+것을 한 이름으로 부르지 않는다** (원칙 2).
+
+### 8. `runs.md` 는 **생성물**이다
+
+`experiments/runs_table.py` 가 `config.json` 에서 조건을, **산출물
+json 에서 정준값을** 읽어 만든다. 숫자를 스크립트에 안 적는다 — 어디서
+읽을지만 적는다. `--check` 를 `tests/test_docs.py` 가 부른다
+(`decisions_index.py` 와 같은 방식).
+
+### 잔여 0 검사 — ★ 줄 단위 규칙
+
+`tests/test_no_old_names.py`. 파일 단위 예외(역사 기록·산출물·`runs/`)에
+더해 **줄 단위 규칙**을 뒀다:
+
+```
+옛 이름은 그 줄이 **`D-128` 을 인용할 때만** 남을 수 있다
+= "옛 이름을 쓰려면 어느 결정이 바꿨는지 같이 적어라"
+```
+
+그리고 **예외가 비어 있지 않은지도** 검사한다 (원칙 38) — 이력을 다
+지우고 통과하는 것을 막는다.

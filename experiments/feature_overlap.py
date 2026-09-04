@@ -42,8 +42,8 @@ import numpy as np
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.features import REGISTRY
 
-REG_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
-RANK_RUNS = [f"f1pipe-F3-rankevo-s{i}" for i in range(3)]
+REG_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
+RANK_RUNS = [f"x-rank-rankevo-s{i}" for i in range(3)]
 #: 상한 측정에서 상위 100 안에서 크게 변하던 것들 (ranking-ceiling.md §3).
 WATCH = ("split_k_cost", "sm_idle_cost", "pipeline_warmup_frac",
          "tail_waste", "waves")

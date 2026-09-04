@@ -57,7 +57,7 @@ TABLES: dict[str, dict] = {
     "a6000": {
         "bundle": "datasets/rtx-a6000-sm_86-c63710df",
         "env_hash": "c63710df",
-        "runs": [f"f1pipe-F3-arch24-s{i}" for i in range(6)]},
+        "runs": [f"F3rw-p8-s{i}" for i in range(6)]},
     "5090": {
         "bundle": "datasets/rtx-5090-sm_120-5bb6f403",
         "env_hash": "5bb6f403",
@@ -72,12 +72,12 @@ TABLES: dict[str, dict] = {
         #    `5090sigma-hw2-s*` 가 번들에서 생성한 5090 hw 를 받은 것이고,
         #    4090 (c) 와 **같은 판**이다. 옛 값은 지우지 않는다 —
         #    `transfer-29-5.md` 와 `c-ladder.md` 에 그대로 있다.
-        "runs": [f"f1pipe-F3-5090sigma-hw2-s{i}" for i in range(3)]},
+        "runs": [f"F3rw-p8-5090-s{i}" for i in range(3)]},
     "4090": {
         "bundle": "datasets/rtx-4090-sm_89-ad95d455",
         "env_hash": "ad95d455",
         # ★ (c) 재생성 3시드. 5090 새 (c) 와 **명령이 같다** (표만 다르다).
-        "runs": [f"f1pipe-F3-4090sigma-s{i}" for i in range(3)]},
+        "runs": [f"F3rw-p8-4090-s{i}" for i in range(3)]},
 }
 
 

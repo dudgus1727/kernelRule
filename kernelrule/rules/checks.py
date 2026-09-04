@@ -26,7 +26,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 
-__all__ = ["PARAMETERS", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
+__all__ = ["PARAMETERS", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
            "weight_reuse_message", "literal_parameter_message",
            "exponent_message", "exponent_indices", "weight_bounds",
            "EXPONENT_BOUNDS",
@@ -427,6 +427,30 @@ LIMITS = {
     "ast_nodes": 400,
     "max_lines": 60,
 }
+
+
+def fitter_for(parameters: int | None) -> dict:
+    """★ 파라미터 수가 적합기를 정한다 (D-128). **한 곳에서만 정한다.**
+
+    ```
+    <= 8   nelder-mead / 재시작 4 / 적합 200      지금까지의 모든 실행
+    >  8   cma         / 재시작 1 / 적합 300      §2 관문이 고른 팔 (D-123)
+    ```
+
+    근거: 8차원에서는 두 적합기가 구분 불가고(D-125), 16차원에서는
+    Nelder-Mead 도달률이 92% 로 미달이다 (D-77·D-123). 다듬기 600 은
+    양쪽 같다.
+
+    ⚠️ **옛 실행 일부는 이 규칙과 다르다** — `rb08`/`rprod`/`rpow` 는
+    파라미터 8인데 CMA 로 돌았다 (D-124). 재측정할 때 이 규칙으로 돈다.
+    """
+    b = int(parameters if parameters is not None else PARAMETERS)
+    # ★ 키 이름은 `LoopConfig` 의 필드 그대로다 — `**fitter_for(n)` 으로
+    #   그대로 펼쳐 넣을 수 있어야 갈릴 자리가 안 생긴다 (원칙 2).
+    if b <= PARAMETERS:
+        return {"fit_method": "nelder-mead", "fit_restarts": 4,
+                "max_evals": 200}
+    return {"fit_method": "cma", "fit_restarts": 1, "max_evals": 300}
 
 
 def limits_for(parameters: int | None) -> dict:

@@ -105,11 +105,11 @@ def test_real_c_arms_are_clean_and_the_recorded_six_are_not():
     """★ 진짜 실행으로 확인한다 — 되돌려서 잡는지 (원칙 38)."""
     from pathlib import Path
 
-    ok = [f"f1pipe-F3-5090sigma-s{i}" for i in range(3)]
+    ok = [f"x-hwold-5090sigma-s{i}" for i in range(3)]
     if not all((Path("runs") / r / "config.json").exists() for r in ok):
         pytest.skip("5090 실행 없음")
     assert_same_condition(ok, label="(c)")
-    mixed = ok + [f"f1pipe-F3-5090sigma-b-s{i}" for i in range(3)]
+    mixed = ok + [f"x-hand-5090sigma-b-s{i}" for i in range(3)]
     with pytest.raises(RunSetError, match="human_guided"):
         assert_same_condition(mixed, label="기록된 (c) 여섯")
 
@@ -118,7 +118,7 @@ def test_run_condition_reads_the_hardware_prompt_identity():
     """D-113 의 자리 — hw 가 조건으로 잡히는가."""
     from pathlib import Path
 
-    r = "f1pipe-F3-5090sigma-hw-s0"
+    r = "x-hwmid-5090sigma-hw-s0"
     if not (Path("runs") / r / "config.json").exists():
         pytest.skip("실행 없음")
     assert run_condition(r)["hw"] is not None

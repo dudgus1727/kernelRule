@@ -71,7 +71,7 @@ def _feats(code: str) -> set:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", nargs="+",
-                    default=[f"f1pipe-F3-rankevo-s{i}" for i in range(3)])
+                    default=[f"x-rank-rankevo-s{i}" for i in range(3)])
     ap.add_argument("--out", default="docs/artifacts/rank-evo.json")
     a = ap.parse_args()
     warnings.simplefilter("ignore")
@@ -85,7 +85,7 @@ def main() -> None:
     print("순위 손실 진화 — 사전 등록 지표   ★ 주 지표는 tau, regret 은 기록만")
     print("=" * 78)
 
-    seed = json.loads(Path("runs/f1pipe-F3-arch24/stage2-rule-writer"
+    seed = json.loads(Path("runs/F3rw-p8/stage2-rule-writer"
                            "/chosen.json").read_text())
     st, sa = _taus(seed["code"], seed["w0"], T, M, shapes)
     print(f"  씨앗 (공통)          상위100 tau {st:6.3f}   전구간 {sa:6.3f}\n")

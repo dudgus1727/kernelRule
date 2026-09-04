@@ -18,9 +18,9 @@
 
 
 ```
-python3 experiments/critic.py judge  --runs f1pipe-F3-arch24-s0 ...   # LLM
+python3 experiments/critic.py judge  --runs F3rw-p8-s0 ...   # LLM
 python3 experiments/critic.py ablate --judged docs/artifacts/critic.json  # LLM 0회
-python3 experiments/critic.py rank   --campaign runs/f1pipe-F3-arch24     # LLM
+python3 experiments/critic.py rank   --campaign runs/F3rw-p8     # LLM
 ```
 
 ## 왜 있나

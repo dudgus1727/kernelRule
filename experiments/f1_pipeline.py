@@ -31,7 +31,7 @@
 ## 조건
 
     F3  REGISTRY(사람 24개) + 씨앗            = 지금까지의 모든 실행
-    F2  ★ 공개 지식 5개 + FeatureWriter 로 확장   (2026-09-04 개명, 구 F1-K)
+    F2  ★ 공개 지식 5개 + FeatureWriter 로 확장  (개명 전 F1-K, D-128)
     F1  0개에서 시작 -> FeatureWriter -> RuleWriter 씨앗   ★ 근본 질문
 
 **0 -> 5 -> 24 사다리다.** 셋 다 돌았다.
@@ -66,6 +66,7 @@ from kernelrule.features.generated import (
 )
 from kernelrule.features.validate import alt_hw
 from kernelrule.report.table_facts import TableFacts
+from kernelrule.rules.checks import fitter_for
 
 #: 기본 표. ★ `--bundle` / `--env-hash` 로 바꾼다 — 5090 전이부터
 #: 하드코딩이면 안 된다. **실행마다 config.json 에 기록된다.**
@@ -240,16 +241,12 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
         return MockLLM("mutate", seed=a.seed, feature_names=names,
                        shape_values=svals)
     from kernelrule.agents.openai_client import OpenAILLM
-    # ★ 목적함수를 프롬프트까지 넘긴다 (D-101). 안 넘기면 채택만 순위
-    #   손실이고 모델은 regret 을 듣는다 — 그것도 조건이므로 조용히
-    #   섞이면 안 된다. `config.json` 의 `llm.objective` 로 확인된다.
+    # ★ 목적함수를 프롬프트까지 넘긴다 (D-101). 안 넘기면 채택 기준과
+    #   모델이 듣는 말이 갈린다. ★ D-128 이후 진화는 regret 뿐이다 —
+    #   순위 손실은 지표로만 남는다 (D-118·D-121).
     return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
-                               objective=getattr(a, "objective", "regret"),
+                               objective="regret",
                                parameters=getattr(a, "parameters", None),
-                               # ★ 프롬프트의 목표 정의가 **실행 조건과
-                               #   같은 숫자**를 말해야 한다 (D-105/D-107).
-                               rank_top_k=getattr(a, "rank_top_k", 100),
-                               rank_lambda=getattr(a, "rank_lambda", 0.0),
                                product_hint=getattr(
                                    a, "product_hint", False),
                                power_hint=getattr(
@@ -649,13 +646,10 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        feature_condition=a.condition,
                        use_analyst=not getattr(a, "no_analyst", False),
                        n_workers=getattr(a, "workers", 0),
-                       objective=getattr(a, "objective", "regret"),
-                       rank_top_k=getattr(a, "rank_top_k", 100),
-                       rank_lambda=getattr(a, "rank_lambda", 0.0),
-                       fit_method=getattr(a, "fit_method", "nelder-mead"),
-                       fit_restarts=getattr(a, "fit_restarts", 4),
-                       max_evals=getattr(a, "max_evals", 200),
+                       objective="regret",
                        parameters=getattr(a, "parameters", None),
+                       # ★ 적합기는 **파라미터 수가 정한다** (D-128)
+                       **fitter_for(getattr(a, "parameters", None)),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
         table=table, matrix=matrix, splits=splits, llm=llm)
@@ -676,14 +670,10 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            feature_condition=a.condition,
                            use_analyst=not a.no_analyst,
                            n_workers=a.workers,
-                           objective=a.objective,
-                           rank_top_k=a.rank_top_k,
-                           rank_lambda=a.rank_lambda,
-                           fit_method=a.fit_method,
-                           fit_restarts=a.fit_restarts,
-                           max_evals=a.max_evals,
-                           objective_switch=a.objective_switch,
+                           objective="regret",
                            parameters=a.parameters,
+                           # ★ 적합기는 **파라미터 수가 정한다** (D-128)
+                           **fitter_for(a.parameters),
                            hypothesis_pool=tuple(a.hypothesis_pool)),
             table=table, matrix=matrix, splits=splits, llm=llm)
         loop.seed(seed_rule["code"], seed_rule["w0"], changes="stage2 씨앗")
@@ -802,35 +792,10 @@ def main() -> None:
                          "비교표에 섞지 마라 (§3.4)")
     ap.add_argument("--env-hash", default=BUNDLE_HASH,
                     help="표의 env_hash 접두. 조인 키가 아니라 격리 경계다")
-    ap.add_argument("--objective", choices=("regret", "rank"),
-                    default="regret",
-                    help="가중치 목적함수. ★ 기본 regret — 지금까지의 모든 "
-                         "실행이 그 조건이다. rank 면 아카이브 채택도 "
-                         "순위 손실로 한다 (셀 축은 그대로, D-101)")
-    ap.add_argument("--fit-method", choices=("nelder-mead", "cma"),
-                    default="nelder-mead",
-                    help="가중치 적합기. ★ 기본 nelder-mead — 지금까지의 "
-                         "모든 실행이 그 조건이다. cma 는 §2 관문이 고른 "
-                         "팔이고 (D-123) `cma` 패키지가 필요하다. "
-                         "★ config.json 에 남고 묶음 검사가 본다")
-    ap.add_argument("--fit-restarts", type=int, default=4,
-                    help="적합 재시작 수. ★ CMA-ES 는 1 이다 — 예산을 넷으로 "
-                         "쪼개면 세대가 여섯 번뿐이라 CMA 가 아니다")
-    ap.add_argument("--max-evals", type=int, default=200,
-                    help="적합 평가 상한. ★ 기본 200 — 지금까지의 모든 "
-                         "실행이 그 값이다. §2 관문은 300 에서 쟀다")
     ap.add_argument("--parameters", type=int, default=None,
                     help="파라미터 상한 (가중치 + 숫자 리터럴). ★ 기본은 checks.PARAMETERS(8) — 지금까지의 "
                          "모든 실행이 그 조건이다. 검사기와 프롬프트가 "
                          "같은 값을 본다")
-    ap.add_argument("--objective-switch",
-                    choices=("rank->regret", "regret->rank"), default=None,
-                    help="★ 두 순서 실험 (D-104). 직전 3라운드 개선이 1%% "
-                         "미만이면 목적함수를 바꾸고 아카이브를 재정렬한다. "
-                         "전환은 한 번뿐이다")
-    ap.add_argument("--rank-top-k", type=int, default=100,
-                    help="순위 손실이 볼 참 상위 개수. ★ 사전 등록에 100 을 "
-                         "박았다 — 결과를 보고 바꾸지 마라")
     ap.add_argument("--power-hint", action="store_true",
                     help="★ 실험 (b) (D-112). 가중치를 **지수 자리**에 둘 "
                          "수 있다고 명시한다. 밑은 f.<이름> 하나, 지수 "
@@ -843,13 +808,6 @@ def main() -> None:
                          "— 조건은 '푸는 것' 이 아니라 '말해 주는 것' 이다. "
                          "네 면(시스템/사용자 프롬프트, 출력 스키마, 검사기) "
                          "에 같이 실린다")
-    ap.add_argument("--rank-lambda", type=float, default=0.0,
-                    help="★ 두 손실의 합 (D-109). "
-                         "L = rank_loss(k) + lambda * rank_loss_top1(k). "
-                         "top1 은 참 1등이 낀 쌍만 — regret 의 부드러운 "
-                         "대리다. ★ 사전 등록에 값 목록을 박고 전부 "
-                         "돌려라. 결과를 보고 목록 밖의 값을 고르는 것이 "
-                         "튜닝이다")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tag", default=None,
@@ -869,27 +827,21 @@ def main() -> None:
                          "가져온다. 형식이 같아서 복사면 된다 — 20호출을 "
                          "아낀다. 가져온 뒤 --stage 2 로 시작하라")
     a = ap.parse_args()
-    # ★ `cma` 가 없으면 **지금** 멈춘다 (원칙 1). 500호출 뒤 첫 적합에서
-    #   FitError 를 보는 것은 늦다.
-    if a.fit_method == "cma":
+    # ★ 적합기는 파라미터 수가 정한다 (D-128). `cma` 가 필요한데 없으면
+    #   **지금** 멈춘다 (원칙 1) — 500호출 뒤 첫 적합에서 보는 것은 늦다.
+    _fit = fitter_for(a.parameters)
+    if _fit["fit_method"] == "cma":
         try:
             import cma  # noqa: F401
         except ImportError:
             raise SystemExit(
-                "--fit-method cma 인데 `cma` 패키지가 없다. "
-                "`pip install cma` (pyproject 의 `fit` 추가 그룹).") from None
-        if a.fit_restarts != 1:
-            print(f"  ⚠️ --fit-method cma 인데 --fit-restarts "
-                  f"{a.fit_restarts} 다. §2 관문이 통과한 조건은 1 이다 "
-                  f"(fitter-regret-prereg.md §2).")
-    if a.objective_switch:
-        # ★ 시작 목적함수는 switch 의 **앞쪽**이어야 한다. 어긋나면
-        #   조용히 다른 실험이 된다 — 여기서 멈춘다 (§26.4).
-        src = a.objective_switch.split("->")[0]
-        if a.objective != src:
-            raise SystemExit(
-                f"--objective {a.objective} 인데 --objective-switch "
-                f"{a.objective_switch} 다. 시작이 {src!r} 여야 한다.")
+                f"파라미터 {a.parameters} 는 CMA-ES 로 적합하는데 `cma` "
+                "패키지가 없다. `pip install cma` (pyproject 의 `fit` 그룹)."
+            ) from None
+    print(f"  적합기: {_fit['fit_method']} / 재시작 "
+          f"{_fit['fit_restarts']} / "
+          f"적합 {_fit['max_evals']}  ← 파라미터 "
+          f"{a.parameters if a.parameters is not None else 8} 이 정한다")
     if a.seed_source is None:
         a.seed_source = "human_guided" if a.condition == "F3" else "rule_writer"
 

@@ -66,7 +66,7 @@ def main() -> None:
     ap.add_argument("--bundle", default="datasets/rtx-5090-sm_120-5bb6f403")
     ap.add_argument("--env-hash", default="5bb6f403")
     ap.add_argument("--runs", nargs="+",
-                    default=[f"f1pipe-F3-5090sigma-s{i}" for i in range(3)])
+                    default=[f"x-hwold-5090sigma-s{i}" for i in range(3)])
     ap.add_argument("--out", default="docs/artifacts/sigma-5090.json")
     a = ap.parse_args()
 

@@ -65,7 +65,7 @@ from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
-SRC_RUNS = [f"f1pipe-F3-arch24-s{i}" for i in range(6)]
+SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 #: ★ 8 과 12 사이가 꼭짓점이라 10/14/16 을 채운다 (2026-09-01)
 KS = (2, 4, 8, 10, 12, 14, 16, 20, 41)
 
