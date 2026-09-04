@@ -25,7 +25,7 @@ expected_range     선언 대조
 shape_level        상대 분산
 ```
 
-**같은 판정이 여러 곳에 있으면 갈린다** (원칙 2). `is_reference` /
+**같은 판정이 여러 곳에 있으면 달라진다** (원칙 2). `is_reference` /
 `top_k` / `DEFAULT_MODEL` / `REGISTRY` / `load_generated` 에 이은
 여섯 번째다.
 """

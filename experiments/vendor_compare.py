@@ -11,7 +11,7 @@
 ```
 
 형상별이 §30.4 의 "geomean 은 소수 형상이 끈다" 문제도 피한다.
-**둘 다 보고하되 형상별이 주 지표다** (재실행 사전 등록 §3).
+**둘 다 보고하되 형상별이 주 지표다** (재실행 실험 계획서 §3).
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ def main() -> None:
                 reg.add(REGISTRY[n])
         matrix = FeatureMatrix(table, reg)
 
-        # 실행마다 형상별 regret. 정준 절차대로 **체제별로 재적합**한다.
+        # 실행마다 형상별 regret. 최종 채점 절차대로 **체제별로 재적합**한다.
         per_run: list[dict] = []
         for s in range(6):
             arc = Path("runs") / f"{pre}{s}" / "archive.jsonl"

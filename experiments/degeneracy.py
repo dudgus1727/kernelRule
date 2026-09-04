@@ -2,7 +2,7 @@
 
     python3 experiments/degeneracy.py
 
-**사전 등록** `docs/artifacts/degeneracy-prereg.md` — 판정선을 먼저 박았다.
+**실험 계획서** `docs/artifacts/degeneracy-prereg.md` — 판정선을 먼저 박았다.
 
 ## 무엇을 묻는가
 
@@ -79,7 +79,7 @@ def main() -> None:
           f"범위 {ans_sz[0]}~{ans_sz[-1]}   1개인 형상 "
           f"{sum(1 for x in ans_sz if x == 1)}개")
 
-    # -- 정적 top-1 — ★ 정본 구현을 쓴다. 세 번째 정의를 만들지 않는다
+    # -- 정적 top-1 — ★ 대표값 구현을 쓴다. 세 번째 정의를 만들지 않는다
     #    (원칙 2. 오늘 `_arith_intensity` 에서 이미 밟았다)
     #    `StaticTopK` 의 키는 (kernel_id, split_k, split_k_mode) 다 —
     #    축 좌표가 아니다. 그래서 규칙의 선택도 같은 키로 센다.
@@ -87,7 +87,7 @@ def main() -> None:
 
     st = StaticTopK(A, shapes, coverage="union").run(ks=(1,))
     static_key = st.chosen[0]
-    print(f"  정적 top-1 (정본: 전체 status + 합집합 덮개)  "
+    print(f"  정적 top-1 (대표값: 전체 status + 합집합 덮개)  "
           f"regret {st.by_k[1]['all']:.4f}  덮개 {st.coverage[1]:.0%}")
     print("  ★ 키 = (kernel_id, split_k, split_k_mode) — 규칙의 선택도 "
           "같은 키로 센다\n")
@@ -231,12 +231,12 @@ def main() -> None:
                           "answer": float(np.mean(b_hits[q][1]))}
                  for q in PCTS}}
 
-    # -- 판정 (사전 등록에 박은 선) ----------------------------------------
+    # -- 판정 (실험 계획서에 박은 선) ----------------------------------------
     kinds = [res["runs"][r]["n_kinds"] for r in SRC_RUNS]
     tt = [res["runs"][r]["tau_top100"] for r in SRC_RUNS]
     n_flat = sum(res["runs"][r]["n_flat_top"] for r in SRC_RUNS) // len(SRC_RUNS)
     print("\n" + "=" * 78)
-    print("판정 — 사전 등록에 박은 선")
+    print("판정 — 실험 계획서에 박은 선")
     print("=" * 78)
     mk = float(np.median(kinds))
     mt = float(np.nanmedian(tt))

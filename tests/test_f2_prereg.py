@@ -1,7 +1,7 @@
-"""F2 사전 등록 — 문서와 코드가 갈리지 않는가 (원칙 2).
+"""F2 실험 계획서 — 문서와 코드가 달라지지 않는가 (원칙 2).
 
-사전 등록은 **문서**로 읽히고 **코드**로 실행된다. 문서만 고치고 코드를
-안 고치면 "사전 등록대로 했다" 가 거짓이 된다.
+실험 계획서는 **문서**로 읽히고 **코드**로 실행된다. 문서만 고치고 코드를
+안 고치면 "실험 계획서대로 했다" 가 거짓이 된다.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def test_doc_says_it_was_written_before_any_llm_call():
 def test_numbers_match_between_doc_and_code(pre):
     body = DOC.read_text()
     for text in (f"{pre['start_library']}개", f"고정 {pre['areas']}개",
-                 # ★ 사전 등록은 옛 이름으로 쓰였다. 문서도 코드도 그때의
+                 # ★ 실험 계획서는 옛 이름으로 쓰였다. 문서도 코드도 그때의
                  # 기록이므로 둘 다 안 고친다 (D-93, 문서 규칙 2).
                  f"Architect {pre['n_architect']}회",
                  f"{pre['n_seeds']}시드", f"{pre['rounds']}라운드"):

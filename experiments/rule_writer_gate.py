@@ -1,4 +1,4 @@
-"""★ 7. RuleWriter A/B 조건 — 전이 주장의 관문.
+"""★ 7. RuleWriter A/B 조건 — 전이 주장의 통과 조건.
 
     python3 experiments/rule_writer_gate.py A 10
     python3 experiments/rule_writer_gate.py B 10
@@ -15,7 +15,7 @@
 각 시도마다 가중치는 학습 분할에서 재적합한다 (§29 — 구조를 비교하려면
 가중치 운을 제거해야 한다). 판정은 **검증 분할**로 한다.
 
-    학습 regret 1.07 근처   ->  관문 통과. 표 없이 구조 생성 + 표본 재적합
+    학습 regret 1.07 근처   ->  통과 조건 통과. 표 없이 구조 생성 + 표본 재적합
     1.15+                   ->  구조 생성에 표가 필요하다
 
 A 와 B 의 격차가 곧 "표의 값어치" 다. **B 를 포기하는 것이 아니다.**
@@ -157,7 +157,7 @@ def main(condition: str, n_tries: int,
         print(f"  {'val':10s} {va.min():8.4f} {np.median(va):8.4f} "
               f"{va.max():8.4f}")
         print(f"  {'벤더':10s} {v.at(1):8.4f} (train) / {v_val.at(1):.4f} (val)")
-        print(f"\n  ★ 관문: train 최고 {tr.min():.4f}  "
+        print(f"\n  ★ 통과 조건: train 최고 {tr.min():.4f}  "
               f"-> {'통과 (1.07 근처)' if tr.min() < 1.09 else '미달'}")
         print(f"\n  최고 규칙 (#{best['i']}, {best['n_terms']}항):")
         print("  " + best["code"].strip().replace("\n", "\n  "))

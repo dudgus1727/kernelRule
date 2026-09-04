@@ -7,9 +7,9 @@
 
 | 스크립트 | LLM | 만든 artifact | 상태 |
 |---|---|---|---|
-| `rerun.py` | ✅ | `rerun-preregistration.md` | ★ **재실행 정본 러너** — 기준이 `PREREG` 에 |
-| `f1_pipeline.py` | ✅ | `f1-guided.md` · `f1k-preregistration.md` · (§30.9) | ★ **F0~F3 정본 러너** — `--dry-run` 확인 완료 |
-| `seed_selection.py` | ✅ | `luna-baseline.md` · `conclusion.md` | F3 전용 (구 정본) |
+| `rerun.py` | ✅ | `rerun-preregistration.md` | ★ **재실행 대표값 러너** — 기준이 `PREREG` 에 |
+| `f1_pipeline.py` | ✅ | `f1-guided.md` · `f1k-preregistration.md` · (§30.9) | ★ **F0~F3 대표값 러너** — `--dry-run` 확인 완료 |
+| `seed_selection.py` | ✅ | `luna-baseline.md` · `conclusion.md` | F3 전용 (구 대표값) |
 | `export_rules.py` | — | `docs/artifacts/rules/` | **규칙 내보내기** |
 | `verify_rules.py` | — | (검증만) | ★ **검증 경로** |
 
@@ -18,7 +18,7 @@
 | `rule_writer_gate.py` | ✅ | `rule-writer-gate.md` | ⚠️ 원본 삭제 (mini 실행만 남음) |
 
 | `score_new_axes.py` | — | `new-axes.md` 채점 | ⚠️ 원본 삭제 |
-| `rescore_canonical.py` | — | `conclusion.md` 의 정준 표 | 유효 |
+| `rescore_canonical.py` | — | `conclusion.md` 의 최종 채점 표 | 유효 |
 | `regime_transfer.py` | — | `structure-transfer.md` · `regime-diagnosis.md` | 유효 |
 | `proxy_dispatch.py` | — | `regime-diagnosis.md` · `glossary.md` | 유효 |
 | `regime_count.py` | — | `regime-count.md` | ⚠️ evolved 팔 원본 삭제 |
@@ -26,7 +26,7 @@
 | `selection_spread.py` | — | `decisions.md` D-40 / D-42 | ⚠️ 원본 삭제 — 목록을 채워야 돈다 |
 | `fitter_sweep.py` | — | `fitter-sweep.md` · D-55 | 유효 — 커밋된 규칙만 읽는다 |
 | `fitter_polish.py` | — | `fitter-sweep.md` · D-55 | 유효 — 커밋된 규칙만 읽는다 |
-| `fitter_movement.py` | — | D-56 · D-57 | ★ **적합기 관문** — 도달률 90% |
+| `fitter_movement.py` | — | D-56 · D-57 | ★ **적합기 통과 조건** — 도달률 90% |
 | `polish_ranking.py` | — | D-57 | ★ **재실행 판정** — 순위가 바뀌는가 |
 
 ## ★ 숫자를 검증하는 법

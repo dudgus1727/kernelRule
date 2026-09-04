@@ -1,4 +1,4 @@
-"""★ §2 관문 — **regret 경로**에서 적합기가 16차원을 버티는가. LLM 0회.
+"""★ §2 통과 조건 — **regret 경로**에서 적합기가 16차원을 버티는가. LLM 0회.
 
     OMP_NUM_THREADS=1 python3 -m experiments.fitter_regret --jobs 20
     python3 -m experiments.fitter_regret --reduce docs/artifacts/fitter-regret.json
@@ -6,7 +6,7 @@
 ★ **`-m` 으로 부른다** — `experiments.fitter_dim` 에서 절차 상수를
 가져오므로 저장소 뿌리가 `sys.path` 에 있어야 한다.
 
-사전 등록 `docs/artifacts/fitter-regret-prereg.md`. 절차는 D-77
+실험 계획서 `docs/artifacts/fitter-regret-prereg.md`. 절차는 D-77
 (`fitter_dim.py`) 과 **같다** — 새 지표를 만들지 않는다 (원칙 2).
 다른 것은 팔뿐이다: 총 evals 900 을 다섯 팔에 똑같이 준다.
 
@@ -19,7 +19,7 @@ SURR16     16항  대리 150 -> regret NM 150/2 + 다듬기 600   <- (나)
 ```
 
 ⚠️ `SURR16` 은 1단계에 순위 손실 조각(`rank_loss_top1`)이 들어간다.
-**초기점 생성에만 쓰고 채택은 regret 이다** (사전 등록 §2).
+**초기점 생성에만 쓰고 채택은 regret 이다** (실험 계획서 §2).
 
 regret 의 절대값은 문서에 보고하지 않는다 (D-56 §2). 차이와 비율만 쓴다.
 """
@@ -47,7 +47,7 @@ from experiments.fitter_dim import (
     extend_code,
 )
 
-#: 팔마다 **같은 총 evals**. 사전 등록 §2 의 표 그대로.
+#: 팔마다 **같은 총 evals**. 실험 계획서 §2 의 표 그대로.
 TOTAL_EVALS = 900
 
 ARMS = {
@@ -60,7 +60,7 @@ ARMS = {
 }
 #: 16항 팔 — 판정선과 "같은 점" 비교의 대상이다. `A8` 은 장치 점검이다.
 ARMS16 = [a for a, v in ARMS.items() if v[0] == 16]
-#: 사전 등록 §4 의 "같은 점" 기술 기준. 판정선이 아니다.
+#: 실험 계획서 §4 의 "같은 점" 기술 기준. 판정선이 아니다.
 SAME_VALUE = 1e-9
 SAME_DIR = 0.999
 
@@ -161,7 +161,7 @@ def work(task: tuple[str, str, str]) -> dict:
 
 
 def _same_point(by: dict) -> dict:
-    """★ 사전 등록 §4 — 팔들이 **같은 점**에 도달했는가. 기술이지 판정이 아니다."""
+    """★ 실험 계획서 §4 — 팔들이 **같은 점**에 도달했는가. 기술이지 판정이 아니다."""
     out: dict = {}
     for a, b in combinations(ARMS16, 2):
         ca, cb = by.get(a, {}), by.get(b, {})
@@ -264,7 +264,7 @@ def summarize(rows: list[dict], arms: list[str]) -> dict:
     if passed:
         print(f"  ★ 판정 통과 — 도달률 {TARGET_REACH:.0%} 이상인 16항 팔: "
               f"{passed}")
-        print("     동점이면 재적합 도달률로, 그것도 같으면 NM16 (사전 등록 §3)")
+        print("     동점이면 재적합 도달률로, 그것도 같으면 NM16 (실험 계획서 §3)")
     else:
         print(f"  ★ 판정 — 16항 팔 전부 도달률 {TARGET_REACH:.0%} 미만. "
               "D-77 은 regret 경로의 성질이다")
@@ -297,7 +297,7 @@ def main() -> None:
     tasks = [(arm, run, rg) for arm in arms for run in RUNS
              for rg in ("short", "long")]
     print("=" * 78)
-    print(f"§2 관문 — regret 경로 16차원 적합기, {len(tasks)}칸, 팔 {arms}")
+    print(f"§2 통과 조건 — regret 경로 16차원 적합기, {len(tasks)}칸, 팔 {arms}")
     print(f"★ 총 evals {TOTAL_EVALS} 을 팔마다 같게 준다 — 실제 값을 보고한다")
     print("=" * 78)
 

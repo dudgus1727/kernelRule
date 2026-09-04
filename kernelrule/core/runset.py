@@ -13,7 +13,7 @@ D-119   씨앗 source 가 chosen.json 에 있었고 안 읽었다
 ★ 원칙 39 가 생긴 지 하루 만에 두 번째다
 ```
 
-**그래서 검사로 만든다.** 묶음을 만드는 자리에서 부르면, 조건이 갈린
+**그래서 검사로 만든다.** 묶음을 만드는 자리에서 부르면, 조건이 달라진
 묶음은 **실패한다** (§26.4).
 
 ## 무엇을 보나
@@ -55,7 +55,7 @@ _OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4}
 
 
 class RunSetError(ValueError):
-    """묶음 안에서 조건이 갈렸다. **조용히 진행하지 않는다** (§26.4)."""
+    """묶음 안에서 조건이 달라졌다. **조용히 진행하지 않는다** (§26.4)."""
 
 
 def _campaign(run: str) -> str:
@@ -131,7 +131,7 @@ def assert_same_condition(runs, *, keys=KEYS, label: str = "묶음",
         if len(uniq) > 1:
             bad[k] = vals
     if bad:
-        lines = [f"{label} 안에서 조건이 갈렸다 ({len(bad)}개 키):"]
+        lines = [f"{label} 안에서 조건이 달라졌다 ({len(bad)}개 키):"]
         for k, vals in bad.items():
             lines.append(f"  {k}:")
             for r, v in vals.items():

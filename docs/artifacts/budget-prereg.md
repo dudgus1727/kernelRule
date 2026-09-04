@@ -1,4 +1,4 @@
-# 사전 등록 — 예산 8 vs 16, 순위 손실 단독
+# 실험 계획서 — 예산 8 vs 16, 순위 손실 단독
 
 **LLM 호출 0회 시점에 쓴다.** 근거:
 [feature-overlap.md](feature-overlap.md), [D-105](../decisions.md),

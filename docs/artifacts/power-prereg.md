@@ -1,4 +1,4 @@
-# 사전 등록 — 가중치를 **지수 자리**에 (형태 (b))
+# 실험 계획서 — 가중치를 **지수 자리**에 (형태 (b))
 
 **LLM 호출 0회 시점에 쓴다.** 근거: [D-111](../decisions.md) §셋을 합치면,
 [wall.md](wall.md) §6, [pending_fixes 11](../pending_fixes.md).

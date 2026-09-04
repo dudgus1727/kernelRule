@@ -74,8 +74,8 @@ BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 BUNDLE_HASH = "c63710df"
 OUT = Path("runs")
 
-#: ★ F2 사전 등록. `docs/artifacts/f2-preregistration.md` 와 **같은
-#: 내용**이고 `tests/test_f2_prereg.py` 가 갈리지 않는지 검사한다.
+#: ★ F2 실험 계획서. `docs/artifacts/f2-preregistration.md` 와 **같은
+#: 내용**이고 `tests/test_f2_prereg.py` 가 달라지지 않는지 검사한다.
 #: **LLM 을 한 번도 안 부른 상태에서 박았다** — 실행 직전에 쓰면 배관을
 #: 만들며 생긴 감이 기준에 스며든다 (D-50).
 F2_PREREG = {
@@ -88,13 +88,13 @@ F2_PREREG = {
     "areas": 7,
     "per_category": 3,
     # ⚠️ 이 키는 **동결된 기록**이다. D-93 에서 역할 이름을 바꿨지만
-    #   사전 등록은 그때의 이름으로 쓰였다 — 고치면 기록을 다시 쓰는 것이다
+    #   실험 계획서는 그때의 이름으로 쓰였다 — 고치면 기록을 다시 쓰는 것이다
     #   (문서 규칙 2). 살아 있는 이름은 `--n-rule-writer` 다.
     "n_architect": 10,
     "n_seeds": 6,
     "rounds": 12,
     "primary_metrics": ["새 축 개수와 사람 24개 대비 상관",
-                        "진화 후 구조 홀드아웃 (F1 과 같은 정준 절차)"],
+                        "진화 후 구조 홀드아웃 (F1 과 같은 최종 채점 절차)"],
     "not_a_criterion": ("재발견 개수 — 5개를 줬으니 줄어드는 게 당연하다. "
                         "이것으로 조건을 평가하지 않는다"),
     "two_variables": ("시작 5개 + GPU 예시. **분리하지 않는다** — 둘 다 "
@@ -242,7 +242,7 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
                        shape_values=svals)
     from kernelrule.agents.openai_client import OpenAILLM
     # ★ 목적함수를 프롬프트까지 넘긴다 (D-101). 안 넘기면 채택 기준과
-    #   모델이 듣는 말이 갈린다. ★ D-128 이후 진화는 regret 뿐이다 —
+    #   모델이 듣는 말이 달라진다. ★ D-128 이후 진화는 regret 뿐이다 —
     #   순위 손실은 지표로만 남는다 (D-118·D-121).
     return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
                                objective="regret",
@@ -475,7 +475,7 @@ def _physics_coverage(table, gen: FeatureRegistry,
                       base: FeatureRegistry) -> dict:
     """★ F1 라이브러리가 손씨앗의 물리를 덮는가 — **측정할 결과다.**
 
-    고칠 문제가 아니다. `has_spill` 하나로 1.1637 -> 3.1841 이 갈렸으니
+    고칠 문제가 아니다. `has_spill` 하나로 1.1637 -> 3.1841 이 달라졌으니
     (§8.2), 대응이 없다는 사실 자체가 결과다. LLM 0회로 계산된다.
 
     각 씨앗 항에 대해 생성 피처 중 스피어만·피어슨이 가장 높은 것을 찾는다.
@@ -531,7 +531,7 @@ def _features_module(gen: FeatureRegistry, base: FeatureRegistry) -> str:
             "",
             ("다시 쓰려면 `features/loader.py::load_generated` 로"
              " `proposals.jsonl` 을"),
-            "읽어라 — 그쪽이 정본이고 여기는 사람이 읽기 위한 것이다.",
+            "읽어라 — 그쪽이 대표값이고 여기는 사람이 읽기 위한 것이다.",
             '"""', "", "import numpy as np  # noqa: F401", ""]
     body = [f"# {n}\n{gen[n].source or '(소스 없음)'}\n" for n in made]
     return "\n".join(head) + "\n".join(body)

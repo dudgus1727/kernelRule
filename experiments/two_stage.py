@@ -2,7 +2,7 @@
 
     python3 experiments/two_stage.py
 
-**사전 등록** `docs/artifacts/two-stage-prereg.md` — 판정선을 먼저 박았다.
+**실험 계획서** `docs/artifacts/two-stage-prereg.md` — 판정선을 먼저 박았다.
 
 ## A — 구조는 순위로, 가중치는 regret 으로
 
@@ -64,7 +64,7 @@ def _best(run: str, by: str) -> dict:
 def _fit(code, w0, table, matrix, train, objective, *,
          rank_top_k: int = TOP_N, rank_lambda: float = 0.0,
          method: str = "nelder-mead", n_restarts: int = 4):
-    """체제별로 맞춘다 — 정준 절차 (§10).
+    """체제별로 맞춘다 — 최종 채점 절차 (§10).
 
     ★ `rank_top_k` / `rank_lambda` 는 **그 실행의 조건**이다. 기본값으로
     두면 k 스윕·λ 스윕을 전부 k=100·λ=0 으로 재게 된다 (원칙 37).
@@ -189,7 +189,7 @@ def main() -> None:
 
     mid = np.array(res["★ 순위 구조 + regret 가중치"])
     r, t1 = float(np.median(mid[:, 0])), float(np.median(mid[:, 1]))
-    print("\n  판정 — 사전 등록에 박은 선")
+    print("\n  판정 — 실험 계획서에 박은 선")
     print(f"    regret {r:.4f} / 상위100 tau {t1:.3f}  ->  " + (
         "★ 성공 (regret<=1.10 이면서 tau>=0.30)"
         if r <= 1.10 and t1 >= 0.30

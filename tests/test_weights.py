@@ -580,7 +580,7 @@ def test_restarts_actually_run(known):
 
 
 def test_canonical_scoring_pins_regret():
-    """★ 정준 채점은 **언제나 regret** 이다 — 명시돼 있어야 한다.
+    """★ 최종 채점은 **언제나 regret** 이다 — 명시돼 있어야 한다.
 
     `fit_weights` 의 기본값이 `rank` 로 바뀌었다 (D-101). `canonical.py`
     가 명시하지 않으면 **이 프로젝트의 모든 수치가 조용히 다른 것이
@@ -598,7 +598,7 @@ def test_canonical_scoring_pins_regret():
         k += 1
     assert 'objective="regret"' in src[i:k], (
         "canonical 이 objective 를 명시하지 않는다 — 기본값이 바뀌면 "
-        "정준 채점이 조용히 달라진다")
+        "최종 채점이 조용히 달라진다")
 
 
 def test_history_experiments_pin_their_objective():

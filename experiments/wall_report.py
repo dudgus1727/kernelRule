@@ -2,7 +2,7 @@
 
     python3 experiments/wall_report.py
 
-사전 등록 `docs/artifacts/wall-prereg.md`.
+실험 계획서 `docs/artifacts/wall-prereg.md`.
 
 ⚠️ **전부 홀드아웃 20형상.** 계열 간 비교는 **k 를 100 으로 고정**한
 tau 로 한다 — 실행마다 다른 k 로 재면 "무엇이 나아졌나" 가 아니라

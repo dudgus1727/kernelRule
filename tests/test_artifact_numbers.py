@@ -1,10 +1,10 @@
-"""★ 4-1 — `.md` 의 숫자가 `.json` 과 갈리지 않는가 (§30.14).
+"""★ 4-1 — `.md` 의 숫자가 `.json` 과 달라지지 않는가 (§30.14).
 
 지금까지 수치를 **손으로 옮겨 적었다.** 전사 오류가 안 잡힌다. 특히
-`conclusion.md` 의 정본 수치가 그렇다 — 그 문서를 다음 세션이 읽는다.
+`conclusion.md` 의 대표값 수치가 그렇다 — 그 문서를 다음 세션이 읽는다.
 
 ```
-docs/artifacts/<name>.json   기계가 쓴 것 (정본)
+docs/artifacts/<name>.json   기계가 쓴 것 (대표값)
 docs/artifacts/<name>.md     사람이 읽는 것
 ```
 
@@ -59,7 +59,7 @@ def test_md_numbers_match_json(js, md):
             continue
         missing.append(f"  {path} = {v}   (표기 후보 {_fmt(v)})")
     assert not missing, (
-        f"{js} 의 값이 {md} 에 없다 — 손으로 옮겨 적다 갈렸다 (§30.14):\n"
+        f"{js} 의 값이 {md} 에 없다 — 손으로 옮겨 적다 달라졌다 (§30.14):\n"
         + "\n".join(missing))
 
 

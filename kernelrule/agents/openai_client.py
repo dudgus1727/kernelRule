@@ -124,7 +124,7 @@ def _rule_example_for(registry, *, parameters: int | None = None) -> str:
 #:                               프롬프트는 GPU 무관해진다 (§16.2)
 #:   Analyst                     ★ 진단 리포트 **블록 1 이 같은 사실**이다.
 #:                               리포트는 표에서 매번 생성되고 `hw/*.md` 는
-#:                               고정이라, 번들이 바뀌면 둘이 갈려 모순된
+#:                               고정이라, 번들이 바뀌면 둘이 달라져 모순된
 #:                               사실을 받는다. 살아 있는 쪽을 남긴다 (원칙 2)
 #:   RuleWriter                   리포트를 안 받으므로 여기서 받아야 한다
 #: ★ 목표 정의 (D-101). **RuleEditor 만** 받는다 — RuleWriter 는 "점수
@@ -281,8 +281,8 @@ def assemble_instructions(role: str, *, objective: str = "rank",
     """★ 시스템 프롬프트 조립. **한 곳에서만 한다** (원칙 2).
 
     전에는 `_agent()` 와 `tests/test_prompt_layout.py` 가 각자 조립했다.
-    `{objective_block}` 을 넣자 **시험 쪽만 안 채워져서** 갈렸다 —
-    "같은 판정이 여러 곳에 있으면 갈린다" 의 여덟 번째다.
+    `{objective_block}` 을 넣자 **시험 쪽만 안 채워져서** 달라졌다 —
+    "같은 판정이 여러 곳에 있으면 달라진다" 의 여덟 번째다.
     """
     if objective not in _OBJECTIVE_BLOCKS:
         raise ValueError(f"알 수 없는 목적함수: {objective!r}")
@@ -349,7 +349,7 @@ def load_prompt(name: str, *, parameters: int | None = None) -> str:
     txt = _HTML_COMMENT.sub("", p.read_text()).strip() + "\n"
     # ★ 파라미터 수에 딸린 상한들도 **같이** 채운다 (D-106). `ast_nodes` 를
     #   상수로 적어 두면 파라미터 16 에서 "400 이 상한" 이라고 말하면서
-    #   검사기는 800 을 쓴다 — 프롬프트와 검사기가 갈린다.
+    #   검사기는 800 을 쓴다 — 프롬프트와 검사기가 달라진다.
     lim = limits_for(parameters if parameters is not None else PARAMETERS)
     for k, v in lim.items():
         txt = txt.replace("{" + k + "}", str(v))
@@ -365,7 +365,7 @@ class LLMConfig:
     #: RuleEditor 의 "채점 방식" 절만 바뀐다 — RuleWriter 는 안 받는다.
     objective: str = "regret"
     #: ★ 파라미터 상한 (D-104). `None` 이면 `checks.PARAMETERS`(8). 프롬프트의
-    #: `{parameters}` 가 이 값으로 채워진다 — 검사기와 갈리면 안 되므로
+    #: `{parameters}` 가 이 값으로 채워진다 — 검사기와 달라지면 안 되므로
     #: 루프가 같은 값을 `check_rule(limits=...)` 에도 넘긴다.
     parameters: int | None = None
     #: ★ 목표 정의의 **숫자**. 프롬프트가 실행 조건과 같은 말을 해야 한다
@@ -530,7 +530,7 @@ class OpenAILLM:
             raise ValueError(
                 "OpenAILLM(registry=...) 는 필수다. F1~F3 조건에서 어느 "
                 "피처 목록이 프롬프트에 들어가는지가 실험 자체다 (§26.4).")
-        # ★ 같은 판정이 두 곳에 있으면 갈린다 (원칙 2). `feature_names` 는
+        # ★ 같은 판정이 두 곳에 있으면 달라진다 (원칙 2). `feature_names` 는
         #   정적 검사가 쓰고 `registry` 는 프롬프트가 쓴다 — 어긋나면 LLM 이
         #   본 적 없는 이름으로 검사받거나, 검사에 없는 이름을 프롬프트가
         #   권한다. 둘 다 비어 있지 않으면 포함 관계를 강제한다.
@@ -702,7 +702,7 @@ class OpenAILLM:
         `has_spill` 이 무엇을 재는지 모르는 채로 항을 골랐고, 그래서 비용
         없는 가지치기를 놓쳤다 (`artifacts/spill-term.md`).
 
-        두 경로를 남겨두면 다시 갈린다. `_feature_block` 을 이쪽으로 흡수해
+        두 경로를 남겨두면 다시 달라진다. `_feature_block` 을 이쪽으로 흡수해
         **출처를 하나로** 만든다.
 
         ⚠️ 하드웨어 상수(SM 84, smem 99KB, ridge)는 주지 않는다. 피처가 이미
@@ -828,7 +828,7 @@ class OpenAILLM:
 
         표를 봐야 **구조**가 나오면 그것은 (c) 다. 그런데 전수를 잴 거면
         표를 직접 쓰면 되므로 이 시스템을 쓸 이유가 없다. 그래서 A 가
-        관문이고, B 와의 격차가 곧 "표의 값어치" 다.
+        통과 조건이고, B 와의 격차가 곧 "표의 값어치" 다.
 
         조립을 손으로 하지 않는다 — `render_features` 를 통과시킨다 (D-28).
         """

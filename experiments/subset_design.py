@@ -2,7 +2,7 @@
 
     python3 experiments/subset_design.py --workers 6
 
-**사전 등록** `docs/artifacts/subset-design-prereg.md`
+**실험 계획서** `docs/artifacts/subset-design-prereg.md`
 
 ## 무작위 뽑기는 최악의 경우를 잰다
 
@@ -52,7 +52,7 @@ G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
 SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 KS = (2, 4, 8, 10, 12)
 STRATEGIES = ("sol", "ridge", "sol+ridge", "layer")
-#: 파국의 문턱. 사전 등록에 박았다.
+#: 파국의 문턱. 실험 계획서에 박았다.
 CATASTROPHE = 1.15
 
 _W: dict = {}
@@ -75,7 +75,7 @@ def _features_without_table(p, hw) -> dict:
     """★ **표를 재기 전에** 계산되는 값만. 이것이 이 실험의 경계다.
 
     `difficulty` / `best_ms` / `distinct_time_frac` 은 여기 없다 —
-    표를 재야 알 수 있고, 쓰면 누출이다 (사전 등록 §3-2).
+    표를 재야 알 수 있고, 쓰면 누출이다 (실험 계획서 §3-2).
     """
     from kernelrule.core.splits import _DUMMY_CFG
     from kernelrule.features.physical import arith_intensity, log_sol_ms

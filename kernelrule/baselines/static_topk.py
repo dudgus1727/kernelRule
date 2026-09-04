@@ -2,13 +2,13 @@
 
 ## ★ 절차가 답을 바꾼다 (§30.5b)
 
-`status` 필터와 덮개 정의를 어떻게 잡느냐로 답이 세 갈래로 갈린다. 실측:
+`status` 필터와 덮개 정의를 어떻게 잡느냐로 답이 세 갈래로 달라진다. 실측:
 
     ok 만 + 개별 전덮개      k=1 1.394   k=3 1.383   k=8 1.383   ← 포화
     ok 만 + 합집합 덮개      k=1 1.394   k=3 1.060   k=8 1.009
-    전체 + 합집합 덮개 (정본) k=1 1.115   k=3 1.031   k=8 1.006
+    전체 + 합집합 덮개 (대표값) k=1 1.115   k=3 1.031   k=8 1.006
 
-**세 절차를 전부 계산해 병기하고 정본을 명시한다. 단일 숫자로 보고하지 마라.**
+**세 절차를 전부 계산해 병기하고 대표값을 명시한다. 단일 숫자로 보고하지 마라.**
 
 ### (1) `status` 필터
 
@@ -46,14 +46,14 @@ __all__ = ["StaticTopK", "TopKResult", "PROCEDURES", "run_all_procedures"]
 #: 완화(덮은 형상에서만 채점)하면 23% 덮개로 도망간다.
 _UNCOVERED_PENALTY = 1e3
 
-#: 병기할 절차 세 개. 마지막이 정본이다.
+#: 병기할 절차 세 개. 마지막이 대표값이다.
 PROCEDURES = (
     ("ok_individual", dict(ok_only=True, coverage="individual"),
      "ok 만 + 개별 전덮개"),
     ("ok_union", dict(ok_only=True, coverage="union"),
      "ok 만 + 합집합 덮개"),
     ("canonical", dict(ok_only=False, coverage="union"),
-     "★ 전체 status + 합집합 덮개 (정본)"),
+     "★ 전체 status + 합집합 덮개 (대표값)"),
 )
 
 
@@ -183,7 +183,7 @@ class StaticTopK:
 
 def run_all_procedures(bundle_ref, env_hash: str, *, shapes_filter=None,
                        ks=(1, 2, 3, 5, 8, 10, 20)) -> list[TopKResult]:
-    """세 절차를 전부 돌린다. **정본만 내지 않는다** (§30.5b)."""
+    """세 절차를 전부 돌린다. **대표값만 내지 않는다** (§30.5b)."""
     out = []
     for name, kw, desc in PROCEDURES:
         table = PerfTable.from_bundle(bundle_ref, env_hash=env_hash,

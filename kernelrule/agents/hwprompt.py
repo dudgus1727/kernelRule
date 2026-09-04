@@ -40,7 +40,7 @@ __all__ = ["render_hw_prompt", "hw_prompt_from_bundle", "check_hw_prompt",
 
 
 class HwPromptError(ValueError):
-    """번들과 프롬프트가 갈렸다. **조용히 진행하지 않는다** (§26.4)."""
+    """번들과 프롬프트가 달라졌다. **조용히 진행하지 않는다** (§26.4)."""
 
 
 #: 눈금 표에 쓸 **참고** 길이 [ms].
@@ -62,7 +62,7 @@ def render_hw_prompt(hw: Hardware, *, noise, env: dict,
     """`Hardware` + 노이즈 모델 -> 프롬프트 본문. **손으로 쓰지 않는다.**
 
     ★ 측정 한계 절의 **결론이 표마다 다르다** (D-116). 노이즈 바닥은
-    `max(통계항, 눈금항)` 인데 어느 쪽이 이기는지가 표마다 갈린다:
+    `max(통계항, 눈금항)` 인데 어느 쪽이 이기는지가 표마다 달라진다:
 
     ```
     A6000   11.3us 에서 눈금 9.09% vs 통계 3.36%   -> ★ 눈금이 한계다
@@ -189,7 +189,7 @@ def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
     from kernelrule.core.noise import NoiseModel
 
     # ★ `PerfTable` 과 **같은 진입점**을 쓴다 (원칙 2). 여기서 따로 읽으면
-    #   표가 쓰는 계수와 갈릴 수 있다.
+    #   표가 쓰는 계수와 달라질 수 있다.
     b = load_bundle(str(bundle), verify=True)
     if env_hash and not str(b.env_hash).startswith(str(env_hash)):
         raise HwPromptError(
@@ -207,7 +207,7 @@ def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
     return txt, {"name": hw.name, "arch": hw.arch, "sm_count": hw.sm_count,
                  "l2_bytes": hw.l2_bytes, "ridge_point": hw.ridge_point,
                  "tick_ms": tick_ms, "source": str(p),
-                 # ★ 조건이므로 남긴다 — 측정 한계 절의 **결론**이 갈린다.
+                 # ★ 조건이므로 남긴다 — 측정 한계 절의 **결론**이 달라진다.
                  "min_ms": float(min_ms),
                  "tick_binds": bool(noise.tick_pct(min_ms)
                                     > noise.sigma(min_ms)),

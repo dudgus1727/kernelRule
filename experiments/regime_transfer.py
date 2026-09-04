@@ -251,7 +251,7 @@ def main() -> None:                                          # noqa: PLR0915
           f"{hw_one.at(1, mask=~is_short):8.4f} {hw_one.at(1):8.4f}")
     print(f"  {'벤더':28s} {v_short.at(1):8.4f} {v_long.at(1):8.4f} "
           f"{v_all.at(1):8.4f}")
-    print("  ★ 관문 1.080")
+    print("  ★ 통과 조건 1.080")
 
     # -- 3. 유의성 판정 (§30.6) --------------------------------------------
     print(f"\n{'=' * 76}")

@@ -8,7 +8,7 @@
 ## ★ kernelTab 과 조건을 맞춘다
 
 ```
-버전     0.1.0.27          다르면 추천이 갈린다
+버전     0.1.0.27          다르면 추천이 달라진다
 target   ★ CUTLASS         CUTLASS3 를 쓰면 cluster(1,4) 가 나온다 —
                            우리 표는 2.x 공간이다
 layout   TN_ROW_MAJOR      전 형상 공통

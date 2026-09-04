@@ -74,7 +74,7 @@ def test_mixed_objective_fails(tmp_path):
 
 def test_mixed_seed_code_fails_even_with_same_source(tmp_path):
     """출처 이름이 같아도 **코드가 다르면** 다른 씨앗이다."""
-    # ★ 캠페인이 둘이다 — 씨앗은 캠페인 단위이므로 이렇게 해야 갈린다
+    # ★ 캠페인이 둘이다 — 씨앗은 캠페인 단위이므로 이렇게 해야 달라진다
     _mk(tmp_path, "d0-s0")
     _mk(tmp_path, "d1-s0", code="def score(): pass")
     with pytest.raises(RunSetError, match="seed_sha"):

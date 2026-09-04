@@ -2,7 +2,7 @@
 
     python3 experiments/power_report.py
 
-사전 등록 `docs/artifacts/power-prereg.md`. 기준선은 `rankevo`
+실험 계획서 `docs/artifacts/power-prereg.md`. 기준선은 `rankevo`
 (같은 조건, 힌트만 없음).
 
 ## 왜 채택률만으로는 부족한가
@@ -176,7 +176,7 @@ def main() -> None:
     r = out["regret"]["pow"]
     med_r, med_t = float(np.median([x[0] for x in r])), \
         float(np.median([x[1] for x in r]))
-    print("\n  판정 — 사전 등록에 박은 선")
+    print("\n  판정 — 실험 계획서에 박은 선")
     print(f"    regret {med_r:.4f} / 상위100 tau {med_t:+.3f}  ->  " + (
         "★ 벽이 낮아졌다" if med_t >= 0.20 and med_r <= 1.15
         else "벽은 형태의 문제가 아니다"))

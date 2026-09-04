@@ -1,12 +1,12 @@
 """★ `decisions.md` 머리의 색인을 **생성한다**. LLM 0회.
 
     python3 experiments/decisions_index.py          # 갱신
-    python3 experiments/decisions_index.py --check   # 갈렸으면 실패
+    python3 experiments/decisions_index.py --check   # 달라졌으면 실패
 
 5,900줄에 D-1~D-114 가 시간순으로 쌓여 있고 색인이 없었다. 새 세션이
 "D-77 이 무엇이었나" 를 찾으려면 전부 훑어야 한다.
 
-★ 손으로 쓰지 않는다. 손으로 쓰면 D 하나 추가할 때마다 갈린다 (원칙 2).
+★ 손으로 쓰지 않는다. 손으로 쓰면 D 하나 추가할 때마다 달라진다 (원칙 2).
 제목은 `## D-N  ...` 줄에서 그대로 가져온다.
 
 `_SUPERSEDED` 만 사람이 적는다 — "무엇이 무엇을 정정했나" 는 제목에서
@@ -85,7 +85,7 @@ def main() -> None:
     new = body[:i] + block + body[i:] if BEGIN not in text else \
         text[:text.index(BEGIN)] + block + text[text.index(END) + len(END):].lstrip("\n")
     # ★ **개수를 센다** (원칙 38). 정규식이 못 잡는 형식이 새로 생기면
-    #   "갈렸다" 로는 안 잡힌다 — 양쪽이 똑같이 빠지기 때문이다.
+    #   "달라졌다" 로는 안 잡힌다 — 양쪽이 똑같이 빠지기 때문이다.
     body_only = text[text.index(END) + len(END):] if END in text else text
     n_head = len(re.findall(r"^## D-", body_only, re.M))
     n_idx = len(_entries(body_only))
@@ -95,7 +95,7 @@ def main() -> None:
                  f"{n_head - n_idx}개 있다 — 형식을 고쳐라 (D-116).")
     if a.check:
         if new != text:
-            sys.exit("decisions.md 색인이 갈렸다. "
+            sys.exit("decisions.md 색인이 달라졌다. "
                      "`python3 experiments/decisions_index.py` 를 돌려라.")
         print(f"색인 최신 ({n_idx}개, 본문 헤더와 일치)")
         return

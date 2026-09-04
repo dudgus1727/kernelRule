@@ -2,7 +2,7 @@
 
     python3 experiments/d75_observe.py runs/x-probe-d78d75v1-s0
 
-사전 등록: `docs/artifacts/d75-verification-prereg.md` 의 여섯 항목.
+실험 계획서: `docs/artifacts/d75-verification-prereg.md` 의 여섯 항목.
 **성능은 안 본다** — 2라운드 1시드는 시드 폭 안이다.
 """
 
@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-#: 요구 문장에 있으면 **표 정보가 샌 것**이다 (사전 등록 5번).
+#: 요구 문장에 있으면 **표 정보가 샌 것**이다 (실험 계획서 5번).
 _LEAK = (
     (re.compile(r"사례\s*#?\d"), "사례 번호"),
     (re.compile(r"regret|리그렛"), "regret"),

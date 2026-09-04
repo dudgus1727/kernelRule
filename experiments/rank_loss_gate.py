@@ -1,4 +1,4 @@
-"""★ 순위 손실 관문 — 대리 손실이 목표와 어긋나는가. LLM 0회.
+"""★ 순위 손실 통과 조건 — 대리 손실이 목표와 어긋나는가. LLM 0회.
 
     python3 experiments/rank_loss_gate.py
 
@@ -182,7 +182,7 @@ def main() -> None:
     sp = _splits(B)
 
     print("=" * 78)
-    print("순위 손실 관문 — 대리 손실이 목표와 어긋나는가")
+    print("순위 손실 통과 조건 — 대리 손실이 목표와 어긋나는가")
     print("=" * 78)
     print(f"  5090 학습 {len(sp.train.shapes)} / 홀드아웃 "
           f"{len(sp.val.shapes)}   ★ config 는 전수다")

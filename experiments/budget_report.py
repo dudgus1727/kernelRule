@@ -2,7 +2,7 @@
 
     python3 experiments/budget_report.py
 
-사전 등록 `docs/artifacts/budget-prereg.md`. 벽은 D-104 다 —
+실험 계획서 `docs/artifacts/budget-prereg.md`. 벽은 D-104 다 —
 regret 이 낮은 규칙은 상위100 tau 가 0 근처고, tau 가 높은 규칙은
 regret 이 1.6 대다.
 
@@ -124,7 +124,7 @@ def main() -> None:
               f"{np.median(tm):4.1f} ({min(tm)}~{max(tm)})")
         out.setdefault("bind", {})[tag] = {
             "spent": sp_, "terms": tm, "cap": cap, "n_at_cap": n_at}
-    print("\n  ⚠️ 사전 등록에 '16항을 쓰는 규칙이 0개면 무효' 라고 썼다.")
+    print("\n  ⚠️ 실험 계획서에 '16항을 쓰는 규칙이 0개면 무효' 라고 썼다.")
     print("     **단위를 잘못 썼다** — 예산은 항이 아니라 리터럴+가중치를")
     print("     센다. 항 수로는 최대 15 지만 예산 소비로는 상한에 닿는다.")
 
@@ -147,7 +147,7 @@ def main() -> None:
               f"{fl[2]:10.3f}")
     out["floor"] = fl
 
-    print("\n  판정 — 사전 등록에 박은 선")
+    print("\n  판정 — 실험 계획서에 박은 선")
     r16 = out["regret"]["b16b"]["med"]
     r08 = out["regret"]["b08"]["med"]
     t16, g16 = r16[1], r16[0]

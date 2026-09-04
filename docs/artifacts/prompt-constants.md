@@ -4,7 +4,7 @@
 > **조건**: LLM 무관 — 표에서 직접 센 것
 
 
-**재현** 명제 재확인은 전용 스크립트 없이 `PerfTable.answer_mask` 로 직접 셌다. 같은 계산이 `report/table_facts.py::TableFacts.compute` 에 들어 있다 — **그쪽이 정본**이다 (학습 분할만 본다).
+**재현** 명제 재확인은 전용 스크립트 없이 `PerfTable.answer_mask` 로 직접 셌다. 같은 계산이 `report/table_facts.py::TableFacts.compute` 에 들어 있다 — **그쪽이 대표값**이다 (학습 분할만 본다).
 
 **측정일** 2026-08-21 · 학습 41형상(`nk11008` 제외) · **LLM 호출 0회**
 

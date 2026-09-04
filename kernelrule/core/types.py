@@ -177,7 +177,7 @@ class CandidateSet:
     정해진 뒤에** 인덱싱에만 쓰인다.
 
     `tiebreak` 는 config 정체성으로만 만든 정수 순위다. `np.lexsort` 의
-    1차 키로 넣으면 점수 동점이 결정론적으로 갈린다 — 타이머 양자화 때문에
+    1차 키로 넣으면 점수 동점이 결정론적으로 달라진다 — 타이머 양자화 때문에
     동점이 대량 발생하므로(512³ 에서 최빈값 하나에 9.2%) 이게 실제로 중요하다.
     """
 
@@ -229,7 +229,7 @@ class CandidateSet:
 
         정확성: 점수가 `kth` 이하인 것만 모아도 충분하다. 그 밖의 원소는
         점수가 `kth` 보다 크고, `kth` 이하인 원소가 이미 k개 이상 있으므로
-        상위 k에 들 수 없다. **동점은 여전히 tie-break 로만 갈린다.**
+        상위 k에 들 수 없다. **동점은 여전히 tie-break 로만 달라진다.**
         """
         score = np.asarray(score, dtype=np.float64)
         if score.shape != (self.n,):

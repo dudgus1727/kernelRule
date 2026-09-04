@@ -82,7 +82,7 @@ def main() -> None:
     print()
     print("  ★ 정답 집합이 넓을수록 '아무거나 골라도 되는' 표다 —")
     print("     남의 가중치를 그대로 옮겨도 덜 벌받는다 (D-126 의 가설)")
-    print("  ⚠️ 관측이다. 표 셋이고 사전 등록에 없던 자름이다 (원칙 27)")
+    print("  ⚠️ 관측이다. 표 셋이고 실험 계획서에 없던 자름이다 (원칙 27)")
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
 

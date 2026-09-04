@@ -28,7 +28,7 @@ def test_order_by_sorts_ascending():
 
 
 def test_ties_broken_by_config_identity_only():
-    """동점은 config 정체성으로만 갈린다. 표의 행 순서와 무관하다."""
+    """동점은 config 정체성으로만 달라진다. 표의 행 순서와 무관하다."""
     c = _cand()
     order = c.order_by(np.zeros(5))
     assert order.tolist() == sorted(range(5), key=lambda i: c.tiebreak[i])

@@ -87,8 +87,8 @@ def test_prompt_has_no_table_derived_claim(path: Path):
 #     _rules_common.md  "w0 를 대충 내지는 마세요 ... 물리적 크기를 반영한"
 #     schemas.py        "대략적이면 충분하다 — 수치 최적화기가 맞춘다"
 #
-#   원칙 26 의 짝이다 — 검사기와 프롬프트가 갈리면 모델은 프롬프트를 믿지만,
-#   프롬프트와 스키마가 갈리면 **모델은 둘 다 본다.**
+#   원칙 26 의 짝이다 — 검사기와 프롬프트가 달라지면 모델은 프롬프트를 믿지만,
+#   프롬프트와 스키마가 달라지면 **모델은 둘 다 본다.**
 
 
 def _schema_descriptions() -> dict[str, str]:
@@ -223,7 +223,7 @@ def test_evidence_cases_do_not_reach_the_rule_editor():
 
 
 def test_prompt_no_longer_names_the_optimizer():
-    """순위 경로는 L-BFGS-B 다. 이름을 적으면 또 갈린다 (pending 12)."""
+    """순위 경로는 L-BFGS-B 다. 이름을 적으면 또 달라진다 (pending 12)."""
     from kernelrule.agents.openai_client import load_prompt
 
     txt = load_prompt("role/_rules_common.md", parameters=8)

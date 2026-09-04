@@ -2,7 +2,7 @@
 
     python3 experiments/cascade.py
 
-사전 등록 `docs/artifacts/cascade-prereg.md`.
+실험 계획서 `docs/artifacts/cascade-prereg.md`.
 
 ```
 1단계   regret 규칙으로 상위 k 를 추린다      (영역 선택)
@@ -143,7 +143,7 @@ def main() -> None:
 
     # -- 판정 ------------------------------------------------------------
     print("\n" + "=" * 86)
-    print("판정 — 사전 등록에 박은 선")
+    print("판정 — 실험 계획서에 박은 선")
     print("=" * 86)
     lo, hi = min(solo), max(solo)
     print(f"  regret 단독 시드 범위  {lo:.4f}~{hi:.4f}")

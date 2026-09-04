@@ -2,7 +2,7 @@
 
     python3 experiments/expressive_report.py       # -> docs/artifacts/expressive-regret.json
 
-사전 등록 `docs/artifacts/expressive-regret-prereg.md`. 판정선은 거기
+실험 계획서 `docs/artifacts/expressive-regret-prereg.md`. 판정선은 거기
 박혀 있다 — 여기서 정하지 않는다.
 
 ```
@@ -13,7 +13,7 @@ rpow   예산 8 + 지수 힌트
 ```
 
 네 판 전부 **같은 씨앗·같은 적합기**(CMA-ES, 재시작 1, 적합 300 /
-다듬기 600)로 돈다 — §2 관문이 고른 팔이다 (D-123).
+다듬기 600)로 돈다 — §2 통과 조건이 고른 팔이다 (D-123).
 
 ⚠️ **재는 쪽 적합기도 CMA 다.** Nelder-Mead 로 재적합하면 16항 규칙에서
 도달률이 92% 라(D-77), "예산 16 이 나쁘다" 가 아니라 재는 쪽의 실패를
@@ -54,11 +54,11 @@ ARMS = [("rb08", "예산 8 (기준선)", None),
         ("rprod", "곱 힌트", "product_hint"),
         ("rpow", "지수 힌트", "power_hint")]
 SEEDS = 3
-#: 사전 등록 §3. **여기서 정하지 않는다** (원칙 7).
+#: 실험 계획서 §3. **여기서 정하지 않는다** (원칙 7).
 DELTA = 0.0516
 #: 옛 적합기(Nelder-Mead 200/600)의 같은 조건. **참고값이다** (원칙 4).
 OLD_BASELINE = 1.0762
-#: 보고할 k. 사전 등록 §1 — 1 이 주 지표, 10/50/100 이 "영역을 더
+#: 보고할 k. 실험 계획서 §1 — 1 이 주 지표, 10/50/100 이 "영역을 더
 #: 정밀하게 가리키는가" 를 본다.
 REPORT_KS = (1, 10, 50, 100)
 
@@ -329,20 +329,20 @@ def main() -> None:
 
     # ---------------------------------------------------------- §6 배분
     print("\n" + "=" * 92)
-    print("§6  ★ 판정 — 사전 등록 §3 의 선, 결과 보고 정하지 않았다")
+    print("§6  ★ 판정 — 실험 계획서 §3 의 선, 결과 보고 정하지 않았다")
     print("=" * 92)
     hits = [label for tag, label, _ in ARMS
             if tag != "rb08" and b - float(np.median(r1[tag])) >= DELTA]
     if hits:
         print(f"  ★ 표현력이 벽이었다 — {hits}")
         print("     -> 순위 손실에서 안 됐던 것은 그 목적함수의 성질이었다")
-        print("     -> conclusion.md 의 '벽' 절을 다시 쓴다 (사전 등록 §4)")
+        print("     -> conclusion.md 의 '벽' 절을 다시 쓴다 (실험 계획서 §4)")
     else:
         print("  ★ 셋 다 구분 불가 — 벽은 피처 공간의 성질이다")
         print("     선형/비선형/예산이 아니다. 남는 후보는 **트리의 조건부")
         print("     분기**다 — 우리 `np.where` 는 형상 수준(`p.*`)으로만")
-        print("     갈리고 GBDT 는 config 수준 피처의 문턱으로도 갈린다")
-        print("     (사전 등록 §4 에 후보로 등록해 뒀다)")
+        print("     달라지고 GBDT 는 config 수준 피처의 문턱으로도 달라진다")
+        print("     (실험 계획서 §4 에 후보로 등록해 뒀다)")
     out["hits"] = hits
 
     n_cfg = {}

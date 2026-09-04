@@ -61,7 +61,7 @@ def _rendered_literals(fn_name: str, node: ast.AST):
 def test_template_never_states_an_uncomputed_comparison():
     """★ 이 프로젝트가 실제로 밟은 함정을 코드로 막는다.
 
-    블록 3 에 "크기 층화가 난이도 층화보다 크게 갈린다" 를 미리 적어 뒀는데
+    블록 3 에 "크기 층화가 난이도 층화보다 크게 달라진다" 를 미리 적어 뒀는데
     학습 분할의 실제 숫자는 반대였다 (0.0007 vs 0.1651). **리포트가 자기
     데이터와 모순되면 LLM 은 데이터가 아니라 문장을 믿는다.**
 

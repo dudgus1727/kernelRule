@@ -154,7 +154,7 @@ def test_ridge_comes_from_hardware_not_recomputed():
     """`_ridge` 가 번들의 `ridge_point` 와 같아야 한다.
 
     실효값/스펙값 중 무엇을 쓰는지가 26% 어긋난다 (§6.2). 그 판단이 두
-    곳에 있으면 경계 형상의 체제가 조용히 갈린다.
+    곳에 있으면 경계 형상의 체제가 조용히 달라진다.
     """
     import json
     import warnings

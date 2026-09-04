@@ -2,7 +2,7 @@
 
     python3 experiments/regret_at_k.py
 
-사전 등록 `docs/artifacts/regret-at-k-prereg.md`.
+실험 계획서 `docs/artifacts/regret-at-k-prereg.md`.
 
 ## 왜
 
@@ -146,7 +146,7 @@ def _row(label: str, vals: list[dict]) -> None:
     a = np.array([[v["regret_at_k"][k] for k in KS] for v in vals])
     print(f"  {label:20s} " + " ".join(
         f"{m:6.3f}" for m in np.median(a, axis=0)))
-    # ★ 판정은 **시드 범위**로 한다 (사전 등록 §5). 잘라 쓰면 못 읽는다.
+    # ★ 판정은 **시드 범위**로 한다 (실험 계획서 §5). 잘라 쓰면 못 읽는다.
     print(f"  {'':20s} " + " ".join(
         f"{a[:, i].min():.2f}-{a[:, i].max():.2f}" for i in range(len(KS))))
 

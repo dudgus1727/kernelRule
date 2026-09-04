@@ -1,4 +1,4 @@
-"""★ `cross` 관찰 — 사전 등록 `docs/artifacts/cross-prereg.md`. LLM 0회.
+"""★ `cross` 관찰 — 실험 계획서 `docs/artifacts/cross-prereg.md`. LLM 0회.
 
     python3 experiments/cross_observe.py --runs F3rw-p8-cross-s{0,1,2} \\
                                          --control F3rw-p8-abl-analyst-s{0,1,2}
@@ -17,7 +17,7 @@ D-42 의 폭 0.098 -> 0.100 / 중앙 1.0817 -> 1.1137 은 **삭제된 gpt-5.4
 모델이 다르면 나란히 못 놓는다. 그래서 **같은 모델의 대조군(`abl-B`)을
 여기서 함께 계산한다.**
 
-⚠️ 그래도 `abl-B` 는 라운드로빈 배정(D-94 이전)이다 — 사전 등록이 적어
+⚠️ 그래도 `abl-B` 는 라운드로빈 배정(D-94 이전)이다 — 실험 계획서가 적어
 둔 교락이다. 3번은 **방향만** 읽고 성능 판정에 쓰지 않는다.
 """
 
@@ -79,7 +79,7 @@ def obs1(runs: list[Path]) -> None:
         return
     verdict = ("★ 교차가 실제로 돈다" if r >= 0.40
                else "★ 프롬프트가 안 듣는다 — 성능을 보기 전에 멈춘다"
-               if r <= 0.10 else "가운데 — 사전 등록에 없는 구간이다")
+               if r <= 0.10 else "가운데 — 실험 계획서에 없는 구간이다")
     print(f"  판정: {verdict}")
     # 어떤 항을 버렸나 — 예산이 있으므로 합치면 반드시 버려야 한다
     dropped = [len(set(x["a"]) | set(x["b"])) - len(x["child"])

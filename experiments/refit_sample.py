@@ -24,7 +24,7 @@ k = 2(5%) 4 8 12 20 41(100%)
 ## ★ 파국의 정체를 함께 남긴다 (2026-09-01)
 
 최악이 2.35 였다 — "조금 나쁜" 것이 아니라 뭔가 깨진 것이다. 대응이
-갈리므로 원인을 기록한다.
+달라지므로 원인을 기록한다.
 
 ```
 적합 집합에서는 좋은데 홀드아웃이 나쁘다  -> ★ 과적합. 표본 문제다
@@ -137,7 +137,7 @@ def _job(arg):
         regs.append(float(t[cand.top_k(sc, 1)[0]] / t.min()))
     return {"ri": ri, "run": _W["runs"][ri], "k": k, "seed": seed,
             "n_sample": len(sample),
-            # ★ 적합 집합에서의 값. 홀드아웃과 갈리면 과적합이다
+            # ★ 적합 집합에서의 값. 홀드아웃과 달라지면 과적합이다
             "fit_regret": float(np.exp(np.mean(np.log(fits)))),
             "moved": all(moved),
             "n_terms": _W["n_terms"][ri],

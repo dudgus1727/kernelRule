@@ -130,7 +130,7 @@ def test_answer_mask_uses_noise_floor_not_one_percent():
 def test_comparison_uses_shape_noise_not_geomean():
     """★ `1.085 > 1.080 이니 졌다` 는 부정확하다.
 
-    61형상 geomean 에서 0.5% 면 형상 몇 개가 눈금 하나 차이로 갈려도 나온다.
+    61형상 geomean 에서 0.5% 면 형상 몇 개가 눈금 하나 차이로 달라져도 나온다.
     **"유의하게 진 형상이 N개" 가 정확한 서술이다.**
     """
     from kernelrule.core.noise import NoiseModel

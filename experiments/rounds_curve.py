@@ -2,7 +2,7 @@
 
     python3 experiments/rounds_curve.py
 
-사전 등록 `docs/artifacts/rounds-prereg.md`.
+실험 계획서 `docs/artifacts/rounds-prereg.md`.
 
 "조기 종료가 안 걸렸다" 는 "수렴했다" 가 아니다 — `patience=10` 에
 12라운드면 판정 창이 둘뿐이고, 새 셀이 하나만 생겨도 안 멈춘다.
@@ -114,7 +114,7 @@ def main() -> None:
             if approx:
                 # ★ F3 6시드가 **전부 같은 문턱**(0.0047)을 냈다 — 문턱은
                 #   규칙이 아니라 홀드아웃 형상이 정한다. 그 값을 빌려 쓰되
-                #   **근사라고 표시한다**. 판정은 F3 로만 한다 (사전 등록 §2).
+                #   **근사라고 표시한다**. 판정은 F3 로만 한다 (실험 계획서 §2).
                 thr = out.get("_f3_thr", float("nan"))
             # 라운드마다의 개선 (양수 = 좋아졌다)
             d = [vals[k - 1] - vals[k] for k in range(1, len(vals))]
@@ -164,7 +164,7 @@ def main() -> None:
     import statistics as _st
     print("=" * 96)
     print("★ patience 별 — 가정 종료 라운드와 **놓칠 개선** "
-          "(사전 등록 patience-prereg.md)")
+          "(실험 계획서 patience-prereg.md)")
     print("=" * 96)
     pat: dict = {}
     for tag, g in out["groups"].items():
@@ -203,7 +203,7 @@ def main() -> None:
 
     print()
     print("=" * 96)
-    print("★ 판정 — 사전 등록 §2 의 셋 중에서")
+    print("★ 판정 — 실험 계획서 §2 의 셋 중에서")
     print("=" * 96)
     if in3:
         verdict = "(나) 12 가 부족하다"
@@ -214,7 +214,7 @@ def main() -> None:
         print("  ★ (다) — 유의 개선은 r8 이하에서 끝났는데 새 셀이 "
               f"r9 이후에도 생긴다: {late_cell}")
         print("     -> patience 조정을 **검토**한다. ⚠️ 여기서 바꾸지 않는다 "
-              "(조건 변경이라 별도 사전 등록)")
+              "(조건 변경이라 별도 실험 계획서)")
     else:
         verdict = "(가) 12 로 충분하다"
         print("  ★ (가) — 6시드 전부 마지막 유의 개선이 r8 이하이고 "

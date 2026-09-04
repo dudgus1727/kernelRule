@@ -299,7 +299,7 @@ def test_retries_raised_to_three():
 # ---------------------------------------------------------------------------
 # 전이가 성립하려면 새 아키텍처에서 **표 없이** 구조가 나와야 한다. 표를
 # 봐야 구조가 나오면 §29.5(c) 재생성이고, 전수를 잴 거면 표를 직접 쓰면
-# 되므로 이 시스템을 쓸 이유가 없다. 그래서 A 가 관문이다.
+# 되므로 이 시스템을 쓸 이유가 없다. 그래서 A 가 통과 조건이다.
 
 def _arch_client():
     import kernelrule.features.physical  # noqa: F401
@@ -317,7 +317,7 @@ class _Facts:
 
 
 def test_rule_writer_condition_a_contains_no_table_derived_line():
-    """★ 관문. 표에서 나온 문장이 한 줄도 들어가면 안 된다."""
+    """★ 통과 조건. 표에서 나온 문장이 한 줄도 들어가면 안 된다."""
     c = _arch_client()
     a = c._rule_writer_prompt(condition="A", table_facts=_Facts())
     for line in (*_Facts.lines, *_Facts.by_feature["has_spill"]):

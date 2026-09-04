@@ -1,4 +1,4 @@
-"""★ 재실행 — 단일 조건 6시드. 사전 등록된 기준으로만 판정한다.
+"""★ 재실행 — 단일 조건 6시드. 실험 계획서에 적힌 기준으로만 판정한다.
 
     python3 experiments/rerun.py --verify     # 짧은 검증 (2실행 x 6라운드)
     python3 experiments/rerun.py              # 본 실행 (6실행 x 12라운드)
@@ -12,7 +12,7 @@
 
     재적합은 최종 산출물만 고친다. 진화 궤적은 못 되돌린다.  (원칙 13)
 
-## 사전 등록
+## 실험 계획서
 
 **판정 기준은 `PREREG` 에 있고 `docs/artifacts/rerun-preregistration.md`
 와 같은 내용이다.** 테스트가 그것을 고정한다. 결과를 보고 기준을 바꾸면
@@ -40,8 +40,8 @@ from kernelrule.features import REGISTRY
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 OUT = Path("runs")
 
-#: ★ 사전 등록. `docs/artifacts/rerun-preregistration.md` 와 **같은 내용**이다.
-#:   `tests/test_rerun_prereg.py` 가 둘이 안 갈리는지 검사한다.
+#: ★ 실험 계획서. `docs/artifacts/rerun-preregistration.md` 와 **같은 내용**이다.
+#:   `tests/test_rerun_prereg.py` 가 둘이 안 달라지는지 검사한다.
 PREREG = {
     "purpose": ("오염 없는 상태의 값을 얻는 것. **벤더를 이기는 것이 "
                 "아니다.**"),
@@ -112,7 +112,7 @@ def main() -> None:
     _install_signal_handlers()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--verify", action="store_true",
-                    help="짧은 검증 — 2실행 x 6라운드. ★ 정본 수치가 아니다")
+                    help="짧은 검증 — 2실행 x 6라운드. ★ 대표값 수치가 아니다")
     ap.add_argument("--tag", default=None)
     ap.add_argument("--score-only", action="store_true")
     a = ap.parse_args()
@@ -127,7 +127,7 @@ def main() -> None:
 
     print("=" * 78)
     print(f"재실행 — 단일 조건 {n_seeds}시드 x {rounds}라운드"
-          + ("   ★ 검증 실행 (정본 수치 아님)" if a.verify else ""))
+          + ("   ★ 검증 실행 (대표값 수치 아님)" if a.verify else ""))
     print("=" * 78)
     print(f"  목적: {PREREG['purpose']}")
     print(f"  예상: {PREREG['expected']}")
@@ -176,7 +176,7 @@ def main() -> None:
                   f"{time.perf_counter() - t0:.0f}s", flush=True)
             if empty_streak >= MAX_EMPTY_STREAK:
                 print(f"\n  ★ {MAX_EMPTY_STREAK}실행 연속 아카이브가 비었다. "
-                      "인프라 문제다 — 멈춘다 (사전 등록).")
+                      "인프라 문제다 — 멈춘다 (실험 계획서).")
                 break
 
     _score(table, matrix, splits, run_ids, d, verify=a.verify)
@@ -188,11 +188,11 @@ def _dump(p: Path, obj) -> None:
 
 
 def _score(table, matrix, splits, run_ids, d: Path, *, verify: bool) -> None:
-    """사전 등록된 지표만 낸다. **삭제한 값과 비교하지 않는다.**"""
+    """실험 계획서에 적힌 지표만 낸다. **삭제한 값과 비교하지 않는다.**"""
     from kernelrule.core.canonical import canonical_score
 
     print("\n" + "=" * 78)
-    print("채점 — 사전 등록된 지표만" + ("  ★ 검증 실행" if verify else ""))
+    print("채점 — 실험 계획서에 적힌 지표만" + ("  ★ 검증 실행" if verify else ""))
     print("=" * 78)
 
     done, missing = [], []
@@ -234,11 +234,11 @@ def _score(table, matrix, splits, run_ids, d: Path, *, verify: bool) -> None:
         "median": float(med), "q1": float(q1), "q3": float(q3),
         "n_done": len(done), "n_designed": len(run_ids), "missing": missing,
         "verify": verify,
-        "note": ("★ 검증 실행이다 — 정본 수치가 아니다" if verify else
-                 "이 저장소의 정본 성능 수치")})
+        "note": ("★ 검증 실행이다 — 대표값 수치가 아니다" if verify else
+                 "이 저장소의 대표값 성능 수치")})
     print(f"\n  기록: {d / 'scores.json'}")
     if verify:
-        print("  ★ 검증 실행 수치는 정본이 아니다. 본 실행과 합치지 않는다.")
+        print("  ★ 검증 실행 수치는 대표값이 아니다. 본 실행과 합치지 않는다.")
 
 
 if __name__ == "__main__":

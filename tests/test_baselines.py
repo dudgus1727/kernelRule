@@ -47,7 +47,7 @@ def test_union_coverage_beats_individual_when_configs_are_partial():
 def test_procedures_are_three_and_canonical_is_last():
     names = [p[0] for p in PROCEDURES]
     assert names == ["ok_individual", "ok_union", "canonical"]
-    assert "정본" in PROCEDURES[-1][2]
+    assert "대표값" in PROCEDURES[-1][2]
 
 
 def test_coverage_is_always_reported():
@@ -59,7 +59,7 @@ def test_coverage_is_always_reported():
 
 @pytest.mark.needs_bundle
 def test_canonical_reproduces_documented_values(real_bundle_path):
-    """★ 정본 절차가 문서 값(§30.5)을 재현한다. 회귀로 고정한다."""
+    """★ 대표값 절차가 문서 값(§30.5)을 재현한다. 회귀로 고정한다."""
     from kernelrule.core.table import PerfTable
 
     with warnings.catch_warnings():
@@ -85,7 +85,7 @@ def test_ok_only_individual_reproduces_the_artifact(real_bundle_path):
     """★ 옛 값 1.394 가 **덮개 인공물**임을 고정한다 (§30.5b).
 
     후보가 3개로 줄어드는 것이 원인이다. 그 사실이 회귀로 남아야 나중에
-    같은 숫자를 다시 정본으로 착각하지 않는다.
+    같은 숫자를 다시 대표값으로 착각하지 않는다.
     """
     from kernelrule.core.table import PerfTable
 

@@ -96,7 +96,7 @@ def main() -> None:
         hos = sorted(x.holdout for x in rs)
         print(f"  {cond:14s} {ins[len(ins) // 2]:11.4f} {ins[-1]:8.4f} "
               f"{hos[len(hos) // 2]:13.4f} {hos[-1]:8.4f}")
-    print(f"  {'벤더 ★관문':14s} {'':11s} {'':8s} {v.at(1):13.4f}")
+    print(f"  {'벤더 ★통과 조건':14s} {'':11s} {'':8s} {v.at(1):13.4f}")
     ps = canonical_score(PS, PS_W0, table=table, matrix=mats["A-base"],
                          splits=splits)
     print(f"  {'human_guided':14s} {ps.in_sample:11.4f} {'':8s} "

@@ -1,11 +1,11 @@
-"""★ 정준 절차 재채점 — 같은 절차 / 같은 분모 / 같은 집계로만 비교한다.
+"""★ 최종 채점 절차 재채점 — 같은 절차 / 같은 분모 / 같은 집계로만 비교한다.
 
     python3 experiments/rescore_canonical.py
 
 ## 왜 필요한가
 
 RuleWriter A/B 는 `nk11008` 구조 분할에서 train41/val20 로 보고했고, 이전
-보고들은 61형상 **체제별 재적합**으로 냈다. 두 숫자를 나란히 놓고 "관문
+보고들은 61형상 **체제별 재적합**으로 냈다. 두 숫자를 나란히 놓고 "통과 조건
 미달" 이라고 쓴 것은 §30.8 이 반복해서 잡아온 패턴이다 — 절차가 다른 두
 값을 비교했다.
 
@@ -109,7 +109,7 @@ def main() -> None:
                     table, holdout, ks=(1,), label="벤더")
 
     print("=" * 78)
-    print("정준 절차 재채점 — 체제별(SOL 2분할) 재적합, 61형상 결합")
+    print("최종 채점 절차 재채점 — 체제별(SOL 2분할) 재적합, 61형상 결합")
     print("=" * 78)
     print(f"  빠른 {len(fast)} / 느린 {len(slow)}   "
           f"홀드아웃 {len(holdout)} (체제 안 3개마다 1개)")
@@ -130,7 +130,7 @@ def main() -> None:
         g_s = geomean(np.array([r_in[p] for p in slow]))
         results[name] = (r_ho, t_ho)
         print(f"  {name:24s} {g_in:9.4f} {g_ho:10.4f} {g_f:8.4f} {g_s:8.4f}")
-    print(f"  {'벤더 nearest ★관문':24s} {v_all.at(1):9.4f} "
+    print(f"  {'벤더 nearest ★통과 조건':24s} {v_all.at(1):9.4f} "
           f"{v_ho.at(1):10.4f}")
 
     # -- 유의성. ★ 홀드아웃에서만 판정한다 --------------------------------

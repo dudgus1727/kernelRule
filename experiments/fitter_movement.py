@@ -36,7 +36,7 @@ from kernelrule.core.weights import fit_weights
 from kernelrule.features import REGISTRY
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
-#: 다듬기 예산. 사전 등록한 비용 상한은 적합 305 의 2배(610)이고 기본값이
+#: 다듬기 예산. 실험 계획서에 적은 비용 상한은 적합 305 의 2배(610)이고 기본값이
 #: 600 이다. 인자로 올릴 수 있게 뺐다 — **올려서 잰 값은 기준 통과가
 #: 아니다** (D-59). 상한을 넘긴 사실과 함께 보고한다.
 POLISH_BUDGET = int(__import__("os").environ.get("KERNELRULE_POLISH_BUDGET",
@@ -77,7 +77,7 @@ def main() -> None:
     shapes = [p for p in table.shapes() if aligned(p)]
     train = [p for p in shapes if 11008 not in (p.N, p.K)]
     # ★ 기본은 커밋된 12규칙이지만, 임의 실행도 받는다 — 검증 실행에서
-    #   관문을 걸려면 그 실행들을 봐야 한다 (D-60).
+    #   통과 조건을 걸려면 그 실행들을 봐야 한다 (D-60).
     import sys
     args = [x for x in sys.argv[1:] if not x.startswith("-")]
     if args:
@@ -90,7 +90,7 @@ def main() -> None:
     print("=" * 76)
     print(f"1단계 — 적합기 품질. 통과선: ★도달률 {TARGET_REACH:.0%} (D-56 승인)")
     if POLISH_BUDGET != 600:
-        print(f"  ★ 다듬기 예산 {POLISH_BUDGET} — 사전 등록 상한 610 을 "
+        print(f"  ★ 다듬기 예산 {POLISH_BUDGET} — 실험 계획서 상한 610 을 "
               "넘겼다면 이 결과는 **기준 통과가 아니다** (D-59)")
     print("=" * 76)
     print(f"  {'규칙':16s} {'체제':6s} {'끔':>6} {'켬':>6} "

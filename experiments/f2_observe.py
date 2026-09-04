@@ -1,4 +1,4 @@
-"""★ F2 3단계 관찰 — 사전 등록한 항목 셋. LLM 0회.
+"""★ F2 3단계 관찰 — 실험 계획서에 적은 항목 셋. LLM 0회.
 
     python3 experiments/f2_observe.py
 
@@ -66,7 +66,7 @@ def main(tag: str = "F2rw-p8") -> None:
     seed = json.loads(Path(f"runs/{tag}/stage2-rule-writer/chosen.json").read_text())
     s0 = structure(seed["code"])
     print("=" * 78)
-    print("F2 3단계 관찰 — 사전 등록 항목")
+    print("F2 3단계 관찰 — 실험 계획서 항목")
     print("=" * 78)
     print(f"  씨앗 {seed['source']}  {s0['n_terms']}항  "
           f"if {s0['if']}  where-선택 {s0['where_select']}\n")

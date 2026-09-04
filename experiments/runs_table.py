@@ -1,10 +1,10 @@
 """★ `docs/artifacts/runs.md` 를 **만든다** — 손으로 쓰지 않는다 (D-128).
 
     python3 experiments/runs_table.py            # 생성
-    python3 experiments/runs_table.py --check    # 갈렸는지 검사 (시험이 부른다)
+    python3 experiments/runs_table.py --check    # 달라졌는지 검사 (시험이 부른다)
 
-조건은 `config.json` 에서, 정준값은 **artifacts json 에서** 읽는다.
-숫자를 이 파일에 적지 않는다 — 적으면 갈린다 (`decisions_index.py` 와 같은
+조건은 `config.json` 에서, 최종 점수는 **artifacts json 에서** 읽는다.
+숫자를 이 파일에 적지 않는다 — 적으면 달라진다 (`decisions_index.py` 와 같은
 방식이다).
 
 ## 태그 규칙 (D-128 §1-7)
@@ -34,12 +34,12 @@ OUT = ROOT / "docs" / "artifacts" / "runs.md"
 BEGIN = "<!-- RUNS:BEGIN — experiments/runs_table.py 가 만든다 -->"
 END = "<!-- RUNS:END -->"
 
-#: 정준값이 **어느 산출물의 어디에** 있나. 값은 여기 안 적는다 (원칙 2).
+#: 최종 점수가 **어느 산출물의 어디에** 있나. 값은 여기 안 적는다 (원칙 2).
 #: `(파일, 키 경로, 집계)` — 집계 `med` 는 리스트의 중앙값.
 CANON: dict[str, tuple[str, tuple, str]] = {
-    # ★ 옛 정본. 새 정본(F3rw-p8)은 재측정이 끝나면 산출물이 생긴다
+    # ★ 옛 대표값. 새 대표값(F3rw-p8)은 재측정이 끝나면 산출물이 생긴다
     "F3rw-p8": ("canon-p8.json", ("holdout_regret",), "med"),
-    # ★ 옛 정본 (D-131 이후 폐기). 값은 conclusion.json 이 갖는다
+    # ★ 옛 대표값 (D-131 이후 폐기). 값은 conclusion.json 이 갖는다
     "F3rw-p8-old": ("conclusion.json", ("f1_vs_human", "human_median"),
                     "one"),
     "F1rw-p8": ("conclusion.json", ("f1_vs_human", "f1_median"), "one"),
@@ -59,7 +59,7 @@ RETIRED = {
     "F3rw-p8-cma": "p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다",
     "F3rw-p8-prod": "p8 인데 CMA. 재측정 대상",
     "F3rw-p8-pow": "p8 인데 CMA. 재측정 대상",
-    "F3rw-p8-old": "옛 정본 — 옛 프롬프트·라운드12·patience10 (D-129)",
+    "F3rw-p8-old": "옛 대표값 — 옛 프롬프트·라운드12·patience10 (D-129)",
 }
 
 
@@ -104,7 +104,7 @@ def _rows() -> list[dict]:
         conds = [run_condition(r) for r in runs]
 
         def one(key: str, _c=conds) -> str:
-            """시드 전부가 같은 값인가. 갈리면 **표에 그렇게 적는다**."""
+            """시드 전부가 같은 값인가. 달라지면 **표에 그렇게 적는다**."""
             vals = {str(c[key]) for c in _c}
             if len(vals) > 1:
                 return "★갈림"
@@ -143,7 +143,7 @@ def _rows() -> list[dict]:
 def render() -> str:
     rows = _rows()
     head = ("| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | "
-            "라운드 | 표 | 정준값 | 출처 | 상태 |")
+            "라운드 | 표 | 최종 점수 | 출처 | 상태 |")
     L = [BEGIN, "", head,
          "|---|--:|---|---|--:|---|---|---|---|--:|---|---|"]
     for r in rows:
@@ -161,7 +161,7 @@ def render() -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
-                    help="갈렸으면 0 이 아닌 코드로 끝난다 (시험이 부른다)")
+                    help="달라졌으면 0 이 아닌 코드로 끝난다 (시험이 부른다)")
     a = ap.parse_args()
     body = render()
     txt = OUT.read_text() if OUT.exists() else ""
@@ -171,7 +171,7 @@ def main() -> None:
         new = txt.rstrip() + "\n\n" + body + "\n"
     if a.check:
         if new != txt:
-            print("★ runs.md 가 실행 산출물과 갈렸다. "
+            print("★ runs.md 가 실행 산출물과 달라졌다. "
                   "`python3 experiments/runs_table.py` 로 다시 만들어라.")
             sys.exit(1)
         print(f"runs.md 최신 ({len(_rows())}개 태그)")

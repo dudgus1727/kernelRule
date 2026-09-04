@@ -1,4 +1,4 @@
-# 사전 등록 — **세 번째 (c)**: 경고 절까지 5090 결론으로
+# 실험 계획서 — **세 번째 (c)**: 경고 절까지 5090 결론으로
 
 **LLM 호출 0회 시점에 쓴다.** 근거: [D-113](../decisions.md),
 [D-116](../decisions.md), [c-rerun-prereg.md](c-rerun-prereg.md) §5-2.

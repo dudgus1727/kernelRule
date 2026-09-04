@@ -1,8 +1,8 @@
-"""★ 순위 손실 진화 결과 — 사전 등록 `rank-evo-prereg.md` 의 지표. LLM 0회.
+"""★ 순위 손실 진화 결과 — 실험 계획서 `rank-evo-prereg.md` 의 지표. LLM 0회.
 
     python3 experiments/rank_evo_report.py
 
-주 지표는 **tau** 다. `regret` 은 기록만 한다 (사전 등록 §4).
+주 지표는 **tau** 다. `regret` 은 기록만 한다 (실험 계획서 §4).
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ def main() -> None:
     shapes = list(sp.train.shapes)
 
     print("=" * 78)
-    print("순위 손실 진화 — 사전 등록 지표   ★ 주 지표는 tau, regret 은 기록만")
+    print("순위 손실 진화 — 실험 계획서 지표   ★ 주 지표는 tau, regret 은 기록만")
     print("=" * 78)
 
     seed = json.loads(Path("runs/F3rw-p8/stage2-rule-writer"
@@ -131,7 +131,7 @@ def main() -> None:
           f"{t1.min():.3f}~{t1.max():.3f}  {ta.min():.3f}~{ta.max():.3f}")
 
     print("\n" + "=" * 78)
-    print("판정 — 사전 등록에 박은 선")
+    print("판정 — 실험 계획서에 박은 선")
     print("=" * 78)
     m1, ma = float(np.median(t1)), float(np.median(ta))
     print(f"  상위100 tau 중앙 {m1:.3f}  -> " + (

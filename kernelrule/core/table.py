@@ -149,7 +149,7 @@ class PerfTable:
         `env_hash` 는 **필수**다 (§3.4). 기본값을 두지 않는다.
 
         `ok_only=False` 가 기본인 이유: `high_outlier_frac` 도 유효한 측정이다
-        (전체의 10.7%). 이 결정은 `RunConfig` 에 기록되어야 하며, 관문 리포트는
+        (전체의 10.7%). 이 결정은 `RunConfig` 에 기록되어야 하며, 통과 조건 리포트는
         양쪽을 다 낸다.
         """
         from kerneltab.core.bundle import load_bundle

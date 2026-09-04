@@ -120,7 +120,7 @@ def main() -> None:
 
     v = evaluate(vendor_order_fn(table, load_vendor(VENDOR), mapping="nearest"),
                  table, shapes, ks=(1,), label="벤더")
-    print(f"\n  벤더 {v.at(1):.4f}   ★ 관문 1.080")
+    print(f"\n  벤더 {v.at(1):.4f}   ★ 통과 조건 1.080")
     print("\n  ※ 학습 점수는 k 가 커지면 반드시 좋아진다 (자유 가중치가"
           " k배).\n     ★ 판단은 홀드아웃 열로만 한다.")
     print("  ※ 등분 경계는 0.5ms 와 다르다 — 재는 것은 '경계를 더 두면"

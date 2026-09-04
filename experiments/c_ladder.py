@@ -2,7 +2,7 @@
 
     python3 experiments/c_ladder.py
 
-사전 등록 `docs/artifacts/c-rerun3-prereg.md`.
+실험 계획서 `docs/artifacts/c-rerun3-prereg.md`.
 
 ```
 옛 (c)    숫자 A6000 · 경고 A6000    5090sigma-s{0,1,2}
@@ -11,7 +11,7 @@
 ```
 
 각 단이 **하나씩만** 다르다. regret 은 `sigma_5090.py` 와 **같은 절차**
-(정준 채점)로 낸다 — 옛 (c) 의 값이 그 절차에서 나왔다 (원칙 4).
+(최종 채점)로 낸다 — 옛 (c) 의 값이 그 절차에서 나왔다 (원칙 4).
 
 ## ⚠️ 기록된 (c) 1.0485 는 **두 씨앗을 섞은 값**이다
 
@@ -119,7 +119,7 @@ def main() -> None:
     out: dict = {"delta": DELTA, "n_holdout": len(sp.val.shapes)}
 
     print("=" * 84)
-    print("§1  regret 사다리 — 정준 채점, 5090 홀드아웃 "
+    print("§1  regret 사다리 — 최종 채점, 5090 홀드아웃 "
           f"{len(sp.val.shapes)}형상, 3시드")
     print("=" * 84)
     print(f"  {'':30s} {'중앙':>8} {'범위':>19}")

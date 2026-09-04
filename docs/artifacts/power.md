@@ -1,6 +1,6 @@
 # 가중치를 **지수 자리**에 — 형태 (b)
 
-사전 등록 [power-prereg.md](power-prereg.md). 숫자 산출 **LLM 0회**.
+실험 계획서 [power-prereg.md](power-prereg.md). 숫자 산출 **LLM 0회**.
 
 ```
 python3 experiments/power_report.py     # -> docs/artifacts/power.json
@@ -69,7 +69,7 @@ python3 experiments/power_report.py     # -> docs/artifacts/power.json
 ★ 무작위 바닥      1.8753      -0.007      0.000
 ```
 
-## 4. 판정 (사전 등록 §7)
+## 4. 판정 (실험 계획서 §7)
 
 ```
 tau >= 0.20 이면서 regret <= 1.15   -> 벽이 낮아졌다

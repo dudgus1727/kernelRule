@@ -3,7 +3,7 @@
     python3 experiments/transfer_29_5.py --pair a6000 5090
     python3 experiments/transfer_29_5.py --pair a6000 4090   # 표가 오면
 
-**사전 등록** `docs/artifacts/transfer-prereg.md` + 부칙.
+**실험 계획서** `docs/artifacts/transfer-prereg.md` + 부칙.
 
 ## 세 팔
 
@@ -18,9 +18,9 @@
 "A6000 에서 진화한 규칙" 을 하나 고르면 그 선택이 낙관 편향이 된다.
 **A6000 F3 캠페인 6시드 전부**의 학습 최고 규칙을 옮기고 분포를 낸다.
 
-## ★ 기준선 — 사전 등록의 대체안을 쓴다
+## ★ 기준선 — 실험 계획서의 대체안을 쓴다
 
-`nvMatmulHeuristics` 가 이 환경에 없다 (import 실패). 사전 등록이
+`nvMatmulHeuristics` 가 이 환경에 없다 (import 실패). 실험 계획서가
 미리 적어 둔 대로 **5090 에서 재적합한 `human_guided`** 를 쓴다.
 결과를 보고 고른 것이 아니다.
 
@@ -63,7 +63,7 @@ TABLES: dict[str, dict] = {
         "env_hash": "5bb6f403",
         # ★ (c) 재생성 6실행. 앞 3개와 뒤 3개가 **같은 2단계 씨앗**을
         #   쓴다 (`--seed-from`) — 안 그러면 씨앗 규칙이 달라져 조건이
-        #   갈린다 (D-84). 표본 단위는 실행이다 (원칙 28).
+        #   달라진다 (D-84). 표본 단위는 실행이다 (원칙 28).
         # ⚠️ 2026-09-03 정정 (D-119): 뒤 셋(`-b-`)은 `human_guided`
         #    **손씨앗**이라 "5090 에서 처음부터" 가 아니다. (c) 에서 뺀다.
         #    옛 값 1.0485 는 그 여섯의 중앙이고 `c-ladder.md` §0 에 남겼다.
@@ -187,7 +187,7 @@ def main() -> None:
     print(f"  홀드아웃 {len(hold)}형상 (공통 {len(common)} 안)   "
           f"뒤집힘 제외 {len(hold_nf)}형상")
     print(f"  {dst} 학습 {len(spB.train.shapes)}형상 — (b) 재적합에 쓴다")
-    print("  ★ 기준선: nvMatmulHeuristics 없음 -> 사전 등록의 대체안"
+    print("  ★ 기준선: nvMatmulHeuristics 없음 -> 실험 계획서의 대체안"
           f" ({dst} 재적합 human_guided)\n")
 
     res: dict = {"a": [], "b": [], "c": [], "a_nf": [], "b_nf": [],

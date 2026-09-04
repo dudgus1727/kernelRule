@@ -135,13 +135,13 @@ def main() -> None:
 
     v = evaluate(vendor_order_fn(table, vendor, mapping="nearest"),
                  table, shapes, ks=(1,), label="벤더")
-    print(f"\n  벤더 전체61 {v.at(1):.4f}   ★ 관문 1.080")
+    print(f"\n  벤더 전체61 {v.at(1):.4f}   ★ 통과 조건 1.080")
 
 
 def margins() -> None:
     """★ 100% 일치가 견고한가 — 경계 여유를 본다.
 
-    SOL 은 하한이므로 `t_best` 는 항상 그 위다. 두 판정이 갈리는 것은
+    SOL 은 하한이므로 `t_best` 는 항상 그 위다. 두 판정이 달라지는 것은
     `SOL < 0.5 <= t_best` 인 좁은 띠에서만이다. **그 띠에 형상이 없었을
     뿐인지, 원리적으로 안전한지**를 구분해야 한다.
     """

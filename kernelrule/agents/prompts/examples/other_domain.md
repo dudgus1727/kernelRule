@@ -9,7 +9,7 @@
 def branch_divergence_cost(warp_size, active_lanes) -> float:
     """워프 안에서 갈라지는 분기의 비용. 클수록 나쁘다.
 
-    SIMT 는 워프 단위로 실행되므로 분기가 갈리면 양쪽을 순차 실행한다.
+    SIMT 는 워프 단위로 실행되므로 분기가 달라지면 양쪽을 순차 실행한다.
     활성 레인이 적을수록 나머지 레인이 논다.
     """
     return 1.0 - active_lanes / max(warp_size, 1)

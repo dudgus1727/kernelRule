@@ -2,7 +2,7 @@
 
 ## 왜 alias 를 안 두나
 
-옛 이름을 읽는 호환 경로를 만들면 **두 이름이 공존하고 그것이 갈린다.**
+옛 이름을 읽는 호환 경로를 만들면 **두 이름이 공존하고 그것이 달라진다.**
 `is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
 `load_generated` / `approx_equal` / 예산 상수에 이은 여덟 번째가 된다
 (원칙 2).

@@ -30,7 +30,7 @@ SRC = Path(__file__).resolve().parents[1] / "kernelrule/agents/openai_client.py"
 
 
 def test_every_load_prompt_call_passes_the_budget():
-    """★ 호출부를 **전부** 센다 — 하나만 빠져도 프롬프트가 갈린다."""
+    """★ 호출부를 **전부** 센다 — 하나만 빠져도 프롬프트가 달라진다."""
     tree = ast.parse(SRC.read_text())
     bad = [n.lineno for n in ast.walk(tree)
            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
@@ -88,7 +88,7 @@ def test_user_and_system_prompts_agree_on_the_budget(budget):
                 or f"{budget} 이하" in txt), (
             f"{name} 프롬프트에 예산 {budget} 이 안 보인다")
         assert f"파라미터 상한 {other}개" not in txt, (
-            f"{name} 프롬프트가 {other} 를 말한다 — 조건이 갈렸다 (D-105)")
+            f"{name} 프롬프트가 {other} 를 말한다 — 조건이 달라졌다 (D-105)")
 
 
 def test_budget_reaches_the_saturation_notice():
@@ -121,7 +121,7 @@ def test_limits_scale_with_the_budget():
 
 
 def test_prompt_states_the_scaled_node_cap():
-    """프롬프트가 상수 400 을 말하면 검사기(800)와 갈린다."""
+    """프롬프트가 상수 400 을 말하면 검사기(800)와 달라진다."""
     from kernelrule.agents.openai_client import load_prompt
     from kernelrule.rules.checks import limits_for
 
@@ -204,7 +204,7 @@ def test_dict_path_validation_follows_the_budget():
     validate_rule_proposal(d, parameters=16)
 
 
-#: ★ 예산 숫자가 나가는 **모든 면**. 하나라도 빠지면 조건이 갈린다.
+#: ★ 예산 숫자가 나가는 **모든 면**. 하나라도 빠지면 조건이 달라진다.
 #:
 #:   D-105  검사기만 닿았다 (프롬프트 파일 / 사용자 프롬프트)
 #:   D-106  딸린 상한(ast_nodes)이 안 따라왔다
@@ -299,7 +299,7 @@ def test_fitter_is_derived_from_the_parameter_count():
 
 
 def test_fitter_keys_are_loopconfig_fields():
-    """★ `**fitter_for(n)` 이 그대로 펼쳐져야 한다 — 갈릴 자리를 안 만든다."""
+    """★ `**fitter_for(n)` 이 그대로 펼쳐져야 한다 — 달라질 자리를 안 만든다."""
     import dataclasses
 
     from kernelrule.core.loop import LoopConfig

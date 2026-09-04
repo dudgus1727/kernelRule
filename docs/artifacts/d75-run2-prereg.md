@@ -1,4 +1,4 @@
-# 사전 등록 — D-75 경로 시험 2차 (2026-08-28)
+# 실험 계획서 — D-75 경로 시험 2차 (2026-08-28)
 
 > **★ LLM 호출 0회 상태에서 작성했다.**
 > **명령** `python3 experiments/f1_pipeline.py F3 --max-new-features 1

@@ -8,7 +8,7 @@ architect-tryNN      -> rule_writer-tryNN
 rule_budget          -> parameters
 ```
 
-**alias 를 두지 않는다** (원칙 2) — 두 이름이 공존하면 갈린다.
+**alias 를 두지 않는다** (원칙 2) — 두 이름이 공존하면 달라진다.
 
 ## 예외는 **정정 이력**이다
 

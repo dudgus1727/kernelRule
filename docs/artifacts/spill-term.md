@@ -6,7 +6,7 @@
 
 **재현** 전용 스크립트 없음 — `experiments/regime_transfer.py::ablate` 로 항을 지우고 `core/canonical.py::canonical_score` 로 재채점했다. 사용률 집계는 `experiments/new_axes.py::used_features`.
 
-**측정일** 2026-08-22 · **LLM 호출 0회** · 정준 절차(체제별 적합, 61형상 결합)
+**측정일** 2026-08-22 · **LLM 호출 0회** · 최종 채점 절차(체제별 적합, 61형상 결합)
 
 ---
 
@@ -36,7 +36,7 @@ physics 만     has_spill, sm_idle_cost, smem_pressure
 **항을 하나씩 빼 보면 `has_spill` 만 자릿수가 다르다** (AST 로 지우고 `w`
 인덱스를 다시 매긴 뒤 재적합):
 
-| `physics_seeded` 에서 뺀 항 | 정준 61 |
+| `physics_seeded` 에서 뺀 항 | 최종 채점 61 |
 |---|---:|
 | (원본, 7항) | 1.1637 |
 | − `f.has_spill` | **3.1841** |
@@ -48,7 +48,7 @@ physics 만     has_spill, sm_idle_cost, smem_pressure
 **반대 방향도 맞는다.** Architect A `#9` 에 physics 전용 피처를 하나씩
 더해 보면:
 
-| Architect A `#9` (7항) 에 더한 항 | 정준 61 |
+| Architect A `#9` (7항) 에 더한 항 | 최종 채점 61 |
 |---|---:|
 | (원본) | 1.1780 |
 | + `f.has_spill` | **1.1456** ← `physics_seeded` 1.1637 보다 낫다 |

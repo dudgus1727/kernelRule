@@ -1,4 +1,4 @@
-# 사전 등록 — `cross` 부모를 실제로 구현한다 (2026-08-31)
+# 실험 계획서 — `cross` 부모를 실제로 구현한다 (2026-08-31)
 
 > **★ LLM 호출 0회 상태에서 작성했다.**
 > **근거** [diversity-and-parallel.md](diversity-and-parallel.md) §4

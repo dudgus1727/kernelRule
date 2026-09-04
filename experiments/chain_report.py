@@ -125,7 +125,7 @@ def main() -> None:
     print("=" * 84)
     print("  선택: 각 팔의 **최종 목적함수** 기준 아카이브 최고 (3시드 중앙)")
     fl = _floor(T, hold)
-    for obj, head in (("regret", "regret 적합 가중치 (정준 §10 경로)"),
+    for obj, head in (("regret", "regret 적합 가중치 (최종 채점 §10 경로)"),
                       ("rank", "순위 적합 가중치")):
         print(f"\n  --- {head} ---")
         print(f"  {'':22s} {'regret':>8} {'상위100 tau':>12} {'전구간':>10}"

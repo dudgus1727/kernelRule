@@ -319,7 +319,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     **진화 루프는 거부한다** (`LoopConfig`).
 
     `"rank"` 에서도 `fit_regret` 은 계속 `regret` 으로 계산해 기록한다 —
-    **채점 기준은 안 바꾼다** (사전 등록 `rank-evo-prereg.md` §3).
+    **채점 기준은 안 바꾼다** (실험 계획서 `rank-evo-prereg.md` §3).
 
     ## `init_objective` — 대리 손실로 **초기점만** 만든다
 
@@ -331,7 +331,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
 
     ⚠️ **채택은 regret 이다.** 1단계 값은 반환값에 남지 않고 `best_v` /
     `fit_regret` / 다듬기 전부가 참 목적함수로 다시 잰다. 조건이 섞이므로
-    쓸 때 사전 등록에 명시한다 — "초기점 생성에만 쓰고 채택은 regret@1"
+    쓸 때 실험 계획서에 명시한다 — "초기점 생성에만 쓰고 채택은 regret@1"
     (`fitter-regret-prereg.md` §2).
 
     `objective="regret"` 에서만 받는다. 순위 손실 경로에서 순위 손실로

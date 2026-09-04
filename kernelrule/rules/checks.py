@@ -244,7 +244,7 @@ def literal_parameter_message(code: str, n_weights: int,
     "가중치 8개면 리터럴을 쓸 수 없다" 를 끝내 알지 못했다.
 
     ★ 세는 일은 `_numeric_literals` 하나가 한다 — `check_rule` 과 여기가
-    **따로 세면 갈린다** (D-37 계열). 갈리면 LLM 경계는 통과시키고 정적
+    **따로 세면 달라진다** (D-37 계열). 달라지면 LLM 경계는 통과시키고 정적
     검사가 조용히 버린다.
     """
     try:
@@ -434,7 +434,7 @@ def fitter_for(parameters: int | None) -> dict:
 
     ```
     <= 8   nelder-mead / 재시작 4 / 적합 200      지금까지의 모든 실행
-    >  8   cma         / 재시작 1 / 적합 300      §2 관문이 고른 팔 (D-123)
+    >  8   cma         / 재시작 1 / 적합 300      §2 통과 조건이 고른 팔 (D-123)
     ```
 
     근거: 8차원에서는 두 적합기가 구분 불가고(D-125), 16차원에서는
@@ -446,7 +446,7 @@ def fitter_for(parameters: int | None) -> dict:
     """
     b = int(parameters if parameters is not None else PARAMETERS)
     # ★ 키 이름은 `LoopConfig` 의 필드 그대로다 — `**fitter_for(n)` 으로
-    #   그대로 펼쳐 넣을 수 있어야 갈릴 자리가 안 생긴다 (원칙 2).
+    #   그대로 펼쳐 넣을 수 있어야 달라질 자리가 안 생긴다 (원칙 2).
     if b <= PARAMETERS:
         return {"fit_method": "nelder-mead", "fit_restarts": 4,
                 "max_evals": 200}
@@ -604,7 +604,7 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     term_sigs: list[str] = []
 
     # ★ 리터럴은 `_numeric_literals` **하나**가 센다 — LLM 경계
-    #   (`literal_parameter_message`) 와 여기가 따로 세면 갈린다 (D-37 계열).
+    #   (`literal_parameter_message`) 와 여기가 따로 세면 달라진다 (D-37 계열).
     #   `w[0]` 의 `0` 은 거기서 빠진다: 가중치는 `n_weights` 로 이미 예산에
     #   들어가 있어서, 안 빼면 항마다 두 번 세어 예산이 반토막 난다.
     _counted, _branch = _numeric_literals(tree)

@@ -346,7 +346,7 @@ def test_shape_size_comparison_is_still_banned():
 def test_both_budget_counters_agree():
     """★ LLM 경계와 정적 검사가 **같은 수를 세야 한다** (D-37 계열).
 
-    갈리면 경계는 통과시키고 정적 검사가 조용히 버린다 — 그때 모델은
+    달라지면 경계는 통과시키고 정적 검사가 조용히 버린다 — 그때 모델은
     무엇이 틀렸는지 끝내 듣지 못한다.
     """
     from kernelrule.rules.checks import PARAMETERS, literal_parameter_message
@@ -367,7 +367,7 @@ def test_both_budget_counters_agree():
         over_static = r.parameters_used > PARAMETERS
         over_llm = literal_parameter_message(code, nw) is not None
         assert over_static == over_llm, (
-            f"두 계수기가 갈렸다: 정적 {r.parameters_used}/{PARAMETERS} vs "
+            f"두 계수기가 달라졌다: 정적 {r.parameters_used}/{PARAMETERS} vs "
             f"경계 {over_llm}\n{code}")
 
 

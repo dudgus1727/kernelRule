@@ -2,7 +2,7 @@
 
     python3 experiments/fitter_regress.py
 
-사전 등록 `docs/artifacts/fitter-regress-prereg.md`.
+실험 계획서 `docs/artifacts/fitter-regress-prereg.md`.
 
 §3 에서 기준선을 다시 뽑았더니 방향이 반대였다 (1.0762 -> 1.0987).
 절차가 셋 달라(적합기·예산·시드 수) 판정에 못 썼다. **여기서는 변수를
@@ -14,7 +14,7 @@ CMA  cma         · 재시작 1 · 적합 300 · 다듬기 600   ← §3 이 쓴
 ```
 
 ⚠️ 학습 regret 은 **판정에 안 쓴다** — CMA 가 학습을 더 잘 맞추는 것은
-설계상 당연하고, 그것은 과적합의 기전이지 판정이 아니다 (사전 등록 §3).
+설계상 당연하고, 그것은 과적합의 기전이지 판정이 아니다 (실험 계획서 §3).
 """
 
 from __future__ import annotations
@@ -134,19 +134,19 @@ def main() -> None:
 
     m = out[MAIN[0]]
     print("\n" + "=" * 88)
-    print("★ 판정 — 사전 등록 §3 그대로")
+    print("★ 판정 — 실험 계획서 §3 그대로")
     print("=" * 88)
     if m["p_hold"] <= 0.05 and np.median(m["paired_hold"]) > 0:
         print("  ★ 적합기가 과적합을 만든다 — 예산 8 에서는 NM, 16차원이")
         print("     필요할 때만 CMA. 4090 전이의 (b) 재적합도 NM 으로 간다")
     elif m["p_hold"] <= 0.05:
-        print("  ★ 예상 밖 — CMA 가 유의하게 좋다. 사전 등록에 없는 갈래다")
+        print("  ★ 예상 밖 — CMA 가 유의하게 좋다. 실험 계획서에 없는 갈래다")
     else:
         print("  구분 불가 — 1.0762 -> 1.0987 은 적합기 탓이 아니다")
         print("     남는 후보: 적합 예산(200 vs 300) · 시드 수(6 vs 3) ·")
         print("     다듬기 수정(D-122) · 진화 경로 자체")
-    print("  ⚠️ 이 결과는 D-123(§2 관문)을 뒤집지 않는다 — 거기는 **16차원")
-    print("     도달률**이고 여기는 **8차원 일반화**다 (사전 등록 §5)")
+    print("  ⚠️ 이 결과는 D-123(§2 통과 조건)을 뒤집지 않는다 — 거기는 **16차원")
+    print("     도달률**이고 여기는 **8차원 일반화**다 (실험 계획서 §5)")
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1,
                                       default=float))

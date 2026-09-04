@@ -34,7 +34,7 @@ def test_f2_is_the_public_knowledge_five(pipe):
     """★ F2 = **공개 지식 다섯** (D-128 개명 전 이름은 `F1-K`).
 
     옛 `F2`(원시 물리량 5개, `F2_BASE`)는 실행이 0회라 삭제했다. 이름이
-    같으므로 **무엇이 F2 인지**를 시험으로 고정한다 — 갈리면 여기서 잡는다.
+    같으므로 **무엇이 F2 인지**를 시험으로 고정한다 — 달라지면 여기서 잡는다.
     """
     from kernelrule.features.known5 import KNOWN5
 

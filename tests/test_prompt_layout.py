@@ -33,7 +33,7 @@ def _instructions(role: str, *, objective: str = "rank") -> str:
     """★ `_agent()` 와 **같은 함수**를 부른다 (원칙 2).
 
     전에는 여기서 조립을 다시 썼다. `{objective_block}` 이 생기자
-    시험 쪽만 안 채워져서 갈렸다 — 조립은 한 곳에서만 한다.
+    시험 쪽만 안 채워져서 달라졌다 — 조립은 한 곳에서만 한다.
 
     ★ `hw_file` 을 **명시한다.** 기본값이 사라졌기 때문이고(D-113),
     시험이 기본값에 기대고 있으면 그 기본값이 조건이라는 것을 못 본다.
@@ -121,7 +121,7 @@ def test_objective_block_differs_and_only_for_the_editor():
     """★ 목적함수를 바꾸면 **RuleEditor 만** 달라진다 (D-101).
 
     RuleWriter 는 "점수 없음" 이라 이 절을 안 받는다. 걸리면 목적함수
-    변경이 RuleWriter 의 조건까지 바꾸는 것이고, 그러면 사전 등록의
+    변경이 RuleWriter 의 조건까지 바꾸는 것이고, 그러면 실험 계획서의
     "바꾸는 곳" 목록이 틀린 것이 된다.
     """
     a = {r: _instructions(r, objective="regret")
@@ -134,7 +134,7 @@ def test_objective_block_differs_and_only_for_the_editor():
 
 
 # ---------------------------------------------------------------------------
-# ★ 같은 문장이 두 역할 파일에 있으면 갈린다 (원칙 2)
+# ★ 같은 문장이 두 역할 파일에 있으면 달라진다 (원칙 2)
 # ---------------------------------------------------------------------------
 
 #: 중복으로 세지 않는 줄. 마크다운 구조나 너무 짧은 것.
@@ -156,7 +156,7 @@ def test_no_duplicate_sentences_between_role_files():
                 dupes.append(f"  {seen[t]} <-> {f.name}: {t[:60]}")
             seen.setdefault(t, f.name)
     assert not dupes, (
-        "역할 파일 사이에 같은 문장이 있다 — 하나만 고치면 갈린다 "
+        "역할 파일 사이에 같은 문장이 있다 — 하나만 고치면 달라진다 "
         "(원칙 2). 진짜 공용이면 `_base.md` 나 `role/_rules_common.md` 로 "
         "올려라:\n" + "\n".join(dupes))
 
@@ -213,7 +213,7 @@ def test_hw_block_does_not_reference_cases():
 
 def test_analyst_gets_hardware_facts_from_the_report_not_a_file():
     """리포트 블록 1 과 `hw/*.md` 는 **같은 사실**이다. 리포트는 표에서
-    매번 생성되고 파일은 고정이라, 둘 다 주면 번들이 바뀔 때 갈린다.
+    매번 생성되고 파일은 고정이라, 둘 다 주면 번들이 바뀔 때 달라진다.
     """
     import warnings
 
@@ -421,9 +421,9 @@ def test_internal_notes_never_reach_the_model():
 
 
 # ---------------------------------------------------------------------------
-# ★ §30.20 — RuleWriter 규칙 예시도 조건별로 갈린다
+# ★ §30.20 — RuleWriter 규칙 예시도 조건별로 달라진다
 #
-#   FeatureWriter 는 예시가 조건별로 갈리는데 RuleWriter 는 자리표시자
+#   FeatureWriter 는 예시가 조건별로 달라지는데 RuleWriter 는 자리표시자
 #   하나뿐이었다. 좋은 예시를 주되 **답을 건네지 않아야** 한다 (D-35).
 #
 #   조건 이름을 키로 쓰지 않는다 — RuleWriter 의 `condition` 은 A/B(표

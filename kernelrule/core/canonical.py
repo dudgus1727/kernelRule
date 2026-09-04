@@ -1,4 +1,4 @@
-"""정준 채점 — **루프의 분할을 그대로 쓴다** (§10.2 / D-36).
+"""최종 채점 — **루프의 분할을 그대로 쓴다** (§10.2 / D-36).
 
 ## 왜 별도 모듈인가
 
@@ -8,7 +8,7 @@
 
     구조는 그 형상들을 보고 진화했다. 홀드아웃인 것은 **가중치뿐**이었다.
 
-그 상태로 "관문을 넘었다" 고 썼고, 실제로는 구분 불가였다
+그 상태로 "통과 조건을 넘었다" 고 썼고, 실제로는 구분 불가였다
 (`docs/artifacts/feature-descriptions.md` 의 정정).
 
 **고침: 임의로 형상을 뽑는 경로를 없앤다.** 이 함수는 `SplitSet` 을
@@ -80,9 +80,9 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
     """
     if not isinstance(splits, SplitSet):
         raise SplitError(
-            "정준 채점은 루프의 SplitSet 을 받아야 한다 (D-36). 형상을 "
+            "최종 채점은 루프의 SplitSet 을 받아야 한다 (D-36). 형상을 "
             "따로 뽑으면 구조 홀드아웃이 학습 형상과 겹친다 — 실제로 19 중 "
-            "11 이 겹쳤고 '관문 통과' 를 잘못 보고했다.")
+            "11 이 겹쳤고 '통과 조건 통과' 를 잘못 보고했다.")
 
     from kernelrule.core.sandbox import compile_rule
     from kernelrule.core.weights import fit_weights, make_score_of
@@ -112,7 +112,7 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
                          f"{MIN_PER_REGIME}. 그 체제의 가중치는 믿기 어렵다")
         fit = fit_weights(fn, matrix, table, Split("train", tuple(g_tr)),
                           w0, max_evals=max_evals,
-                          # ★ **정준 채점은 언제나 regret 이다** (D-103).
+                          # ★ **최종 채점은 언제나 regret 이다** (D-103).
                           #   `fit_weights` 의 기본값이 `rank` 로 바뀌었으므로
                           #   여기서 **명시**해야 한다. 안 하면 이 프로젝트의
                           #   모든 수치가 조용히 다른 것이 된다.
