@@ -26,6 +26,7 @@ from kernelrule.core.weights import fit_weights
 from kernelrule.features import REGISTRY
 
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
+_BIG = 1e9   # ★ `bounds` 의 "안 묶음" 쪽. `_proj` 가 클립만 하므로 넉넉히
 RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 
 
@@ -111,7 +112,7 @@ def dead_terms_report() -> None:
     T = PerfTable.from_bundle(A6000[0], env_hash=A6000[1], ok_only=False)
     M, sp = FeatureMatrix(T, REGISTRY), _splits(T)
     train = list(sp.train.shapes)
-    print(f"  {'실행':16s} {'항':>3s} {'죽은 항':>7s}  들어온 라운드 / 그 뒤 교체 시도")
+    print(f"  {'실행':16s} {'항':>3s} {'죽은 항':>7s}  자리별 손해 (0 에 묶었을 때 학습 regret 증가)")
     for run in RUNS:
         arc = _rows(run, "archive.jsonl")
         if not arc:
@@ -126,37 +127,37 @@ def dead_terms_report() -> None:
                                     best["w"], max_evals=200,
                                     objective="regret",
                                     warn_invariants=False))
-        dead = []
+        dead, cost = [], {}
         for i in range(n):
             w = list(best["w"])
             w[i] = 0.0
-            ok = True
+            # ★ 그 자리를 **0 에 묶는다** (`bounds`). 묶지 않으면 적합기가
+            #   0 에서 되돌아 나오므로, 재는 것이 "죽은 항" 이 아니라
+            #   "시작점을 흔들어도 같은 점을 찾나" 가 된다 — D-136 의 정정.
+            bnd = [(-_BIG, _BIG)] * n
+            bnd[i] = (0.0, 0.0)
+            ok, worst = True, 0.0
             for j, nm in enumerate(("short", "long")):
                 g = [q for q in train if regime_of(q, T.hw) == nm]
                 fr = fit_weights(fn, M, T, Split("train", tuple(g)), w,
                                  max_evals=200, objective="regret",
-                                 warn_invariants=False)
-                # ★ 0 으로 두고 다시 맞춰도 나빠지지 않으면 그 자리는 죽었다
-                if fr.fit_regret > base[j].fit_regret + 1e-6:
+                                 warn_invariants=False, bounds=bnd)
+                d = fr.fit_regret - base[j].fit_regret
+                worst = max(worst, d)
+                if d > 1e-6:
                     ok = False
+            cost[i] = worst
             if ok:
                 dead.append(i)
-        # 그 항이 언제 들어왔나 — bests.jsonl 의 라운드별 코드에서 처음 등장
-        bests = _rows(run, "bests.jsonl")
-        came = {}
-        for i in dead:
-            for b in bests:
-                try:
-                    m = max(int(x) for x in __import__("re").findall(
-                        r"w\[(\d+)\]", b["code"]))
-                except ValueError:
-                    continue
-                if m >= i:
-                    came[i] = b["round"]
-                    break
-        print(f"  {run:16s} {n:3d} {len(dead):7d}  " + ", ".join(
-            f"w[{i}]<-r{came.get(i, '?')}" for i in dead) or "  —")
-    print("\n  ⚠️ '들어온 뒤 지워질 뻔했나' 는 옛 로그로 못 센다 — 제안의")
+        # ⚠️ "언제 들어왔나" 는 안 센다 — 씨앗 규칙이 이미 8자리를 다 쓰므로
+        #    `bests.jsonl` 의 코드에서 첫 등장은 전부 r0 이고, 아무것도
+        #    말해주지 않는다 (D-136). 대신 **자리마다 묶었을 때의 손해**를 적는다.
+        print(f"  {run:16s} {n:3d} {len(dead):7d}  " + " ".join(
+            f"{'★' if i in dead else ' '}w{i}:{cost[i]:+.4f}"
+            for i in range(n)))
+    print("\n  ★ 는 죽은 자리 (0 에 묶어도 두 체제 다 안 나빠진다)."
+          " 숫자는 묶었을 때 학습 regret 이 나빠지는 폭")
+    print("  ⚠️ '들어온 뒤 지워질 뻔했나' 는 옛 로그로 못 센다 — 제안의")
     print("     changes 와 부모가 제안 단위로 안 남는다. 트레이스가 그 자리다")
 
 
