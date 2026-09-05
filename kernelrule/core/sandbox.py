@@ -29,6 +29,7 @@
 
 from __future__ import annotations
 
+import functools
 import multiprocessing as mp
 import queue as _queue
 import resource
@@ -103,6 +104,25 @@ def compile_rule(code: str, *, name: str = "score"):
     """제한된 네임스페이스에서 `exec` 하고 함수를 꺼낸다.
 
     ⚠️ **정적 검사를 먼저 통과시켜라.** 이 함수는 AST 를 안 본다.
+
+    ## ★ numpy 경고를 끄고 부른다 (D-135)
+
+    numpy 는 경고를 내려고 `warnings` 를 import 하는데, 제한된 builtins 에
+    `__import__` 가 없어서 **`KeyError: '__import__'` 로 죽는다.** 규칙이
+    `log(음수)` · 0 나누기 · overflow 를 한 번이라도 만들면 점수도 못 받고
+    버려졌다 — 대표값 6실행에서 **제안 1,728개 중 34개(2.0%)** 가 그랬다.
+
+    ```
+    샌드박스 자식   np.seterr(all="ignore") 가 **있었다** (여기 아래)
+    채점·적합 경로  ★ 없었다   -> 같은 방어가 한쪽에만 (원칙 2)
+    ```
+
+    ★ 전역 `np.seterr` 대신 **호출마다 `np.errstate`** 를 쓴다 — 전역
+    상태를 바꾸면 이 프로세스의 다른 계산까지 조용히 달라진다.
+
+    비유한 값이 나온 뒤는 **이미 정해져 있다**: 적합기는 그 가중치를
+    실행 불가로 보고(`inf`, 구조 기각 아님), 채점의 `top_k` 는
+    `ValueError` 로 그 규칙을 거부한다.
     """
     ns = safe_namespace()
     try:
@@ -112,7 +132,13 @@ def compile_rule(code: str, *, name: str = "score"):
     fn = ns.get(name)
     if not callable(fn):
         raise SandboxError(f"규칙에 `{name}` 함수가 없다")
-    return fn
+
+    @functools.wraps(fn)
+    def guarded(*a, **kw):
+        with np.errstate(all="ignore"):
+            return fn(*a, **kw)
+
+    return guarded
 
 
 def _child(code: str, name: str, args_pickle: bytes, mem_mb: int, q) -> None:

@@ -107,3 +107,59 @@ def test_feats_survive_pickle():
     assert np.allclose(g.waves, np.arange(3.0))
     with pytest.raises(AttributeError, match="등록되지 않은"):
         _ = g.nope
+
+
+# ---------------------------------------------------------------------------
+# ★ numpy 경고가 규칙을 죽이면 안 된다 (D-135)
+# ---------------------------------------------------------------------------
+def test_numpy_warning_does_not_kill_the_rule():
+    """★ `log(음수)` 가 `KeyError: '__import__'` 를 내면 안 된다.
+
+    numpy 는 경고를 내려고 `warnings` 를 import 하는데 제한된 builtins 에
+    `__import__` 가 없다. 대표값 6실행에서 **제안 1,728개 중 34개(2.0%)**
+    가 이것으로 버려졌다 — 규칙이 나빠서가 아니라 우리 결함으로.
+
+    비유한 값이 나온 뒤는 이미 정해져 있다 (적합기는 inf, `top_k` 는 거부).
+    """
+    import numpy as np
+
+    from kernelrule.core.sandbox import compile_rule
+
+    fn = compile_rule("def score(f, p, hw, w):\n"
+                      "    return np.log(f.waves - 5.0) * w[0]\n")
+
+    class F:
+        waves = np.array([1.0, 2.0, 3.0])
+
+    out = fn(F(), None, None, np.array([1.0]))
+    assert np.isnan(out).all(), out          # 죽지 않고 nan 이 나온다
+
+
+def test_the_same_guard_is_on_both_paths():
+    """★ 같은 방어가 **양쪽에** 있는가 (원칙 2).
+
+    전에는 샌드박스 자식에만 있었다. 한쪽에만 있으면 어느 쪽으로 부르느냐가
+    결과를 바꾼다 — 그것이 D-135 였다.
+    """
+    import inspect
+
+    from kernelrule.core import sandbox
+
+    assert "errstate" in inspect.getsource(sandbox.compile_rule)
+    assert "seterr" in inspect.getsource(sandbox._child)
+
+
+def test_errstate_does_not_leak_globally():
+    """★ 전역 `np.seterr` 를 바꾸지 않는다 — 다른 계산까지 조용히 달라진다."""
+    import numpy as np
+
+    from kernelrule.core.sandbox import compile_rule
+
+    before = np.geterr()
+    fn = compile_rule("def score(f, p, hw, w):\n    return f.waves * w[0]\n")
+
+    class F:
+        waves = np.array([1.0])
+
+    fn(F(), None, None, np.array([1.0]))
+    assert np.geterr() == before
