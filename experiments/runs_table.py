@@ -12,9 +12,22 @@
 ```
 <피처><씨앗>-p<파라미터>[-<표현력>][-<실험명>]
   F3rw-p8   F3rw-p16   F3rw-p8-prod   F3hg-p8-d75-a
-★ 표(GPU)·계승·코드 판은 태그에 안 넣는다 — config.json 이 갖는다
+★ 표(GPU)·계승은 태그에 안 넣는다 — config.json 이 갖는다
 ★ `x-` 로 시작하는 것은 **폐기**다 (순위 손실 계열 등). 표에 안 넣는다
 ```
+
+### ★ 코드 판 규칙을 고쳤다 (2026-09-05, D-137)
+
+D-128 은 "코드 판은 태그에 안 넣는다" 였다. 그런데 `__import__` 수정은
+**버려지던 제안 2% 를 채점되게 만든다** — 결과를 바꾸면 그것은 조건이다.
+
+```
+결과를 바꾸는 코드 변경   ★ 태그에 붙인다 (`-nan` 처럼)
+그 밖의 변경             커밋으로만 — ★ 이 표의 `커밋` 열
+```
+
+커밋은 `trace.jsonl` 첫 줄(`run_start.commit`)에서 읽는다. 트레이스가
+없는 옛 실행은 `?` 다 — **추정해 채우지 않는다** (원칙 39).
 """
 
 from __future__ import annotations
@@ -51,6 +64,18 @@ CANON: dict[str, tuple[str, tuple, str]] = {
     "F3rw-p8-pow": ("expressive-regret.json", ("r1", "rpow"), "med"),
     "F3rw-p8-5090": ("c-ladder.json", ("regret", "5090sigma-hw2"), "med"),
     "F3rw-p8-4090": ("sigma-4090.json", ("holdout_regret",), "med"),
+    # ★ 재측정 중. 끝나면 canon-nan.json 이 생긴다 (canon-nan-prereg.md)
+    "F3rw-p8-nan": ("canon-nan.json", ("holdout_regret",), "med"),
+}
+#: 폐기가 아닌데 설명이 필요한 태그. 상태 열에 그대로 실린다.
+NOTES = {
+    "F3rw-p8-nan": "★ 지금 대표값 — `-nan` 은 `compile_rule` 의 "
+                   "np.errstate 방어(D-135) 를 뜻한다. 그 전 캠페인은 "
+                   "`F3rw-p8` 이다. 커밋 둘은 캠페인 도중 문서 커밋 때문이고 "
+                   "`kernelrule/`·`prompts/` 는 안 바뀌었다 (확인함)",
+    "F3rw-p8": "결함 있는 코드로 돈 캠페인 — `__import__` 로 제안 2% 가 "
+               "버려졌다 (D-135). 대표값은 `F3rw-p8-nan` 이다",
+    "F3rw-p8-p3": "patience 3 으로 r4~r6 에서 멈춘 캠페인 (D-131)",
 }
 #: 표에서 빼는 접두. **지우지 않는다** — 이름으로 표시만 한다.
 DROP = ("x-",)
@@ -84,6 +109,44 @@ def _canon(tag: str) -> tuple[str, str]:
         import statistics as st
         v = st.median(v)
     return f"{float(v):.4f}", f
+
+
+def _commit(runs: list[str]) -> str:
+    """`trace.jsonl` 첫 줄의 커밋. 없으면 `?` — 추정하지 않는다."""
+    got = set()
+    for r in runs:
+        p = RUNS / r / "trace.jsonl"
+        if not p.exists():
+            got.add("?")
+            continue
+        with p.open() as f:
+            line = f.readline()
+        try:
+            got.add(json.loads(line).get("commit") or "?")
+        except json.JSONDecodeError:
+            got.add("?")
+    # ★ 캠페인 도중에 커밋하면 시드마다 달라진다. **숨기지 않고 다 적는다** —
+    #   `kernelrule/` 이 안 바뀐 커밋이면 동작은 같지만 그 판단은 사람이 한다.
+    return "·".join(sorted(got)) if got else "?"
+
+
+#: 캠페인이 도는 동안 그 태그의 줄은 라운드마다 달라진다. `--check` 에서
+#: **그 줄만** 뺀다 — 나머지 줄의 검사는 그대로 살아 있다.
+LIVE_SECONDS = 1800
+
+
+def _live_tags() -> set[str]:
+    """최근 `LIVE_SECONDS` 안에 쓰인 실행이 있는 태그. mtime 만 본다 —
+    추측하지 않는다."""
+    import time
+    now, live = time.time(), set()
+    for tag, runs in _groups().items():
+        for r in runs:
+            f = RUNS / r / "rounds.jsonl"
+            if f.exists() and now - f.stat().st_mtime < LIVE_SECONDS:
+                live.add(tag)
+                break
+    return live
 
 
 def _groups() -> dict[str, list[str]]:
@@ -135,6 +198,8 @@ def _rows() -> list[dict]:
                              int(one("parameters")))["fit_method"]),
             "rounds": "~".join(map(str, nr)),
             "gpu": gpu, "canon": val, "canon_src": src,
+            "commit": _commit(runs),
+            "note": NOTES.get(tag, ""),
             "retired": RETIRED.get(tag, ""),
             "objective": one("objective")})
     return rows
@@ -143,17 +208,19 @@ def _rows() -> list[dict]:
 def render() -> str:
     rows = _rows()
     head = ("| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | "
-            "라운드 | 표 | 최종 점수 | 출처 | 상태 |")
+            "라운드 | 표 | 커밋 | 최종 점수 | 출처 | 상태 |")
     L = [BEGIN, "", head,
-         "|---|--:|---|---|--:|---|---|---|---|--:|---|---|"]
+         "|---|--:|---|---|--:|---|---|---|---|---|--:|---|---|"]
     for r in rows:
         L.append(
             f"| `{r['tag']}` | {r['n']} | {r['features']}/{r['condition']} |"
             f" {r['seed']} | {r['parameters']} | {r['hint']} | {r['fitter']} |"
-            f" {r['rounds']} | {r['gpu']} | {r['canon'] or '—'} |"
-            f" {r['canon_src'] or '—'} |"
-            + (f" ⛔ 폐기 — {r['retired']} |" if r["retired"]
-               else " ⚠️ 적합기 규칙 밖 |" if r["off_rule"] else " |"))
+            f" {r['rounds']} | {r['gpu']} | `{r['commit']}` |"
+            f" {r['canon'] or '—'} | {r['canon_src'] or '—'} |"
+            + (f" ⛔ 폐기 — {r['retired']}" if r["retired"]
+               else " ⚠️ 적합기 규칙 밖" if r["off_rule"] else "")
+            + ((" · " if (r["retired"] or r["off_rule"]) else " ")
+               + r["note"] if r["note"] else "") + " |")
     L += ["", END]
     return "\n".join(L)
 
@@ -170,10 +237,18 @@ def main() -> None:
     else:
         new = txt.rstrip() + "\n\n" + body + "\n"
     if a.check:
-        if new != txt:
+        live = _live_tags()
+
+        def strip(t: str) -> list[str]:
+            return [x for x in t.splitlines()
+                    if not any(x.startswith(f"| `{g}` |") for g in live)]
+
+        if strip(new) != strip(txt):
             print("★ runs.md 가 실행 산출물과 달라졌다. "
                   "`python3 experiments/runs_table.py` 로 다시 만들어라.")
             sys.exit(1)
+        if live:
+            print(f"  ★ 도는 중이라 건너뛴 태그: {sorted(live)}")
         print(f"runs.md 최신 ({len(_rows())}개 태그)")
         return
     OUT.write_text(new)

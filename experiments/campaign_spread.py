@@ -25,6 +25,8 @@ CAMPAIGNS = [
     ("옛", "round-curve.json", None),
     ("p3", "round-curve-p3.json", None),
     ("새24", "round-curve-new.json", None),
+    # ★ 재측정. 곡선이 나오면 켠다 (없으면 건너뛴다)
+    ("nan", "round-curve-nan.json", None),
 ]
 # 검정력 계수: 양측 0.05 + 검정력 0.8 -> z(0.975) + z(0.8)
 ZSUM = 2.8016
@@ -59,7 +61,8 @@ def main() -> None:
     ap.add_argument("--out", default=str(ART / "campaign-spread.json"))
     a = ap.parse_args()
 
-    cur = {name: _curves(fn, k) for name, fn, k in CAMPAIGNS}
+    cur = {name: _curves(fn, k) for name, fn, k in CAMPAIGNS
+           if (ART / fn).exists()}
     print("=" * 88)
     print("1. 캠페인마다 몇 라운드까지 **모든 시드가 살아 있나**")
     print("=" * 88)
