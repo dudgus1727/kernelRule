@@ -59,6 +59,10 @@ class LoopConfig:
     n_rules_per_round: int = 12
     max_rounds: int = 20
     max_evals: int = 200
+    #: ★ 실행 트레이스 (D-133). `trace.jsonl` 에 사건을 시간순으로 남긴다.
+    #: **조건이 아니다** — 로깅만 하고 계산 경로를 안 건드린다. 그래서
+    #: `runset.KEYS` 에 넣지 않는다 (`tests/test_trace.py` 가 확인한다).
+    trace: bool = True
     #: ★ 조기 종료 **끔** (D-132). `0` 이면 라운드 상한까지 다 돈다.
     #:
     #: 왜 껐나 — 문제가 값이 아니라 **판단 기준**이었다:
@@ -335,6 +339,24 @@ class RoundResult:
             f"{self.seconds:.1f}s")
 
 
+def _git_commit() -> str:
+    """지금 커밋. 트레이스 첫 줄이 자족하려면 코드 판이 있어야 한다."""
+    import subprocess
+    try:
+        return subprocess.run(["git", "rev-parse", "--short", "HEAD"],
+                              capture_output=True, text=True, check=False,
+                              timeout=5).stdout.strip() or "?"
+    except Exception:                                     # noqa: BLE001
+        return "?"
+
+
+def _sha(code: str) -> str:
+    """코드의 짧은 해시. 트레이스에서 같은 제안을 잇는 데 쓴다 (D-133)."""
+    import hashlib
+
+    return hashlib.sha256(code.encode()).hexdigest()[:12]
+
+
 class RoundLoop:
     def __init__(self, *, cfg: LoopConfig, table: PerfTable,
                  matrix: FeatureMatrix, splits: SplitSet, llm) -> None:
@@ -347,6 +369,11 @@ class RoundLoop:
                 "틀린 목적함수로 결론났다 (D-118·D-121) — 지표로만 쓴다. "
                 "옛 실행을 재현하려면 그 커밋으로 돌아가라 (D-128).")
         self.cfg = cfg
+        # ★ 트레이스 (D-133). `dump()` 와 같은 곳에 쌓는다.
+        from kernelrule.core.trace import Tracer
+        self.trace = Tracer(
+            Path(cfg.out_dir) / cfg.run_id / "trace.jsonl"
+            if cfg.trace else None)
         self.table = table
         self.matrix = matrix
         self.splits = splits
@@ -817,6 +844,10 @@ class RoundLoop:
         r = len(self.rounds)
         res = RoundResult(round=r)
         calls = {"analyze": 0, "rule_editor": 0, "feature": 0}
+        self.trace.ev("round_start", round=r,
+                      archive_best=(self.archive.best.regret
+                                    if self.archive.best else None),
+                      cells=self.archive.n_cells)
 
         # 1~2. 진단 리포트 -> 가설
         #  ★ `use_analyst=False` 면 이 블록을 통째로 건너뛴다 (§16.1).
@@ -882,6 +913,13 @@ class RoundLoop:
                 h.setdefault("analyst_pass", 1)
             self.hypotheses.extend(replaced)
             self.hypotheses.extend(hyps)
+            self.trace.llm_calls(self.llm, round=r)
+            self.trace.ev("hypotheses", round=r,
+                          ids=[h.get("id") for h in hyps],
+                          claims=[h.get("claim", "") for h in hyps],
+                          needs_feature=[h.get("needs_feature")
+                                         for h in hyps],
+                          n_replaced=len(replaced))
         elif self.cfg.hypothesis_pool and self.archive.best is not None:
             # ★ 대조군 C — Analyst 는 안 부르고 남의 가설을 넣는다 (D-91)
             hyps = self._pool_round(r)
@@ -896,6 +934,10 @@ class RoundLoop:
         parents = self.archive.parents(self.cfg.n_rules_per_round, self.rng)
         applied = [f"{h.get('id','?')}: {h.get('claim','')[:80]}"
                    for h in self.hypotheses[-4:]]
+        self.trace.ev("parents", round=r, picks=[
+            {"kind": k, "rules": [x.rule_id for x in ps],
+             "cells": [list(x.cell) if x.cell else None for x in ps]}
+            for k, ps in parents])
         reqs = []
         for kind, ps in parents:
             parent, parent2, n_terms = None, None, 0
@@ -933,6 +975,9 @@ class RoundLoop:
                          #   자식이 **두 부모 각각에만 있던 피처**를 둘 다
                          #   쓰는지 세려면 부모 피처 집합이 필요하다.
                          "_codes": [x.code for x in ps[:2]],
+                         # ★ 트레이스용 부모 id (D-133). `_user_prompt` 가
+                         #   안 읽는 키다 — 프롬프트에는 안 들어간다.
+                         "_parent_ids": [x.rule_id for x in ps[:2]],
                          "parent_n_terms": n_terms,
                          "hypothesis": hyp,
                          "hypotheses_applied": applied,
@@ -945,6 +990,7 @@ class RoundLoop:
                                          or self.cfg.hypothesis_pool)})
         raws = self._call_optimizers(reqs)
         calls["rule_editor"] += len(reqs)
+        self.trace.llm_calls(self.llm, round=r)
 
         elites: list[Elite] = []
         #: 병렬로 보낼 후보 — 부모 종류를 함께 들고 간다 (D-94 계수용).
@@ -954,7 +1000,7 @@ class RoundLoop:
             res.by_parent_kind.setdefault(
                 kind, {"n": 0, "dup": 0, "scored": 0})[key] += 1
 
-        for req, raw in zip(reqs, raws, strict=True):
+        for i, (req, raw) in enumerate(zip(reqs, raws, strict=True)):
             hyp = req["hypothesis"]
             kind = req.get("parent_kind", "?")
             bump(kind, "n")
@@ -968,10 +1014,16 @@ class RoundLoop:
                     res.n_llm_error += 1
                     res.rejections.append(("llm-transport", (
                         f"{type(raw).__name__}: {str(raw)[:70]}")))
+                    self.trace.ev("reject", round=r, i=i, kind=kind,
+                                  why="llm-transport",
+                                  detail=f"{type(raw).__name__}: {raw}"[:300])
                 else:
                     res.n_rejected_schema += 1
                     res.rejections.append(("llm", (
                         f"{type(raw).__name__}: {str(raw)[:70]}")))
+                    self.trace.ev("reject", round=r, i=i, kind=kind,
+                                  why="llm",
+                                  detail=f"{type(raw).__name__}: {raw}"[:300])
                 continue
             try:
                 # ★ 예산을 넘긴다 (D-107). 안 넘기면 MockLLM 경로와
@@ -981,14 +1033,23 @@ class RoundLoop:
             except SchemaViolation as e:
                 res.n_rejected_schema += 1
                 res.rejections.append(("schema", str(e)[:90]))
+                self.trace.ev("reject", round=r, i=i, kind=kind,
+                              why="schema", detail=str(e)[:300])
                 continue
             if hyp:
                 prop.hypothesis_id = hyp.get("id", "")
             if kind == "cross" and len(req.get("_codes") or ()) > 1:
                 self._record_cross(r, req["_codes"], prop.code)
+            self.trace.ev("proposal", round=r, i=i, kind=kind,
+                           parents=req.get("_parent_ids") or [],
+                           hyp=(hyp or {}).get("id"),
+                           changes=prop.changes, n_weights=len(prop.w0),
+                           code=prop.code, code_sha=_sha(prop.code))
             key = prop.code.strip()
             if key in self._seen_code:      # 재채점하지 않는다 (§15.4)
                 bump(kind, "dup")
+                self.trace.ev("duplicate", round=r, i=i, kind=kind,
+                              code_sha=_sha(prop.code))
                 continue
             # ★ 중복 제거를 **병렬 진입 전에** 끝낸다 — 같은 라운드 안의
             #   중복도 여기서 잡아야 워커가 같은 일을 두 번 안 한다.
@@ -1002,8 +1063,17 @@ class RoundLoop:
             e2 = by_code.get(prop.code.strip())
             if e2 is None:
                 self._seen_code.pop(prop.code.strip(), None)
+                # ★ 채점까지 못 간 것 — 지금까지 어디에도 안 남았다 (D-133)
+                self.trace.ev("reject", round=r, kind=kind, why="fit_or_run",
+                              code_sha=_sha(prop.code))
                 continue
             bump(kind, "scored")
+            self.trace.ev("scored", round=r, kind=kind, rule=e2.rule_id,
+                          code_sha=_sha(e2.code), fit=e2.regret,
+                          val=e2.val_regret,
+                          # ★ 적합기가 안 움직였는가 — "조용히 아무것도 안
+                          #   함" 의 자리다 (D-54)
+                          moved=bool(getattr(e2, "moved", True)))
             self._seen_code[prop.code.strip()] = e2.regret
             elites.append(e2)
 
@@ -1011,6 +1081,10 @@ class RoundLoop:
         before = self.archive.best.regret if self.archive.best else float("inf")
         for e in elites:
             won = self.archive.consider(e)
+            self.trace.ev("archive", round=r, rule=e.rule_id,
+                          accepted=bool(won),
+                          cell=list(e.cell) if e.cell else None,
+                          regret=e.regret)
             if won:
                 res.n_accepted += 1
             else:
@@ -1044,6 +1118,13 @@ class RoundLoop:
         res.llm_calls = calls
         res.seconds = time.perf_counter() - t0
         self.rounds.append(res)
+        self.trace.ev("round_end", round=r, best=res.best_regret,
+                      val=res.best_val_regret, cells=res.n_cells,
+                      calls=dict(calls), proposed=res.n_proposed,
+                      scored=res.n_scored, accepted=res.n_accepted,
+                      rejected=(res.n_rejected_schema + res.n_rejected_static
+                                + res.n_rejected_sandbox + res.n_rejected_fit),
+                      seconds=round(res.seconds, 1))
         return res
 
     def _call_optimizers(self, reqs: list[dict]) -> list:
@@ -1175,6 +1256,15 @@ class RoundLoop:
         (아카이브가 작아 비용이 무시할 만하다).
         """
         n = n_rounds or self.cfg.max_rounds
+        # ★ 첫 줄이 자족해야 한다 (D-133 §3-3) — 트레이스 하나만 있어도
+        #   조건을 알 수 있게 config 전체와 커밋 해시를 담는다.
+        self.trace.ev("run_start", run_id=self.cfg.run_id, n_rounds=n,
+                      commit=_git_commit(), config=self._config_dict(),
+                      table=str(getattr(self.table, "bundle", "")),
+                      split=self.splits.kind,
+                      n_train=len(self.splits.train.shapes),
+                      n_val=len(self.splits.val.shapes),
+                      features=sorted(self.matrix.feature_names()))
         try:
             for _ in range(n):
                 res = self.run_round()
@@ -1211,13 +1301,9 @@ class RoundLoop:
                 print(f"  -> {path}", flush=True)
         return self.rounds
 
-    def dump(self, out: str | Path | None = None) -> Path:
-        d = Path(out or (Path(self.cfg.out_dir) / self.cfg.run_id))
-        d.mkdir(parents=True, exist_ok=True)
-        # ★ **무엇으로 돌렸는지**를 남긴다 (D-31, D-45, D-51). 이것이 없으면
-        #   나중에 어느 실행이 어느 모델/엔드포인트/추론강도였는지 알 수
-        #   없고, 그러면 나란히 놓을 수 없다. 실제로 30개 실행 중 2개만
-        #   config.json 이 있었다 — 그 둘은 다른 스크립트가 쓴 것이다.
+    def _config_dict(self) -> dict:
+        """`config.json` 의 내용. ★ 트레이스 첫 줄도 **이것을** 쓴다 —
+        두 곳에서 따로 만들면 어긋난다 (원칙 2, D-133)."""
         from kernelrule.core.splits import is_unsealed
 
         cfg: dict = {"loop": dict(self.cfg.__dict__),
@@ -1251,6 +1337,15 @@ class RoundLoop:
             cfg["llm"] = llm_cfg.to_dict()
         else:                                   # MockLLM 등
             cfg["llm"] = {"class": type(self.llm).__name__}
+        return cfg
+
+    def dump(self, out: str | Path | None = None) -> Path:
+        # ★ **무엇으로 돌렸는지**를 남긴다 (D-31, D-45, D-51). 이것이 없으면
+        #   나중에 어느 실행이 어느 모델/엔드포인트/추론강도였는지 알 수
+        #   없고, 그러면 나란히 놓을 수 없다.
+        d = Path(out or (Path(self.cfg.out_dir) / self.cfg.run_id))
+        d.mkdir(parents=True, exist_ok=True)
+        cfg = self._config_dict()
         (d / "config.json").write_text(
             json.dumps(cfg, ensure_ascii=False, indent=1, default=str))
         self.archive.dump(d / "archive.jsonl")

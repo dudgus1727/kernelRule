@@ -157,5 +157,7 @@ def test_config_records_seal_state(pipe):
 
     from kernelrule.core.loop import RoundLoop
 
-    assert '"unsealed"' in inspect.getsource(RoundLoop.dump)
+    # ★ config 를 만드는 자리가 `_config_dict` 로 옮겼다 (D-133 — 트레이스
+    #   첫 줄이 같은 것을 쓴다). 검사 대상도 따라간다.
+    assert '"unsealed"' in inspect.getsource(RoundLoop._config_dict)
     assert '"unsealed": is_unsealed()' in inspect.getsource(pipe.main)
