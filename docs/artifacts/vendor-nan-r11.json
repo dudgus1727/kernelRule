@@ -1,0 +1,60 @@
+{
+ "bundle": "datasets/rtx-a6000-sm_86-c63710df",
+ "round": 11,
+ "arms": {
+  "새 대표값(nan, r11)": {
+   "runs": [
+    "F3rw-p8-nan-s0",
+    "F3rw-p8-nan-s1",
+    "F3rw-p8-nan-s2",
+    "F3rw-p8-nan-s3",
+    "F3rw-p8-nan-s4",
+    "F3rw-p8-nan-s5"
+   ],
+   "per_shape_median": {
+    "Problem(M=1, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.01086954229377,
+    "Problem(M=1, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.014598545573201,
+    "Problem(M=8192, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.017430227660468,
+    "Problem(M=8192, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0570373189021995,
+    "Problem(M=512, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1233183483406215,
+    "Problem(M=512, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1561086044357398,
+    "Problem(M=32, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0539568804754853,
+    "Problem(M=32, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0217390845875396,
+    "Problem(M=256, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.2358870771363004,
+    "Problem(M=256, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1428571952650024,
+    "Problem(M=128, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1547618717643644,
+    "Problem(M=128, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1879350411836695,
+    "Problem(M=1024, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0839201410046382,
+    "Problem(M=1024, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.098308052055172,
+    "Problem(M=2048, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0513284703223889,
+    "Problem(M=2048, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1179556255226215,
+    "Problem(M=4096, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0462863226804933,
+    "Problem(M=4096, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0692789427767297,
+    "Problem(M=8, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0253623005016825,
+    "Problem(M=8, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.021897871468983
+   }
+  }
+ },
+ "vendor_per_shape": {
+  "Problem(M=1, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1304347184225556,
+  "Problem(M=1, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.094890599334988,
+  "Problem(M=8192, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0291532132712968,
+  "Problem(M=8192, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.025328447752263,
+  "Problem(M=512, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0358744523373542,
+  "Problem(M=512, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.205882345194615,
+  "Problem(M=32, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1582734392887275,
+  "Problem(M=32, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0942028756271032,
+  "Problem(M=256, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.008064577645324,
+  "Problem(M=256, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1428571952650024,
+  "Problem(M=128, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0595238301472722,
+  "Problem(M=128, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0326935278876206,
+  "Problem(M=1024, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0751173256668654,
+  "Problem(M=1024, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0227537616276083,
+  "Problem(M=2048, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0416666315171137,
+  "Problem(M=2048, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0137889341374737,
+  "Problem(M=4096, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.0292172912785038,
+  "Problem(M=4096, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.054384343992372,
+  "Problem(M=8, N=11008, K=4096, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.1449274766304682,
+  "Problem(M=8, N=4096, K=11008, dtype='f16', acc_dtype='f32', layout_a='row', layout_b='col', layout_c='row')": 1.102189819012407
+ }
+}

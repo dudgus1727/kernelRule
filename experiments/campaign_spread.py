@@ -21,12 +21,15 @@ from pathlib import Path
 
 ART = Path("docs/artifacts")
 # (이름, 곡선 파일, 그 파일 안의 그룹 키)
+#: ★ 전부 `round-curve-bests.json` 에서 읽는다 — `bests.jsonl` 로 다시 만든
+#: 곡선이다 (D-139). 옛 파일들(`round-curve*.json`)은 **정정 이력으로
+#: 남기고** 여기서 안 읽는다.
+CURVES = "round-curve-bests.json"
 CAMPAIGNS = [
-    ("옛", "round-curve.json", None),
-    ("p3", "round-curve-p3.json", None),
-    ("새24", "round-curve-new.json", None),
-    # ★ 재측정. 곡선이 나오면 켠다 (없으면 건너뛴다)
-    ("nan", "round-curve-nan.json", None),
+    ("옛", CURVES, "F3rw-p8-old"),
+    ("p3", CURVES, "F3rw-p8-p3"),
+    ("새24", CURVES, "F3rw-p8"),
+    ("nan", CURVES, "F3rw-p8-nan"),
 ]
 # 검정력 계수: 양측 0.05 + 검정력 0.8 -> z(0.975) + z(0.8)
 ZSUM = 2.8016
@@ -37,6 +40,12 @@ def _curves(fn: str, key: str | None) -> dict[str, list[float]]:
     g = j["groups"]
     k = key or next(iter(g))
     return g[k]["curves"]
+
+
+def _source(fn: str, key: str | None) -> list[str]:
+    j = json.loads((ART / fn).read_text())
+    g = j["groups"]
+    return g[key or next(iter(g))].get("source", ["?"])
 
 
 def _at(c: list[float], r: int) -> float:
@@ -114,7 +123,12 @@ def main() -> None:
             v = [_at(c, rr) for c in cs.values()]
             row.append(f"{st.mean(v):7.4f} {st.median(v):7.4f} {st.stdev(v):6.4f}")
         print(f"  r{rr:<5d} " + " ".join(row))
-    print("\n  ⚠️ 일부 시드가 멈춘 캠페인을 그 뒤 라운드에서 비교하면 **멈춘 쪽은")
+    print("\n  출처: " + " · ".join(
+        f"{n}={'/'.join(_source(fn, k))}" for n, fn, k in CAMPAIGNS
+        if (ART / fn).exists()))
+    print("  ⚠️ archive-snapshot 은 **마지막 라운드에서만 정확하다** (D-139) —")
+    print("     옛 캠페인의 r11 만 쓸 수 있고 그 앞 라운드는 못 쓴다")
+    print("  ⚠️ 일부 시드가 멈춘 캠페인을 그 뒤 라운드에서 비교하면 **멈춘 쪽은")
     print("     값이 고정되고 도는 쪽만 나아진다** — 그 차이는 캠페인 산포가 아니라")
     print("     '한쪽이 그만뒀다' 는 사실이다 (D-136 이 D-135 를 정정하는 자리)")
 
@@ -124,8 +138,15 @@ def main() -> None:
     # Var(캠페인 평균) = sw^2/n + sc^2 ;  Var(차) = 2(sw^2/n + sc^2)
     # 관측이 **차 하나**뿐이므로 점추정만 가능하다 (자유도 1).
     var_diff = d_mean ** 2
-    sc2 = var_diff / 2.0 - sw ** 2 / n
-    sc = math.sqrt(sc2) if sc2 > 0 else 0.0
+    sc2_raw = var_diff / 2.0 - sw ** 2 / n
+    # ★ 점추정이 **음수로 나올 수 있다** — 관측된 캠페인 차가 시드 산포만으로
+    #   기대되는 폭보다 작다는 뜻이다. 분산은 음수가 못 되므로 0 으로 자르고,
+    #   **자른 사실을 적는다** (숨기면 "캠페인 성분이 있다" 로 읽힌다).
+    sc2 = max(0.0, sc2_raw)
+    sc = math.sqrt(sc2)
+    if sc2_raw < 0:
+        print(f"  ★ σ(캠페인)² 점추정이 **음수다** ({sc2_raw:+.3e}) — 관측 차가"
+              " 시드 산포만으로 기대되는 폭보다 작다. 0 으로 자른다")
     print(f"  σ(시드)  = {sw:.4f}   -> 평균의 표준오차 {sw / math.sqrt(n):.4f}")
     print(f"  ★ σ(캠페인) 점추정 = {sc:.4f}   (자유도 1 — 구간은 못 준다)")
     print(f"  캠페인 평균의 표준편차 = sqrt(σw²/n + σc²)"
@@ -164,6 +185,7 @@ def main() -> None:
         "seed_values": vals,
         "diff_mean": d_mean, "diff_median": d_med,
         "sigma_within": sw, "sigma_campaign_point": sc,
+        "sigma_campaign_var_raw": sc2_raw,
         "line_current": cur_line, "line_with_campaign": new_line,
         "line_floor": floor, "n": n, "sigma_hi_used": SIG_HI,
         "note": "σ(캠페인) 은 캠페인 쌍 하나에서 나온 점추정이다 (자유도 1)",

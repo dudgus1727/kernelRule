@@ -1,0 +1,54 @@
+{
+ "F3rw-p8-nan": {
+  "bytes_raw": {
+   "F3rw-p8-nan-s0": 4643730,
+   "F3rw-p8-nan-s1": 4643457,
+   "F3rw-p8-nan-s2": 4658220,
+   "F3rw-p8-nan-s3": 4748635,
+   "F3rw-p8-nan-s4": 4589241,
+   "F3rw-p8-nan-s5": 4857374
+  },
+  "bytes_zst": {
+   "F3rw-p8-nan-s0": 104052,
+   "F3rw-p8-nan-s1": 100881,
+   "F3rw-p8-nan-s2": 103230,
+   "F3rw-p8-nan-s3": 102025,
+   "F3rw-p8-nan-s4": 100451,
+   "F3rw-p8-nan-s5": 103252
+  },
+  "commits": {
+   "F3rw-p8-nan-s0": "cdd9cc1",
+   "F3rw-p8-nan-s1": "4803a1b",
+   "F3rw-p8-nan-s2": "4803a1b",
+   "F3rw-p8-nan-s3": "21aee74",
+   "F3rw-p8-nan-s4": "21aee74",
+   "F3rw-p8-nan-s5": "21aee74"
+  },
+  "events": {
+   "F3rw-p8-nan-s0": 1248,
+   "F3rw-p8-nan-s1": 1241,
+   "F3rw-p8-nan-s2": 1244,
+   "F3rw-p8-nan-s3": 1257,
+   "F3rw-p8-nan-s4": 1252,
+   "F3rw-p8-nan-s5": 1245
+  },
+  "release": "trace-F3rw-p8-nan-cdd9cc1",
+  "runs": [
+   "F3rw-p8-nan-s0",
+   "F3rw-p8-nan-s1",
+   "F3rw-p8-nan-s2",
+   "F3rw-p8-nan-s3",
+   "F3rw-p8-nan-s4",
+   "F3rw-p8-nan-s5"
+  ],
+  "sha256": {
+   "trace-F3rw-p8-nan-s0.jsonl.zst": "3fb5cf531cb978318492baa3c1b6bb2ea3fd048adb1074c2aad14223656270e1",
+   "trace-F3rw-p8-nan-s1.jsonl.zst": "778428dcab810c80f2f96c19b73b43f8220364e6c2f0f78410f2f11aaf70f02b",
+   "trace-F3rw-p8-nan-s2.jsonl.zst": "e518338e77e40ea25b84d2ab0ed56f1b72d3b48d21f0207a1a469d352a50ad92",
+   "trace-F3rw-p8-nan-s3.jsonl.zst": "fb5b444c2ea318265da4cc504d1bc8245c79915a2257228e368cd2a512259446",
+   "trace-F3rw-p8-nan-s4.jsonl.zst": "abf478a47dcb6753bd39232d9ef781e9d0a5c8d16343c46da75158bac0fee04a",
+   "trace-F3rw-p8-nan-s5.jsonl.zst": "36e2b9ff97ba5d9cd15472b99254c8f6924aca7807a86b9488c9642c8dfc816c"
+  },
+  "uploaded": "2026-09-06"
+ }
+}

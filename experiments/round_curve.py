@@ -57,19 +57,45 @@ GROUPS = [
 SIGMA = 0.0113
 
 
-def _curve(run: str, T, M, sp) -> list[float]:
-    """라운드마다 '그때 멈췄다면 보고했을 값'."""
-    arc = [json.loads(x) for x in
-           (Path("runs") / run / "archive.jsonl").read_text().splitlines()
-           if x.strip()]
+def _rows(run: str, name: str) -> list[dict]:
+    p = Path("runs") / run / name
+    return ([json.loads(x) for x in p.read_text().splitlines() if x.strip()]
+            if p.exists() else [])
+
+
+def _series(run: str) -> tuple[list[dict], str]:
+    """라운드마다 '그때의 최고'. **출처를 함께 돌려준다.**
+
+    ★ `bests.jsonl` 이 정답이다 — 라운드마다 한 줄, 그 라운드의 최고를
+    코드·가중치까지 적는다.
+
+    ⚠️ `archive.jsonl` 은 **마지막 아카이브 상태**다 (`loop.py:1351`,
+    `archive.dump`). 거기서 "round <= r 인 것 중 최고" 를 고르면 **끝까지
+    살아남은 것만** 보게 된다 — 중간에 밀려난 elite 가 빠지므로 앞 라운드가
+    실제보다 나쁘게(또는 비어서 nan 으로) 나온다. **마지막 라운드에서만
+    정확하다.** `bests.jsonl` 이 없는 옛 실행에만 쓴다 (D-139).
+    """
+    bs = _rows(run, "bests.jsonl")
+    if bs:
+        return sorted(bs, key=lambda e: e["round"]), "bests"
+    arc = _rows(run, "archive.jsonl")
     n_rounds = max(e.get("round", 0) for e in arc) + 1
-    out, prev_code = [], None
+    out = []
     for r in range(n_rounds):
         sub = [e for e in arc if e.get("round", 99) <= r]
-        if not sub:
+        out.append(sorted(sub, key=lambda e: e["regret"])[0] if sub
+                   else {"code": None, "w": None, "round": r})
+    return out, "archive-snapshot"
+
+
+def _curve(run: str, T, M, sp) -> tuple[list[float], str]:
+    """라운드마다 '그때 멈췄다면 보고했을 값'."""
+    series, src = _series(run)
+    out, prev_code = [], None
+    for b in series:
+        if b["code"] is None:
             out.append(float("nan"))
             continue
-        b = sorted(sub, key=lambda e: e["regret"])[0]
         key = (b["code"], tuple(b["w"]))
         if key == prev_code:            # ★ 최고가 안 바뀌면 다시 안 잰다
             out.append(out[-1])
@@ -77,7 +103,7 @@ def _curve(run: str, T, M, sp) -> list[float]:
         prev_code = key
         out.append(canonical_score(b["code"], b["w"], table=T, matrix=M,
                                    splits=sp).holdout)
-    return out
+    return out, src
 
 
 def main() -> None:
@@ -98,13 +124,14 @@ def main() -> None:
         print("=" * 92)
         print(f"{name}  — {note}")
         print("=" * 92)
-        curves = {}
+        curves, srcs = {}, set()
         for i in range(n):
             run = f"{prefix}-s{i}"
             if not (Path("runs") / run / "archive.jsonl").exists():
                 print(f"  ⚠️ 없는 실행: {run}")
                 continue
-            c = _curve(run, T, M, sp)
+            c, src = _curve(run, T, M, sp)
+            srcs.add(src)
             curves[run] = c
             print(f"  {run:18s} " + " ".join(f"{x:.4f}" for x in c),
                   flush=True)
@@ -124,7 +151,11 @@ def main() -> None:
         print(f"  ★ 마지막 라운드까지의 개선 (r0 -> 끝): "
               f"{med[0] - final:+.4f}   "
               f"마지막 4라운드 개선: {med[max(0, L - 5)] - final:+.4f}")
+        print(f"  ★ 출처: {sorted(srcs)}"
+              + ("   ⚠️ archive-snapshot 은 **마지막 라운드에서만 정확하다**"
+                 if "archive-snapshot" in srcs else ""))
         out["groups"][name] = {"curves": curves, "median": med,
+                               "source": sorted(srcs),
                                "flat_from": flat, "note": note}
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1,

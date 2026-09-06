@@ -34,30 +34,30 @@ F3hg-p8-d75-a  human_guided 씨앗
 
 <!-- RUNS:BEGIN — experiments/runs_table.py 가 만든다 -->
 
-| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | 라운드 | 표 | 커밋 | 최종 점수 | 출처 | 상태 |
-|---|--:|---|---|--:|---|---|---|---|---|--:|---|---|
-| `F1rw-p8` | 6 | 16/? | rule_writer-try09 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | 1.1195 | conclusion.json | |
-| `F2rw-p8` | 6 | 17/? | rule_writer-try01 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | 1.1288 | conclusion.json | |
-| `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | |
-| `F3hg-p8-d75-b` | 6 | 19/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | |
-| `F3rw-p16` | 3 | 19/F3 | rule_writer-try05 | 16 | 기본 | cma/1/300 | 12 | a6000 | `?` | 1.0906 | expressive-regret.json | |
-| `F3rw-p8` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 24 | a6000 | `?` | 1.0787 | canon-p8.json | 결함 있는 코드로 돈 캠페인 — `__import__` 로 제안 2% 가 버려졌다 (D-135). 대표값은 `F3rw-p8-nan` 이다 |
-| `F3rw-p8-4090` | 3 | 19/F3 | rule_writer-try00 | 8 | 기본 | nelder-mead/4/200 | 12 | 4090 | `?` | 1.0493 | sigma-4090.json | |
-| `F3rw-p8-5090` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | 5090 | `?` | 1.0611 | c-ladder.json | |
-| `F3rw-p8-abl-analyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | |
-| `F3rw-p8-abl-noanalyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | |
-| `F3rw-p8-abl-shuffled` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | |
-| `F3rw-p8-cma` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | cma/1/300 | 12 | a6000 | `?` | 1.0987 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다 |
-| `F3rw-p8-cross` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | |
-| `F3rw-p8-d75` | 6 | 21/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | |
-| `F3rw-p8-nan` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 18~24 | a6000 | `4803a1b·cdd9cc1` | — | — | ★ 지금 대표값 — `-nan` 은 `compile_rule` 의 np.errstate 방어(D-135) 를 뜻한다. 그 전 캠페인은 `F3rw-p8` 이다. 커밋 둘은 캠페인 도중 문서 커밋 때문이고 `kernelrule/`·`prompts/` 는 안 바뀌었다 (확인함) |
-| `F3rw-p8-old` | 6 | 19/? | rule_writer-try05 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | 1.0762 | conclusion.json | ⛔ 폐기 — 옛 대표값 — 옛 프롬프트·라운드12·patience10 (D-129) |
-| `F3rw-p8-p3` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 5~6~7 | a6000 | `?` | — | — | patience 3 으로 r4~r6 에서 멈춘 캠페인 (D-131) |
-| `F3rw-p8-pow` | 3 | 19/F3 | rule_writer-try05 | 8 | 지수 | cma/1/300 | 12 | a6000 | `?` | 1.0839 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
-| `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | 곱 | cma/1/300 | 12 | a6000 | `?` | 1.0840 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
-| `luna` | 3 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | |
-| `lunaNAMES` | 6 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | |
-| `verify` | 2 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 6 | a6000 | `?` | — | — | |
+| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | 라운드 | 표 | 커밋 | 트레이스 | 최종 점수 | 출처 | 상태 |
+|---|--:|---|---|--:|---|---|---|---|---|---|--:|---|---|
+| `F1rw-p8` | 6 | 16/? | rule_writer-try09 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1195 | conclusion.json | |
+| `F2rw-p8` | 6 | 17/? | rule_writer-try01 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1288 | conclusion.json | |
+| `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
+| `F3hg-p8-d75-b` | 6 | 19/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
+| `F3rw-p16` | 3 | 19/F3 | rule_writer-try05 | 16 | 기본 | cma/1/300 | 12 | a6000 | `?` | — | 1.0906 | expressive-regret.json | |
+| `F3rw-p8` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 24 | a6000 | `?` | — | 1.0787 | canon-p8.json | 결함 있는 코드로 돈 캠페인 — `__import__` 로 제안 2% 가 버려졌다 (D-135). 대표값은 `F3rw-p8-nan` 이다 |
+| `F3rw-p8-4090` | 3 | 19/F3 | rule_writer-try00 | 8 | 기본 | nelder-mead/4/200 | 12 | 4090 | `?` | — | 1.0493 | sigma-4090.json | |
+| `F3rw-p8-5090` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | 5090 | `?` | — | 1.0611 | c-ladder.json | |
+| `F3rw-p8-abl-analyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-abl-noanalyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-abl-shuffled` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-cma` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | cma/1/300 | 12 | a6000 | `?` | — | 1.0987 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다 |
+| `F3rw-p8-cross` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-d75` | 6 | 21/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-nan` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 24 | a6000 | `21aee74·4803a1b·cdd9cc1` | trace-F3rw-p8-nan-cdd9cc1 | 1.0886 | round-curve-bests.json | ★ 지금 대표값 — `-nan` 은 `compile_rule` 의 np.errstate 방어(D-135) 를 뜻한다. 그 전 캠페인은 `F3rw-p8` 이다. ★ 최종 점수는 **r11 에서 읽는다** (라운드 12, D-140) — 캠페인은 24까지 돌았다. 커밋이 갈린 것은 캠페인 도중 문서 커밋 때문이고 `kernelrule/`·`prompts/` 는 어느 쌍에서도 안 바뀌었다 (확인함, D-137) |
+| `F3rw-p8-old` | 6 | 19/? | rule_writer-try05 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.0762 | conclusion.json | ⛔ 폐기 — 옛 대표값 — 옛 프롬프트·라운드12·patience10 (D-129) |
+| `F3rw-p8-p3` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 5~6~7 | a6000 | `?` | — | — | — | patience 3 으로 r4~r6 에서 멈춘 캠페인 (D-131) |
+| `F3rw-p8-pow` | 3 | 19/F3 | rule_writer-try05 | 8 | 지수 | cma/1/300 | 12 | a6000 | `?` | — | 1.0839 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
+| `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | 곱 | cma/1/300 | 12 | a6000 | `?` | — | 1.0840 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
+| `luna` | 3 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `lunaNAMES` | 6 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `verify` | 2 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 6 | a6000 | `?` | — | — | — | |
 
 <!-- RUNS:END -->
 

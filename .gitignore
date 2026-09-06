@@ -18,3 +18,4 @@ datasets/baselines/*
 runs/
 datasets/rtx-5090-sm_120-5bb6f403/
 datasets/rtx-5090-sm_120-5bb6f403.tar.zst
+.trace-release/

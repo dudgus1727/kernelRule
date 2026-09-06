@@ -64,15 +64,20 @@ CANON: dict[str, tuple[str, tuple, str]] = {
     "F3rw-p8-pow": ("expressive-regret.json", ("r1", "rpow"), "med"),
     "F3rw-p8-5090": ("c-ladder.json", ("regret", "5090sigma-hw2"), "med"),
     "F3rw-p8-4090": ("sigma-4090.json", ("holdout_regret",), "med"),
-    # ★ 재측정 중. 끝나면 canon-nan.json 이 생긴다 (canon-nan-prereg.md)
-    "F3rw-p8-nan": ("canon-nan.json", ("holdout_regret",), "med"),
+    # ★ 지금 대표값 (D-140). 라운드가 12 이므로 **r11 에서 읽는다** —
+    #   캠페인은 24라운드까지 돌았지만 보고하는 값은 r11 이다
+    "F3rw-p8-nan": ("round-curve-bests.json",
+                    ("groups", "F3rw-p8-nan", "curves"), "med@11"),
 }
 #: 폐기가 아닌데 설명이 필요한 태그. 상태 열에 그대로 실린다.
 NOTES = {
     "F3rw-p8-nan": "★ 지금 대표값 — `-nan` 은 `compile_rule` 의 "
                    "np.errstate 방어(D-135) 를 뜻한다. 그 전 캠페인은 "
-                   "`F3rw-p8` 이다. 커밋 둘은 캠페인 도중 문서 커밋 때문이고 "
-                   "`kernelrule/`·`prompts/` 는 안 바뀌었다 (확인함)",
+                   "`F3rw-p8` 이다. ★ 최종 점수는 **r11 에서 읽는다** "
+                   "(라운드 12, D-140) — 캠페인은 24까지 돌았다. "
+                   "커밋이 갈린 것은 캠페인 도중 문서 "
+                   "커밋 때문이고 `kernelrule/`·`prompts/` 는 어느 쌍에서도 "
+                   "안 바뀌었다 (확인함, D-137)",
     "F3rw-p8": "결함 있는 코드로 돈 캠페인 — `__import__` 로 제안 2% 가 "
                "버려졌다 (D-135). 대표값은 `F3rw-p8-nan` 이다",
     "F3rw-p8-p3": "patience 3 으로 r4~r6 에서 멈춘 캠페인 (D-131)",
@@ -103,11 +108,19 @@ def _canon(tag: str) -> tuple[str, str]:
                 isinstance(v, dict) and k not in v):
             return "", ""
         v = v[k]
+    import statistics as st
     if how == "med":
         if not isinstance(v, list) or not v:
             return "", ""
-        import statistics as st
         v = st.median(v)
+    elif how.startswith("med@"):
+        # ★ 라운드 N 에서의 중앙값. `round-curve-bests.json` 의 곡선을 읽는다.
+        #   곡선은 **최고가 안 바뀌면 값을 이어 쓰므로** 길이가 짧을 수 있다 —
+        #   `min(N, len-1)` 로 잡는 것이 '그때 멈췄다면' 과 같다 (D-139).
+        r = int(how[4:])
+        if not isinstance(v, dict) or not v:
+            return "", ""
+        v = st.median([c[min(r, len(c) - 1)] for c in v.values()])
     return f"{float(v):.4f}", f
 
 
@@ -133,6 +146,18 @@ def _commit(runs: list[str]) -> str:
 #: 캠페인이 도는 동안 그 태그의 줄은 라운드마다 달라진다. `--check` 에서
 #: **그 줄만** 뺀다 — 나머지 줄의 검사는 그대로 살아 있다.
 LIVE_SECONDS = 1800
+#: 릴리즈 대장. `trace_release.py --upload` 이 쓴다 (D-138).
+TRACE_MANIFEST = ROOT / "docs" / "artifacts" / "trace-releases.json"
+MISSING = "★ 미업로드"
+
+
+def _trace(tag: str, runs: list[str]) -> str:
+    """트레이스가 어느 릴리즈에 있나. 있는데 릴리즈가 없으면 그렇게 적는다."""
+    if not any((RUNS / r / "trace.jsonl").exists() for r in runs):
+        return ""
+    m = (json.loads(TRACE_MANIFEST.read_text())
+         if TRACE_MANIFEST.exists() else {})
+    return m.get(tag, {}).get("release") or MISSING
 
 
 def _live_tags() -> set[str]:
@@ -199,6 +224,7 @@ def _rows() -> list[dict]:
             "rounds": "~".join(map(str, nr)),
             "gpu": gpu, "canon": val, "canon_src": src,
             "commit": _commit(runs),
+            "trace": _trace(tag, runs),
             "note": NOTES.get(tag, ""),
             "retired": RETIRED.get(tag, ""),
             "objective": one("objective")})
@@ -208,14 +234,15 @@ def _rows() -> list[dict]:
 def render() -> str:
     rows = _rows()
     head = ("| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | "
-            "라운드 | 표 | 커밋 | 최종 점수 | 출처 | 상태 |")
+            "라운드 | 표 | 커밋 | 트레이스 | 최종 점수 | 출처 | 상태 |")
     L = [BEGIN, "", head,
-         "|---|--:|---|---|--:|---|---|---|---|---|--:|---|---|"]
+         "|---|--:|---|---|--:|---|---|---|---|---|---|--:|---|---|"]
     for r in rows:
         L.append(
             f"| `{r['tag']}` | {r['n']} | {r['features']}/{r['condition']} |"
             f" {r['seed']} | {r['parameters']} | {r['hint']} | {r['fitter']} |"
             f" {r['rounds']} | {r['gpu']} | `{r['commit']}` |"
+            f" {r['trace'] or '—'} |"
             f" {r['canon'] or '—'} | {r['canon_src'] or '—'} |"
             + (f" ⛔ 폐기 — {r['retired']}" if r["retired"]
                else " ⚠️ 적합기 규칙 밖" if r["off_rule"] else "")
@@ -243,6 +270,14 @@ def main() -> None:
             return [x for x in t.splitlines()
                     if not any(x.startswith(f"| `{g}` |") for g in live)]
 
+        # ★ 트레이스가 있는데 릴리즈가 없으면 잡는다 (D-138). 도는 중은 뺀다.
+        miss = [r["tag"] for r in _rows()
+                if r["trace"] == MISSING and r["tag"] not in live]
+        if miss:
+            print(f"★ 트레이스가 있는데 릴리즈가 없다: {miss}. "
+                  "`python3 experiments/trace_release.py --tag <태그> "
+                  "--upload` 를 하고 다시 만들어라.")
+            sys.exit(1)
         if strip(new) != strip(txt):
             print("★ runs.md 가 실행 산출물과 달라졌다. "
                   "`python3 experiments/runs_table.py` 로 다시 만들어라.")

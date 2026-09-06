@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import warnings
 from math import comb
@@ -54,7 +55,41 @@ def _sign_test(wins: int, losses: int) -> float:
     return min(1.0, 2.0 * sum(comb(n, i) for i in range(k + 1)) / 2 ** n)
 
 
+def _pick(pre: str, s: int, rnd: int | None) -> dict | None:
+    """그 실행의 규칙 하나. `rnd` 가 있으면 **그 라운드의 최고**를 쓴다.
+
+    ★ `bests.jsonl` 이 라운드별 최고를 갖는다. `archive.jsonl` 은 **마지막
+    상태**라 중간 라운드를 못 준다 (D-139).
+    """
+    d = Path("runs") / f"{pre}{s}"
+    if rnd is None:
+        rows = [json.loads(ln) for ln in (d / "archive.jsonl").open()
+                if ln.strip()] if (d / "archive.jsonl").exists() else []
+        return min(rows, key=lambda e: e["regret"]) if rows else None
+    f = d / "bests.jsonl"
+    if not f.exists():
+        raise SystemExit(f"{f} 가 없다 — 라운드를 지정한 비교를 못 한다 (D-139)")
+    rows = [json.loads(ln) for ln in f.open() if ln.strip()]
+    at = [e for e in rows if e["round"] <= rnd]
+    return max(at, key=lambda e: e["round"]) if at else None
+
+
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--arm", action="append", metavar="이름=접두[:라이브러리]",
+                    help="팔을 직접 준다. 없으면 ARMS 를 쓴다")
+    ap.add_argument("--round", type=int, default=None,
+                    help="그 라운드에서 멈췄다면의 규칙 (bests.jsonl). "
+                         "기본은 마지막 아카이브 최고")
+    ap.add_argument("--out", default=None)
+    a = ap.parse_args()
+    arms = ARMS
+    if a.arm:
+        arms = {}
+        for spec in a.arm:
+            name, _, rest = spec.partition("=")
+            pre, _, lib = rest.partition(":")
+            arms[name] = (pre, lib or None)
     warnings.simplefilter("ignore")
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
 
@@ -78,7 +113,8 @@ def main() -> None:
     print(f"  구조 홀드아웃 {len(held)}형상   "
           f"벤더 geomean {geomean(np.array(list(v_by_shape.values()))):.4f}\n")
 
-    for tag, (pre, lib) in ARMS.items():
+    out_json: dict = {"bundle": BUNDLE, "round": a.round, "arms": {}}
+    for tag, (pre, lib) in arms.items():
         if lib:
             reg = extended_registry(FeatureRegistry("F1-empty"),
                                     load_generated(lib, table=table,
@@ -92,14 +128,12 @@ def main() -> None:
 
         # 실행마다 형상별 regret. 최종 채점 절차대로 **체제별로 재적합**한다.
         per_run: list[dict] = []
+        used: list[str] = []
         for s in range(6):
-            arc = Path("runs") / f"{pre}{s}" / "archive.jsonl"
-            if not arc.exists():
+            best = _pick(pre, s, a.round)
+            if best is None:
                 continue
-            rows = [json.loads(ln) for ln in arc.open() if ln.strip()]
-            if not rows:
-                continue
-            best = min(rows, key=lambda e: e["regret"])
+            used.append(f"{pre}{s}")
             fn = compile_rule(best["code"])
             reg_by_shape: dict = {}
             for name in ("short", "long"):
@@ -115,7 +149,21 @@ def main() -> None:
                     reg_by_shape[p] = float(e.regret[i, 0])
             per_run.append(reg_by_shape)
 
+        print(f"  실행: {used}"
+              + (f"   ★ 라운드 {a.round} 에서" if a.round is not None
+                 else "   (마지막 아카이브 최고)"))
+        out_json["arms"][tag] = {
+            "runs": used,
+            "per_shape_median": {str(p): float(np.median(
+                [r[p] for r in per_run if p in r]))
+                for p in held if any(p in r for r in per_run)},
+        }
         _report(tag, per_run, v_by_shape, held, table)
+    out_json["vendor_per_shape"] = {str(p): v for p, v in v_by_shape.items()}
+    if a.out:
+        Path(a.out).write_text(json.dumps(out_json, ensure_ascii=False,
+                                          indent=1))
+        print(f"\n  -> {a.out}")
 
 
 def _report(tag, per_run, v_by_shape, held, table) -> None:
