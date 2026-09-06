@@ -57,7 +57,14 @@ TABLES: dict[str, dict] = {
     "a6000": {
         "bundle": "datasets/rtx-a6000-sm_86-c63710df",
         "env_hash": "c63710df",
-        "runs": [f"F3rw-p8-s{i}" for i in range(6)]},
+        # ★ 2026-09-06 (D-141): 대표값이 `F3rw-p8-nan` 으로 바뀌었고
+        #   라운드가 12 이므로 **r11 의 규칙**을 쓴다 (D-140).
+        #   ⚠️ 앞서 여기 `F3rw-p8-s{i}` 가 적혀 있었는데, 그 이름이 개명으로
+        #      다른 캠페인을 가리키게 됐다 — 옛 전이 수치가 **어느 캠페인의
+        #      것인지 산출물에 안 남아 있다**. 그래서 아래 `src_runs` 를
+        #      기록한다.
+        "runs": [f"F3rw-p8-nan-s{i}" for i in range(6)],
+        "round": 11},
     "5090": {
         "bundle": "datasets/rtx-5090-sm_120-5bb6f403",
         "env_hash": "5bb6f403",
@@ -78,6 +85,11 @@ TABLES: dict[str, dict] = {
         "env_hash": "ad95d455",
         # ★ (c) 재생성 3시드. 5090 새 (c) 와 **명령이 같다** (표만 다르다).
         "runs": [f"F3rw-p8-4090-s{i}" for i in range(3)]},
+    "h100": {
+        "bundle": "datasets/h100-nvl-sm_90-63684546",
+        "env_hash": "63684546",
+        # ★ (c) 가 **없다**. 대상으로만 쓸 수 있다 — 출처로 쓰면 거절한다.
+        "runs": []},
 }
 
 
@@ -94,8 +106,21 @@ def _splits(table: PerfTable) -> SplitSet:
         val=Split("val", tuple(held)), kind="nk11008")
 
 
-def _best(run: str) -> dict:
-    """학습 점수로 아카이브에서 하나. **홀드아웃을 안 본다** (§10.2)."""
+def _best(run: str, rnd: int | None = None) -> dict:
+    """학습 점수로 하나. **홀드아웃을 안 본다** (§10.2).
+
+    `rnd` 가 있으면 **그 라운드의 최고**를 `bests.jsonl` 에서 읽는다.
+    `archive.jsonl` 은 마지막 상태라 중간 라운드를 못 준다 (D-139).
+    """
+    if rnd is not None:
+        f = Path("runs") / run / "bests.jsonl"
+        if not f.exists():
+            raise SystemExit(f"{f} 가 없다 — 라운드 지정을 못 한다 (D-139)")
+        at = [json.loads(x) for x in f.read_text().splitlines() if x.strip()]
+        at = [e for e in at if e["round"] <= rnd]
+        if not at:
+            raise SystemExit(f"{run} 에 r{rnd} 이하의 최고가 없다")
+        return max(at, key=lambda e: e["round"])
     f = Path("runs") / run / "archive.jsonl"
     arc = sorted((json.loads(x) for x in f.read_text().splitlines()
                   if x.strip()), key=lambda e: e["regret"])
@@ -153,6 +178,13 @@ def main() -> None:
         raise SystemExit("같은 표끼리는 전이가 아니다.")
     S, D = TABLES[src], TABLES[dst]
     SRC_RUNS, DST_RUNS = S["runs"], D["runs"]
+    S_RND, D_RND = S.get("round"), D.get("round")
+    if not SRC_RUNS:
+        raise SystemExit(
+            f"{src} 는 (c) 재생성 실행이 없다 — **출처로 쓸 수 없다**. "
+            "구조가 거기서 나와야 한다.")
+    if not DST_RUNS:
+        print(f"  ⚠️ {dst} 는 (c) 재생성이 **없다** — (a)(b) 만 낸다")
     # ★ 묶음의 조건이 하나인지 **여기서** 본다 (D-120). 나중에 보면
     #   "있었는데 안 봤다" 가 된다 (원칙 39).
     assert_same_condition(SRC_RUNS, label=f"{a.pair[0]} (c) 재생성")
@@ -194,7 +226,7 @@ def main() -> None:
                  "c_nf": [], "src": []}
 
     for run in SRC_RUNS:
-        e = _best(run)
+        e = _best(run, S_RND)
         fn = compile_rule(e["code"])
         # (a) A6000 에서 맞춘 체제별 가중치를 **그대로**
         _, wsA = _fit_per_regime(e["code"], e["w"], A, mA,
@@ -216,7 +248,7 @@ def main() -> None:
 
     print()
     for run in DST_RUNS:
-        e = _best(run)
+        e = _best(run, D_RND)
         fn, ws = _fit_per_regime(e["code"], e["w"], B, mB,
                                  list(spB.train.shapes))
         vc = _score_on(fn, ws, B, mB, hold)
@@ -240,17 +272,25 @@ def main() -> None:
     print("=" * 78)
     print(_row("(a) 완전 이식", res["a"]))
     print(_row("(b) 재적합", res["b"]))
-    print(_row("(c) 재생성", res["c"]))
+    print(_row("(c) 재생성", res["c"]) if res["c"]
+          else "  (c) 재생성                        ★ 없다 — 이 표의 원주민 미측정")
     # ★ 여기도 쌍마다 다르다 (위 두 자리와 같은 실수를 세 번째로 하지 않는다)
     print(f"  {f'★ 기준선 human_guided({dst} 재적합)':34s} {base:.4f}")
     print(f"\n홀드아웃 {len(hold_nf)}형상 (뒤집힘 제외)")
     print("-" * 78)
     print(_row("(a) 완전 이식", res["a_nf"]))
     print(_row("(b) 재적합", res["b_nf"]))
-    print(_row("(c) 재생성", res["c_nf"]))
+    print(_row("(c) 재생성", res["c_nf"]) if res["c_nf"]
+          else "  (c) 재생성                        ★ 없다")
     print(f"  {'★ 기준선 human_guided':34s} {base_nf:.4f}")
 
     res["pair"] = [src, dst]
+    # ★ 어느 실행을 썼나 — 개명 때문에 옛 산출물이 어느 캠페인의 것인지
+    #   알 수 없게 됐다. 다시는 그러지 않는다 (원칙 2, D-141).
+    res["src_runs"] = list(SRC_RUNS)
+    res["dst_runs"] = list(DST_RUNS)
+    res["src_round"] = S_RND
+    res["dst_round"] = D_RND
     res["ridge"] = [A.hw.ridge_point, B.hw.ridge_point]
     res["n_holdout"] = [len(hold), len(hold_nf)]
     Path(out).write_text(json.dumps(res, ensure_ascii=False, indent=1))

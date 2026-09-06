@@ -31,6 +31,9 @@ TABLES = {
     "a6000": ("datasets/rtx-a6000-sm_86-c63710df", "c63710df"),
     "4090": ("datasets/rtx-4090-sm_89-ad95d455", "ad95d455"),
     "5090": ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403"),
+    # ★ 2026-09-06 (D-141). ⚠️ 이 표의 정답 집합만 노이즈 계수 논란이 있다 —
+    #   `--sigma-rel` 로 계수를 갈아 끼워 영향 범위를 괄호로 낼 수 있다.
+    "h100": ("datasets/h100-nvl-sm_90-63684546", "63684546"),
 }
 KS = (10, 100)
 
@@ -55,18 +58,37 @@ def _axes(T: PerfTable, shapes) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="docs/artifacts/table-axes.json")
+    ap.add_argument("--sigma-rel", type=float, default=None, metavar="X",
+                    help="이 표들의 sigma_rel 을 X 로 바꿔 다시 센다. "
+                         "★ 계수가 정답 집합에 얼마나 닿는지 괄호로 내는 용도")
+    ap.add_argument("--only", nargs="+", default=None)
     a = ap.parse_args()
     warnings.simplefilter("ignore")
 
     T = {n: PerfTable.from_bundle(b, env_hash=h, ok_only=False)
          for n, (b, h) in TABLES.items()}
-    # ★ 세 표에 **다 있는 형상**으로만 잰다 — 형상 쓸이가 다르면 (4090 은
+    # ★ 등록된 표에 **다 있는 형상**으로만 잰다 — 형상 쓸이가 다르면 (4090 은
     #   큰 M 쪽이다) 표의 성질이 아니라 형상 구성을 재게 된다.
     common = common_shapes(T["a6000"], T["4090"])
     keys = {(p.M, p.N, p.K) for p in common} & {
         (p.M, p.N, p.K) for p in common_shapes(T["a6000"], T["5090"])}
+    if "h100" in T:
+        keys &= {(p.M, p.N, p.K)
+                 for p in common_shapes(T["a6000"], T["h100"])}
+    if a.only:
+        T = {n: t for n, t in T.items() if n in a.only}
+    if a.sigma_rel is not None:
+        # ★ 계수만 갈아 끼운다. **다른 것은 그대로** — 영향 범위를 괄호로
+        #   내기 위한 것이지 계수를 고치는 것이 아니다 (D-141).
+        import dataclasses
+        for n, t in T.items():
+            # `noise` 는 읽기 전용 property 다 — 뒷필드를 바꾼다.
+            t._noise = dataclasses.replace(
+                t.noise, sigma_rel_coef=a.sigma_rel,
+                source=t.noise.source + f" [★ sigma_rel 을 {a.sigma_rel} 로 갈아끼움]")
+        print(f"  ★ sigma_rel 을 {a.sigma_rel} 로 바꿔 잰다 — 원본이 아니다")
     print("=" * 88)
-    print(f"표의 축 — 세 표에 다 있는 {len(keys)}형상에서만 잰다 (LLM 0회)")
+    print(f"표의 축 — 표 {len(T)}개에 다 있는 {len(keys)}형상에서만 잰다 (LLM 0회)")
     print("=" * 88)
     print(f"  {'표':8s} {'정답 집합 (중앙)':>16s} {'분포':>22s} "
           f"{'10등이 1등보다':>14s} {'100등':>10s}")

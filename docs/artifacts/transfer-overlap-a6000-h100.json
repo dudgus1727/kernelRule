@@ -1,0 +1,39 @@
+{
+ "_note": "겹침만 센다. 전이 수치는 여기 없다",
+ "base": "datasets/rtx-a6000-sm_86-c63710df",
+ "other": "datasets/h100-nvl-sm_90-63684546",
+ "report": {
+  "n_shapes_a": 66,
+  "n_shapes_b": 64,
+  "n_shapes_common": 48,
+  "n_axis_a": 1634,
+  "n_axis_b": 2200,
+  "n_axis_common": 1634,
+  "n_bound_flipped": 3,
+  "ridge_a": 159.10648211593806,
+  "ridge_b": 104.26346954096421
+ },
+ "bound_flipped": [
+  {
+   "M": 128,
+   "N": 11008,
+   "K": 4096,
+   "a_memory_bound": true,
+   "b_memory_bound": false
+  },
+  {
+   "M": 128,
+   "N": 4096,
+   "K": 11008,
+   "a_memory_bound": true,
+   "b_memory_bound": false
+  },
+  {
+   "M": 128,
+   "N": 12288,
+   "K": 4096,
+   "a_memory_bound": true,
+   "b_memory_bound": false
+  }
+ ]
+}

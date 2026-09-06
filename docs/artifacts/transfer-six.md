@@ -1,5 +1,15 @@
 # ★ 세 쌍 여섯 방향 — **전이 손해는 출처가 아니라 대상이 정한다**
 
+> ⚠️ **2026-09-06 (D-141): 이 문서의 표가 옛 값이다.** 같은 이름의
+> `transfer-<src>-<dst>.json` 여섯 개는 그날 **덮어썼다** — a6000 (c) 를
+> 지금 대표값(`F3rw-p8-nan` r11)으로 바꾸고 `src_runs` 를 기록하면서다.
+> **옛 수치는 아래 표에 그대로 남는다** (json 옛 판은 git 이력에 있다).
+> 새 값과 H100 세 방향은 [transfer-twelve.md](transfer-twelve.md) 에 있다.
+>
+> ⚠️ 그리고 **이 문서의 수치가 어느 a6000 캠페인의 것인지 알 수 없다** —
+> 그때 산출물에 실행 id 를 안 적었다 (D-141 §6).
+
+
 > **재현**: `python3 experiments/transfer_29_5.py --pair <src> <dst>` (여섯 번)
 > -> `python3 experiments/transfer_six.py`   (전부 **LLM 0회**)
 > **실험 계획서**: [transfer-4090-prereg.md](transfer-4090-prereg.md)
