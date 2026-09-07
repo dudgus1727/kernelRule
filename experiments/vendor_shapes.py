@@ -58,8 +58,12 @@ def main() -> None:
         t = np.sort(np.asarray(T.times_of(p), dtype=np.float64))
         best = t[0]
         ok = T.noise.resolvable(np.full(t.shape, best), t)
+        d0 = T.frame_for(p)
         rows.append({
             "M": mnk[0], "N": mnk[1], "K": mnk[2],
+            # ★ 형상 수준 축이다 — 한 형상 안에서 값이 하나다 (확인함)
+            "arith_intensity": float(d0["arith_intensity"].iloc[0]),
+            "is_memory_bound": bool(d0["is_memory_bound"].iloc[0]),
             "ours": o, "vendor": vend[k], "delta": o - vend[k],
             "regime": regime_of(p, T.hw),
             "answer_set": int((~ok).sum()),
@@ -96,6 +100,18 @@ def main() -> None:
     out["groups"]["M>=128"] = tally(lambda r: r["M"] >= 128, "M >= 128")
     out["groups"]["fast"] = tally(lambda r: r["regime"] == "short", "빠른 체제")
     out["groups"]["slow"] = tally(lambda r: r["regime"] == "long", "느린 체제")
+    # ★ 기존 축으로 다시 — `is_memory_bound` 는 표가 이미 갖고 있는 형상 수준
+    #   값이다 (AI < ridge). 사후 자름인 M 을 이것으로 대신할 수 있나 본다.
+    out["groups"]["mem_bound"] = tally(lambda r: r["is_memory_bound"],
+                                       "메모리 바운드 (AI<ridge)")
+    out["groups"]["compute_bound"] = tally(lambda r: not r["is_memory_bound"],
+                                           "컴퓨트 바운드")
+    # ★ D-130/D-141 의 축 — 상위권 간격. 중앙에서 가른다 (형상 20개)
+    med_gap = float(np.median([r["gap100"] for r in rows]))
+    out["groups"]["tight_top"] = tally(lambda r: r["gap100"] < med_gap,
+                                       f"상위권 촘촘 (<{med_gap:.1%})")
+    out["groups"]["wide_top"] = tally(lambda r: r["gap100"] >= med_gap,
+                                      f"상위권 벌어짐 (>={med_gap:.1%})")
 
     print("\n  ⚠️ M 으로 가른 것은 **사후**다 (실험 계획서에 없다). 관측으로 읽어라.")
     print("     체제 분할은 이미 있던 축이고 같은 얘기다.")
