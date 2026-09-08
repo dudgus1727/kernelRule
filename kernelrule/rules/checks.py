@@ -26,7 +26,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 
-__all__ = ["PARAMETERS", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
+__all__ = ["PARAMETERS", "MAX_PATHS", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
            "weight_reuse_message", "literal_parameter_message",
            "exponent_message", "exponent_indices", "weight_bounds",
            "EXPONENT_BOUNDS",
@@ -169,7 +169,12 @@ def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
 
 
 def _branch_depth(node: ast.AST) -> int:
-    """중첩된 `if` 문의 최대 깊이. `IfExp`(삼항)는 안 센다 (D-144)."""
+    """중첩된 `if` 문의 최대 깊이. `IfExp`(삼항)는 안 센다.
+
+    ⚠️ **판정에는 안 쓴다** (D-145). 깊이는 경로 수를 안 묶는다 —
+    `if/elif/elif/else` 는 깊이 3 인데 경로가 4 이고, 순차 `if` 4개는
+    깊이 1 인데 경로가 16 이다. 보고용으로만 남긴다.
+    """
     if isinstance(node, ast.If):
         return 1 + max((_branch_depth(x)
                         for x in [*node.body, *node.orelse]), default=0)
@@ -191,31 +196,55 @@ def _path_use(node: ast.AST, counted_ids: set[int]) -> tuple[set, set]:
     return lits, ws
 
 
-def _paths(stmts, counted_ids: set[int]) -> list[tuple[set, set]]:
+def _paths(stmts, counted_ids: set[int], *,
+           cap: int | None = None) -> list[tuple[set, set]]:
     """★ 실행 경로마다 (리터럴 id 집합, 가중치 인덱스 집합) (D-144).
 
     ```
     if/else 밖의 공통 항   ★ 모든 경로에 속한다
     np.where               ★ 분기가 아니다 — 양쪽이 다 계산되므로 한 경로
     ```
+
+    ★ `cap` 을 주면 경로가 그 수를 넘는 순간 **만들기를 멈춘다** (D-145).
+    끝까지 데카르트 곱을 만든 뒤 거부하면 순차 `if` 14개에서 16,384개를
+    만든다 — 거부할 것을 위해 228ms 를 쓴다. 넘겼다는 사실만 알면 되므로
+    `cap + 1` 개까지만 들고 반환한다.
     """
     paths: list[tuple[set, set]] = [(set(), set())]
     for st in stmts:
         if isinstance(st, ast.If):
             hl, hw = _path_use(st.test, counted_ids)
-            subs = _paths(st.body, counted_ids) + (
-                _paths(st.orelse, counted_ids) if st.orelse
+            subs = _paths(st.body, counted_ids, cap=cap) + (
+                _paths(st.orelse, counted_ids, cap=cap) if st.orelse
                 else [(set(), set())])
-            paths = [(pl | hl | sl, pw | hw | sw)
-                     for pl, pw in paths for sl, sw in subs]
+            out: list[tuple[set, set]] = []
+            for pl, pw in paths:
+                for sl, sw in subs:
+                    out.append((pl | hl | sl, pw | hw | sw))
+                    if cap is not None and len(out) > cap:
+                        return out          # ★ 조기 중단
+            paths = out
         else:
             al, aw = _path_use(st, counted_ids)
             paths = [(pl | al, pw | aw) for pl, pw in paths]
+        if cap is not None and len(paths) > cap:
+            return paths
     return paths
 
 
-#: ★ 분기 깊이 상한. 경로가 최대 4개 -> 실질 파라미터 최대 32 (D-144).
-MAX_BRANCH_DEPTH = 2
+#: ★ 실행 경로 수 상한 (D-145). 경로 4 -> 실질 파라미터 최대 32.
+#:
+#: ⚠️ 옛 값은 `MAX_BRANCH_DEPTH = 2` 였다 (D-144). **깊이는 경로 수를 안
+#: 묶는다** — 파이썬 AST 에서 `elif` 는 `orelse` 안의 `If` 라 깊이를 먹는다:
+#:
+#: ```
+#: 중첩 if/else 2단     깊이 2  경로 4    통과
+#: if/elif/elif/else    깊이 3  경로 4    ⛔ 같은 4경로인데 거부됐다
+#: 순차 if 4개          깊이 1  경로 16   ⛔ 깊이로는 안 잡혔다
+#: ```
+#:
+#: **문법 때문에 같은 경로 수가 갈렸다.** 경로를 직접 센다.
+MAX_PATHS = 4
 
 #: 인자가 유한하면 **언제나 1** 인 호출. 상수를 만드는 데밖에 못 쓴다.
 #: ⚠️ "이 표에서 유한하다" 는 **표 의존 사실**이다 (f 피처 19개 전부에서
@@ -322,12 +351,13 @@ def literal_parameter_message(code: str, n_weights: int,
     #   쓴다 — 따로 세면 달라진다 (D-37 계열).
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
     if fnode is not None:
-        depth = _branch_depth(fnode)
-        if depth > MAX_BRANCH_DEPTH:
-            return (f"분기 깊이가 {depth} 다. **{MAX_BRANCH_DEPTH} 단까지**만 "
-                    "된다 — 경로별 예산이라 깊게 갈라 자리를 늘릴 수 있다")
-        per = sorted(len(a) + len(bw)
-                     for a, bw in _paths(fnode.body, {id(n) for n in counted}))
+        paths = _paths(fnode.body, {id(n) for n in counted}, cap=MAX_PATHS)
+        if len(paths) > MAX_PATHS:
+            return (f"실행 경로가 {MAX_PATHS} 개를 넘는다. **{MAX_PATHS} 개까지**"
+                    "만 된다 — 경로별 예산이라 갈라서 자리를 무한히 늘릴 수 "
+                    "있다. 중첩 2단 · `if/elif/elif/else` · 순차 `if` 2개가 "
+                    "전부 4경로다")
+        per = sorted(len(a) + len(bw) for a, bw in paths)
         if per and max(per) <= b:
             return None
         if per:
@@ -616,8 +646,10 @@ class CheckReport:
     branch_constants: list[float] = field(default_factory=list)
     #: ★ 실행 경로별 (리터럴 + 가중치) 수 (D-144). 예산은 **경로마다** 센다.
     path_parameters: list[int] = field(default_factory=list)
-    #: 중첩된 `if` 의 최대 깊이.
+    #: 중첩된 `if` 의 최대 깊이. ⚠️ 보고용이다 — 판정은 `n_paths` 가 한다.
     branch_depth: int = 0
+    #: ★ 실행 경로 수 (D-145). 상한을 넘으면 `MAX_PATHS + 1` 에서 멈춘다.
+    n_paths: int = 0
 
     @property
     def parameters_used(self) -> int:
@@ -636,7 +668,8 @@ class CheckReport:
         head = "통과" if self.ok else "거부"
         bc = (f", 분기상수 {self.branch_constants}(면제)"
               if self.branch_constants else "")
-        pp = (f", 경로별 {self.path_parameters} (깊이 {self.branch_depth})"
+        pp = (f", 경로 {self.n_paths}개 {self.path_parameters} "
+              f"(깊이 {self.branch_depth})"
               if len(self.path_parameters) > 1 else "")
         return (f"[{head}] 리터럴 {self.n_literals} + 가중치 {self.n_weights} "
                 f"= 최대경로 {self.parameters_used}/{LIMITS['parameters']}"
@@ -862,12 +895,14 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
     if fnode is not None:
         rep.branch_depth = _branch_depth(fnode)
-        paths = _paths(fnode.body, {id(n) for n in _counted})
+        paths = _paths(fnode.body, {id(n) for n in _counted}, cap=MAX_PATHS)
+        rep.n_paths = len(paths)
         rep.path_parameters = sorted(len(a) + len(b) for a, b in paths)
-        if rep.branch_depth > MAX_BRANCH_DEPTH:
-            bad(f"분기 깊이 {rep.branch_depth} > {MAX_BRANCH_DEPTH}. "
-                "경로별 예산이라 무한히 갈라 자리를 늘릴 수 있다 — "
-                f"중첩 `if` 는 {MAX_BRANCH_DEPTH} 단까지다")
+        if rep.n_paths > MAX_PATHS:
+            bad(f"실행 경로가 {MAX_PATHS} 개를 넘는다. "
+                "경로별 예산이라 갈라서 자리를 무한히 늘릴 수 있다 — "
+                f"경로는 {MAX_PATHS} 개까지다 (중첩 2단 · "
+                "if/elif/elif/else · 순차 if 2개가 전부 4경로다)")
         over = [n for n in rep.path_parameters if n > lim["parameters"]]
         if over:
             bad(f"실행 경로의 파라미터가 {over} 로 {lim['parameters']} 를 "

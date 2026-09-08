@@ -75,7 +75,7 @@ class TableFacts:
         def emit(text: str, support: int) -> None:
             (lines if support >= MIN_SUPPORT else withheld).append(text)
 
-        lines.append(f"학습 분할 {n}형상에서만 계산했다 (§12.3).")
+        lines.append(f"Computed on the training split only, {n} shapes (§12.3).")
 
         # ★ 여기 있던 "정답 집합의 구성" 은 **삭제됐다** (2026-08-26, §12.3).
         #
@@ -101,33 +101,34 @@ class TableFacts:
         from kernelrule.baselines.static_topk import StaticTopK
 
         res = StaticTopK(table, shapes, coverage="union").run(ks=(1, 3, 8))
-        emit("고정 config 하나로 얼마나 가는가 (형상 무관):  "
+        emit("How far one fixed config gets you (shape-independent):  "
              f"top-1 {res.by_k[1]['all']:.3f}   top-3 {res.by_k[3]['all']:.3f}"
              f"   top-8 {res.by_k[8]['all']:.3f}", n)
 
         # -- 체제별 분해. ★ 크기가 먼저다 (§30.5) --------------------------
         fast = [p for p in shapes if regime_of(p, table.hw) == "short"]
         slow = [p for p in shapes if regime_of(p, table.hw) == "long"]
-        for group, label in ((fast, "빠른 체제(SOL<0.5ms)"),
-                             (slow, "느린 체제(SOL>=0.5ms)")):
+        for group, label in ((fast, "fast regime (SOL<0.5ms)"),
+                             (slow, "slow regime (SOL>=0.5ms)")):
             if not group:
                 continue
             r = StaticTopK(table, group, coverage="union").run(ks=(1,))
-            emit(f"  {label} {len(group):2d}형상만: top-1 "
+            emit(f"  {label}, {len(group):2d} shapes only: top-1 "
                  f"{r.by_k[1]['all']:.3f}", len(group))
 
         # -- 정답의 뾰족함 — 노이즈 안에서 순위가 사라지는 형상 -------------
         n_flat = sum(1 for p in shapes if int(table.answer_mask(p).sum()) > 1)
-        emit(f"정답이 하나로 정해지지 않는 형상(노이즈 안 동률): "
-             f"{n_flat}/{n}개", n)
+        emit(f"Shapes with no single answer (ties inside the noise): "
+             f"{n_flat}/{n}", n)
         sizes = np.array([int(table.answer_mask(p).sum()) for p in shapes])
-        emit(f"  동률 폭 중앙값 {int(np.median(sizes))}개, 최대 "
-             f"{int(sizes.max())}개", n)
+        emit(f"  tie width: median {int(np.median(sizes))}, max "
+             f"{int(sizes.max())}", n)
 
         if withheld:
-            lines.append(f"★ 제시하지 못한 관찰 {len(withheld)}건 "
-                         f"(지지 형상 {MIN_SUPPORT}개 미만이거나 컬럼 부재). "
-                         "조용히 빠지지 않는다 (§26.4).")
+            lines.append(f"★ {len(withheld)} observations were withheld "
+                         f"(fewer than {MIN_SUPPORT} supporting shapes, or a "
+                         "missing column). They do not disappear silently "
+                         "(§26.4).")
 
         return cls(lines=tuple(lines), n_shapes=n, by_feature=by_feature,
                    withheld=tuple(withheld))

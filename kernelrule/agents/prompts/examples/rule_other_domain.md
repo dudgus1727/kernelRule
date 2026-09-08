@@ -1,33 +1,33 @@
-## 규칙 예시 — ★ 다른 도메인의 것입니다
+## Rule example — ★ from a different domain
 
-아래는 **이 문제와 무관한 도메인**(캐시 교체 정책 선택)의 점수 함수
-예시입니다. **항이 왜 그 자리에 있는지**와 **형태**만 보세요.
-여기 나온 개념을 GEMM 에 옮기려 하지 마세요.
+Below is a scoring function from a **domain unrelated to this problem**
+(choosing a cache replacement policy). Look only at **why each term is there**
+and at **the shape**. Do not carry these concepts over to GEMM.
 
 ```python
 def score(f, p, hw, w):
-    # 재참조 거리 — 상한이 없어 로그로 압축한다
-    s = np.log2(f.<재참조거리>) * w[0]
-    # 오염 비율 — 이미 [0,1] 이라 그대로
-    s = s + f.<오염비율> * w[1]
-    # 메타데이터 초과 — 이진. 켜지면 자릿수가 달라지므로 크게 출발
-    s = s + f.<메타초과> * w[2]
-    # ★ 체제에 따라 **다른 물리**를 본다 (재가중이 아니라 선택)
-    s = s + np.where(p.<작업부하비율> < 1,
-                     f.<지연민감축>, f.<대역폭축>) * w[3]
+    # re-reference distance — unbounded, so compress with a log
+    s = np.log2(f.<re-reference distance>) * w[0]
+    # pollution ratio — already [0,1], leave it
+    s = s + f.<pollution ratio> * w[1]
+    # metadata overflow — binary. Switching it on changes magnitude, start large
+    s = s + f.<metadata overflow> * w[2]
+    # ★ look at **different physics** per regime (selection, not re-weighting)
+    s = s + np.where(p.<workload ratio> < 1,
+                     f.<latency-sensitive axis>, f.<bandwidth axis>) * w[3]
     return s
 ```
 
-전달하려는 것:
+What this is meant to convey:
 
 ```
-로그 압축을 언제 쓰는가        범위가 큰 항
-이진 항의 초기 가중치           켜지면 자릿수가 달라지므로 크게
-★ 재가중과 선택의 차이
-    if p.x:  s += f.a * w[i]              같은 물리를 더/덜 본다
-    np.where(p.x < 1, f.a, f.b) * w[i]    ★ 다른 물리를 본다
-항마다 한 줄 주석              `changes` 에 쓸 내용의 형태
+when to use log compression   for wide-range terms
+initial weight of a binary term  large, since switching it on changes magnitude
+★ re-weighting vs selection
+    if p.x:  s += f.a * w[i]              see the same physics more/less
+    np.where(p.x < 1, f.a, f.b) * w[i]    ★ see different physics
+one comment per term          the shape of what goes into `changes`
 ```
 
-**자리표시자를 실제 이름으로 바꿔 쓰세요.** 위 코드를 그대로 제출하면
-거부됩니다.
+**Replace the placeholders with real names.** Submitting the code above as is
+will be rejected.

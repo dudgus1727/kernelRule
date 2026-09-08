@@ -87,7 +87,8 @@ def test_rule_writers_get_the_budget():
         for b in (8, 16):
             body = assemble_instructions(role, objective="rank", parameters=b,
                                          hw_file=FROZEN_HW)
-            assert f"항 상한 {b}개" in body or f"{b} 이하" in body, (
+            assert (f"{b} per execution path" in body
+                    or f"at most {b}" in body), (
                 f"{role}: 예산 {b} 이 안 보인다")
 
 
@@ -101,7 +102,7 @@ def test_architect_does_not_get_the_edit_block():
     받으면 정면으로 모순이다 (§30.10)."""
     assert "rule_writer" not in _EDITS_RULES
     body = _instructions("rule_writer")
-    assert "점수 없음" in body, "역할 파일이 바뀌었다 — 검사가 무의미하다"
+    assert "no scores" in body, "the role file changed — this check is moot"
     assert "regret` = " not in body, "RuleWriter 에 regret 정의가 샜다"
 
 
@@ -112,9 +113,9 @@ def test_optimizer_gets_the_edit_block():
     이므로 "regret` = " 를 찾으면 안 된다 — **절이 있는가**로 본다.
     """
     body = _instructions("rule_editor")
-    assert "## 채점 방식" in body and "실제로 거부된 것들" in body
+    assert "## How you are scored" in body and "actually got rejected" in body
     assert "{objective_block}" not in body, "자리표시자가 안 채워졌다"
-    assert "낮을수록 좋습니다" in body
+    assert "Lower is better" in body
 
 
 def test_objective_block_differs_and_only_for_the_editor():
@@ -198,7 +199,7 @@ def test_feature_examples_are_from_another_domain():
 
 @pytest.mark.parametrize("role", ROLES)
 def test_every_role_gets_the_base(role):
-    assert "측정값은 배포 시점에 없습니다" in _instructions(role)
+    assert "Measurements are not available at deployment time" in _instructions(role)
 
 
 def test_hw_block_does_not_reference_cases():
@@ -206,9 +207,9 @@ def test_hw_block_does_not_reference_cases():
     안 받는다. "사례에 붙은 ... 을 보세요" 는 없는 것을 가리킨다 (§30.10).
     """
     hw = load_prompt(FROZEN_HW)
-    assert "사례에 붙은" not in hw
+    assert "사례에 붙은" not in hw     # ★ 얼린 파일이라 한글이다 (D-113)
     arch = _instructions("rule_writer")
-    assert "사례 없음" in arch, "역할 파일이 바뀌었다 — 검사가 무의미하다"
+    assert "no cases" in arch, "the role file changed — this check is moot"
 
 
 def test_analyst_gets_hardware_facts_from_the_report_not_a_file():
@@ -342,7 +343,7 @@ def test_examples_differ_by_condition():
     f2 = _feature_prompt("F2")
     assert "branch_divergence_cost" in f1 and "queue_backlog" in f1
     assert "branch_divergence_cost" not in f2
-    assert "def tail_waste" in f2 and "다시 만들지 마세요" in f2
+    assert "def tail_waste" in f2 and "Do not rebuild" in f2
 
 
 def test_areas_are_fixed_and_do_not_name_features():
@@ -484,4 +485,68 @@ def test_rule_examples_keep_placeholders():
     for f in ("examples/rule_known.md", "examples/rule_other_domain.md"):
         body = load_prompt(f)
         assert "<" in body and ">" in body, f"{f} 에 자리표시자가 없다"
-        assert "재가중" in body and "선택" in body, f"{f} 에 둘의 차이가 없다"
+        assert "re-weighting" in body and "selection" in body, (
+            f"{f} does not show the difference between the two")
+
+
+def test_no_korean_on_the_llm_path():
+    """★ LLM 에 나가는 것은 **영어만** (D-146).
+
+    한글은 토큰이 비싸다 — 실측으로 `rule_editor` 입력이 글자당 1.08 토큰
+    (한글 비율 32.8%) 이었고 순수 영어면 3.5~4 자당 1 토큰이다. 15실행 x
+    12라운드 기준 약 100만 토큰(총 부하의 20~25%) 차이다.
+
+    ⚠️ `docs/` 는 한글을 유지한다 — 사람이 읽는 것이고 LLM 에 안 나간다.
+    """
+    import json
+    import re
+
+    from kernelrule.agents.openai_client import (
+        assemble_instructions,
+        load_prompt,
+    )
+
+    KO = re.compile(r"[가-힣]")
+    bad: list[str] = []
+
+    # (1) 조립된 시스템 프롬프트 넷
+    for role in ("analyze", "feature", "rule_writer", "rule_editor"):
+        kw: dict = {"objective": "regret", "parameters": 8}
+        if role == "rule_writer":
+            kw["hw_text"] = "GPU: TEST\n"
+        hits = KO.findall(assemble_instructions(role, **kw))
+        if hits:
+            bad.append(f"시스템 프롬프트 {role}: {''.join(hits[:20])}")
+
+    # (2) 프롬프트 파일 — ★ `hw/sm_86.md` 는 **얼린 파일**이라 뺀다 (D-113).
+    #     옛 실행의 조건 기록이고 지금 LLM 경로에 안 쓰인다.
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
+    for f in sorted(root.rglob("*.md")):
+        if f.name == "sm_86.md":
+            continue
+        hits = KO.findall(load_prompt(str(f.relative_to(root))))
+        if hits:
+            bad.append(f"{f.relative_to(root)}: {''.join(hits[:20])}")
+
+    # (3) 출력 스키마의 description
+    from kernelrule.agents import schemas as S
+    if S.HAVE_PYDANTIC:
+        for name in ("AnalysisOutput", "CategoryOutput", "CritiqueOutput"):
+            js = json.dumps(getattr(S, name).model_json_schema(),
+                            ensure_ascii=False)
+            hits = KO.findall(js)
+            if hits:
+                bad.append(f"스키마 {name}: {''.join(hits[:20])}")
+        js = json.dumps(S.rule_output_for(8).model_json_schema(),
+                        ensure_ascii=False)
+        if (hits := KO.findall(js)):
+            bad.append(f"스키마 RuleOutput: {''.join(hits[:20])}")
+
+    # (4) 피처 블록 — 규칙 프롬프트에 통째로 들어간다
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.features import REGISTRY, render_features
+    if (hits := KO.findall(render_features(REGISTRY, include_observed=False))):
+        bad.append(f"피처 블록: {''.join(hits[:20])}")
+
+    assert not bad, "LLM 경로에 한글이 있다:\n  " + "\n  ".join(bad)

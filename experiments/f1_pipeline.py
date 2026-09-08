@@ -152,18 +152,19 @@ def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
     """이번 제안의 지시. 영역이 있으면 그 영역 안에서 만들게 한다."""
     if cat is None:
         made = sorted(set(gen._items) - set(base._items))
-        tail = (f"\n\n지금까지 만든 것: {made}. 이것들과 다른 축을 찾으세요."
-                if made else "")
-        return "## 이번에 만들 것\n\n피처 하나를 제안하세요." + tail
+        tail = (f"\n\nBuilt so far: {made}. Find an axis different from "
+                "these." if made else "")
+        return "## What to build now\n\nPropose one feature." + tail
     desc = next(c["description"] for c in cats if c["name"] == cat)
     mine = made_in.get(cat, [])
     other = sorted(set(gen._items) - set(base._items) - set(mine))
-    return (f"## 이번에 만들 것\n\n**영역: `{cat}`** — {desc}\n\n"
-            f"이 영역의 물리량을 하나 제안하세요.\n\n"
-            f"```\n이 영역에서 이미 만든 것: {mine or '없음'}\n"
-            f"다른 영역의 것(중복 판정 참고): {other or '없음'}\n```\n\n"
-            "★ **이 영역 안에서** 만드세요. 다른 영역으로 넘어가면 그 영역의\n"
-            "차례에 만들 것이 없어집니다.")
+    return (f"## What to build now\n\n**Area: `{cat}`** — {desc}\n\n"
+            f"Propose one physical quantity in this area.\n\n"
+            f"```\nalready built in this area: {mine or 'none'}\n"
+            f"from other areas (for duplicate checking): {other or 'none'}\n"
+            "```\n\n"
+            "★ Stay **within this area**. Wandering into another area leaves "
+            "nothing to build\nwhen that area's turn comes.")
 
 
 #: RuleWriter 산출물이 정적 검사에 걸릴 때 몇 번까지 다시 부를까.

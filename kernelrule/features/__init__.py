@@ -303,12 +303,12 @@ def render_features(registry: FeatureRegistry, *,
         return f.describe_with(include_observed=include_observed,
                                extra=tuple(extra.get(f.name, ())))
 
-    h_shape = ("## 형상 수준 — `p.<이름>` 으로만 접근한다. "
-               "스칼라라서 `if p.<이름>:` 분기 가능")
-    h_cfg = ("## config 수준 — `f.<이름>` 으로만 접근한다. "
-             "**배열이다** (`if` 금지, ValueError)")
-    tail = ("★ 접두사를 바꿔 쓰면 즉시 거부된다. `p.` 목록에 없는 이름을 "
-            "`p.` 로 쓰거나 그 반대도 마찬가지다.")
+    h_shape = ("## Shape level — access only as `p.<name>`. "
+               "Scalars, so `if p.<name>:` is allowed")
+    h_cfg = ("## Config level — access only as `f.<name>`. "
+             "**Arrays** (no `if`, raises ValueError)")
+    tail = ("★ Swapping the prefix is rejected immediately. Using a name "
+            "that is not in the `p.` list as `p.`, or the reverse.")
     out = [h_shape, *(line(f) for f in shape),
            "", h_cfg, *(line(f) for f in cfg), "", tail]
     return "\n".join(out)

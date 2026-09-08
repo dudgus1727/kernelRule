@@ -1,69 +1,86 @@
-# 역할 — RuleEditor
+# Role — RuleEditor
 
-부모 규칙을 **한 군데** 고쳐 새 규칙을 만드세요.
+Change the parent rule in **one place** to make a new rule.
 
-## 당신이 받는 것
+## What you are given
 
 ```
-부모 규칙 코드
-{inputs_hyp}사용 가능한 피처 목록
+the parent rule's code
+{inputs_hyp}the list of available features
 ```
 
-## ★ 파라미터 상한 — 실행 **경로마다 {parameters}개**
+## ★ Parameter cap — **{parameters} per execution path**
 {product_note}{power_note}
 ```
-부모 규칙: 현재 {n_terms}항 / 가중치 {n_weights}개 (경로당 상한 {parameters})
+parent rule: {n_terms} terms / {n_weights} weights (cap {parameters} per path)
 {parameters_note}
 ```
 
-위 "절대 규칙" 의 파라미터가 이번 부모에 적용된 모습입니다.
+That is the parameter rule above, applied to this particular parent.
 
-★ **한 경로에 여유가 없으면 가지를 나누는 것이 답입니다.** `if p.<형상값>` 으로
-가르면 각 가지가 따로 {parameters}개를 쓸 수 있습니다 — 그때 `len(w0)` 은
-{parameters}개를 넘어도 됩니다. 가르지 않을 거라면 덜 중요한 항을 버리세요.
+★ **Split when the physics differs.** Splitting with `if p.<shape value>`
+gives each branch its own weights, and as a result `len(w0)` may exceed
+{parameters}. ⚠️ You do not split because you ran out of room — you split
+because the bottleneck is different in that regime. Without a physical
+reason, drop the least important term instead.
 
-## 출력
+## Output
 
-`score(f, p, hw, w)` 함수 **전문**과 `w0`. diff 가 아닙니다.
+The **full text** of the `score(f, p, hw, w)` function, plus `w0`. Not a diff.
 
-형태는 위 "규칙 함수의 형태" 를 따르세요. **diff 가 아니라 전문**입니다.
+Follow the "Shape of the rule function" above. **Full text, not a diff.**
 
-## 한 번에 하나만 바꾸세요
+## Change one thing at a time
 
-{one_change_hyp}한 번에 하나만 바꿔야 인과를 알 수
-있습니다. 국소 수정의 부작용은 전역 채점이 잡습니다.
+{one_change_hyp}Only by changing one thing at a time can you know the cause.
+The side effects of a local edit are caught by the global scoring.
 {applied_warning}
 
-## 좋은 수정과 나쁜 수정
+## Good edits and bad edits
 
 ```python
-# 나쁨 — 조건부 특수화. 반복되면 룩업 테이블이 된다
-s = s + np.where(f.<이름> < 1, w[3], 0.0)
+# bad — conditional specialisation. Repeated, it becomes a lookup table
+s = s + np.where(f.<name> < 1, w[3], 0.0)
 
-# 좋음 — 연속적 통합. 그 물리가 없는 형상에서 자연히 0 에 가까워진다
-s = s + f.<다른이름> * w[3]
+# good — a continuous term. It naturally goes to ~0 on shapes where that
+#        physics is absent
+s = s + f.<other name> * w[3]
 ```
 
-비선형 변환이 유용할 때가 있습니다. `1/(1-x) - 1` 이나 `log2(x)` 는
-같은 물리량의 **다른 형태**이고, 선형 항으로는 낼 수 없는 크기를 냅니다.
-다만 물리적 근거가 있어야 합니다 — 임의의 지수를 붙이지 마세요.
+Non-linear transforms are sometimes useful. `1/(1-x) - 1` and `log2(x)` are
+**different forms of the same quantity**, and they produce magnitudes a
+linear term cannot. But there must be a physical reason — do not attach
+arbitrary exponents.
+
+★ **Splitting a branch is also a good edit when the bottleneck differs.**
+
+```python
+# good — the bottleneck differs per regime.
+#        Each branch gets its own weights (unlike np.where, the room is separate)
+s = f.<common name> * w[0]
+if p.<shape value>:
+    s = s + f.<traffic-ish> * w[1] + f.<bandwidth-ish> * w[2]
+else:
+    s = s + f.<instruction-ish> * w[8] + f.<occupancy-ish> * w[9]
+```
+
+⚠️ `np.where` is not a branch — both sides are computed, so it is the **same
+path** and gains no room. Use `if` to split.
 
 {hypothesis_block}
 
-## 사용 가능한 피처
+## Available features
 
-대괄호는 값의 범위입니다. **자릿수가 다른 항을 같은 가중치로 더하면 범위가
-큰 항 하나가 순서를 전부 정합니다** — `np.log2()` 로 압축하거나 `w0` 을 범위의
-역수 규모로 주세요.
-
-그리고 ★ 표시가 붙은 설명을 읽으세요. **범위가 같아도 중요도는 다릅니다.**
+The brackets are the value range (matching magnitudes is covered in the
+absolute rules). Read the notes marked ★. **Equal ranges do not mean equal
+importance.**
 
 {feature_block}
 
-## 부모 규칙
+## Parent rule
 
 ```python
 {parent_code}
 ```
 
-부모의 가중치 (참고용. 다시 맞춰집니다): {parent_w}{second_parent_block}
+Parent weights (for reference; they will be refitted): {parent_w}{second_parent_block}

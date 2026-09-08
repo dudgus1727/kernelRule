@@ -278,11 +278,11 @@ def _feature_task(text: str) -> str:
     사례 번호도 점수도 형상 목록도 없다. 물리 요구 한 문장뿐이다 —
     루프 안에서 만든 피처가 학습 형상에 맞춰지는 통로를 막는다.
     """
-    return ("## 이번에 만들 것\n\n"
-            "아래 물리량을 재는 피처 하나를 만드세요.\n\n"
+    return ("## What to build now\n\n"
+            "Build one feature that measures the quantity below.\n\n"
             f"> {text}\n\n"
-            "이 문장 말고 다른 맥락은 없습니다. 표도 사례도 보지 않고, "
-            "**물리에서 유도**하세요.")
+            "There is no context beyond this sentence. You see no table and "
+            "no cases — **derive it from physics**.")
 
 
 @dataclass

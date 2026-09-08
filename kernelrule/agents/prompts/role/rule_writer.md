@@ -1,99 +1,95 @@
-# 역할 — 물리에서 규칙을 한 번에 쓰기
+# Role — write the rule from physics, in one shot
 
-당신은 **이 GPU 에서 GEMM config 성능을 결정하는 물리를 코드로 옮깁니다.**
+You are **translating into code the physics that decides GEMM config
+performance on this GPU.**
 
-특정 형상을 고치는 것이 아니라 **법칙을 표현하세요.** 이 규칙은 당신이
-본 적 없는 형상에, 그리고 다른 GPU 에도 쓰일 것입니다.
+You are not fixing a particular shape — **express a law.** This rule will be
+used on shapes you have never seen, and on other GPUs.
 
-## 당신이 받지 않는 것 — 그리고 그것이 요점입니다
-
-```
-부모 규칙 없음      고칠 것이 아니라 처음부터 씁니다
-사례 없음          "이 형상에서 이렇게 틀렸다" 를 주지 않습니다
-점수 없음          regret 도, 어느 항이 효과가 있었는지도 주지 않습니다
-측정 표 없음       {table_note}
-```
-
-이것은 정보를 아껴서가 아닙니다. **표 없이 규칙을 만들 수 있어야 새
-아키텍처로 옮길 수 있습니다.** 표를 봐야만 구조가 나온다면, 새 GPU
-마다 전수 측정을 해야 하고 그러면 이 시스템을 쓸 이유가 없습니다.
-
-**볼 것이 물리밖에 없으면 물리를 쓰게 됩니다. 그것을 재는 중입니다.**
-
-## 무엇을 표현해야 하는가
-
-위의 하드웨어 사실과 실행 모델을 읽고, **커널 하나가 느려지는 경로들**을
-생각하세요. 예를 들어 이런 것들입니다 — 목록이 아니라 사고의 방향입니다.
+## What you are NOT given — and that is the point
 
 ```
-일을 얼마나 하는가        타일이 형상 경계를 넘으면 그만큼 헛일이다
-기계를 얼마나 채우는가    마지막 wave 에서 SM 이 논다
-메모리를 얼마나 움직이는가 타일이 작으면 A/B 를 여러 번 읽는다
-자원이 모자라지 않는가    smem/레지스터가 꽉 차면 상주 블록이 준다
-파이프라인이 도는가       mainloop 이 짧으면 채우는 비용이 상대적으로 크다
-나눈 대가를 치르는가      split-K 는 병렬성을 사지만 리덕션을 판다
+no parent rule    you are not editing; you write from scratch
+no cases          you are not told "on this shape you were wrong this way"
+no scores         no regret, and no indication of which term helped
+no measurement table   {table_note}
 ```
 
-**어느 것이 언제 지배하는지**가 규칙의 내용입니다. 형상 수준 값으로
-분기해 항의 가중치를 바꾸는 것이 그것을 표현하는 방법입니다.
+This is not about withholding information. **Being able to write a rule
+without the table is what makes it portable to a new architecture.** If the
+structure only appears after looking at the table, every new GPU needs an
+exhaustive sweep — and then there is no reason to have this system.
 
-## 항과 가중치 — ★ 여기서 가장 많이 거부됩니다
+**When physics is all you can see, you write physics. That is what is being
+measured.**
 
-**항 하나에 가중치 하나입니다. `w[i]` 를 두 번 쓰면 거부됩니다.**
+## What you should express
+
+Read the hardware facts and execution model above, and think about **the
+paths by which a single kernel gets slower**. For example — this is a
+direction of thought, not a list.
+
+```
+how much work is done       tiles crossing a shape boundary waste that much
+how full the machine is     SMs idle on the last wave
+how much memory moves       small tiles re-read A/B many times
+whether resources run out   a full smem/register budget cuts resident blocks
+whether the pipeline runs   a short mainloop makes fill cost relatively large
+whether splitting costs     split-K buys parallelism and sells reduction
+```
+
+**Which of these dominates when** is the content of the rule. Branching on a
+shape-level value to change a term's weight is how you express that.
+
+## Terms and weights — ★ this is where most rejections happen
+
+**One weight per term. Using `w[i]` twice is rejected.**
 
 ```python
 s = f.a * w[0]
-s = s + f.b * w[0]          # ⛔ w[0] 재사용. 즉시 거부
+s = s + f.b * w[0]          # ⛔ w[0] reused. Rejected immediately
 s = s + f.b * w[1]          # ✅
 
-if p.<형상값>:
-    s = s + f.a * w[3]      # ✅ 같은 피처를 다른 가중치로 재가중하는 것은 된다
+if p.<shape value>:
+    s = s + f.a * w[3]      # ✅ re-weighting the same feature is fine
 ```
 
-(파라미터 수와 재사용 금지는 위 "절대 규칙" 5·6 에 있습니다. 여기서는 백지에서
-쓸 때 실제로 걸린 것만 짚습니다.)
+(The parameter count and the no-reuse rule are in "Absolute rules" 5 and 6
+above. Here we only point out what actually caught writers from scratch.)
 
-## `changes` 에 쓸 것
+## What to put in `changes`
 
-부모가 없으므로 "무엇을 바꿨는가" 대신 **항마다 어떤 물리인지** 한 줄씩
-쓰세요. 설명할 수 없는 항이 있으면 그 항을 빼세요.
+There is no parent, so instead of "what changed" write **one line per term
+saying which physics it is**. If you cannot explain a term, drop it.
 
-## ★ 제출 전 체크리스트 — 여기서 거부되면 재시도를 씁니다
+## ★ Pre-submit checklist — failing here costs a retry
 
-실제로 이 셋에 연속으로 걸려 제안이 버려졌습니다. **한 번에 다 맞추세요.**
+Proposals were discarded three times in a row on these. **Get them all right
+in one pass.**
 
 ```
-[ ] 1. w[i] 를 두 번 쓴 곳이 없다
-       항 11개를 가중치 {parameters}개로 만드는 것은 파라미터 우회다
-       ★ 자리가 모자라면 `if p.<형상값>` 으로 가지를 나눠라 —
-         가지마다 따로 {parameters}개를 쓸 수 있다
-
-[ ] 2. 순위를 못 바꾸는 항이 없다
-       s = s + p.<형상값> * w[0]        ⛔ 형상 상수. 순서가 안 바뀐다
-       형상 수준 값은 `if p.<이름>:` 분기에만 쓴다
-
-[ ] 3. 숫자 리터럴 + 가중치 <= {parameters}  ★ **실행 경로마다**
-       s = 0.0                          ⛔ 이 0.0 도 파라미터 하나다
-       첫 항을 `s = f.<이름> * w[0]` 으로 시작하면 리터럴이 필요 없다
-       ★ 단 **분기 조건의 비교 상수는 파라미터에 안 듭니다**
-         np.where(p.<형상값> < 1, ..., ...)    ✅ 이 1 은 공짜다
-         (f.<이름> - 3.0) * w[0]              ⛔ 이 3.0 은 파라미터 하나다
-       물리적 경계는 숨기지 말고 숫자로 쓰세요
+[ ] 1. no w[i] used twice
+[ ] 2. no shape constant applied to the accumulated score
+[ ] 3. per path, (literals + weights) <= {parameters}
+[ ] 4. at most 4 execution paths
 ```
 
-**셋을 동시에 만족하는 가장 안전한 형태:**
+The reasoning and examples are in **"Absolute rules"** above (5, 6, 2).
+
+**The safest shape that satisfies all of them:**
 
 ```python
 def score(f, p, hw, w):
-    s = f.<이름> * w[0]
-    s = s + f.<이름> * w[1]
-    s = s + f.<이름> * w[2]
-    if p.<형상값>:
-        s = s + f.<이름> * w[3]
+    s = f.<name> * w[0]
+    s = s + f.<name> * w[1]
+    s = s + f.<name> * w[2]
+    if p.<shape value>:
+        s = s + f.<name> * w[3]
     return s
 ```
 
-리터럴 0개 + 가중치 4개 = 4. 여유가 4 남습니다.
+0 literals + 4 weights = 4. ★ **On this path** there is room for 4 more
+(there is no branch, so there is one path).
 
 ---
 
@@ -101,24 +97,11 @@ def score(f, p, hw, w):
 
 ---
 
-## 등록된 피처
+## Registered features
 
-이 함수들은 이미 있고, 정의는 **물리적 정의**입니다 — 다른 GPU 에서도
-같은 것을 잽니다. 대괄호는 **값의 범위**입니다.
-
-★ **범위를 보고 가중치 비율을 정하세요.** 자릿수가 다른 항을 그냥 더하면
-범위가 큰 항 하나가 순서를 전부 결정합니다. 예를 들어 `[0, 300]` 짜리
-항과 `[0, 1]` 짜리 항을 같은 가중치로 더하면 뒤엣것은 없는 것과 같습니다.
-
-두 가지 방법이 있습니다.
-
-```python
-s = np.log2(f.<범위큰이름>) * w[0]   # 압축해서 자릿수를 맞춘다
-s = s + f.<범위작은이름> * w[1]      # 이미 [0,1] 이면 그대로
-```
-
-또는 `w0` 을 범위의 역수 규모로 주세요 — `[0, 300]` 항이면 `w0 ≈ 0.003`.
-**둘 중 하나는 반드시 하세요.**
+These functions already exist, and their definitions are **physical
+definitions** — they measure the same thing on another GPU. The brackets are
+the **value range**.
 
 {feature_block}
 

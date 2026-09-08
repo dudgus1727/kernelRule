@@ -1,34 +1,62 @@
-## 규칙 예시 — ★ **위 목록의 피처로** 만든 것입니다
+## Rule example — ★ built **from the feature list above**
 
-아래는 형태 예시입니다. **그대로 제출하지 말고**, 항이 왜 그 자리에
-있는지를 보세요. 일부는 자리표시자입니다.
+This is a shape example. **Do not submit it as is** — look at why each term
+is where it is. Some names are placeholders.
 
 ```python
 def score(f, p, hw, w):
-    # 트래픽 — 상한이 없어 로그로 압축한다
-    s = np.log2(f.<범위 큰 트래픽 축>) * w[0]
-    # wave 양자화 — 이미 [0,1] 이라 그대로
+    # traffic — unbounded, so compress with a log
+    s = np.log2(f.<wide-range traffic axis>) * w[0]
+    # wave quantisation — already [0,1], leave it
     s = s + f.tail_waste * w[1]
-    # 스필 — 이진. 켜지면 자릿수가 달라지므로 큰 가중치로 출발한다
+    # spill — binary. Switching it on changes the magnitude, so start large
     s = s + f.has_spill * w[2]
-    # 자원 압력
+    # resource pressure
     s = s + f.occupancy_deficit * w[3]
-    # ★ 체제에 따라 **다른 물리**를 본다 (재가중이 아니라 선택)
+    # ★ look at **different physics** per regime (selection, not re-weighting)
     s = s + np.where(p.roofline_ratio < 1,
-                     f.<메모리 쪽 축>, f.<연산 쪽 축>) * w[4]
+                     f.<memory-side axis>, f.<compute-side axis>) * w[4]
     return s
 ```
 
-전달하려는 것:
+What this is meant to convey:
 
 ```
-로그 압축을 언제 쓰는가        범위가 큰 항 (edge_waste 는 [0,300] 이다)
-이진 항의 초기 가중치           켜지면 자릿수가 달라지므로 크게
-★ 재가중과 선택의 차이
-    if p.x:  s += f.a * w[i]              같은 물리를 더/덜 본다
-    np.where(p.x < 1, f.a, f.b) * w[i]    ★ 다른 물리를 본다
-항마다 한 줄 주석              `changes` 에 쓸 내용의 형태
+when to use log compression   for wide-range terms (edge_waste is [0,300])
+initial weight of a binary term  large, since switching it on changes magnitude
+★ re-weighting vs selection
+    if p.x:  s += f.a * w[i]              see the same physics more/less
+    np.where(p.x < 1, f.a, f.b) * w[i]    ★ see different physics
+one comment per term          the shape of what goes into `changes`
 ```
 
-**설명할 수 없는 항은 빼세요.** 위 예시의 다섯 항은 각각 한 줄로
-설명됩니다 — 그것이 기준입니다.
+**Drop any term you cannot explain.** Each of the five terms above is
+explained in one line — that is the bar.
+
+## ★ The split form — each branch has its own weights
+
+When the bottleneck differs, split with `if`. **This differs from
+`np.where`** — `np.where` computes both sides, so it is one path and gains no
+room, while `if` splits the path and **each branch spends its own
+parameters.**
+
+```python
+def score(f, p, hw, w):
+    # common — belongs to every path
+    s = np.log2(f.<wide-range traffic axis>) * w[0]
+    if p.<regime shape value>:
+        # one regime: bandwidth is the bottleneck
+        s = s + f.<memory-side axis> * w[1]
+        s = s + f.tail_waste * w[2]
+    else:
+        # the other regime: instructions and occupancy are the bottleneck
+        s = s + f.<compute-side axis> * w[8]
+        s = s + f.occupancy_deficit * w[9]
+    return s
+```
+
+```
+len(w0) = 10 but only 3 per path — both are within the cap
+★ Do not split to gain room. Split only when the physics differs
+⚠️ There may be at most 4 execution paths
+```

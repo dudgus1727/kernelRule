@@ -1,33 +1,48 @@
-<!-- ★ **부모 규칙을 고치는** 역할만 받는다 (RuleEditor). RuleWriter 는
-     백지에서 쓰므로 "교체할 항" 도 "이전 점수" 도 없다 — 주면 자기
-     역할 파일의 "점수 없음, regret 도 주지 않습니다" 와 모순된다. -->
+<!-- ★ Only the role that **edits a parent rule** receives this (RuleEditor).
+     RuleWriter writes from scratch, so there is no "term to replace" and no
+     "previous score" — giving it this file contradicts its own role file
+     ("no scores, and no regret either"). -->
 
-## 채점 방식
+## How you are scored
 
 {objective_block}
 
-주어진 사례 몇 개는 **진단을 위한 창**이지 암기할 목록이 아닙니다.
+The few cases you are given are a **window for diagnosis**, not a list to
+memorise.
 
-## ★ 실제로 거부된 것들 — 이렇게 쓰면 버려집니다
+## ★ What actually got rejected — write it this way and it is discarded
 
-### 1. 가중치 재사용으로 항을 늘리는 것 (가장 흔했다)
+### 1. Adding terms by reusing a weight (the most common one)
 
 ```python
-# ⛔ 거부: 가중치 {parameters}개로 항 19개를 만들었다
-s = s + f.<이름A> * w[0]
-s = s + f.<이름B> * w[0]      # w[0] 재사용
-s = s + f.<이름C> * w[0]      # 또
+# ⛔ rejected: 19 terms built out of {parameters} weights
+s = s + f.<nameA> * w[0]
+s = s + f.<nameB> * w[0]      # w[0] reused
+s = s + f.<nameC> * w[0]      # again
 ```
 
-### 2. 가중치를 {parameters}개 넘게 내는 것
+### 2. Using more than {parameters} parameters on one path
 
-`w0` 의 길이가 9 이상이면 즉시 거부됩니다.
+★ `len(w0)` **itself may exceed {parameters}** — if you split. What gets
+rejected is ★ **one execution path** whose (literals + weights) exceeds
+{parameters}.
 
-### 3. 코드가 너무 긴 것
+```python
+# ✅ accepted: <= {parameters} per path. len(w0) is larger than that
+s = f.<nameA> * w[0]                       # common — belongs to every path
+if p.<shape value> < 1:
+    s = s + f.<nameB> * w[1] + ...         # the rest of this path's room
+else:
+    s = s + f.<nameC> * w[8] + ...         # the rest of that path's room
+```
 
-AST 노드 {ast_nodes}개가 상한입니다. 항 {parameters}개 정도면 넉넉히 들어갑니다.
-그보다 길어졌다면 특수 케이스를 늘리고 있다는 신호입니다.
+(The path cap itself is in the absolute rules above.)
 
-### 4. 형상 상수를 누적 점수에 곱하거나 더하는 것
+### 3. Code that is too long
 
-절대 규칙 2 를 다시 보세요. **순위가 하나도 안 바뀝니다.**
+The cap is {ast_nodes} AST nodes. About {parameters} terms fits comfortably.
+Going past it is a sign that you are piling up special cases.
+
+### 4. Multiplying or adding a shape constant to the accumulated score
+
+Re-read absolute rule 2. **It changes no ordering at all.**

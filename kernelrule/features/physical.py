@@ -483,92 +483,111 @@ def _align_ok(p: Problem) -> bool:
 # 측정에서 나온 배수는 적지 않는다.
 
 _PHYSICS: dict[str, str] = {
-    # -- 자원 한계. 넘으면 자릿수가 바뀐다 -----------------------------------
+    # -- resource limits. A cliff, not a slope --------------------------------
     "has_spill":
-        "레지스터가 넘쳐 로컬 메모리(=DRAM)로 나간다. 레지스터 접근이 1사이클"
-        "이라면 로컬은 수백 사이클이고, mainloop 안에서 매 반복 일어난다. "
-        "★ 켜지면 다른 어떤 이점도 상쇄하기 어렵다 — 가장 큰 벌점을 줘라",
+        "Registers overflow into local memory (= DRAM). If a register access "
+        "is one cycle, local is hundreds, and it happens every mainloop "
+        "iteration. ★ Once it is on, no other advantage easily offsets it — "
+        "give it the largest penalty",
     "spill_magnitude":
-        "스필의 양(log2 바이트/4). `has_spill` 이 켜졌을 때 얼마나 나쁜지를 "
-        "가른다. 4 이면 16배 더 많은 바이트가 왕복한다",
+        "How much spilling (log2 bytes / 4). Separates how bad it is once "
+        "`has_spill` is on. A 4 means 16x more bytes round-tripping",
     "reg_pressure":
-        "블록 하나가 SM 레지스터 파일의 몇 배를 요구하는가. 1 을 넘으면 "
-        "블록이 SM 에 하나도 안 올라가거나 스필한다 — 1 근처가 절벽이다",
+        "How many times the SM register file one block demands. Above 1, no "
+        "block fits on an SM or it spills — the cliff is right around 1",
     "smem_pressure":
-        "smem 예산을 얼마나 쓰는가. 꽉 채우면 SM 당 상주 블록이 1개로 줄어 "
-        "메모리 지연을 다른 블록으로 가릴 수 없게 된다. 절벽이 아니라 계단이다",
+        "How much of the smem budget is used. Filling it drops residency to "
+        "one block per SM, so memory latency cannot be hidden behind another "
+        "block. A staircase, not a cliff",
 
-    # -- 일의 양. 선형으로 는다 ---------------------------------------------
+    # -- amount of work. Grows linearly ---------------------------------------
     "traffic_amplification":
-        "실제 A/B 트래픽 / 이론 최소치. 타일이 작으면 같은 데이터를 여러 번 "
-        "읽는다. 메모리 바운드 형상에서 시간에 거의 비례한다. ★ 값이 크므로 "
-        "log2 를 취해 쓰는 편이 다른 항과 자릿수가 맞는다",
+        "Actual A/B traffic / theoretical minimum. Small tiles re-read the "
+        "same data many times. On memory-bound shapes it is nearly "
+        "proportional to time. ★ The value is large, so taking log2 matches "
+        "its magnitude to the other terms",
     "log_dram_traffic":
-        "DRAM 에서 읽는 바이트(log2). 대역폭이 상한이면 이것이 곧 시간이다",
+        "Bytes read from DRAM (log2). When bandwidth is the ceiling, this is "
+        "the time",
     "edge_waste":
-        "타일이 형상 경계를 넘어 버려지는 일의 배수 - 1. M=1 에 128행 타일이면 "
-        "일의 99.2% 가 헛일이다. ★ 범위가 넓으니(수백) 가중치를 그만큼 작게 "
-        "주거나 포화시켜 써라",
+        "Work multiplier from tiles overhanging the shape, minus 1. A 128-row "
+        "tile on M=1 wastes 99.2% of the work. ★ The range is wide (hundreds), "
+        "so use a correspondingly small weight or saturate it",
     "log_inst_total":
-        "SASS 명령어 수(log2). 연산 바운드에서 시간의 대리 지표",
+        "SASS instruction count (log2). A proxy for time when compute-bound",
     "log_mainloop_iters":
-        "mainloop 반복 수(log2) = K/(tile_k*split_k). 작으면 파이프라인을 "
-        "채우는 비용이 상대적으로 커진다",
+        "Mainloop iterations (log2) = K/(tile_k*split_k). When small, filling "
+        "the pipeline costs relatively more",
 
-    # -- 기계를 얼마나 채우는가 ---------------------------------------------
+    # -- how full the machine is ----------------------------------------------
     "tail_waste":
-        "마지막 wave 에서 노는 SM 슬롯의 비율. 손해는 대략 1/(1-x) 배다 — "
-        "0.5 면 2배, 0.8 면 5배. ★ 선형으로 쓰면 그 크기가 안 나온다",
+        "Fraction of SM slots idle on the last wave. The loss is roughly "
+        "1/(1-x) — 2x at 0.5, 5x at 0.8. ★ Used linearly, that magnitude does "
+        "not come out",
     "sm_idle_cost":
-        "위의 비선형 형태: 1/(1-tail_waste) - 1. 실제 손해의 배수다. "
-        "tail_waste 가 1 에 가까우면 발산하므로 구현이 잘라 놓았다",
+        "The non-linear form of the above: 1/(1-tail_waste) - 1. The actual "
+        "loss multiplier. It diverges as tail_waste approaches 1, so the "
+        "implementation clips it",
     "occupancy_deficit":
-        "SM 당 스레드 슬롯 중 못 채우는 비율. 메모리 지연을 가릴 여지가 "
-        "줄어든다. 연산 바운드에서는 덜 중요하다",
+        "Fraction of per-SM thread slots that cannot be filled. Less room to "
+        "hide memory latency. Matters less when compute-bound",
     "waves":
-        "그리드가 GPU 를 몇 번 채우는가. 1 미만이면 GPU 가 놀고, 정수에 "
-        "가까울수록 마지막 wave 낭비가 적다",
+        "How many times the grid fills the GPU. Below 1 the GPU idles; the "
+        "closer to an integer, the less last-wave waste",
     "log_grid_tiles":
-        "CTA 개수(log2). 방향성이 없는 규모 지표다 — 다른 항의 조건으로 "
-        "쓰는 편이 낫다",
+        "CTA count (log2). A scale indicator with no direction — better used "
+        "as a condition on other terms",
 
-    # -- 파이프라인과 커널 계열 ---------------------------------------------
+    # -- pipelining and kernel family -----------------------------------------
     "is_two_stage":
-        "2단 파이프라인(MmaPipelined)인가. multistage 와 **다른 커널 계열**이라 "
-        "성능 특성이 통째로 다르다. cp.async 를 못 쓰면 이것만 가능하다",
+        "Is this a 2-stage pipeline (MmaPipelined)? It is a **different "
+        "kernel family** from multistage, with entirely different performance "
+        "characteristics. Without cp.async, only this is possible",
     "can_use_cp_async":
-        "정렬이 cp.async(16바이트)를 허용하는가. 0 이면 stages=2 만 가능하고 "
-        "글로벌→smem 복사에 레지스터를 거쳐야 한다",
+        "Does alignment allow cp.async (16 bytes)? At 0, only stages=2 is "
+        "possible and the global->smem copy must go through registers",
     "pipeline_warmup_frac":
-        "파이프라인 채우기가 mainloop 에서 차지하는 비율. mainloop 이 짧을수록 "
-        "크다 — stages 를 늘리는 것이 손해가 되는 지점을 가른다",
+        "Share of the mainloop spent filling the pipeline. Larger when the "
+        "mainloop is short — it marks where adding stages starts to cost",
 
-    # -- 나누는 대가 --------------------------------------------------------
+    # -- the price of splitting -----------------------------------------------
     "split_k_cost":
-        "split-K 리덕션 비용의 대리 지표. K 를 나누면 병렬성을 사지만 부분합을 "
-        "합쳐야 한다. serial 은 fp16 왕복(정밀도 손실), parallel 은 M*N*sk 를 "
-        "DRAM 에 쓰고 다시 읽는다",
+        "Proxy for the split-K reduction cost. Dividing K buys parallelism "
+        "but the partials must be combined. serial round-trips in fp16 "
+        "(precision loss); parallel writes M*N*sk to DRAM and reads it back",
     "log_workspace_bytes":
-        "parallel split-K 가 DRAM 에 쓰는 부분합 바이트(log2). serial 이면 0",
+        "Partial-sum bytes parallel split-K writes to DRAM (log2). 0 for "
+        "serial",
 
-    # -- 타일 모양 ----------------------------------------------------------
+    # -- tile shape -----------------------------------------------------------
     "tile_aspect_imbalance":
-        "타일이 얼마나 길쭉한가. |log2(tm/tn)|. 정방형이 재사용에 유리하지만 "
-        "형상이 길쭉하면 타일도 길쭉한 편이 경계 낭비가 적다",
+        "How elongated the tile is. |log2(tm/tn)|. Square is better for "
+        "reuse, but on an elongated shape an elongated tile wastes less at "
+        "the edges",
 
-    # -- 형상 수준 (분기용) -------------------------------------------------
+    # -- shape level (for branching) ------------------------------------------
     "is_memory_bound":
-        "arithmetic intensity 가 ridge point 미만인가. 그렇다면 트래픽 항이 "
-        "지배하고, 아니면 명령어 수와 상주율이 지배한다. ★ 어느 항을 무겁게 "
-        "볼지 가르는 주 분기다",
+        "Is arithmetic intensity below the ridge point? If so the traffic "
+        "terms dominate; otherwise instruction count and residency do. "
+        "★ This is the main branch for deciding which terms to weight heavily",
     "roofline_ratio":
-        "AI / ridge point. 1 미만이면 메모리 바운드. is_memory_bound 의 "
-        "연속 버전이라 경계 근처를 부드럽게 다룰 수 있다",
+        "AI / ridge point. Below 1 is memory-bound. The continuous version of "
+        "is_memory_bound, so the boundary can be handled smoothly",
     "arith_intensity":
-        "2MNK / 움직인 바이트. 형상만의 함수라 config 로 못 바꾼다",
+        "2MNK / bytes moved. A function of the shape alone, so no config can "
+        "change it",
     "log_sol_ms":
-        "roofline 하한 시간(log2 ms). **측정값이 아니라 형상에서 계산한다.** "
-        "커널이 짧을수록 타이머 눈금이 상대적으로 커져 순위가 흐려진다",
+        "Roofline lower-bound time (log2 ms). **Computed from the shape, not "
+        "measured.** The shorter the kernel, the larger the timer tick is "
+        "relatively, blurring the ordering",
+    "log_flops":
+        "log2(2*M*N*K). The absolute size of the problem",
+    "aspect_MN":
+        "log2(M/N). How elongated the shape is. 0 means square",
+    "reuse_ratio":
+        "M*N*K / (M*K + K*N + M*N). The amount of data reuse",
+    "log_min_dim":
+        "log2(min(M,N,K)). The shortest axis — separates skinny shapes",
 }
 
 for _name, _text in _PHYSICS.items():

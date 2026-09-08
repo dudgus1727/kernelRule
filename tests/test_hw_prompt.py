@@ -77,7 +77,7 @@ def test_generated_prompt_matches_its_bundle(bundle, env_hash):
     txt, facts = hw_prompt_from_bundle(bundle, env_hash=env_hash, table=t)
     check_hw_prompt(txt, t.hw, float(t.noise.tick_ms))
     assert facts["arch"] == t.hw.arch
-    assert f"{t.hw.sm_count}개" in txt
+    assert f"SMs        {t.hw.sm_count}" in txt
     assert f"{t.hw.ridge_point:.1f} FLOP/byte" in txt
 
 
@@ -91,9 +91,11 @@ def test_generated_a6000_prompt_reproduces_the_frozen_numbers():
 
     txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
                                    table=_table(*A6000))
-    for want in ("84개", "101,376 B", "6 MB", "116.1 TFLOP/s",
-                 "729.7 GB/s", "159.1 FLOP/byte", "눈금(1.024 us)"):
-        assert want in txt, f"옛 파일의 {want!r} 를 재현 못 한다"
+    # ★ 2026-09-08 (D-146): 프롬프트가 영어가 됐다. **재현해야 하는 것은
+    #   숫자**이므로 숫자만 본다 — 옛 파일(`hw/sm_86.md`)은 얼려 뒀다.
+    for want in ("SMs        84", "101,376 B", "6 MB", "116.1 TFLOP/s",
+                 "729.7 GB/s", "159.1 FLOP/byte", "tick (1.024 us)"):
+        assert want in txt, f"cannot reproduce {want!r} from the frozen file"
 
 
 # ---------------------------------------------------------------------------
@@ -157,12 +159,12 @@ def test_tick_advisory_follows_which_term_binds():
                                   table=_table(*G5090))
 
     assert fa["tick_binds"] is True and fg["tick_binds"] is False
-    # A6000 — 눈금이 한계다
-    assert "눈금 안의 차이는 존재하지 않는 것과 같습니다" in a
-    assert "이 표에서는 눈금이 한계가 아닙니다" not in a
-    # 5090 — 눈금이 한계가 아니다
-    assert "이 표에서는 눈금이 한계가 아닙니다" in g
-    assert "눈금 안의 차이는 존재하지 않는 것과 같습니다" not in g
+    # A6000 — the tick binds
+    assert "A difference inside one tick may as well not exist" in a
+    assert "the tick is not the limit" not in a
+    # 5090 — the tick does not bind
+    assert "the tick is not the limit" in g
+    assert "A difference inside one tick may as well not exist" not in g
 
 
 def test_both_noise_terms_are_shown():
@@ -172,8 +174,8 @@ def test_both_noise_terms_are_shown():
     for bundle, env_hash in (A6000, G5090):
         txt, _ = hw_prompt_from_bundle(bundle, env_hash=env_hash,
                                        table=_table(bundle, env_hash))
-        assert "눈금 " in txt and "통계 " in txt
-        assert "노이즈 바닥은 두 항 중 **큰 쪽**이다" in txt
+        assert "tick " in txt and "statistical " in txt
+        assert "The noise floor is the **larger** of two terms" in txt
 
 
 def test_binding_term_is_recorded_as_a_condition():

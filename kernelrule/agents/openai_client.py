@@ -131,8 +131,9 @@ def _rule_example_for(registry, *, parameters: int | None = None) -> str:
 #: 없음" 이므로 이 절 자체를 안 본다 (§30.10). 그래서 목적함수를 바꿔도
 #: RuleWriter 의 조건은 안 바뀐다.
 _OBJECTIVE_BLOCKS = {
-    "regret": """`regret` = (규칙이 1등으로 고른 config 의 시간) / (그 형상의 전수 최적 시간).
-1.0 이 완벽입니다. 낮을수록 좋습니다.""",
+    "regret": """`regret` = (time of the config the rule ranked first) /
+(the exhaustively measured best time for that shape).
+1.0 is perfect. Lower is better.""",
     #: ★ `rank` 는 함수다 — `k` 와 `lambda` 가 실행마다 다르다. 문장에
     #: 100 을 상수로 박아 두었더니 `--rank-top-k 10` 을 줘도 프롬프트는
     #: "100개" 라고 말했다 (D-105/D-107 과 같은 자리, 다섯 번째 면).
@@ -142,19 +143,22 @@ _OBJECTIVE_BLOCKS = {
 
 def _rank_block(k: int = 100, lam: float = 0.0) -> str:
     extra = "" if not lam else (
-        f"\n\n★ 여기에 더해, **참 1등을 맞히는 것**에 가중치 {lam:g} 를 "
-        "더 얹습니다.\n1등이 낀 쌍의 손실을 그만큼 더 세게 봅니다 — "
-        "상위권 순서를 지키면서\n**1등도 놓치지 마세요.**")
-    return f"""★ **1등 하나가 아니라 상위권의 순서**로 채점합니다.
+        f"\n\n★ On top of that, **getting the true first place right** "
+        f"carries an extra weight of {lam:g}.\nLosses on pairs that include "
+        "the winner count that much more — keep the top order\n**and do not "
+        "miss first place.**")
+    return f"""★ You are scored on **the order of the top ranks**, not on
+first place alone.
 
-각 형상에서 실제로 가장 빠른 config {k}개를 놓고, 그 안의 모든 쌍 (i, j) 에
-대해 **더 빠른 쪽에 더 낮은 점수**를 주었는지 봅니다. 쌍마다 두 시간의
-차이만큼 무게가 붙습니다 — 차이가 큰 쌍을 뒤집으면 손해가 큽니다.
+For each shape we take the {k} genuinely fastest configs and check, for every
+pair (i, j) among them, whether you gave **the faster one the lower score**.
+Each pair is weighted by the difference between the two times — inverting a
+pair with a large gap costs a lot.
 
-0 이 완벽입니다. 낮을수록 좋습니다.
+0 is perfect. Lower is better.
 
-⚠️ 측정 노이즈로 구별할 수 없는 쌍은 채점에서 빠집니다. **미세한 차이를
-맞추려 하지 말고 순서를 만드는 물리를 쓰세요.**{extra}"""
+⚠️ Pairs that measurement noise cannot separate are excluded from scoring.
+**Do not chase tiny differences; use the physics that creates the order.**{extra}"""
 
 
 #: ★ 실험 B (D-110) — **항 안에서 피처 둘을 곱해도 된다**는 것을 명시한다.
@@ -165,21 +169,22 @@ def _rank_block(k: int = 100, lam: float = 0.0) -> str:
 #: ⚠️ 끄면 **빈 문자열**이라 프롬프트가 이전과 바이트까지 같다.
 _PRODUCT_BLOCK = """
 
-## ★ 항의 형태 — 피처를 곱해도 됩니다
+## ★ Term shape — you may multiply features
 
-한 항 안에서 **피처 둘을 곱할 수 있습니다.** 가중치는 그대로 하나입니다.
+Within one term you **may multiply two features.** It is still one weight.
 
 ```python
-s = s + (f.<이름A> * f.<이름B>) * w[3]           # ✅ 예산 하나
-s = s + f.<이름A> * np.log2(f.<이름B>) * w[4]    # ✅
+s = s + (f.<nameA> * f.<nameB>) * w[3]           # ✅ one parameter
+s = s + f.<nameA> * np.log2(f.<nameB>) * w[4]    # ✅
 ```
 
-두 물리량이 **동시에** 나쁠 때만 벌을 주고 싶으면 곱이 맞습니다 —
-더하기는 하나만 나빠도 벌을 줍니다. 해석이 어려워지는 것을 걱정하지
-마세요. **성능이 오르는 형태를 쓰고, 왜 그런지는 나중에 봅니다.**"""
+If you want to penalise only when two quantities are bad **at the same
+time**, a product is right — a sum penalises when either one is bad. Do not
+worry about it being harder to interpret. **Use the shape that improves
+performance; why it works can be looked at later.**"""
 
 _PRODUCT_NOTE = """
-★ 피처 둘을 곱한 항을 써도 됩니다 — 예산은 항 하나입니다.
+★ A term multiplying two features is allowed — it costs one parameter.
 """
 
 
@@ -190,42 +195,44 @@ _PRODUCT_NOTE = """
 #: 끄면 **빈 문자열**이라 프롬프트가 이전과 바이트까지 같다.
 _POWER_BLOCK = """
 
-## ★ 항의 형태 — 가중치를 지수 자리에 둘 수 있습니다
+## ★ Term shape — a weight may sit in the exponent
 
-지금까지 가중치는 항에 **곱해지기만** 했습니다. **지수로도 쓸 수
-있습니다.**
+So far weights have only **multiplied** a term. **They can also be
+exponents.**
 
 ```python
-s = s + f.<이름> * w[3]                     # 지금까지의 형태 (예산 하나)
-s = s + np.power(f.<이름>, w[3])            # ✅ 지수만 (예산 **하나**)
-s = s + np.power(f.<이름>, w[3]) * w[4]     # 지수 + 크기 (예산 둘)
+s = s + f.<name> * w[3]                     # the usual form (one parameter)
+s = s + np.power(f.<name>, w[3])            # ✅ exponent only (**one** parameter)
+s = s + np.power(f.<name>, w[3]) * w[4]     # exponent + scale (two parameters)
 ```
 
-★ **가운데 것이 기존 항을 그대로 바꿉니다** — 예산이 안 늡니다.
-예산이 찼으면 항을 버리지 말고 **`f.a * w[i]` 를
-`np.power(f.a, w[i])` 로 바꾸세요.**
+★ **The middle one replaces an existing term as is** — it costs no extra
+room. If you are at the cap, do not drop a term; **turn `f.a * w[i]` into
+`np.power(f.a, w[i])`.**
 
-무엇이 달라지나: `f.a * w[3]` 은 "얼마나 세게 벌을 줄까" 만 정합니다.
-`np.power(f.a, w[3])` 은 **"얼마나 빠르게 나빠지는가"** 를 정합니다 —
-1 보다 크면 커질수록 가속하고, 1 보다 작으면 완만해집니다.
+What changes: `f.a * w[3]` only sets "how hard to penalise".
+`np.power(f.a, w[3])` sets **"how fast it gets worse"** — above 1 it
+accelerates as the value grows, below 1 it flattens.
 
-두 가지 제약이 있습니다. **수치가 무너지지 않게 하는 것**이지 표현력을
-빼는 것이 아닙니다.
+There are two constraints. They exist to **keep the numerics from breaking**,
+not to remove expressiveness.
 
 ```
-1. 밑은 `f.<이름>` 하나여야 한다
-   식을 밑으로 쓰면 음수가 될 수 있고, 음수의 실수 거듭제곱은 nan 이다
-2. 지수 가중치는 0~4 로 묶인다
-   0 보다 작으면 f == 0 에서 inf 이고, 방향이 뒤집힌다
-   4 보다 빠른 것은 매끄러운 물리가 아니라 문턱이고, 문턱은 np.where 가 한다
+1. The base must be a single `f.<name>`
+   An expression as the base can go negative, and a real power of a negative
+   number is nan
+2. The exponent weight is bounded to 0~4
+   Below 0 it is inf at f == 0, and the direction flips
+   Faster than 4 is not smooth physics but a threshold, and thresholds are
+   what np.where is for
 ```
 
-**어느 축이 "천천히 나빠지고" 어느 축이 "갑자기 나빠지는지" 를
-생각해서 쓰세요.**"""
+**Think about which axis "degrades slowly" and which "degrades suddenly",
+then write it.**"""
 
 _POWER_NOTE = """
-★ `f.<이름> * w[i]` 를 `np.power(f.<이름>, w[i])` 로 **바꿔도 됩니다**
-   — 예산이 안 늘고, 지수(0~4)를 최적화기가 맞춥니다.
+★ You **may replace** `f.<name> * w[i]` with `np.power(f.<name>, w[i])`
+   — it costs no extra room, and the optimiser fits the exponent (0~4).
 """
 
 
@@ -755,17 +762,17 @@ class OpenAILLM:
         # ★ `checks.PARAMETERS` 을 직접 읽으면 `parameters` 을 무시한다
         #   (D-105). 유효 예산은 `self._parameters` 하나뿐이다.
         if n_path >= self._parameters:
-            note = ("\n★ **가장 무거운 경로**의 예산이 찼습니다 "
+            note = ("\n★ The **heaviest path** is at the cap "
                     f"({n_path}/{self._parameters}).\n"
-                    "  두 가지 중 하나를 하세요:\n"
-                    "  (1) `if p.<형상값>` 으로 **가지를 나눠라** — 가지마다 "
-                    "따로 예산을 씁니다\n"
-                    "  (2) 그 경로의 **가장 덜 중요한 항 하나를 지우고** 그 "
-                    "자리에 넣어라\n"
-                    "  무엇을 했고 왜 그것을 골랐는지 `changes` 에 쓰세요.")
+                    "  Do one of two things:\n"
+                    "  (1) **split a branch** with `if p.<shape value>` — "
+                    "each branch spends its own room\n"
+                    "  (2) **drop the least important term** on that path and "
+                    "put the new one there\n"
+                    "  Write what you did and why you chose it in `changes`.")
         else:
-            note = (f"가장 무거운 경로의 남은 예산: "
-                    f"{self._parameters - n_path}개 (전체 항 {n_terms}개)")
+            note = (f"Room left on the heaviest path: "
+                    f"{self._parameters - n_path} ({n_terms} terms in total)")
         # ★ Analyst 가 꺼져 있으면 **가설 절 자체를 안 만든다** (§16.1, D-89).
         #   "## 이번 가설\n\n(가설 없음)" 처럼 빈 자리를 남기면 모델이
         #   "가설이 있는데 비어 있다" 로 읽어 다른 조건이 된다. 진단
@@ -775,20 +782,22 @@ class OpenAILLM:
         #   `test_optimize_prompt_without_analyst_is_a_deletion` 이 고정한다.
         if kw.get("analyst", True):
             hyp_block = (
-                "## 현재 규칙에 반영된 가설\n\n"
+                "## Hypotheses already reflected in the current rule\n\n"
                 + ("\n".join(f"- {h}" for h in applied)
-                   or "(아직 없음 — 첫 라운드다)")
-                + "\n\n## 이번 가설\n\n"
+                   or "(none yet — this is the first round)")
+                + "\n\n## This round's hypothesis\n\n"
                 + (json.dumps(_for_editor(hyp), ensure_ascii=False, indent=1)
                    if hyp else
-                   "(가설 없음. 부모를 개선할 방향을 스스로 찾아라)"))
-            inputs_hyp = ("이번에 반영할 가설 하나\n"
-                          "현재 규칙에 이미 반영된 가설들\n")
-            one_change = "가설이 국소적인 것은 **의도**입니다. "
+                   "(no hypothesis. Find a direction to improve the parent "
+                   "yourself)"))
+            inputs_hyp = ("the one hypothesis to reflect this round\n"
+                          "the hypotheses already reflected in the rule\n")
+            one_change = "The hypothesis being local is **deliberate**. "
             applied_warn = (
-                "\n**기존 가설들의 효과를 훼손하지 마세요.** 아래 목록의 "
-                "항들은 이유가 있어\n들어간 것입니다. 그것을 지우려면 이번 "
-                "가설이 그 이유를 무효화한다는 근거가\n있어야 합니다.\n")
+                "\n**Do not undo the effect of the existing hypotheses.** The "
+                "terms listed below\nare there for a reason. Removing one "
+                "requires evidence that this round's\nhypothesis invalidates "
+                "that reason.\n")
         else:
             hyp_block = inputs_hyp = one_change = applied_warn = ""
         # ★ 두 번째 부모는 `cross` 일 때만 있다 (D-96). 없으면 **절 자체를
@@ -800,14 +809,14 @@ class OpenAILLM:
             second = ""
         else:
             second = (
-                "\n\n## ★ 두 번째 부모 — 이 둘을 **합치세요**\n\n"
+                "\n\n## ★ Second parent — **combine these two**\n\n"
                 "```python\n" + p2.code.strip() + "\n```\n\n"
-                f"두 번째 부모의 가중치: {list(p2.w0)}\n\n"
-                "**각각의 좋은 항을 골라 하나로 만드세요.** 한쪽을 그대로 "
-                "베끼지 마세요 — 그러면 교차가 아닙니다.\n\n"
-                f"⚠️ 예산이 {self._parameters}항이므로 합치면 **반드시 버려야 "
-                "합니다.** 무엇을 버렸고 왜 그것을 골랐는지 `changes` 에 "
-                "쓰세요.\n")
+                f"Second parent's weights: {list(p2.w0)}\n\n"
+                "**Pick the good terms from each and make one rule.** Do not "
+                "copy one side as is — that is not a crossover.\n\n"
+                f"⚠️ The cap is {self._parameters} per path, so combining "
+                "**forces you to drop something.** Write what you dropped and "
+                "why you chose it in `changes`.\n")
         body = load_prompt("role/rule_editor.md", parameters=self._parameters) \
             .replace("{product_note}", product_note(self._product)) \
             .replace("{power_note}", power_note(self._power))
@@ -818,7 +827,7 @@ class OpenAILLM:
             inputs_hyp=inputs_hyp, one_change_hyp=one_change,
             applied_warning=applied_warn,
             parent_code=(parent.code if parent else
-                         "(부모 없음 — 처음부터 만들어라)"),
+                         "(no parent — write from scratch)"),
             parent_w=(list(parent.w0) if parent else "-"))
 
 
@@ -856,16 +865,17 @@ class OpenAILLM:
         block = render_features(reg, include_observed=condition == "B",
                                 extra_observed=extra)
         if condition == "A":
-            note = "당신은 이 GPU 의 측정 표를 보지 않습니다"
-            agg = ("## 표 집계\n\n**없습니다.** 이것이 조건 A 입니다 — "
-                   "물리만 보고 쓰세요.")
+            note = "you do not see this GPU's measurement table"
+            agg = ("## Table aggregates\n\n**None.** That is condition A — "
+                   "write from physics alone.")
         else:
             lines = "\n".join(table_facts.lines)
-            note = "학습 분할의 **집계**만 봅니다. 형상별 답은 보지 않습니다"
-            agg = ("## 표 집계 (학습 분할에서만 — §12.3)\n\n"
-                   "개별 형상의 답이 아니라 전체에서 나온 패턴입니다. "
-                   "**형상을 식별할 수 있는 것은 없습니다.**\n\n"
-                   f"```\n{lines}\n```")
+            note = ("you see only **aggregates** of the training split, "
+                    "never per-shape answers")
+            agg = ("## Table aggregates (training split only — §12.3)\n\n"
+                   "These are patterns over the whole split, not answers for "
+                   "individual shapes. **Nothing here identifies a shape.**"
+                   f"\n\n```\n{lines}\n```")
         # ★ 규칙 예시도 **조건마다 다르다** (§30.20). RuleWriter 는
         #   `condition` 이 A/B(표 관측 유무)라 피처 조건과 축이 다르다 —
         #   레지스트리가 사람 24개면 실제 이름을 써도 되고, F0/F1
@@ -912,13 +922,15 @@ class OpenAILLM:
                 f"알 수 없는 조건: {condition!r}. {sorted(_CONDITIONS)}")
         reg = registry if registry is not None else self.registry
         if condition == "F1":
-            block = ("## 이미 있는 피처\n\n**없습니다.** 위 원시 값만으로 "
-                     "물리량을 유도하세요.\n\n★ 이것이 이 조건의 요점입니다 "
-                     "— 파생량을 스스로 만들 수 있는지를 봅니다.")
+            block = ("## Existing features\n\n**None.** Derive the "
+                     "physical quantities from the raw values above.\n\n"
+                     "★ That is the point of this condition — whether you can "
+                     "build derived quantities yourself.")
         else:
             if reg is None:
                 raise ValueError(f"조건 {condition} 은 레지스트리가 필요하다")
-            block = ("## 이미 있는 피처 — **중복되면 폐기됩니다**\n\n"
+            block = ("## Existing features — **duplicates are discarded**"
+                     "\n\n"
                      + render_features(reg, include_observed=False))
         # ★ 예시는 **조건마다 다르다** (§30.17). F1 은 답을 건네지
         #   않으려 무관 도메인을 쓰고, 공개 지식을 주는 조건(F2/F3)은
@@ -930,7 +942,8 @@ class OpenAILLM:
             field_block=field_block(), feature_block=block,
             example_block=example,
             area_block=load_prompt("areas.md", parameters=self._parameters),
-            task_block=task or ("## 이번에 만들 것\n\n피처 하나를 제안하세요."))
+            task_block=task or ("## What to build now\n\nPropose one "
+                                "feature."))
 
     # -- 루프 밖 역할 등록 (D-92) -----------------------------------------
     def register_role(self, name: str, *, instructions: str,

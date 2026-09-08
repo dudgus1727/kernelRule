@@ -137,37 +137,38 @@ MAX_WEIGHTS = LIMITS["parameters"]
 
 
 #: ★ 실험 B (D-110). 스키마도 프롬프트와 같은 말을 해야 한다 (D-107).
-_PRODUCT_DESC = (" ★ 한 항 안에서 **피처 둘을 곱해도 된다** — "
-                 "`(f.a * f.b) * w[i]` 는 예산 하나다.")
+_PRODUCT_DESC = (" ★ Within one term you **may multiply two features** — "
+                 "`(f.a * f.b) * w[i]` costs one parameter.")
 
 #: ★ 실험 (b) (D-112). 가중치를 **지수 자리**에 둘 수 있다.
-_POWER_DESC = (" ★ 가중치를 **지수 자리**에 둬도 된다 — "
-               "`f.a * w[i]` 를 `np.power(f.a, w[i])` 로 바꾸면 예산이 "
-               "안 늘고 지수를 맞춘다. 밑은 `f.<이름>` 하나여야 하고, "
-               "지수 가중치는 0~4 로 묶인다.")
+_POWER_DESC = (" ★ A weight may sit **in the exponent** — replacing "
+               "`f.a * w[i]` with `np.power(f.a, w[i])` costs no extra room "
+               "and fits the exponent. The base must be a single "
+               "`f.<name>`, and the exponent weight is bounded to 0~4.")
 
 
 def _desc_code(b: int, product: bool = False,
                power: bool = False) -> str:
-    return ("`def score(f, p, hw, w):` 로 시작하는 함수 전문. "
-            "설명이나 마크다운 펜스를 넣지 마라. "
-            f"★ 항은 최대 {b}개이고 각 w[i] 는 정확히 "
-            "한 번만 쓸 수 있다 — 하나의 가중치를 여러 항에 "
-            "재사용해 항을 늘리면 거부된다. "
-            "★ 분기 조건의 비교 상수(`p.roofline_ratio < 1`)는 "
-            "예산에 들지 않는다 — 물리적 경계는 그대로 써라"
+    return ("The full function, starting at `def score(f, p, hw, w):`. "
+            "No prose, no markdown fences. "
+            f"★ At most {b} parameters **per execution path**, and each w[i] "
+            "may be used exactly once — reusing one weight across terms to "
+            "add terms is rejected. "
+            "★ Comparison constants in branch conditions "
+            "(`p.roofline_ratio < 1`) do not count — write physical "
+            "boundaries as plain numbers"
             + (_PRODUCT_DESC if product else "")
             + (_POWER_DESC if power else ""))
 
 
 def _desc_w0(b: int) -> str:
-    return ("가중치 초기값. ★ 대충 내지 마라 — 목적함수가 계단 "
-            "함수라 최적화기가 출발점 근처에서 못 빠져나오는 "
-            "일이 있다. **각 항의 물리적 크기를 반영한 출발점**"
-            "을 줘라. 길이는 코드가 참조하는 최대 인덱스 + 1 "
-            f"이어야 한다. ★ 최대 {b}개. 숫자 "
-            "리터럴과 합산되므로 리터럴을 쓰면 그만큼 줄어든다 "
-            "— 단 분기 비교 상수는 빠진다")
+    return ("Initial weights. ★ Do not give them carelessly — the objective "
+            "is a step function and the optimiser can get stuck on a plateau "
+            "near the starting point. Give a **starting point that reflects "
+            "the physical magnitude of each term**. The length must equal the "
+            f"largest index the code references + 1. ★ At most {b} **per "
+            "execution path**, summed with numeric literals, so literals "
+            "reduce it — except comparison constants in branch conditions")
 
 
 def _w0_message(n: int, b: int) -> str:
@@ -293,47 +294,50 @@ def validate_rule_proposal(obj: Any, *, parameters: int | None = None
 if HAVE_PYDANTIC:                                   # pragma: no branch
 
     class HypothesisOut(BaseModel):
-        """가설 하나. **코드를 쓰지 않는다** (§11.3).
+        """One hypothesis. **No code** (§11.3).
 
-        같이 시키면 원인 분석을 대충 하고 바로 `if` 를 추가한다.
+        Asking for code alongside makes the root-cause analysis shallow and
+        jumps straight to adding an `if`.
         """
 
         claim: str = Field(
-            description="무엇이 왜 잘못됐는가. 한두 문장. 코드 금지")
+            description="What is wrong and why. One or two sentences. No code")
         evidence_cases: list[int] = Field(
             default_factory=list,
-            description="근거가 된 사례 번호. 비우지 마라 — 근거 없는 "
-                        "일반론을 막는 장치다")
+            description="Case numbers this rests on. Do not leave empty — "
+                        "it is the device that blocks unfounded generalities")
         affected_regime: str = Field(
-            default="", description="어느 체제인가 (예: 'waves < 1')")
+            default="", description="Which regime (e.g. 'waves < 1')")
         measurable_with: list[str] = Field(
             default_factory=list,
-            description="기존 피처 이름들. 등록된 것만 쓴다")
+            description="Names of existing features. Registered ones only")
         needs_new_feature: str | None = Field(
             default=None,
-            description="기존 피처로 못 재면 그 물리량의 이름. 아니면 null")
+            description="If existing features cannot measure it, the name of that quantity. Otherwise null")
         proposed_direction: str = Field(
-            default="", description="어떻게 고칠지. 코드가 아니라 방향")
+            default="", description="How to fix it. A direction, not code")
         risk: str = Field(
             default="",
-            description="이 수정이 망가뜨릴 수 있는 구간. 반드시 채워라")
+            description="Which regime this fix could break. Always fill this in")
 
         @field_validator("claim")
         @classmethod
         def _no_code(cls, v: str) -> str:
             if "def " in v or "return " in v or "w[" in v:
                 raise ValueError(
-                    "가설에 코드를 쓰지 마라. 자연어 문장이어야 한다 (§11.3)")
+                    "Do not put code in a hypothesis. It must be prose "
+                    "(§11.3)")
             # ★ 형상 크기를 문장에 담지 마라 (D-114). `claim` 은
             #   `json.dumps` 로 RuleEditor 에 통째로 간다 — "M=4096 에서"
             #   가 거기 있으면 그것을 그대로 리터럴로 옮겨 적을 수 있다.
             #   `p.M > 1024` 는 정적 검사가 막지만 **가설 문장은 안 거친다.**
             if _SHAPE_SIZE.search(v):
                 raise ValueError(
-                    "가설에 형상 크기를 쓰지 마라 (예: 'M=4096', "
-                    "'4096x4096'). 체제로 말하라 — 'waves < 1 인 형상' "
-                    "처럼. 크기를 그대로 옮기면 그 형상 하나만 겨냥하는 "
-                    "규칙이 된다 (§29.4).")
+                    "Do not put a shape size in a hypothesis (e.g. "
+                    "'M=4096', '4096x4096'). Speak in regimes — 'shapes "
+                    "where waves < 1', say. Copying a size across produces a "
+                    "rule aimed at that one shape (§29.4). ★ An inequality "
+                    "range such as 'small M (< 128)' is fine.")
             return v
 
         # ★ `claim` 만 검사하면 새는 자리가 남는다 (D-117). RuleEditor 에
@@ -349,26 +353,26 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
 
     class AnalysisOutput(BaseModel):
         hypotheses: list[HypothesisOut] = Field(
-            description=(f"★ 정확히 {N_HYP_MIN}개. 서로 다른 실패 모드를 "
-                         "다뤄라 — 이 라운드의 exploit 제안 3개에 하나씩 "
-                         "배정된다"
+            description=(f"★ Exactly {N_HYP_MIN}. Cover different failure "
+                         "modes — one is assigned to each of this round's 3 "
+                         "exploit proposals"
                          if N_HYP_MIN == N_HYP_MAX else
-                         f"{N_HYP_MIN}~{N_HYP_MAX}개. 서로 다른 실패 모드를 "
-                         "다뤄라"))
+                         f"{N_HYP_MIN}~{N_HYP_MAX}. Cover different failure "
+                         "modes"))
 
         @field_validator("hypotheses")
         @classmethod
         def _count(cls, v: list) -> list:
             if not N_HYP_MIN <= len(v) <= N_HYP_MAX:
                 raise ValueError(
-                    f"가설이 {len(v)}개다. "
-                    + (f"정확히 {N_HYP_MIN}개를 내라"
+                    f"You gave {len(v)} hypotheses. "
+                    + (f"Give exactly {N_HYP_MIN}"
                        if N_HYP_MIN == N_HYP_MAX
-                       else f"{N_HYP_MIN}~{N_HYP_MAX}개를 내라"))
+                       else f"Give {N_HYP_MIN}~{N_HYP_MAX}"))
             return v
 
     class RuleOutput(BaseModel):
-        """규칙 하나. ★ diff 가 아니라 **전체 코드**다 (§11.6)."""
+        """One rule. ★ Not a diff — the **full code** (§11.6)."""
 
         # ⚠️ 이 스키마는 **RuleEditor 와 RuleWriter 가 함께 쓴다.** 설명에
         #   부모 이야기를 넣으면 RuleWriter 가 없는 부모를 찾는다 —
@@ -384,9 +388,9 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         # ★ 계보 추적용이다. **비었다고 규칙을 버리지 않는다** — 필수
         #   필드가 많을수록 재시도 소진 확률만 올라간다. 비면 경고를 남긴다.
         changes: str = Field(
-            default="", description="부모에서 무엇을 바꿨는가. 한 문장")
+            default="", description="What changed from the parent. One sentence")
         hypothesis_id: str = Field(
-            default="", description="반영한 가설 id")
+            default="", description="Id of the hypothesis this reflects")
 
         @model_validator(mode="after")
         def _budget(self):
@@ -449,26 +453,29 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         direction: str = "higher_is_worse"
 
     class Category(BaseModel):
-        name: str = Field(description="소문자 + 밑줄")
-        description: str = Field(description="한 문장. 무엇이 얼마나 "
-                                             "낭비/제약되는가")
+        name: str = Field(description="lower case + underscores")
+        description: str = Field(description="One sentence. What is wasted "
+                                             "or constrained, by how much")
 
     class CategoryOutput(BaseModel):
-        """★ LLM 이 물리를 어떻게 구조화하는가 (§30.10).
+        """★ How the LLM structures the physics (§30.10).
 
-        재발견 개수보다 흥미로울 수 있는 관찰이다 — 사람이 나눈 것과
-        비교할 재료가 된다. `stage1-features/categories.json` 에 남는다.
+        Possibly a more interesting observation than the rediscovery count —
+        it is material for comparing against a human partition. Recorded in
+        `stage1-features/categories.json`.
         """
 
         categories: list[Category]
-        notes: str = Field(default="", description="나누면서 뺀 것")
+        notes: str = Field(default="", description="What you left out while partitioning")
 
     class CritiqueOutput(BaseModel):
         has_defect: bool
         defects: list[str] = Field(default_factory=list)
         measures_what: str = Field(
-            description="결함을 못 찾았으면 이 함수가 재는 물리량을 한 "
-                        "문장으로. **못 쓰면 그 자체가 거부 신호다** (§11.5)")
+            description="If you found no defect, one sentence on the "
+                        "physical quantity this function measures. **Being "
+                        "unable to write it is itself a rejection signal** "
+                        "(§11.5)")
         confidence: float = 0.5
 
 else:                                               # pragma: no cover

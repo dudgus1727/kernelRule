@@ -1,99 +1,131 @@
-<!-- ★ 규칙 **함수**를 쓰는 역할이 공유하는 하드 제약 (RuleEditor + RuleWriter).
-     여기 있는 것은 둘 다에게 참인 것만이다. 한쪽에만 해당하면
-     `_rules_edit.md`(RuleEditor) 나 역할 파일로 내려라. -->
+<!-- ★ Hard constraints shared by the roles that write the rule **function**
+     (RuleEditor + RuleWriter). Only what is true for both belongs here.
+     If it applies to one of them, push it down into `_rules_edit.md`
+     (RuleEditor) or into the role file. -->
 
-## 규칙 함수의 형태
+## Shape of the rule function
 
 ```python
 def score(f, p, hw, w):
-    s = f.<이름> * w[0]
-    s = s + f.<이름> * w[1]
+    s = f.<name> * w[0]
+    s = s + f.<name> * w[1]
     return s
 ```
 
-낮을수록 좋은 점수입니다. 모든 피처는 **클수록 나쁜 방향**으로 통일되어
-있으므로 보통 가중치는 양수입니다.
+Lower is better. All features are normalised so that **larger is worse**, so
+weights are usually positive.
 
-## 절대 규칙
+## Absolute rules
 
 ```
-1. config 수준 피처(`f.*`)로 분기하지 마라.
-   `f.*` 는 후보 전체의 **배열**이라 `if f.<이름> < 1:` 은 오류가 난다.
-   `np.where(...)` 를 써라. 이것은 의도된 제약이다 — 조건부 특수화는
-   반복되면 룩업 테이블이 되고 일반화되지 않는다.
+1. Do not branch on config-level features (`f.*`).
+   `f.*` is an **array** over all candidates, so `if f.<name> < 1:` raises.
+   Use `np.where(...)`. This constraint is deliberate — conditional
+   specialisation, repeated, becomes a lookup table and does not generalise.
 
-2. 형상 수준 값(`p.*`)으로는 분기해도 된다. 스칼라다.
-   다만 ★ **누적 점수 전체에 형상 상수를 곱하거나 더하는 것은 아무 효과가
-   없다.** 규칙은 형상마다 독립적으로 정렬되므로 형상 상수는 소거된다.
+2. You may branch on shape-level values (`p.*`). They are scalars.
+   But ★ **multiplying or adding a shape constant to the whole accumulated
+   score does nothing.** The rule sorts within each shape independently, so
+   a shape constant cancels out.
 
-       if p.<형상값>:
-           s = s * w[2]                    # ⛔ 순위가 하나도 안 바뀐다
-           s = s + f.<이름> * w[2]         # ✅ 항의 가중치가 바뀐다
+       if p.<shape value>:
+           s = s * w[2]                    # ⛔ changes no ordering at all
+           s = s + f.<name> * w[2]         # ✅ changes a term's weight
 
-3. 가중치는 `w[0]`, `w[1]` 처럼 **상수 인덱스로만** 접근하라.
+   ★ **`p.M` / `p.N` / `p.K` may be used with inequalities.**
 
-4. `import` 금지. `np` 는 이미 주어져 있고, 허용된 함수만 쓸 수 있다:
+       if p.M == 4096:                     # ⛔ memorises one point. Rejected
+       if p.M < 128:                       # ✅ splits a range. Generalises
+
+   Only equality (`==`, `!=`) is rejected. Splitting a range states a
+   physical fact ("small M means a skinny shape"), so it is allowed.
+
+3. Access weights **by constant index only**: `w[0]`, `w[1]`, ...
+
+4. No `import`. `np` is already provided, and only these functions:
    where clip minimum maximum log log2 sqrt abs exp power sign
    floor ceil round isfinite nan_to_num square fmin fmax
-   `np.random` 은 금지다 — 규칙은 결정론적이어야 한다.
+   `np.random` is forbidden — the rule must be deterministic.
 
-5. ★ 숫자 리터럴 + 가중치 개수의 합이 실행 **경로마다 {parameters} 이하**여야
-   한다. 전체 합계가 아니라 **경로별**이다.
-   `s = 0.0` 의 `0.0` 도 파라미터 하나다. 첫 항을 `s = f.<이름> * w[0]` 으로
-   시작하면 리터럴이 필요 없다.
+5. ★ The number of numeric literals + weights must be **at most
+   {parameters} per execution path**. Not the total — **per path**.
+   The `0.0` in `s = 0.0` is a parameter too. Starting with
+   `s = f.<name> * w[0]` avoids needing a literal at all.
 
-   ★ **가지마다 자기 가중치를 줘라.** `if/else` 로 나누면 각 가지가 따로
-   {parameters}개를 쓸 수 있고, 그때 `len(w0)` 은 {parameters}개를 넘어도 된다.
+   ★ **Split when the physics differs.** Memory-bound and compute-bound
+   shapes have different bottlenecks, so the same term does not act in the
+   same direction. When you split, **each branch gets its own weights** —
+   and as a result `len(w0)` may exceed {parameters}.
+   ⚠️ Do not split to gain room. Physics must be the reason.
 
-       s = f.<이름> * w[0]                    # 공통 — 모든 경로에 든다
-       if p.<형상값> < 1:
-           s = s + f.<A> * w[1] + ...         # w[1..7]  -> 이 경로 8개
+       s = f.<name> * w[0]                   # common — belongs to every path
+       if p.<shape value> < 1:
+           s = s + f.<A> * w[1] + ...        # w[1..7]  -> 8 on this path
        else:
-           s = s + f.<B> * w[8] + ...         # w[8..14] -> 이 경로 8개
-       # len(w0) = 15, 두 경로 다 8 이하 -> ✅ 통과
+           s = s + f.<B> * w[8] + ...        # w[8..14] -> 8 on that path
+       # len(w0) = 15, both paths <= 8 -> ✅ accepted
 
-   ⚠️ `if/else` **밖**의 항은 모든 경로에 든다. `np.where` 는 분기가 아니다 —
-   양쪽이 다 계산되므로 한 경로다.
-   ⚠️ 중첩 `if` 는 **2단까지**다 (경로 최대 4개).
+   ⚠️ Terms **outside** the `if/else` belong to every path. `np.where` is
+   not a branch — both sides are computed, so it is one path.
+   ⚠️ There may be **at most 4 execution paths**.
+   Two levels of nesting · `if/elif/elif/else` · two sequential `if`s —
+   all of those are 4 paths.
 
-   ★ **분기 조건의 비교 상수는 파라미터에 들지 않는다.**
+   ★ **Comparison constants in branch conditions are not parameters.**
 
-       np.where(p.<형상값> < 1, A, B)      ✅ 이 `1` 은 공짜다
-       (f.<이름> - 3.0) * w[0]             ⛔ 이 `3.0` 은 파라미터 하나다
+       np.where(p.<shape value> < 1, A, B)   ✅ this `1` is free
+       (f.<name> - 3.0) * w[0]              ⛔ this `3.0` is one parameter
 
-   물리적 경계(roofline 의 무릎, 점유 한계 …)는 **숫자로 그냥 쓰라.**
-   `np.sign(x)` 나 `np.isfinite(x)` 로 1 을 대신 만들지 마라 — 파라미터가
-   아끼는 것이 없고 읽는 사람만 잃는다.
+   Write physical boundaries (the roofline knee, an occupancy limit, ...)
+   **as plain numbers**. Do not manufacture a 1 with `np.sign(x)` or
+   `np.isfinite(x)` — it saves no parameter and only costs the reader.
 
-6. ★ **각 `w[i]` 는 정확히 한 번만 쓴다.** 항마다 다른 가중치를 써라.
-   `len(w0)` 은 참조한 최대 인덱스 + 1 과 **정확히** 같아야 한다.
+6. ★ **Each `w[i]` is used exactly once.** Use a different weight per term.
+   `len(w0)` must equal the largest referenced index + 1, **exactly**.
 ```
 
-**5·6 을 우회하지 마세요.** 파라미터 상한의 목적은 "파라미터가 많으면 어떤 구조든
-비슷한 점수에 도달해 **구조 비교가 무의미해진다**" 를 막는 것입니다.
-가중치 하나를 여러 항에 재사용해 항을 늘리면 그 목적이 무너집니다.
+## ★ Match the magnitudes
 
-**한 경로의 항이 {parameters}개를 넘으면 늘리지 말고 덜 중요한 항을 버리세요.**
-그리고 {parameters}개를 채울 의무는 없습니다 — 항이 적고 각각이 설명되는 편이 낫습니다.{product_block}{power_block}
+The brackets in the feature list are the **value range**. If you add terms of
+different magnitude with the same weight, **the widest term decides the whole
+ordering** — a `[0, 300]` term added to a `[0, 1]` term with equal weights
+makes the latter invisible.
 
-## ★ 가중치는 당신이 맞추지 않습니다
+```python
+s = np.log2(f.<wide range name>) * w[0]   # compress to match magnitudes
+s = s + f.<narrow range name> * w[1]      # already [0,1], leave it
+```
 
-`w` 는 수치 최적화기가 **채점 전에** 맞춥니다. (어느 최적화기인지는
-목적함수에 따라 다르고 바뀔 수 있습니다 — 여러분이 알 필요는 없습니다.)
+Or give `w0` on the inverse scale of the range — for a `[0, 300]` term,
+`w0 ≈ 0.003`. **Do one of the two.**
 
-★ `p.n_candidates` 는 그 형상에서 **잰 config 이 몇 개인가** 입니다.
-성능이 아니라 열거 정보입니다 — 어느 config 이 빠른지는 전혀 말해
-주지 않습니다. 후보 수로 형상을 가르는 것은 물리가 아니라 **실험
-설계를 배우는 것**입니다.
+**Do not work around 5 and 6.** The point of the parameter cap is to prevent
+"with enough parameters any structure reaches a similar score, so **comparing
+structures becomes meaningless**". Reusing one weight across several terms to
+add terms destroys that point.
 
-**당신은 구조에 집중하세요** — 어떤 물리량을 쓸지, 어떻게 엮을지,
-어디서 체제를 나눌지. "2.0 이 맞나 2.7 이 맞나" 는 당신의 일이 아닙니다.
+**If a path already has {parameters} terms, drop the least important one
+instead of adding.** And there is no obligation to fill {parameters} — fewer
+terms, each explainable, is better.{product_block}{power_block}
 
-다만 `w0` 를 대충 내지는 마세요. 목적함수가 계단 함수라 최적화기가
-출발점 근처의 평지에서 못 빠져나오는 일이 있습니다. **각 항의 물리적
-크기를 반영한 출발점**을 주세요.
+## ★ You do not fit the weights
 
-## 점수는 무차원으로
+`w` is fitted by a numerical optimiser **before scoring**. (Which optimiser
+depends on the objective and may change — you do not need to know.)
 
-절대 시간을 예측하지 마세요. 하드웨어가 바뀌면 전부 다시 배워야 합니다.
-비율·로그·정규화된 양은 전이됩니다.
+★ `p.n_candidates` is **how many configs were measured** for that shape. It
+is enumeration information, not performance — it says nothing about which
+config is fast. Splitting shapes by candidate count is not learning physics,
+it is **learning the experimental design**.
+
+**Focus on structure** — which physical quantities to use, how to combine
+them, where to split regimes. "Is 2.0 right, or 2.7?" is not your job.
+
+Still, do not give a careless `w0`. The objective is a step function and the
+optimiser can get stuck on a plateau near the starting point. Give a
+**starting point that reflects the physical magnitude of each term**.
+
+## Keep the score dimensionless
+
+Do not predict absolute time. If the hardware changes, all of it has to be
+relearned. Ratios, logs and normalised quantities transfer.

@@ -1,39 +1,40 @@
-# 역할 — 영역 나누기
+# Role — partition the areas
 
-주어진 원시 값들로 잴 수 있는, **성능을 좌우하는 물리 영역**을
-{n_min}~{n_max}개로 나누세요.
+Using the raw values you are given, partition the **physical areas that drive
+performance** into {n_min}~{n_max} areas.
 
-## 왜 나누나
+## Why partition
 
-이 다음 단계에서 영역마다 물리량을 만들 것입니다. 나누지 않으면 처음 몇
-개가 앉은 자리 근처에서만 맴돕니다 — 실제로 한 축을 세 번 나눠 본 일이
-있습니다.
+In the next step you will build a physical quantity per area. Without a
+partition, the first few stay near wherever they landed — one axis actually
+got split three times.
 
-**영역을 사람이 정해 주지 않는 이유**는 그것이 사전 지식을 건네는 것이기
-때문입니다. "메모리 트래픽이 중요하다" 를 알려주는 셈이 됩니다.
-**당신이 어떻게 나누는지 자체가 관찰 대상입니다.**
+**The reason a human does not hand you the areas** is that doing so would be
+handing over prior knowledge. It would amount to telling you "memory traffic
+matters". **How you partition is itself the observation.**
 
-## 쓸 수 있는 것
+## What you may use
 
 {field_block}
 
-## 규칙
+## Rules
 
 ```
-1. 영역끼리 **겹치지 않게** 하세요. 같은 물리를 두 이름으로 부르지 마세요
-2. 각 영역은 위 원시 값들로 **실제로 계산 가능**해야 합니다
-3. 한 문장으로 설명하세요 — "무엇이 얼마나 낭비/제약되는가"
-4. 영역 이름은 소문자 + 밑줄
+1. Areas must **not overlap**. Do not name the same physics twice
+2. Each area must be **actually computable** from the raw values above
+3. Describe it in one sentence — "what is wasted or constrained, by how much"
+4. Area names: lower case + underscores
 ```
 
-**빈틈이 있어도 됩니다.** 원시 값으로 표현할 수 없는 물리가 있으면 그
-영역은 만들지 마세요 — 억지로 채우면 다음 단계에서 무의미한 함수가
-나옵니다.
+**Gaps are allowed.** If a physical effect cannot be expressed from the raw
+values, do not create that area — forcing it produces a meaningless function
+in the next step.
 
-## 출력
+## Output
 
 ```
-categories   [{{name, description}}] — {n_min}~{n_max}개
-notes        ★ 나누면서 뺀 것이 있으면 여기 쓰세요.
-             "이 물리는 중요하지만 주어진 값으로 못 잰다" 같은 것
+categories   [{{name, description}}] — {n_min}~{n_max} of them
+notes        ★ If you left something out while partitioning, write it here.
+             Things like "this physics matters but cannot be measured from
+             the given values"
 ```

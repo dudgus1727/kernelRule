@@ -571,11 +571,13 @@ def test_analyze_prompt_matches_the_measured_baseline():
     """
     from kernelrule.agents.openai_client import load_prompt
 
+    # ★ 2026-09-08 (D-146): 프롬프트가 영어가 됐다. **문구를 고정한다는
+    #   요구는 그대로다** — 여기서만 바꾸고 그 실행부터 새 계열로 다룬다.
     baseline = (
-        "`measurable_with` 에는 **아래 목록에 있는 이름만** 쓰세요.\n"
-        "목록에 없는 물리량이 필요하면 `needs_new_feature` 에 그 이름을 쓰세요\n"
-        "(대부분의 라운드에서는 `null` 입니다 — 물리량이 그렇게 많지 "
-        "않습니다).")
+        "In `measurable_with`, use **only names from the lists below**. If "
+        "you need a\nquantity that is not listed, put its name in "
+        "`needs_new_feature` (in most\nrounds this is `null` — there are not "
+        "that many physical quantities).")
     txt = load_prompt("role/analyze.md")
     assert baseline in txt, (
         "요구 필드 안내가 기준선 문구와 다르다. 그대로 두거나, 바꿀 거면 "

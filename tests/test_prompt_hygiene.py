@@ -156,8 +156,8 @@ def test_w0_description_agrees_with_the_prompt():
 
     d = S.RuleOutput.model_fields["w0"].description or ""
     assert "대략적이면 충분" not in d, "프롬프트와 반대를 말한다"
-    assert "대충 내지 마라" in d
-    assert "대충 내지는 마세요" in load_prompt("role/_rules_common.md")
+    assert "Do not give them carelessly" in d
+    assert "do not give a careless `w0`" in load_prompt("role/_rules_common.md")
 
 
 # ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ def test_hypothesis_claim_refuses_shape_sizes(claim):
 
     if not S.HAVE_PYDANTIC:                              # pragma: no cover
         pytest.skip("pydantic 없음")
-    with pytest.raises(Exception, match="형상 크기"):
+    with pytest.raises(Exception, match="shape size"):
         S.HypothesisOut(claim=claim, evidence_cases=[1])
 
 
@@ -213,7 +213,7 @@ def test_evidence_cases_do_not_reach_the_rule_editor():
            "measurable_with": ["tail_waste"]}
     txt = llm._user_prompt("rule_editor", "", parent=None, parent_n_terms=0,
                            hypothesis=hyp, analyst=True)
-    block = txt.split("## 이번 가설")[1][:600]
+    block = txt.split("## This round's hypothesis")[1][:600]
     # ★ 허용 목록만 간다 (D-117)
     for keep in ("짧은 형상에서 진다", "tail 항을 세게", "tail_waste"):
         assert keep in block, keep
@@ -228,11 +228,12 @@ def test_prompt_no_longer_names_the_optimizer():
 
     txt = load_prompt("role/_rules_common.md", parameters=8)
     assert "Nelder-Mead" not in txt
-    assert "수치 최적화기가" in txt
+    assert "fitted by a numerical optimiser" in txt
 
 
 def test_n_candidates_is_described_as_enumeration_not_performance():
     from kernelrule.agents.openai_client import load_prompt
 
     txt = load_prompt("role/_rules_common.md", parameters=8)
-    assert "p.n_candidates" in txt and "성능이 아니라 열거 정보" in txt
+    assert "p.n_candidates" in txt and (
+        "enumeration information, not performance" in txt)

@@ -318,7 +318,9 @@ class MockLLM:
         """
         missing = []
         for ln in prompt.split("\n"):
-            if "★ 미사용" in ln:
+            # ★ 2026-09-08 (D-146): 리포트가 영어가 됐다. **옛 형태도 읽는다**
+            #   — 옛 리포트로 이 목을 돌릴 수 있어야 한다.
+            if "★ unused" in ln or "★ 미사용" in ln:
                 name = ln.split()[0]
                 if name in self.features and name not in missing:
                     missing.append(name)

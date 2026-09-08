@@ -201,7 +201,8 @@ def test_hypothesis_count_desc_and_validator_share_one_constant():
     # ★ 2026-09-08 (D-144): 3 으로 **고정**됐다. 설명·검증·에러가 같은
     #   상수를 말해야 한다는 요구는 그대로다 (D-26).
     exact = S.N_HYP_MIN == S.N_HYP_MAX
-    want = f"{S.N_HYP_MIN}개" if exact else f"{S.N_HYP_MIN}~{S.N_HYP_MAX}"
+    want = (f"xactly {S.N_HYP_MIN}" if exact       # 설명은 "Exactly", 에러는 "exactly"
+            else f"{S.N_HYP_MIN}~{S.N_HYP_MAX}")
     desc = S.AnalysisOutput.model_fields["hypotheses"].description
     assert want in desc
 
@@ -374,9 +375,17 @@ def test_prompt_tells_the_model_branch_constants_are_free():
 
     검사기만 풀고 프롬프트를 그대로 두면 모델은 계속 우회한다 — 제약이
     풀린 것을 모르기 때문이다.
-    """
-    from kernelrule.agents.openai_client import load_prompt
 
-    for f in ("role/_rules_common.md", "role/rule_writer.md"):
-        txt = load_prompt(f)
-        assert "분기" in txt and "비교 상수" in txt, f"{f}: 면제 설명이 없다"
+    ★ 2026-09-08 (D-145): **조립된 프롬프트**로 본다. 설명이 어느 파일에
+    있는지는 중복 제거에 따라 달라지고(§3-4), 모델이 받는 것은 조립된
+    결과다. 파일 단위로 보면 중복을 없앨 때마다 시험이 깨진다.
+    """
+    from kernelrule.agents.openai_client import assemble_instructions
+
+    for role in ("rule_writer", "rule_editor"):
+        kw = {"objective": "regret", "parameters": 8}
+        if role == "rule_writer":
+            kw["hw_text"] = "GPU: T\n"
+        txt = assemble_instructions(role, **kw)
+        assert "branch condition" in txt and "not parameters" in txt, (
+            f"{role}: the exemption is not explained")

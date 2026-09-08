@@ -143,10 +143,10 @@ def test_rule_block_states_the_absolute_rules():
     c = load_prompt("role/_rules_common.md")
     # ★ `is_memory_bound` 는 뺐다 — 실제 피처 이름을 프롬프트에 박으면
     #   F0~F2 에서 답을 건네주는 것이다 (D-65). 자리표시자로 바뀌었다.
-    for must in ("import", "np.random", "8", "w[0]", "p.<형상값>"):
+    for must in ("import", "np.random", "8", "w[0]", "p.<shape value>"):
         assert must in c
     # ★ no-op 분기 경고가 프롬프트에 들어 있다
-    assert "소거된다" in c
+    assert "cancels out" in c
 
 
 def test_rule_editor_prompt_formats(client):
@@ -234,10 +234,10 @@ def test_failed_calls_are_counted():
 def test_prompt_shows_rejected_examples():
     """★ 규칙만 적어 두면 LLM 이 어긴다. 실제 거부 사례를 함께 준다."""
     c = load_prompt("role/_rules_edit.md")
-    assert "실제로 거부된 것들" in c
-    assert "w[0] 재사용" in c
+    assert "actually got rejected" in c
+    assert "w[0] reused" in c
     # ★ 규칙 자체는 `_rules_common.md` 에 있다 — 갤러리는 사례만 든다
-    assert "한 번만 쓴다" in load_prompt("role/_rules_common.md")
+    assert "used exactly once" in load_prompt("role/_rules_common.md")
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ def test_rule_writer_condition_a_contains_no_table_derived_line():
     a = c._rule_writer_prompt(condition="A", table_facts=_Facts())
     for line in (*_Facts.lines, *_Facts.by_feature["has_spill"]):
         assert line not in a, f"A 조건에 표 문장이 샜다: {line}"
-    assert "이 조건 A" in a or "조건 A" in a
+    assert "condition A" in a
 
 
 def test_rule_writer_condition_b_carries_the_aggregates():
@@ -631,10 +631,11 @@ def test_rule_editor_prompt_without_analyst_mentions_no_hypothesis():
     같은 원칙이다 — 자리 자체가 없어야 한다.
     """
     on, off = _rule_editor_prompts()
-    assert "가설" in on
-    assert "가설" not in off, "Analyst 를 껐는데 가설을 언급한다"
+    assert "hypothesis" in on
+    assert "hypothesis" not in off, (
+        "Analyst is off but the prompt still mentions a hypothesis")
     assert "## 이번 가설" not in off
-    assert "부모 규칙" in off and "사용 가능한 피처" in off
+    assert "Parent rule" in off and "Available features" in off
 
 
 def test_rule_editor_prompt_without_analyst_is_a_deletion():
@@ -685,12 +686,12 @@ def test_second_parent_section_is_absent_without_a_second_parent():
     from kernelrule.agents.schemas import RuleProposal
 
     one = _editor_prompt(None)
-    assert "두 번째 부모" not in one
+    assert "Second parent" not in one
     b = RuleProposal(
         code="def score(f,p,hw,w):\n    return f.tail_waste * w[0]\n",
         w0=[2.0])
     two = _editor_prompt(b)
-    assert "두 번째 부모" in two and "f.tail_waste" in two
+    assert "Second parent" in two and "f.tail_waste" in two
     # ★ 한 부모 프롬프트가 두 부모의 **부분수열**이다 — 순수 추가다
     it = iter(two)
     assert all(ch in it for ch in one), (

@@ -86,12 +86,11 @@ def test_user_and_system_prompts_agree_on_the_budget(budget):
     for name, txt in (("시스템", sys_p), ("사용자", usr_p)):
         # ★ 문구 이력: "항 상한 N개" -> "파라미터 상한 N개"(D-128)
         #   -> "실행 경로마다 N개"(D-144). 숫자가 한 곳에서 온다는 요구는 같다.
-        assert (f"경로마다 {budget}개" in txt
-                or f"파라미터 상한 {budget}개" in txt
-                or f"{budget} 이하" in txt), (
+        assert (f"{budget} per execution path" in txt
+                or f"at most {budget}" in txt), (
             f"{name} 프롬프트에 예산 {budget} 이 안 보인다")
-        assert (f"경로마다 {other}개" not in txt
-                and f"파라미터 상한 {other}개" not in txt), (
+        assert (f"{other} per execution path" not in txt
+                and f"at most {other}" not in txt), (
             f"{name} 프롬프트가 {other} 를 말한다 — 조건이 달라졌다 (D-105)")
 
 
@@ -107,16 +106,17 @@ def test_budget_reaches_the_saturation_notice():
     txt = llm._user_prompt("rule_editor", "", parent=None,
                            parent_n_terms=8, parent_path_params=8,
                            analyst=False)
-    assert "예산이 찼습니다" not in txt, (
-        "예산 16 인데 경로 8 짜리 부모에게 '찼습니다' 를 보냈다 (D-105)")
-    assert "남은 예산: 8개" in txt, txt[:400]
+    assert "is at the cap" not in txt, (
+        "budget is 16 but a parent with 8 on its path was told it is at the "
+        "cap (D-105)")
+    assert "Room left on the heaviest path: 8" in txt, txt[:400]
 
     # ★ 가지를 나눈 부모 — 전체 항은 14개지만 가장 무거운 경로는 8이다
     txt2 = llm._user_prompt("rule_editor", "", parent=None,
                             parent_n_terms=14, parent_path_params=8,
                             analyst=False)
-    assert "예산이 찼습니다" not in txt2, (
-        "경로별로 8인데 전체 항 14를 보고 '찼습니다' 를 보냈다 (D-144)")
+    assert "is at the cap" not in txt2, (
+        "8 per path but told 'at the cap' from the total of 14 terms (D-144)")
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +145,8 @@ def test_prompt_states_the_scaled_node_cap():
     for b in (8, 16):
         txt = load_prompt("role/_rules_edit.md", parameters=b)
         n = limits_for(b)["ast_nodes"]
-        assert f"AST 노드 {n}개" in txt, f"예산 {b} 에서 노드 상한이 안 맞는다"
+        assert f"{n} AST nodes" in txt, (
+            f"the node cap does not match at budget {b}")
 
 
 def test_a_sixteen_term_rule_fits_only_under_the_raised_cap():
@@ -192,9 +193,10 @@ def test_output_schema_states_the_budget(budget):
     schema = rule_output_for(budget).model_json_schema()
     for fld in ("code", "w0"):
         d = schema["properties"][fld]["description"]
-        assert f"최대 {budget}개" in d, (
-            f"출력 스키마 {fld} 설명이 예산 {budget} 을 안 말한다 — "
-            "모델은 이 문장을 보고 항 수를 정한다 (D-107)")
+        assert f"At most {budget}" in d or f"at most {budget}" in d, (
+            f"the output schema's {fld} description does not state the "
+            f"budget {budget} — the model sets the term count from this "
+            "sentence (D-107)")
 
 
 def test_output_schema_validation_follows_the_budget():
@@ -243,9 +245,10 @@ def test_all_four_surfaces_say_the_same_budget():
                 rule_output_for(b).model_json_schema(), ensure_ascii=False),
         }
         for name, txt in surfaces.items():
-            assert (f"경로마다 {b}개" in txt or f"파라미터 상한 {b}개" in txt
-                    or f"{b} 이하" in txt
-                    or f"최대 {b}개" in txt), f"{name} 가 예산 {b} 을 안 말한다"
+            assert (f"{b} per execution path" in txt
+                    or f"at most {b}" in txt
+                    or f"At most {b}" in txt), (
+                f"{name} does not state the budget {b}")
         assert limits_for(b)["parameters"] == b
 
 
@@ -263,7 +266,8 @@ def test_objective_block_states_the_running_k(k):
 
     txt = assemble_instructions("rule_editor", objective="rank", parameters=8,
                                 rank_top_k=k)
-    assert f"config {k}개" in txt, f"목표 정의가 k={k} 를 안 말한다"
+    assert f"the {k} genuinely fastest" in txt, (
+        f"the objective block does not state k={k}")
     for other in (10, 20, 100):
         if other != k:
             assert f"config {other}개" not in txt
@@ -275,7 +279,7 @@ def test_objective_block_states_lambda_only_when_set():
     kw = {"objective": "rank", "parameters": 8}
     assert "가중치 1 를" not in assemble_instructions("rule_editor", **kw)
     on = assemble_instructions("rule_editor", rank_lambda=1.0, **kw)
-    assert "참 1등을 맞히는 것" in on
+    assert "getting the true first place right" in on
 
 
 def test_product_hint_is_off_by_default_and_lands_on_every_surface():
@@ -286,12 +290,15 @@ def test_product_hint_is_off_by_default_and_lands_on_every_surface():
     on = assemble_instructions("rule_editor", objective="rank", parameters=8,
                                product_hint=True)
     assert "{product_block}" not in off and "{product_note}" not in off
-    assert "피처를 곱해도 됩니다" not in off
-    assert "피처를 곱해도 됩니다" in on and "피처 둘을 곱한 항" in on
+    assert "you may multiply features" not in off
+    assert "you may multiply features" in on and (
+        "multiplying two features" in on)
     for ph in (False, True):
         d = rule_output_for(8, product_hint=ph).model_json_schema()
-        has = "곱해도 된다" in d["properties"]["code"]["description"]
-        assert has is ph, f"스키마 product_hint={ph} 인데 곱 문장 {has}"
+        has = ("may multiply two features"
+               in d["properties"]["code"]["description"])
+        assert has is ph, (
+            f"schema product_hint={ph} but the product sentence is {has}")
 
 
 # ---------------------------------------------------------------------------

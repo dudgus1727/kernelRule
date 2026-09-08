@@ -139,8 +139,8 @@ def test_stratification_sentence_follows_the_data():
     assert a != b, "데이터가 반대인데 리포트가 같다"
     # 두 리포트의 크기 격차 부호가 반대여야 한다
     import re
-    ga = float(re.search(r"격차 ([+-][\d.]+)", a).group(1))
-    gb = float(re.search(r"격차 ([+-][\d.]+)", b).group(1))
+    ga = float(re.search(r"gap ([+-][\d.]+)", a).group(1))
+    gb = float(re.search(r"gap ([+-][\d.]+)", b).group(1))
     assert ga * gb < 0, f"크기 격차가 데이터를 따르지 않는다: {ga} vs {gb}"
 
 
@@ -198,7 +198,7 @@ def test_real_report_has_no_holdout_and_fits_budget(real_bundle_path):
     for h in held:
         assert h not in txt, f"홀드아웃 형상 {h} 이 리포트에 들어갔다"
     # 사례마다 σ 와 사용여부가 있다
-    assert "노이즈 바닥의" in txt and "미사용" in txt
+    assert "the noise floor" in txt and "unused" in txt
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ def test_table_facts_only_sees_the_train_shapes():
     whole = TableFacts.compute(t, Split("train", tuple(shapes)))
     assert part.n_shapes == 2
     assert whole.n_shapes == len(shapes)
-    assert "학습 분할 2형상" in part.lines[0]
+    assert "training split only, 2 shapes" in part.lines[0]
     assert part.lines != whole.lines
 
 

@@ -1,23 +1,24 @@
-<!-- ★ 고정 영역 (§30.18). 매 실행 LLM 에게 뽑게 하면 네 번째 판이 다를 수
-     있고, 그러면 **그 실행만 다른 조건**이 되는데 조용히 그렇게 된다.
-     D-45(모델 상수)·D-47(seed 미전달)과 같은 논리다 — 통제 가능한 것을
-     통제 안 하는 것.
+<!-- ★ Fixed areas (§30.18). Letting the LLM pick them on every run means a
+     fourth list could differ, and then **that run alone has a different
+     condition** — silently. Same logic as D-45 (model constant) and D-47
+     (seed not passed): do not leave controllable things uncontrolled.
 
-     이 일곱은 LLM 이 낸 세 판을 전부 덮는다 (대조 결과 §30.18).
-     `--recategorize` 를 **명시**해야만 LLM 으로 다시 뽑는다. -->
+     These seven cover all three lists the LLM produced (comparison in
+     §30.18). Only an explicit `--recategorize` re-derives them with an LLM. -->
 
-## 물리 영역 — 이 일곱을 고르게 도세요
+## Physical areas — spread your work evenly over these seven
 
 ```
-연산 처리량      | 계산 자원이 얼마나 활용되는가
-메모리 트래픽    | 데이터가 얼마나 움직이는가
-연산·트래픽 비율 | 둘 중 무엇이 병목인가. `hw.ridge_point` 가 그 경계다
-자원 압력        | SM 당 자원 한계에 얼마나 가까운가
-파이프라인       | 지연을 얼마나 숨기는가
-리덕션           | 부분합을 합치는 비용
-정렬·경계        | 데이터 경계와 형상 경계 처리
+compute throughput   | how well the compute resources are used
+memory traffic       | how much data moves
+compute/traffic ratio| which of the two is the bottleneck. `hw.ridge_point`
+                       is that boundary
+resource pressure    | how close you are to the per-SM resource limits
+pipelining           | how well latency is hidden
+reduction            | the cost of combining partial sums
+alignment & edges    | handling of data boundaries and shape boundaries
 ```
 
-**영역은 "무엇을 재는 자리인가" 일 뿐입니다.** 그 안에서 어떤 물리량을
-만들지는 당신이 정합니다. 한 영역에서 여러 개를 만들어도 되고, 표현할
-것이 없으면 건너뛰어도 됩니다.
+**An area is only "where to measure", not what to measure.** Which physical
+quantity you build inside it is your decision. Several per area is fine, and
+skipping one is fine if there is nothing to express there.

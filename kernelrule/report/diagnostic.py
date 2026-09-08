@@ -62,16 +62,21 @@ from kernelrule.report.table_facts import TableFacts
 
 __all__ = ["DiagnosticReport", "Case", "Regime", "build_report"]
 
-#: 체제 정의. `(이름, 형상 술어)`. 크기가 먼저다 (§30.5).
+#: 체제 정의. `(이름, 형상 술어)`.
+#:
+#: ★ 2026-09-08 (D-145): **memory/compute 를 앞으로**. 아카이브가 그 축으로
+#: 보존하는데(D-144) Analyst 는 크기(SOL<0.5ms)로 진단하고 있었다 — 진단과
+#: 보존이 다른 축을 보면 가설이 아카이브가 지키는 것을 못 짚는다.
+#: 여덟 구간을 다 보여주는 것 자체는 정보이므로 유지한다.
 REGIMES: tuple[tuple[str, str], ...] = (
-    ("t_sol < 0.5ms (짧음)", "small"),
-    ("t_sol >= 0.5ms (김)", "large"),
     ("memory-bound", "mem"),
     ("compute-bound", "comp"),
+    ("t_sol < 0.5ms (short)", "small"),
+    ("t_sol >= 0.5ms (long)", "large"),
     ("waves < 1", "wlt1"),
     ("waves 1~4", "w14"),
     ("waves > 8", "wgt8"),
-    ("K <= 1024 (짧은 mainloop)", "smallk"),
+    ("K <= 1024 (short mainloop)", "smallk"),
 )
 
 
@@ -136,27 +141,30 @@ class DiagnosticReport:
 def hardware_block(hw, noise) -> str:
     return textwrap.dedent(f"""\
         GPU: {hw.name} ({hw.arch})
-          SM {hw.sm_count}개 / 블록당 smem {hw.smem_per_block}B
-          SM당 최대 {hw.max_threads_per_sm} 스레드 / 레지스터 {hw.regs_per_sm}
+          {hw.sm_count} SMs / smem {hw.smem_per_block}B per block
+          up to {hw.max_threads_per_sm} threads / {hw.regs_per_sm} registers per SM
           L2 {hw.l2_bytes // (1 << 20)}MB
-          실효 {hw.peak_tflops_f16} TFLOP/s / {hw.bandwidth_gbps} GB/s
+          effective {hw.peak_tflops_f16} TFLOP/s / {hw.bandwidth_gbps} GB/s
           ridge point {hw.ridge_point:.1f} FLOP/byte
 
-        실행 모델:
-          CTA가 SM에 배분되며 마지막 wave에서 SM 일부가 유휴.
-          타일은 형상 경계를 넘어도 그 부분을 전부 계산한다 — M=1에 128행
-            타일이면 일의 99.2%가 버려진다.
-          split-K는 K를 나눠 타일 수를 늘리되 리덕션 비용이 추가된다.
-          serial split-K는 파티션마다 fp16으로 D를 왕복한다 (정밀도 손실).
-          parallel split-K는 부분합 M*N*sk개를 DRAM에 쓰고 다시 읽는다.
-          stages=2(MmaPipelined)와 stages>=3(multistage)은 다른 커널 계열이다.
-          alignment가 16바이트를 못 맞추면 cp.async를 못 써서 2단만 가능하다.
+        Execution model:
+          CTAs are distributed across SMs; on the last wave some SMs idle.
+          A tile computes everything it covers, even outside the shape — a
+            128-row tile on M=1 wastes 99.2% of the work.
+          split-K divides K to create more tiles, adding a reduction cost.
+          serial split-K round-trips D in fp16 per partition (precision loss).
+          parallel split-K writes M*N*sk partials to DRAM and reads them back.
+          stages=2 (MmaPipelined) and stages>=3 (multistage) are different
+            kernel families.
+          If alignment does not reach 16 bytes, cp.async is unavailable and
+            only 2 stages are possible.
 
-        측정의 한계:
-          시간은 CUDA 이벤트 타이머의 눈금({noise.tick_ms * 1000:.3f}us) 단위로만
-            기록된다. 그보다 작은 차이는 **측정으로 구분할 수 없다.**
-          짧은 커널일수록 그 눈금이 상대적으로 크다 —
-            14us에서 한 눈금이 7.3%, 1.3ms에서 0.08%.""")
+        Limits of measurement:
+          Time is only recorded in units of the CUDA event timer's tick
+            ({noise.tick_ms * 1000:.3f}us). Smaller differences **cannot be
+            distinguished by measurement.**
+          The shorter the kernel, the larger that tick is relatively —
+            one tick is 7.3% at 14us, 0.08% at 1.3ms.""")
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +398,13 @@ def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
     overall.update(ev.stratified(1))
     overall["size_gap@1"] = ev.size_gap(1)
     overall["difficulty_gap@1"] = ev.difficulty_gap(1)
+    # ★ 아카이브 축(roofline)의 집계 (D-145). 요약이 이것부터 보여준다.
+    import numpy as _np
+    _m = _np.asarray(masks["mem"], dtype=bool)
+    if _m.any() and not _m.all():
+        overall["mem"] = ev.at(1, mask=_m)
+        overall["comp"] = ev.at(1, mask=~_m)
+        overall["n_mem"] = int(_m.sum())
 
     return DiagnosticReport(
         run_id=run_id,
@@ -407,110 +422,125 @@ def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
 def _render(r: DiagnosticReport) -> str:
     L: list[str] = []
     add = L.append
-    add(f"# 진단 리포트 — {r.run_id}")
+    add(f"# Diagnostic report — {r.run_id}")
     if r.notes:
         add("")
         for n in r.notes:
             add(f"> {n}")
     add("")
-    add("## 블록 1 — 하드웨어 사실")
+    add("## Block 1 — hardware facts")
     add("```")
     add(r.hw_block)
     add("```")
 
     add("")
-    add("## 블록 2 — 현재 규칙")
-    add(f"가중치는 수치 최적화기가 맞춘 값이다: "
+    add("## Block 2 — current rule")
+    add(f"The weights were fitted by the numerical optimiser: "
         f"{np.round(r.rule_weights, 3).tolist()}")
     add("```python")
     add(r.rule_code)
     add("```")
     if r.hypotheses_applied:
         add("")
-        add("현재 규칙에는 다음 가설들이 반영되어 있다:")
+        add("The current rule already reflects these hypotheses:")
         for h in r.hypotheses_applied:
             add(f"  {h}")
 
     add("")
-    add("## 블록 3 — 체제별 regret 분해")
+    add("## Block 3 — regret broken down by regime")
     o = r.overall
     add("```")
-    add(f"전체 regret@1 {o['regret@1']:.4f}  (@3 {o['regret@3']:.4f}  "
+    add(f"overall regret@1 {o['regret@1']:.4f}  (@3 {o['regret@3']:.4f}  "
         f"@5 {o['regret@5']:.4f}  @10 {o['regret@10']:.4f})")
-    # ★ regret 과 hit 을 나란히 본다. 둘이 달라지면 오류의 성격이 다르다.
-    add(f"정답 적중 hit@1 {o['hit@1']:.3f}  hit@3 {o['hit@3']:.3f}  "
-        f"(정답 = 최적 대비 노이즈 바닥 2시그마 이내)")
-    add("  regret 은 낮은데 hit 이 0 이면 **아깝게 빗나가는 것이 아니라")
-    add("  구조적으로 다른 곳을 짚는 것**이다 — 가중치 조정이 아니라 항이 필요하다.")
+    # ★ Look at regret and hit side by side. When they disagree the nature of
+    #   the error is different.
+    add(f"hit rate hit@1 {o['hit@1']:.3f}  hit@3 {o['hit@3']:.3f}  "
+        f"(a hit = within 2 sigma of the noise floor from the optimum)")
+    add("  Low regret with hit 0 means **not a near miss but structurally")
+    add("  pointing elsewhere** — that needs a term, not a weight change.")
     add("")
-    # ★ 결론을 미리 적어 두면 안 된다. 이 리포트의 숫자가 반대일 수 있고,
-    #   그러면 LLM 이 데이터가 아니라 문장을 믿는다. **재서 쓴다.**
+    # ★ Do not pre-write the conclusion. The numbers in this report may say
+    #   the opposite, and then the LLM believes the sentence, not the data.
+    #   **Measure it and write that.**
     sg, dg = abs(o["size_gap@1"]), abs(o["difficulty_gap@1"])
-    which = ("크기" if sg > dg else "난이도")
+    which = ("size" if sg > dg else "difficulty")
     ratio = (max(sg, dg) / max(min(sg, dg), 1e-9))
-    add(f"층화 — 이 분할에서는 **{which} 층화가 더 크게 달라진다** "
+    add(f"stratification — on this split, **{which} separates more** "
         f"({max(sg,dg):.4f} vs {min(sg,dg):.4f})")
+    # ★ Show the archive axis (roofline) **first** (D-145).
+    if "mem" in o and "comp" in o:
+        add(f"  ★ memory-bound   {o['mem']:.4f}   "
+            f"({int(o.get('n_mem', 0))} shapes)")
+        add(f"  ★ compute-bound  {o['comp']:.4f}   "
+            f"({int(o['n_shapes']) - int(o.get('n_mem', 0))} shapes)   "
+            f"gap {o['comp'] - o['mem']:+.4f}")
     add(f"  t_sol >= 0.5ms   {o['large(>=0.5ms)']:.4f}   "
-        f"({int(o['n_shapes']) - int(o['n_small'])}형상)")
+        f"({int(o['n_shapes']) - int(o['n_small'])} shapes)")
     add(f"  t_sol <  0.5ms   {o['small(<0.5ms)']:.4f}   "
-        f"({int(o['n_small'])}형상)   격차 {o['size_gap@1']:+.4f}")
-    add(f"  난이도 상 / 하    {o['hard']:.4f} / {o['easy']:.4f}   "
-        f"격차 {o['difficulty_gap@1']:+.4f}")
+        f"({int(o['n_small'])} shapes)   gap {o['size_gap@1']:+.4f}")
+    add(f"  difficulty hi/lo {o['hard']:.4f} / {o['easy']:.4f}   "
+        f"gap {o['difficulty_gap@1']:+.4f}")
     if ratio < 2.0:
-        add("  (두 축의 격차가 비슷하다. 이 분할의 형상 구성 때문일 수 있다)")
+        add("  (the two axes separate similarly. It may be the shape mix "
+            "of this split)")
     add("")
-    add(f"{'체제':26s} {'형상':>4} {'regret':>8}   최악 형상")
+    add(f"{'regime':26s} {'shapes':>6} {'regret':>8}   worst shape")
     for g in r.regimes:
-        add(f"{g.name:26s} {g.n_shapes:4d} {g.regret:8.4f}   "
+        add(f"{g.name:26s} {g.n_shapes:6d} {g.regret:8.4f}   "
             f"{g.worst_shape} ({g.worst_regret:.3f})")
     add("```")
 
     if r.table_facts is not None:
         add("")
-        add("## 블록 3.5 — 표 구조 관찰")
-        add("개별 사례로는 보이지 않는 패턴이다. "
-            "**학습 분할에서만 계산했다** (§12.3).")
+        add("## Block 3.5 — table structure observations")
+        add("Patterns that a single case never shows. "
+            "**Computed on the training split only** (§12.3).")
         add("```")
         for f in r.table_facts.lines:
             add(f)
         add("```")
 
     add("")
-    add("## 블록 4 — 사례")
-    add("**선택 vs 최적을 나란히 본다.** 주변 config 는 최적이 뾰족한지")
-    add("넓은지 알려준다 — 넓으면 정확히 맞추라는 뜻이 아니다.")
+    add("## Block 4 — cases")
+    add("**Picked vs optimal, side by side.** The neighbouring configs tell")
+    add("you whether the optimum is sharp or wide — wide does not mean you")
+    add("must hit it exactly.")
     for i, c in enumerate(r.cases, 1):
         add("")
-        add(f"### 사례 #{i}  {c.shape[0]}x{c.shape[1]}x{c.shape[2]}  "
-            f"[{c.regime}] {'★ 잘 맞춤' if c.kind == 'best' else ''}")
+        add(f"### Case #{i}  {c.shape[0]}x{c.shape[1]}x{c.shape[2]}  "
+            f"[{c.regime}] {'★ good match' if c.kind == 'best' else ''}")
         add("```")
-        add(f"규칙 선택: {_cfg_summary(c.picked):46s} -> {c.picked['ms']*1000:9.2f}us"
-            f"  (regret {c.regret:.3f})")
-        add(f"실제 최적: {_cfg_summary(c.optimum):46s} -> {c.optimum['ms']*1000:9.2f}us")
+        add(f"rule picked: {_cfg_summary(c.picked):46s} -> "
+            f"{c.picked['ms']*1000:9.2f}us  (regret {c.regret:.3f})")
+        add(f"actual best: {_cfg_summary(c.optimum):46s} -> "
+            f"{c.optimum['ms']*1000:9.2f}us")
         add("")
-        add(f"격차 = 노이즈 바닥의 **{c.gap_sigma:.1f}배**"
-            + ("   <- 노이즈 안이다. 이 형상에는 순위가 없다"
+        add(f"gap = **{c.gap_sigma:.1f}x** the noise floor"
+            + ("   <- inside the noise. This shape has no ordering"
                if c.gap_sigma < 1.0 else ""))
         add("")
         if c.feature_rows:
-            add(f"{'피처(차이 큰 순)':28s} {'선택':>12} {'최적':>12}  규칙에서")
+            add(f"{'feature (largest diff first)':28s} {'picked':>12} "
+                f"{'best':>12}  in rule")
             for name, a, b, in_rule in c.feature_rows:
                 add(f"{name:28s} {a:12.4f} {b:12.4f}  "
-                    + ("사용 중" if in_rule else "★ 미사용"))
+                    + ("in use" if in_rule else "★ unused"))
             add("")
-        add("같은 형상 상위 5개 실측 (최적 대비 노이즈 바닥 배수):")
+        add("top 5 measured for this shape (multiples of the noise floor "
+            "from the optimum):")
         for cs, ms, sg in c.neighbors:
-            tag = "(최적)" if sg <= 1e-9 else f"+{sg:.1f}시그마"
+            tag = "(optimal)" if sg <= 1e-9 else f"+{sg:.1f} sigma"
             add(f"  {ms*1000:9.2f}us  {tag:>12s}  {cs}")
         add("")
-        add(f"난이도 {c.difficulty:.2f}   노이즈 바닥 {c.noise_floor*100:.3f}%   "
-            f"구분 불가능한 정답 {c.n_answers}/{c.n_candidates}개")
+        add(f"difficulty {c.difficulty:.2f}   noise floor "
+            f"{c.noise_floor*100:.3f}%   "
+            f"indistinguishable answers {c.n_answers}/{c.n_candidates}")
         add("```")
 
     if r.failures:
         add("")
-        add("## 블록 5 — 실패 이력")
-        add("**같은 아이디어를 반복하지 마라.**")
+        add("## Block 5 — failure history")
+        add("**Do not repeat the same idea.**")
         add("```")
         for f in r.failures:
             add(f"r{f.get('round','?'):<4} {f.get('verdict','?'):12s} "

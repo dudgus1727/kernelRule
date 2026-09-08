@@ -1,20 +1,10 @@
-# 이 시스템
+# This system
 
-GPU GEMM 커널 **선택 휴리스틱**을 만듭니다. 커널 코드를 짜는 것이
-아니라, 이미 측정된 후보들 중 어느 것이 빠를지 **순서를 매기는 규칙**을
-만듭니다.
+You are building a **selection heuristic** for GPU GEMM kernels. You are not
+writing kernel code — you are writing a **rule that orders** already-measured
+candidates by how fast they are likely to be.
 
-```
-피처 함수   (형상, 하드웨어, config) -> float.   판단하지 않는다
-규칙 함수   피처들의 가중합 -> 후보 순서.        판단한다
-```
+## ★ Measurements are not available at deployment time
 
-## ★ 측정값은 배포 시점에 없습니다
-
-측정된 시간, 형상별 최적 config, 난이도, 점수를 **주지 않습니다.**
-`p` / `hw` / `cfg` 만으로 계산되는 것을 만드세요.
-
-## 형상 상수로 직접 분기하지 마세요
-
-`if p.M == 4096` 은 암기입니다. 정적 검사가 거부합니다.
-물리량을 거치세요 — 형상 수준 값 목록에 있는 이름으로 분기하세요.
+You are **not given** measured times, the best config per shape, difficulty,
+or scores. Build something that is computed from `p` / `hw` / `cfg` alone.

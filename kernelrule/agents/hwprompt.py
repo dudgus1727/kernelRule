@@ -87,10 +87,10 @@ def render_hw_prompt(hw: Hardware, *, noise, env: dict,
     at_mem = f" @{mem_mhz:.0f}MHz" if mem_mhz else ""
     spec_line = ""
     if spec_t and spec_b:
-        spec_line = (f"**실효값입니다.** 스펙({spec_t:.1f} TFLOP/s, "
-                     f"{spec_b:.0f} GB/s)이 아니라 클럭을 고정한 상태의 "
-                     "관측값입니다.\n이 보정이 없으면 memory-bound 판정이 "
-                     "어긋납니다.\n")
+        spec_line = (f"**These are effective values.** Not the spec "
+                     f"({spec_t:.1f} TFLOP/s, {spec_b:.0f} GB/s) but "
+                     "measured with the clocks locked.\nWithout this "
+                     "correction the memory-bound verdict is wrong.\n")
     if not (min_ms and min_ms > 0):
         raise HwPromptError(
             f"min_ms 가 {min_ms} 다. 이 표의 **가장 짧은 커널**에서 "
@@ -104,66 +104,69 @@ def render_hw_prompt(hw: Hardware, *, noise, env: dict,
     # ★ 어느 항이 한계인가 — **이 표의 가장 짧은 커널**에서 본다.
     tick_binds = noise.tick_pct(min_ms) > noise.sigma(min_ms)
     limit_note = (
-        """**눈금 안의 차이는 존재하지 않는 것과 같습니다.** 그 아래를 겨냥해
-규칙을 정교하게 만드는 것은 노이즈를 배우는 일입니다. 그보다 **확실히
-지는 경로**를 막는 편이 낫습니다."""
+        """**A difference inside one tick may as well not exist.** Refining
+the rule below that is learning noise. It is better to block the paths that
+**lose for certain**."""
         if tick_binds else
-        """★ **이 표에서는 눈금이 한계가 아닙니다.** 위 표에서 보듯 어느
-길이에서도 통계 항이 더 큽니다 — 즉 한계를 정하는 것은 타이머가 아니라
-**반복 측정으로 줄어드는 산포**입니다. 짧은 형상이라고 해서 특별히 못
-맞추는 것이 아닙니다.
+        """★ **On this table the tick is not the limit.** As the table above
+shows, the statistical term is larger at every length — so what sets the
+limit is not the timer but **the spread that repetition averages down**.
+Short shapes are not especially hard to get right.
 
-노이즈 바닥(둘 중 큰 쪽) 아래를 겨냥하지 마세요. 그것은 여전히
-노이즈를 배우는 일입니다.""")
-    return f"""# 하드웨어 사실 — 기억에서 꺼내지 말고 아래를 쓰세요
+Do not aim below the noise floor (the larger of the two). That is still
+learning noise.""")
+    return f"""# Hardware facts — do not recall from memory, use what follows
 
-이 프로젝트에서 기억에 의존해 네 번 틀렸습니다 (ScaleType 의미, split-K
-제약, swizzle 호환성, serial 부분합 타입). 아래가 대상 하드웨어입니다.
+This project got it wrong from memory four times (the meaning of ScaleType,
+split-K constraints, swizzle compatibility, the serial partial type). This is
+the target hardware.
 
 ```
 GPU        {hw.name} ({hw.arch})
-SM         {hw.sm_count}개
-smem       블록당 {_fmt_bytes(hw.smem_per_block)} ({hw.smem_per_block:,} B)
-스레드      SM 당 최대 {hw.max_threads_per_sm:,}
-레지스터    SM 당 {hw.regs_per_sm:,}
+SMs        {hw.sm_count}
+smem       {_fmt_bytes(hw.smem_per_block)} per block ({hw.smem_per_block:,} B)
+threads    up to {hw.max_threads_per_sm:,} per SM
+registers  {hw.regs_per_sm:,} per SM
 L2         {_fmt_bytes(hw.l2_bytes)}
-실효 성능   {hw.peak_tflops_f16:.1f} TFLOP/s{at_sm}   \
+effective  {hw.peak_tflops_f16:.1f} TFLOP/s{at_sm}   \
 {hw.bandwidth_gbps:.1f} GB/s{at_mem}
 ridge      {hw.ridge_point:.1f} FLOP/byte
 ```
 
 {spec_line}
-## 실행 모델
+## Execution model
 
 ```
-CTA 가 SM 에 배분되고, 마지막 wave 에서 SM 일부가 논다.
+CTAs are distributed across SMs, and on the last wave some SMs idle.
 
-타일은 형상 경계를 넘어도 그 부분을 **전부 계산한다.**
-  M=1 에 128행 타일이면 일의 99.2% 가 버려진다.
+A tile computes **everything it covers**, even outside the shape.
+  A 128-row tile on M=1 wastes 99.2% of the work.
 
-split-K 는 K 를 나눠 타일 수를 늘리되 리덕션 비용이 붙는다.
-  serial   파티션마다 fp16 으로 D 를 왕복한다 (정밀도 손실)
-  parallel 부분합 M*N*sk 개를 DRAM 에 쓰고 다시 읽는다
+split-K divides K to create more tiles, at the cost of a reduction.
+  serial    round-trips D in fp16 per partition (precision loss)
+  parallel  writes M*N*sk partials to DRAM and reads them back
 
-stages=2 (MmaPipelined) 와 stages>=3 (multistage) 는 **다른 커널 계열**이다.
-alignment 가 16바이트를 못 맞추면 cp.async 를 못 써서 2단만 가능하다.
+stages=2 (MmaPipelined) and stages>=3 (multistage) are **different kernel
+families**. If alignment does not reach 16 bytes, cp.async is unavailable and
+only 2 stages are possible.
 ```
 
-## 측정의 한계 — 이것이 판단에 영향을 줍니다
+## Limits of measurement — this affects your judgement
 
 ```
-시간은 CUDA 이벤트 타이머의 눈금({tick_ms * 1000:.3f} us) 단위로만 기록된다.
-그보다 작은 차이는 **측정으로 구분할 수 없다.**
+Time is only recorded in units of the CUDA event timer's tick ({tick_ms * 1000:.3f} us).
+Differences smaller than that **cannot be distinguished by measurement.**
 
-노이즈 바닥은 두 항 중 **큰 쪽**이다:
-  눈금   tick/t          반복 측정해도 안 줄어든다 (분해 한계)
-  통계   sigma_abs/t + sigma_rel   반복하면 평균으로 줄어든다
+The noise floor is the **larger** of two terms:
+  tick        tick/t                    repetition does not shrink it
+                                        (a resolution limit)
+  statistical sigma_abs/t + sigma_rel   repetition averages it down
 
 {rows}
 ```
 
-**이것은 하드웨어와 타이머의 성질입니다.** 어느 GPU 로 가도
-같은 형태로 나타납니다 — 다만 **어느 항이 이기는지는 표마다 다릅니다.**
+**This is a property of the hardware and the timer.** It appears in the same
+form on any GPU — but **which term wins differs per table.**
 
 {limit_note}
 """
@@ -225,9 +228,14 @@ def check_hw_prompt(text: str, hw: Hardware, tick_ms: float) -> None:
         raise HwPromptError(
             f"하드웨어 프롬프트가 {hw.name!r} 를 말하지 않는다. "
             "다른 GPU 의 사실이 가고 있다 (D-113).")
-    m = re.search(r"눈금\(([\d.]+) us\)", text)
+    # ★ 2026-09-08 (D-146): 프롬프트가 영어가 됐다. **옛 한글 형태도 받는다**
+    #   — `hw/sm_86.md` 는 얼린 파일이라 한글이고, 그것도 검사할 수 있어야 한다.
+    m = (re.search(r"tick \(([\d.]+) us\)", text)
+         or re.search(r"눈금\(([\d.]+) us\)", text))
     if not m:
-        raise HwPromptError("하드웨어 프롬프트에 눈금 절이 없다.")
+        raise HwPromptError(
+            "the hardware prompt has no tick section / "
+            "하드웨어 프롬프트에 눈금 절이 없다.")
     got, want = float(m.group(1)), tick_ms * 1000
     if abs(got - want) > 0.5e-3 * max(1.0, want):
         raise HwPromptError(
