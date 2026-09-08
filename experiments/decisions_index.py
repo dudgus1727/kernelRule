@@ -1,16 +1,22 @@
-"""★ `decisions.md` 머리의 색인을 **생성한다**. LLM 0회.
+"""★ It **generates** the index at the head of `decisions.md`. 0 LLM calls.
 
-    python3 experiments/decisions_index.py          # 갱신
-    python3 experiments/decisions_index.py --check   # 달라졌으면 실패
+    python3 experiments/decisions_index.py           # update
+    python3 experiments/decisions_index.py --check    # fail if it diverged
 
-5,900줄에 D-1~D-114 가 시간순으로 쌓여 있고 색인이 없었다. 새 세션이
-"D-77 이 무엇이었나" 를 찾으려면 전부 훑어야 한다.
+5,900 lines hold D-1~D-114 in time order and there was no index. For a new
+session to find "what was D-77" it would have to read all of it.
 
-★ 손으로 쓰지 않는다. 손으로 쓰면 D 하나 추가할 때마다 달라진다 (원칙 2).
-제목은 `## D-N  ...` 줄에서 그대로 가져온다.
+★ It is not written by hand. Writing it by hand makes it diverge every time
+one D is added (principle 2). The titles are taken from the `## D-N  ...`
+lines as they are.
 
-`_SUPERSEDED` 만 사람이 적는다 — "무엇이 무엇을 정정했나" 는 제목에서
-자동으로 못 읽는다.
+Only `_SUPERSEDED` is written by a human — "what corrected what" cannot be
+read automatically from the titles.
+
+⚠️ 2026-09-08 (D-146): **the strings that go into `docs/decisions.md`** (the
+BEGIN marker, the index heading and note, the `_SUPERSEDED` statuses) **stay
+in Korean** — `docs/` is not translated. Only what this file prints to the
+terminal is English.
 """
 
 from __future__ import annotations
@@ -24,7 +30,8 @@ DOC = Path(__file__).resolve().parents[1] / "docs/decisions.md"
 BEGIN = "<!-- INDEX:BEGIN — experiments/decisions_index.py 가 만든다 -->"
 END = "<!-- INDEX:END -->"
 
-#: ★ 정정된 결정. `D번호 -> (상태, 정정한 D)`. **사람이 적는다.**
+#: ★ The corrected decisions. `D number -> (status, the D that corrected it)`.
+#: **Written by a human.**
 _SUPERSEDED: dict[int, tuple[str, str]] = {
     77: ("부분 철회", "D-103 — 순위 경로에서는 도달률 100%"),
     92: ("정정됨", "D-92 안의 정정 — 표본 단위가 틀렸다"),
@@ -36,11 +43,13 @@ _SUPERSEDED: dict[int, tuple[str, str]] = {
 
 
 def _entries(text: str) -> list[tuple[int, str, str]]:
-    """`(번호, 제목, 헤더 원문)`. 앵커는 **헤더 원문**에서 만든다."""
+    """`(number, title, the raw header)`. The anchor is made from **the raw
+    header**."""
     out = []
-    # ★ 형식은 `## D-N  제목` **하나**다 (2026-09-03 통일). 옛 `## D-1.`
-    #   형식을 정규식으로 같이 받다가 25개를 빠뜨렸다 — 정규식을 늘리는
-    #   것보다 **형식을 하나로 만드는 것**이 맞다 (원칙 2).
+    # ★ The format is `## D-N  title`, **one** format (unified 2026-09-03).
+    #   Taking the old `## D-1.` format in the same regex too missed 25 of
+    #   them — **making the format one thing** is more right than growing the
+    #   regex (principle 2).
     for m in re.finditer(r"^## D-(\d+)\s+(.+)$", text, re.M):
         out.append((int(m.group(1)), m.group(2).strip(),
                     m.group(0)[3:].strip()))
@@ -48,7 +57,8 @@ def _entries(text: str) -> list[tuple[int, str, str]]:
 
 
 def _slug(header: str) -> str:
-    """GitHub 앵커. 한글은 그대로, 공백은 `-`, 나머지 기호는 뺀다."""
+    """The GitHub anchor. Korean stays as it is, spaces become `-`, and the
+    other symbols are dropped."""
     s = header.lower()
     s = re.sub(r"[^0-9a-z가-힣\s\-_]", "", s)
     return re.sub(r"\s+", "-", s.strip())
@@ -77,30 +87,32 @@ def main() -> None:
         i, j = text.index(BEGIN), text.index(END) + len(END)
         body = text[:i] + text[j:]
     else:
-        # 첫 `## ` 앞에 끼운다
+        # It is inserted before the first `## `
         m = re.search(r"^## ", text, re.M)
         body = text
         i = m.start() if m else len(text)
     block = BEGIN + "\n" + build(body) + END + "\n\n"
     new = body[:i] + block + body[i:] if BEGIN not in text else \
         text[:text.index(BEGIN)] + block + text[text.index(END) + len(END):].lstrip("\n")
-    # ★ **개수를 센다** (원칙 38). 정규식이 못 잡는 형식이 새로 생기면
-    #   "달라졌다" 로는 안 잡힌다 — 양쪽이 똑같이 빠지기 때문이다.
+    # ★ **It counts them** (principle 38). If a new format the regex cannot
+    #   catch appears, "it diverged" does not catch it — because both sides
+    #   miss it equally.
     body_only = text[text.index(END) + len(END):] if END in text else text
     n_head = len(re.findall(r"^## D-", body_only, re.M))
     n_idx = len(_entries(body_only))
     if n_head != n_idx:
-        sys.exit(f"본문의 `## D-` 헤더 {n_head}개 중 {n_idx}개만 색인에 "
-                 f"들어간다. 헤더 형식이 `## D-N  제목` 이 아닌 것이 "
-                 f"{n_head - n_idx}개 있다 — 형식을 고쳐라 (D-116).")
+        sys.exit(f"only {n_idx} of the {n_head} `## D-` headers in the body "
+                 f"get into the index. {n_head - n_idx} of them are not in "
+                 f"the `## D-N  title` format — fix the format (D-116).")
     if a.check:
         if new != text:
-            sys.exit("decisions.md 색인이 달라졌다. "
-                     "`python3 experiments/decisions_index.py` 를 돌려라.")
-        print(f"색인 최신 ({n_idx}개, 본문 헤더와 일치)")
+            sys.exit("the decisions.md index diverged. Run "
+                     "`python3 experiments/decisions_index.py`.")
+        print(f"the index is up to date ({n_idx} entries, matching the body "
+              f"headers)")
         return
     DOC.write_text(new)
-    print(f"색인 {len(_entries(body))}줄 갱신")
+    print(f"the index was updated, {len(_entries(body))} lines")
 
 
 if __name__ == "__main__":

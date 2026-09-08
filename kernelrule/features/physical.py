@@ -1,31 +1,36 @@
-"""사람이 작성한 물리 피처 (§8.2). **판단하지 않는다.**
+"""Physical features written by a human (§8.2). **They do not judge.**
 
-이 파일이 LLM 루프보다 먼저 있어야 하는 이유가 둘이다. (1) LLM 생성에
-의존하면 초반에 아무것도 못 한다. (2) "LLM 이 추가한 피처가 기여했는가" 를
-재는 기준선이 된다 (§16.1 ablation).
+There are two reasons this file must exist before the LLM loop. (1) Depending
+on LLM generation means nothing works at the start. (2) It is the baseline
+against which "did the features the LLM added contribute" is measured (§16.1
+ablation).
 
-## 작성 규칙 — LLM 에게도 동일하게 강제한다
+## Writing rules — enforced identically on the LLM
 
-    순수 함수. (Problem, Hardware, Config) 만으로 계산
-    float 하나. **클수록 나쁜 방향으로 통일** — 규칙이 항상 "가중합 후
-                 오름차순 정렬" 이 되어 LLM 이 부호를 헷달라질 여지가 없다
-    하드웨어 상수는 hw.* 에서 읽기. 84 / 101376 하드코딩 금지
-    cfg.ext 참조 금지 — 아키텍처 전이 전제 (§4.3)
-    10줄 이내
+    Pure function. Computed from (Problem, Hardware, Config) only
+    A single float. **Unify the direction so that larger is worse** — the
+                 rule is then always "weighted sum, then ascending sort", and
+                 there is no room for the LLM to get the sign confused
+    Read hardware constants from hw.*. No hardcoding of 84 / 101376
+    No reference to cfg.ext — the architecture-transfer premise (§4.3)
+    At most 10 lines
 
-## 벡터화 (`vec=`) 는 **같은 물리를 배열로** 쓴 것이다
+## The vectorisation (`vec=`) is **the same physics written as arrays**
 
-스칼라 구현이 계약이고 벡터화는 속도다. 둘이 어긋나면 학습(행렬)과
-배포(스칼라)가 다른 함수를 쓰게 되므로 `verify_vectorized()` 가 표본에서
-대조하고 **불일치는 기각**이다 (§26.4).
+The scalar implementation is the contract and the vectorisation is speed. If
+the two diverge, training (the matrix) and deployment (the scalar) use
+different functions, so `verify_vectorized()` compares them on a sample and
+**a mismatch is a rejection** (§26.4).
 
-## 이 표에서 확인된 사실 (§18.3) — 피처가 담아야 할 것
+## Facts confirmed on this table (§18.3) — what the features must capture
 
-    스필 커널은 최적으로 뽑힌 적이 0회다 (rel 중앙 13.6, 최대 37.2)
-    warp_m=128 은 최적 0회 — 스필과 같은 것을 가리킨다
-    stages=2(MmaPipelined)는 stages>=3(multistage)과 다른 커널 계열이다
-    alignment 1 형상은 cp.async 를 못 써서 stages=2 만 가능하다
-    split_k_mode 는 66/66 이 serial. parallel 은 40만 줄을 쓰고 최적 0회
+    A spilling kernel was picked as optimal 0 times (rel median 13.6, max 37.2)
+    warp_m=128 is optimal 0 times — it points at the same thing as spilling
+    stages=2 (MmaPipelined) is a different kernel family from stages>=3
+      (multistage)
+    An alignment-1 shape cannot use cp.async, so only stages=2 is possible
+    split_k_mode is serial in 66/66. parallel occupies 400k rows and is
+      optimal 0 times
 """
 
 from __future__ import annotations
@@ -40,10 +45,11 @@ from kernelrule.features import REGISTRY
 from kernelrule.features import feature as _feature
 from kernelrule.features import shape_feature as _shape_feature
 
-# ★ 이 모듈의 피처는 **전부 `REGISTRY` 에** 들어간다. 그 묶음을 여기 한 줄로
-#   못박는다 — `feature()` 자체에는 기본값이 없다 (§30.9). 데코레이터마다
-#   `registry=REGISTRY` 를 반복하지 않으면서도, 어디로 등록되는지가
-#   파일 첫머리에서 한눈에 보인다.
+# ★ **Every** feature in this module goes into `REGISTRY`. That binding is
+#   nailed down here in one line — `feature()` itself has no default
+#   (§30.9). This avoids repeating `registry=REGISTRY` on every decorator
+#   while still making where things register visible at a glance at the top
+#   of the file.
 feature = partial(_feature, registry=REGISTRY)
 shape_feature = partial(_shape_feature, registry=REGISTRY)
 
@@ -62,7 +68,7 @@ def _v_ebytes(df) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# 그리드와 wave — GPU 를 몇 번 채우는가
+# Grid and waves — how many times the GPU is filled
 # ---------------------------------------------------------------------------
 def _v_tiles_mn(df):
     return (np.ceil(df["M"].to_numpy(np.float64) / df["tile_m"].to_numpy(np.float64)),
@@ -77,7 +83,8 @@ def _v_grid_tiles(df):
 @feature(unit="count", expected_range=(1.0, 1e7), direction="neutral",
          vec=lambda df, hw, p: np.log2(1.0 + _v_grid_tiles(df)))
 def log_grid_tiles(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """CTA 개수(log2). 그리드가 얼마나 큰가. 방향성 없음 — 규모 지표다."""
+    """The number of CTAs (log2). How large the grid is. No direction — it
+    is a scale indicator."""
     tiles = (math.ceil(p.M / cfg.tile_m) * math.ceil(p.N / cfg.tile_n)
              * cfg.split_k)
     return math.log2(1.0 + tiles)
@@ -91,9 +98,9 @@ def _v_waves(df, hw):
 @feature(unit="dimensionless", expected_range=(0.0, 1e5), direction="neutral",
          vec=lambda df, hw, p: _v_waves(df, hw))
 def waves(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """그리드가 GPU 를 몇 번 채우는가. occupancy 를 반영한다.
+    """How many times the grid fills the GPU. It accounts for occupancy.
 
-    1 미만이면 SM 이 남는다. 방향성 없음 — 크다고 나쁜 것이 아니다.
+    Below 1, SMs are left over. No direction — larger is not worse.
     """
     tiles = (math.ceil(p.M / cfg.tile_m) * math.ceil(p.N / cfg.tile_n)
              * cfg.split_k)
@@ -109,10 +116,12 @@ def _v_tail_waste(df, hw):
 @feature(expected_range=(0.0, 1.0), direction="higher_is_worse",
          vec=lambda df, hw, p: _v_tail_waste(df, hw))
 def tail_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """마지막 wave 에서 노는 SM 슬롯의 비율. 0~1, 클수록 나쁨.
+    """The fraction of SM slots idle in the last wave. 0~1, larger is
+    worse.
 
-    waves 가 크면 자연히 0 에 가까워진다 — 그래서 조건부 분기 없이도
-    큰 형상에서 이 항이 알아서 사라진다 (§2.3 의 "좋은 수정").
+    When waves is large it naturally approaches 0 — so this term fades away
+    by itself on large shapes, without any conditional branch (the "good
+    fix" of §2.3).
     """
     w = max(1e-12, waves(p, hw, cfg))
     full = math.ceil(w)
@@ -123,17 +132,19 @@ def tail_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
          vec=lambda df, hw, p: 1.0 / np.maximum(1.0 - _v_tail_waste(df, hw), 1e-3)
          - 1.0)
 def sm_idle_cost(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """wave 양자화로 **몇 배** 손해인가 - 1. `tail_waste` 의 비선형 형태.
+    """**How many times** worse wave quantisation makes it, minus 1. The
+    non-linear form of `tail_waste`.
 
-    512³ 에 128x128 을 쓰면 타일 16개로 84 SM 중 16개만 돌아 계수가 5.3배다.
-    선형 항(`tail_waste=0.81`)으로는 그 크기가 안 나온다 — 손규칙이 실제로
-    이걸 놓쳐서 1.221 에서 1.192 로 내려갔다 (kernelTab baselines.md).
+    Using 128x128 on 512³ gives 16 tiles, so only 16 of 84 SMs run and the
+    factor is 5.3x. A linear term (`tail_waste=0.81`) cannot produce that
+    magnitude — the hand rule really did miss this, and went from 1.221 down
+    to 1.192 (kernelTab baselines.md).
     """
     return 1.0 / max(1e-3, 1.0 - tail_waste(p, hw, cfg)) - 1.0
 
 
 # ---------------------------------------------------------------------------
-# 타일이 실제로 하는 일 — 형상 x config 상호작용
+# What a tile actually does — the shape x config interaction
 # ---------------------------------------------------------------------------
 def _v_edge_waste(df):
     gm, gn = _v_tiles_mn(df)
@@ -147,11 +158,13 @@ def _v_edge_waste(df):
 @feature(expected_range=(0.0, 300.0), direction="higher_is_worse",
          vec=lambda df, hw, p: _v_edge_waste(df))
 def edge_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """타일이 형상 경계를 넘어 **버려지는 일**의 배수 - 1.
+    """The multiple of **wasted work** where a tile crosses the shape
+    boundary, minus 1.
 
-    타일은 형상 밖으로 튀어나가도 그 부분을 전부 계산한다. M=1 에 128행
-    타일이면 일의 99.2% 가 버려진다 (값 127). 작은 M 이 작은 tile_m 을
-    선호하는 이유이고, 형상과 config 가 만나는 지점이다.
+    A tile computes everything it covers even outside the shape. With a
+    128-row tile on M=1, 99.2% of the work is thrown away (value 127). This
+    is why a small M prefers a small tile_m, and it is where the shape and
+    the config meet.
     """
     gm = math.ceil(p.M / cfg.tile_m)
     gn = math.ceil(p.N / cfg.tile_n)
@@ -164,11 +177,13 @@ def edge_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
                               + df["tile_n"].to_numpy(np.float64))
              * df["K"].to_numpy(np.float64) * _v_ebytes(df)))(*_v_tiles_mn(df)))
 def log_dram_traffic(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """A/B 를 DRAM 에서 몇 바이트 읽는가 (log2). 타일링이 결정한다.
+    """How many bytes of A/B are read from DRAM (log2). The tiling decides
+    it.
 
-    `ceil(M/tm)*ceil(N/tn)*(tm+tn)*K*elem` — 타일이 클수록 재사용이 커져
-    총 트래픽이 준다. M=1 이면 `gm=1` 이라 tm 을 키워도 타일 수가 안 줄고
-    `(tm+tn)` 만 늘어 **자동으로 벌점**이 된다.
+    `ceil(M/tm)*ceil(N/tn)*(tm+tn)*K*elem` — a larger tile means more reuse,
+    so the total traffic falls. At M=1, `gm=1`, so raising tm does not
+    reduce the tile count and only `(tm+tn)` grows, which makes it
+    **automatically a penalty**.
     """
     gm = math.ceil(p.M / cfg.tile_m)
     gn = math.ceil(p.N / cfg.tile_n)
@@ -187,9 +202,10 @@ def log_dram_traffic(p: Problem, hw: Hardware, cfg: Config) -> float:
                                            * df["N"].to_numpy(np.float64)), 1.0)
          )(*_v_tiles_mn(df)))
 def traffic_amplification(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """실제 A/B 트래픽 / 이론 최소치. 1.0 이 완벽한 재사용이다.
+    """Actual A/B traffic / the theoretical minimum. 1.0 is perfect reuse.
 
-    `log_dram_traffic` 의 무차원 형태. 형상 크기를 나눠서 전이가 된다 (§8.1).
+    The dimensionless form of `log_dram_traffic`. Dividing out the shape
+    size makes it transferable (§8.1).
     """
     gm = math.ceil(p.M / cfg.tile_m)
     gn = math.ceil(p.N / cfg.tile_n)
@@ -204,15 +220,15 @@ def traffic_amplification(p: Problem, hw: Hardware, cfg: Config) -> float:
              df["tile_m"].to_numpy(np.float64)
              / df["tile_n"].to_numpy(np.float64))))
 def tile_aspect_imbalance(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """타일이 얼마나 길쭉한가. |log2(tm/tn)|. 정방형이 0.
+    """How elongated the tile is. |log2(tm/tn)|. A square is 0.
 
-    같은 면적이면 정방형이 A/B 트래픽을 최소화한다.
+    At equal area, a square minimises A/B traffic.
     """
     return abs(math.log2(cfg.tile_m / cfg.tile_n))
 
 
 # ---------------------------------------------------------------------------
-# mainloop 깊이와 split-K
+# mainloop depth and split-K
 # ---------------------------------------------------------------------------
 @feature(unit="count", expected_range=(0.0, 16.0), direction="neutral",
          vec=lambda df, hw, p: np.log2(np.maximum(1.0,
@@ -220,16 +236,18 @@ def tile_aspect_imbalance(p: Problem, hw: Hardware, cfg: Config) -> float:
              / (df["tile_k"].to_numpy(np.float64)
                 * df["split_k"].to_numpy(np.float64)))))
 def log_mainloop_iters(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """mainloop 반복 수(log2). `K / (tile_k * split_k)`.
+    """The number of mainloop iterations (log2). `K / (tile_k * split_k)`.
 
-    GBDT 가 가장 중요하게 꼽은 축이다 (§30.6b). 짧으면 파이프라인 워밍업
-    비용을 못 갚고, 길면 A/B 재사용이 잘 된다.
+    The axis GBDT ranked most important (§30.6b). When it is short the
+    pipeline warm-up cost cannot be paid back; when it is long A/B reuse
+    works well.
     """
     return math.log2(max(1.0, p.K / (cfg.tile_k * cfg.split_k)))
 
 
 def _v_stages_est(df):
-    """smem 에서 파이프라인 깊이를 역산한다. **`ext` 를 안 본다.**"""
+    """Derives the pipeline depth backwards from smem. **It does not look
+    at `ext`.**"""
     denom = np.maximum(1.0, df["tile_k"].to_numpy(np.float64)
                        * (df["tile_m"].to_numpy(np.float64)
                           + df["tile_n"].to_numpy(np.float64)) * _v_ebytes(df))
@@ -243,15 +261,16 @@ def _v_stages_est(df):
                           / (df["tile_k"].to_numpy(np.float64)
                              * df["split_k"].to_numpy(np.float64))), 0.0, 4.0))
 def pipeline_warmup_frac(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """파이프라인 채우기가 mainloop 에서 차지하는 비율.
+    """The fraction of the mainloop taken up by filling the pipeline.
 
-    ★ 깊이를 아키텍처 전용 확장 필드에서 읽지 않고 **smem 에서 역산한다.**
-    CUTLASS 의 mainloop smem 이 `stages * tile_k * (tile_m+tile_n) * elem`
-    이므로 나누면 깊이가 나온다. `ext` 를 안 보므로 아키텍처 전이가 되고
-    (§4.3), SM90 처럼 stages 개념이 다른 곳에서도 "smem 을 얼마나 깊이
-    쌓았는가" 로 여전히 의미가 있다.
+    ★ The depth is **derived backwards from smem** instead of being read
+    from an architecture-specific extension field. CUTLASS's mainloop smem
+    is `stages * tile_k * (tile_m+tile_n) * elem`, so dividing gives the
+    depth. Because it does not look at `ext` it transfers across
+    architectures (§4.3), and where the notion of stages differs, as on
+    SM90, it still means something as "how deep the smem was stacked".
 
-    깊은 파이프라인은 mainloop 이 짧을 때 워밍업을 못 갚는다.
+    A deep pipeline cannot pay back its warm-up when the mainloop is short.
     """
     denom = max(1.0, cfg.tile_k * (cfg.tile_m + cfg.tile_n) * _ebytes(p.dtype))
     stages = max(1.0, cfg.smem_bytes / denom)
@@ -262,10 +281,11 @@ def pipeline_warmup_frac(p: Problem, hw: Hardware, cfg: Config) -> float:
 @feature(expected_range=(0.0, 1.0), direction="higher_is_worse",
          vec=lambda df, hw, p: np.log2(df["split_k"].to_numpy(np.float64)) / 4.0)
 def split_k_cost(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """split-K 리덕션 비용의 대리 지표. log2(sk)/4, sk=1 이면 0.
+    """A proxy for the split-K reduction cost. log2(sk)/4, and 0 at sk=1.
 
-    serial split-K 는 파티션마다 D 를 왕복하므로 파티션 수에 비례해 비용이
-    붙는다. 로그를 쓰는 이유는 sk=1->2 의 차이가 8->16 보다 크기 때문이다.
+    serial split-K round-trips D per partition, so the cost grows with the
+    number of partitions. The log is used because the difference from sk=1
+    to 2 is larger than from 8 to 16.
     """
     return math.log2(cfg.split_k) / 4.0
 
@@ -277,11 +297,11 @@ def split_k_cost(p: Problem, hw: Hardware, cfg: Config) -> float:
                             * df["N"].to_numpy(np.float64)
                             * df["split_k"].to_numpy(np.float64), 0.0)))
 def log_workspace_bytes(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """parallel split-K 의 리덕션 트래픽(log2). serial 이면 0.
+    """The reduction traffic of parallel split-K (log2). 0 for serial.
 
-    GBDT 가 상위로 꼽았는데 손규칙은 안 썼다 (§30.6b). parallel 은 부분합
-    M*N*sk 개를 DRAM 에 쓰고 다시 읽는다 — 66/66 형상에서 최적이 serial 인
-    이유를 이것이 설명할 수 있다.
+    GBDT ranked it highly and the hand rule did not use it (§30.6b).
+    parallel writes M*N*sk partials to DRAM and reads them back — this can
+    explain why serial is optimal on 66/66 shapes.
     """
     if cfg.split_k_mode != "parallel":
         return 0.0
@@ -289,13 +309,14 @@ def log_workspace_bytes(p: Problem, hw: Hardware, cfg: Config) -> float:
 
 
 # ---------------------------------------------------------------------------
-# 자원 압력 — 빌드 시점에 알 수 있는 커널 속성 (§3.2)
+# Resource pressure — kernel properties knowable at build time (§3.2)
 # ---------------------------------------------------------------------------
 @feature(expected_range=(0.0, 1.5), direction="higher_is_worse",
          vec=lambda df, hw, p: df["smem_bytes"].to_numpy(np.float64)
          / hw.smem_per_block)
 def smem_pressure(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """smem 예산을 얼마나 쓰는가. 꽉 채우면 SM 당 상주 블록이 줄어든다."""
+    """How much of the smem budget it uses. Filling it reduces the resident
+    blocks per SM."""
     return cfg.smem_bytes / hw.smem_per_block
 
 
@@ -305,7 +326,7 @@ def smem_pressure(p: Problem, hw: Hardware, cfg: Config) -> float:
          else df["regs_per_thread"].to_numpy(np.float64)
          * df["threads"].to_numpy(np.float64) / hw.regs_per_sm)
 def reg_pressure(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """블록 하나가 SM 레지스터 파일의 몇 배를 요구하는가."""
+    """How many times the SM register file one block demands."""
     return cfg.regs_per_thread * cfg.threads / hw.regs_per_sm
 
 
@@ -315,9 +336,9 @@ def reg_pressure(p: Problem, hw: Hardware, cfg: Config) -> float:
              * df["threads"].to_numpy(np.float64) / hw.max_threads_per_sm,
              0.0, 1.0))
 def occupancy_deficit(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """SM 당 스레드 슬롯 중 채우지 못하는 비율. 0 이면 만점.
+    """The fraction of thread slots per SM left unfilled. 0 is perfect.
 
-    `max_blocks_per_sm` 은 빌드 시점 값이라 써도 된다 (§3.2).
+    `max_blocks_per_sm` is a build-time value, so it may be used (§3.2).
     """
     used = cfg.max_blocks_per_sm * cfg.threads / hw.max_threads_per_sm
     return 1.0 - min(1.0, max(0.0, used))
@@ -327,10 +348,11 @@ def occupancy_deficit(p: Problem, hw: Hardware, cfg: Config) -> float:
          vec=lambda df, hw, p: (df["spill_bytes"].to_numpy(np.float64) > 0
                                 ).astype(np.float64))
 def has_spill(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """레지스터 스필이 있는가. 0 또는 1.
+    """Is there a register spill? 0 or 1.
 
-    ★ 이 표에서 스필 커널은 **최적으로 뽑힌 적이 0회**이고 rel 중앙값이
-    13.6(최대 37.2)이다. 전체 행의 7.4% 이며 긴 꼬리가 전부 여기서 나온다.
+    ★ In this table a spilling kernel was **picked as optimal 0 times**, and
+    its rel median is 13.6 (max 37.2). It is 7.4% of all rows, and the whole
+    long tail comes from here.
     """
     return 1.0 if cfg.spill_bytes > 0 else 0.0
 
@@ -339,7 +361,7 @@ def has_spill(p: Problem, hw: Hardware, cfg: Config) -> float:
          vec=lambda df, hw, p: np.log2(
              1.0 + df["spill_bytes"].to_numpy(np.float64)) / 4.0)
 def spill_magnitude(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """스필의 크기(log2/4). 있고 없고만이 아니라 얼마나인지."""
+    """The size of the spill (log2/4). Not just whether, but how much."""
     return math.log2(1.0 + cfg.spill_bytes) / 4.0
 
 
@@ -347,10 +369,11 @@ def spill_magnitude(p: Problem, hw: Hardware, cfg: Config) -> float:
          vec=lambda df, hw, p: (df["pipeline_kind"].to_numpy().astype(str)
                                 == "pipelined").astype(np.float64))
 def is_two_stage(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """2단 파이프라인(MmaPipelined)인가. multistage 와 **다른 커널 계열**이다.
+    """Is it a two-stage pipeline (MmaPipelined)? A **different kernel
+    family** from multistage.
 
-    `ext.stages` 를 안 보고 `pipeline_kind` 를 본다 — 그쪽이 아키텍처
-    공통 필드라 전이가 된다 (§4.3).
+    It looks at `pipeline_kind` rather than `ext.stages` — that one is a
+    field common across architectures, so it transfers (§4.3).
     """
     return 1.0 if cfg.pipeline_kind == "pipelined" else 0.0
 
@@ -359,21 +382,23 @@ def is_two_stage(p: Problem, hw: Hardware, cfg: Config) -> float:
          vec=lambda df, hw, p: np.log2(1.0 + df["inst_total"].to_numpy(np.float64))
          if "inst_total" in df.columns else np.zeros(len(df)))
 def log_inst_total(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """SASS 명령어 수(log2). 커널 복잡도의 대리 지표.
+    """The number of SASS instructions (log2). A proxy for kernel
+    complexity.
 
-    GBDT 가 상위로 꼽았는데 손규칙은 안 썼다 (§30.6b). 빌드 시점에 알 수
-    있으므로 써도 된다. 표에 없으면 0 — 그 경우 이 항은 상수가 되어
-    `validate` 의 "상수" 검사에 걸린다.
+    GBDT ranked it highly and the hand rule did not use it (§30.6b). It is
+    knowable at build time, so it may be used. If absent from the table it
+    is 0 — in that case this term becomes a constant and trips `validate`'s
+    "constant" check.
     """
     return math.log2(1.0 + float(cfg.inst_total))
 
 
 # ---------------------------------------------------------------------------
-# 형상 수준 — **스칼라**라서 규칙이 `if` 를 쓸 수 있다 (§8.1 대체본)
+# Shape level — **scalars**, so a rule may use `if` (the §8.1 replacement)
 # ---------------------------------------------------------------------------
 @shape_feature(unit="flop/byte", expected_range=(0.0, 1e5), direction="neutral")
 def arith_intensity(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """형상만의 함수. 2MNK / (읽고 쓰는 바이트)."""
+    """A function of the shape alone. 2MNK / (bytes read and written)."""
     eb = _ebytes(p.dtype)
     return 2.0 * p.M * p.N * p.K / max(1.0, eb * (p.M * p.K + p.K * p.N
                                                   + p.M * p.N))
@@ -381,27 +406,31 @@ def arith_intensity(p: Problem, hw: Hardware, cfg: Config) -> float:
 
 @shape_feature(expected_range=(0.0, 1e4), direction="neutral")
 def roofline_ratio(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """AI / ridge point. 1 미만이면 메모리 바운드다.
+    """AI / ridge point. Below 1 it is memory-bound.
 
-    `hw.ridge_point` 는 **실효값**에서 계산된다 (§6.2). 스펙값을 쓰면
-    26% 어긋나 경계 근처 형상의 분류가 뒤집힌다.
+    `hw.ridge_point` is computed from the **effective** values (§6.2). Using
+    the spec values is off by 26% and flips the class of shapes near the
+    boundary.
     """
     return arith_intensity(p, hw, cfg) / hw.ridge_point
 
 
 @shape_feature(expected_range=(0.0, 1.0), direction="neutral")
 def is_memory_bound(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """메모리 바운드인가. 0 또는 1. **규칙이 `if p.is_memory_bound:` 로 쓴다.**"""
+    """Is it memory-bound? 0 or 1. **A rule writes
+    `if p.is_memory_bound:`.**"""
     return 1.0 if roofline_ratio(p, hw, cfg) < 1.0 else 0.0
 
 
 @shape_feature(expected_range=(-25.0, 15.0), direction="neutral")
 def log_sol_ms(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """roofline 하한 시간(log2, ms). **측정값이 아니라 형상에서 계산한다.**
+    """The roofline lower-bound time (log2, ms). **Computed from the
+    shape, not measured.**
 
-    형상이 얼마나 짧은가의 대리 지표다. 크기 층화(§30.4)가 지표에서
-    중요한데 `best_ms` 는 `ANSWER_COLS` 라 규칙이 볼 수 없다. 이것은
-    형상과 하드웨어만으로 계산되므로 배포 시점에도 알 수 있다.
+    A proxy for how short a shape is. Size stratification (§30.4) matters in
+    the metric, but `best_ms` is `ANSWER_COLS` and a rule cannot see it.
+    This is computed from the shape and the hardware alone, so it is known
+    at deployment time too.
     """
     eb = _ebytes(p.dtype)
     t_c = 2.0 * p.M * p.N * p.K / (hw.peak_tflops_f16 * 1e12) * 1e3
@@ -411,30 +440,31 @@ def log_sol_ms(p: Problem, hw: Hardware, cfg: Config) -> float:
 
 
 # ---------------------------------------------------------------------------
-# ★ 2026-09-08 (D-144) — 분기에 쓸 형상 수준 값 넷을 더한다.
-#   지금까지 넷뿐이라(`is_memory_bound` · `roofline_ratio` · `log_sol_ms` ·
-#   `arith_intensity`) 모델이 체제를 찾을 재료가 부족했다.
-#   ★ 전부 **형상만으로** 정해진다 — config 가 안 들어간다.
+# ★ 2026-09-08 (D-144) — four more shape-level values to branch on.
+#   There were only four so far (`is_memory_bound` · `roofline_ratio` ·
+#   `log_sol_ms` · `arith_intensity`), too little material for the model to
+#   find a regime with.
+#   ★ All are determined **by the shape alone** — no config enters.
 # ---------------------------------------------------------------------------
 @shape_feature(unit="log2 flop", expected_range=(0.0, 80.0),
                direction="neutral")
 def log_flops(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """log2(2·M·N·K). 문제의 절대 크기."""
+    """log2(2·M·N·K). The absolute size of the problem."""
     return math.log2(max(1.0, 2.0 * p.M * p.N * p.K))
 
 
 @shape_feature(expected_range=(-30.0, 30.0), direction="neutral")
 def aspect_MN(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """log2(M/N). 형상이 얼마나 길쭉한가. 0 이면 정사각."""
+    """log2(M/N). How elongated the shape is. 0 is square."""
     return math.log2(max(1.0, float(p.M)) / max(1.0, float(p.N)))
 
 
 @shape_feature(expected_range=(0.0, 1e5), direction="neutral")
 def reuse_ratio(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """M·N·K / (M·K + K·N + M·N). 자료 재사용의 크기.
+    """M·N·K / (M·K + K·N + M·N). The amount of data reuse.
 
-    `arith_intensity` 와 형태가 닮았지만 **dtype 바이트가 안 들어간다** —
-    순수 형상 량이다.
+    Its form resembles `arith_intensity`, but **the dtype bytes do not
+    enter** — it is a pure shape quantity.
     """
     return (float(p.M) * p.N * p.K
             / max(1.0, float(p.M) * p.K + float(p.K) * p.N
@@ -443,44 +473,53 @@ def reuse_ratio(p: Problem, hw: Hardware, cfg: Config) -> float:
 
 @shape_feature(unit="log2", expected_range=(0.0, 30.0), direction="neutral")
 def log_min_dim(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """log2(min(M,N,K)). 가장 짧은 축 — skinny 형상을 가른다."""
+    """log2(min(M,N,K)). The shortest axis — it separates skinny
+    shapes."""
     return math.log2(max(1.0, float(min(p.M, p.N, p.K))))
 
 
 @shape_feature(expected_range=(0.0, 1.0), direction="neutral")
 def can_use_cp_async(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """alignment 가 cp.async 를 허용하는가. 0 이면 stages=2 만 가능하다.
+    """Does the alignment permit cp.async? At 0, only stages=2 is possible.
 
-    ★ 표에서 확인된 물리적 사실이다 (§18.3). alignment 1 형상은
-    multistage 커널이 아예 없다.
+    ★ A physical fact confirmed in the table (§18.3). An alignment-1 shape
+    has no multistage kernel at all.
     """
     return 1.0 if min(p.M, p.N, p.K) and _align_ok(p) else 0.0
 
 
 def _align_ok(p: Problem) -> bool:
-    """K 방향 접근이 16바이트 정렬을 만족하는가 (cp.async 요건)."""
+    """Does the K-direction access satisfy 16-byte alignment (the cp.async
+    requirement)?"""
     elems = 16 // _ebytes(p.dtype)
     return (p.K % elems == 0) and (p.N % elems == 0)
 
 
 # ---------------------------------------------------------------------------
-# ★ 물리적 의미 — "무엇을 재는가" 가 아니라 "왜 성능을 좌우하는가" (§12.3b)
+# ★ Physical meaning — not "what does it measure" but "why does it drive
+# performance" (§12.3b)
 # ---------------------------------------------------------------------------
-# 전에는 한 줄 요약(`doc`)만 프롬프트에 나갔다. `has_spill` 은 이렇게 보였다:
+# Previously only the one-line summary (`doc`) went into the prompt.
+# `has_spill` looked like this:
 #
-#     f.has_spill    [0, 1]    레지스터 스필이 있는가. 0 또는 1.
+#     f.has_spill    [0, 1]    Is there a register spill? 0 or 1.
 #
-# 범위가 `tail_waste` 와 같아서 **비슷한 크기의 벌점**으로 읽힌다. 실제로는
-# 자릿수가 다르다 — 그 항을 빼면 regret 1.1637 -> 3.1841 이 된다
-# (`docs/artifacts/spill-term.md`). RuleWriter A 조건이 그 항을 안 골랐고,
-# 그것 하나가 씨앗 실험의 (가) 조건을 갇히게 했다.
+# The range is the same as `tail_waste`'s, so it reads as **a penalty of
+# similar size**. In reality they are orders of magnitude apart — removing
+# that term takes regret from 1.1637 to 3.1841
+# (`docs/artifacts/spill-term.md`). RuleWriter under condition A did not pick
+# that term, and that one thing trapped condition (a) of the seed experiment.
 #
-# ⚠️ 여기 쓰는 것은 **표 없이도 아는 것**뿐이다 (§12.3b).
-#     물리 (허용)  "레지스터가 넘쳐 로컬 메모리로 나간다. 접근이 수십 배 느리다"
-#     관측 (금지)  "이 표에서 스필 커널은 정답 집합에 든 적이 없다"
+# ⚠️ What is written here is only **what is knowable without the table**
+# (§12.3b).
+#     physics (allowed)  "registers overflow into local memory. An access is
+#                         tens of times slower"
+#     observed (banned)  "in this table a spilling kernel never entered the
+#                         answer set"
 #
-# 크기는 **식에서 유도되는 것만** 적는다 (`1/(1-x)` 이면 0.5 에서 2배).
-# 측정에서 나온 배수는 적지 않는다.
+# Magnitudes are written **only where they follow from the formula** (for
+# `1/(1-x)`, 0.5 gives 2x). Multiples that came out of measurement are not
+# written.
 
 _PHYSICS: dict[str, str] = {
     # -- resource limits. A cliff, not a slope --------------------------------
@@ -593,10 +632,12 @@ _PHYSICS: dict[str, str] = {
 for _name, _text in _PHYSICS.items():
     REGISTRY.annotate(_name, physical_meaning=_text)
 
-# ★ 선언 범위가 실제와 어긋난 둘을 고친다 (§12.3b — 표가 아니라 식에서 온다)
-#   log_grid_tiles: log2(1+tiles) 를 반환하는데 **선형** 범위를 선언했다.
-#                   1e7 타일이면 log2 는 24 다.
-#   sm_idle_cost:   1/max(1e-3, 1-x) - 1 이므로 구현상 상한이 999 다.
-#                   10 으로 선언해 실제 값이 선언을 넘었다.
+# ★ Fixes the two whose declared range diverged from reality (§12.3b — it
+#   comes from the formula, not the table)
+#   log_grid_tiles: it returns log2(1+tiles) but declared a **linear** range.
+#                   At 1e7 tiles, log2 is 24.
+#   sm_idle_cost:   it is 1/max(1e-3, 1-x) - 1, so the implementation's upper
+#                   bound is 999. It was declared as 10, so actual values
+#                   exceeded the declaration.
 REGISTRY.annotate("log_grid_tiles", expected_range=(0.0, 24.0))
 REGISTRY.annotate("sm_idle_cost", expected_range=(0.0, 999.0))

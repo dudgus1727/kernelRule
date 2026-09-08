@@ -1,21 +1,23 @@
-"""★ 항 예산이 **프롬프트 전부**에 같은 값으로 간다 (D-105).
+"""★ The parameter budget goes to **every prompt** as the same value
+(D-105).
 
-`--rule-budget 16` 으로 캠페인 하나를 돌렸는데, 검사기만 16 이었고
-**시스템 프롬프트의 역할 파일과 사용자 프롬프트는 8 로 렌더링됐다.**
-같은 프롬프트 안에서 `_rules_common.md` 는 "16 이하", `rule_editor.md` 는
-"항 상한 8개" 라고 말하고 있었다 (문구는 D-128 에서 "파라미터 상한 N개" 로
-바뀌었다 — 검사하는 것은 **네 면이 같은 숫자를 말하는가** 다). 규칙 36개 전부가 8항에서 멈췄고,
-"예산을 늘려도 항이 안 는다" 로 읽힐 뻔했다.
+A campaign was run with `--rule-budget 16`, and only the checker was 16 —
+**the role files of the system prompt and the user prompt rendered 8.**
+Within the same prompt, `_rules_common.md` said "at most 16" while
+`rule_editor.md` said "a term cap of 8" (the wording changed in D-128 to "a
+parameter cap of N" — what is checked is **whether the four surfaces say the
+same number**). All 36 rules stopped at 8 terms, and it was nearly read as
+"raising the budget does not raise the term count".
 
-원인은 자리가 여럿이었다는 것이다 (원칙 23):
+The cause was that there were several places (principle 23):
 
-    load_prompt(..., parameters=)   `assemble_instructions` 만 넘기고 있었다
-    load_prompt("role/...")     `_agent` 와 `_optimize_prompt` 는 안 넘겼다
-    checks.PARAMETERS               사용자 프롬프트가 **직접 import** 했다
+    load_prompt(..., parameters=)   only `assemble_instructions` passed it
+    load_prompt("role/...")         `_agent` and `_optimize_prompt` did not
+    checks.PARAMETERS               the user prompt **imported it directly**
 
-옛 시험 `test_rule_writers_get_the_budget` 은 `"8" in body` 였다 — 8 은
-피처 설명에도 나오므로 16 으로 바꿔도 통과한다. **바뀌는 값을 상수로
-찾으면 안 된다.**
+The old test `test_rule_writers_get_the_budget` was `"8" in body` — 8 also
+appears in the feature descriptions, so it passes even when changed to 16.
+**A changing value must not be searched for as a constant.**
 """
 from __future__ import annotations
 
@@ -30,24 +32,26 @@ SRC = Path(__file__).resolve().parents[1] / "kernelrule/agents/openai_client.py"
 
 
 def test_every_load_prompt_call_passes_the_budget():
-    """★ 호출부를 **전부** 센다 — 하나만 빠져도 프롬프트가 달라진다."""
+    """★ It counts **every** call site — one missed and the prompt
+    diverges."""
     tree = ast.parse(SRC.read_text())
     bad = [n.lineno for n in ast.walk(tree)
            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
            and n.func.id == "load_prompt"
            and "parameters" not in {k.arg for k in n.keywords}]
     assert not bad, (
-        f"`parameters=` 없이 부르는 자리가 있다: {SRC.name} 줄 {bad}. "
-        "기본값으로 떨어지면 `parameters` 을 무시한다 (D-105).")
+        f"there is a call without `parameters=`: {SRC.name} lines {bad}. "
+        f"Falling back to the default ignores `parameters` (D-105).")
 
 
-#: `checks.PARAMETERS` 을 읽어도 되는 함수. 그 밖에서 읽으면 `parameters`
-#: 을 무시한다 — 조건이 조용히 8 로 돌아간다.
+#: The functions allowed to read `checks.PARAMETERS`. Read anywhere else it
+#: ignores `parameters` — the condition silently returns to 8.
 _MAY_READ_PARAMETERS = {"load_prompt", "__init__"}
 
 
 def test_only_two_functions_read_the_module_constant():
-    """★ `checks.PARAMETERS` 을 읽는 자리를 **센다**. 유효 예산은 하나다."""
+    """★ It **counts** the places that read `checks.PARAMETERS`. There is
+    one effective budget."""
     tree = ast.parse(SRC.read_text())
     bad = []
     for fn in ast.walk(tree):
@@ -59,8 +63,8 @@ def test_only_two_functions_read_the_module_constant():
             if isinstance(n, ast.Name) and n.id in ("BUDGET", "_CHECK_BUDGET"):
                 bad.append((fn.name, n.lineno))
     assert not bad, (
-        f"`checks.PARAMETERS` 을 직접 읽는 자리: {bad}. "
-        "`self._budget` 하나만 봐야 한다 (D-105).")
+        f"places that read `checks.PARAMETERS` directly: {bad}. "
+        f"Only `self._budget` may be looked at (D-105).")
 
 
 def _llm(budget: int | None):
@@ -74,7 +78,7 @@ def _llm(budget: int | None):
 
 @pytest.mark.parametrize("budget", [8, 16])
 def test_user_and_system_prompts_agree_on_the_budget(budget):
-    """시스템과 사용자 프롬프트가 **같은 숫자**를 말하는가."""
+    """Do the system and user prompts say **the same number**?"""
     from kernelrule.agents.openai_client import assemble_instructions
 
     llm = _llm(budget)
@@ -83,24 +87,28 @@ def test_user_and_system_prompts_agree_on_the_budget(budget):
                                   parameters=llm._parameters)
     usr_p = llm._user_prompt("rule_editor", "", parent=None,
                              parent_n_terms=0, analyst=False)
-    for name, txt in (("시스템", sys_p), ("사용자", usr_p)):
-        # ★ 문구 이력: "항 상한 N개" -> "파라미터 상한 N개"(D-128)
-        #   -> "실행 경로마다 N개"(D-144). 숫자가 한 곳에서 온다는 요구는 같다.
+    for name, txt in (("system", sys_p), ("user", usr_p)):
+        # ★ Wording history: "a term cap of N" -> "a parameter cap of N"
+        #   (D-128) -> "N per execution path" (D-144). The requirement that
+        #   the number comes from one place is unchanged.
         assert (f"{budget} per execution path" in txt
                 or f"at most {budget}" in txt), (
-            f"{name} 프롬프트에 예산 {budget} 이 안 보인다")
+            f"the budget {budget} is not visible in the {name} prompt")
         assert (f"{other} per execution path" not in txt
                 and f"at most {other}" not in txt), (
-            f"{name} 프롬프트가 {other} 를 말한다 — 조건이 달라졌다 (D-105)")
+            f"the {name} prompt says {other} — the condition changed "
+            f"(D-105)")
 
 
 def test_budget_reaches_the_saturation_notice():
-    """포화 문구도 유효 예산을 봐야 한다 — 8항짜리 부모가 16 예산에서
-    '예산이 찼습니다' 를 받으면 항을 절대 못 늘린다.
+    """The saturation notice must see the effective budget too — an
+    8-term parent told "the budget is full" under a budget of 16 can never
+    add a term.
 
-    ★ 2026-09-08 (D-144): 예산이 **경로별**이 되면서 남은 자리를
-    `parent_path_params`(가장 무거운 경로)로 센다. `parent_n_terms`
-    (전체 항 수)로 세면 가지를 나눈 부모에게 거짓말을 한다.
+    ★ 2026-09-08 (D-144): with the budget now **per path**, the room left is
+    counted from `parent_path_params` (the heaviest path). Counting from
+    `parent_n_terms` (the total term count) lies to a parent that split its
+    branches.
     """
     llm = _llm(16)
     txt = llm._user_prompt("rule_editor", "", parent=None,
@@ -111,7 +119,8 @@ def test_budget_reaches_the_saturation_notice():
         "cap (D-105)")
     assert "Room left on the heaviest path: 8" in txt, txt[:400]
 
-    # ★ 가지를 나눈 부모 — 전체 항은 14개지만 가장 무거운 경로는 8이다
+    # ★ A parent that split its branches — 14 terms in total but the
+    #   heaviest path is 8
     txt2 = llm._user_prompt("rule_editor", "", parent=None,
                             parent_n_terms=14, parent_path_params=8,
                             analyst=False)
@@ -120,12 +129,13 @@ def test_budget_reaches_the_saturation_notice():
 
 
 # ---------------------------------------------------------------------------
-# ★ 예산에 **딸린** 상한들 (D-106)
+# ★ The caps **attached** to the budget (D-106)
 # ---------------------------------------------------------------------------
 #
-# 8항 규칙의 AST 노드가 실측 중앙 271 / 최대 383 인데 상한이 400 이다.
-# 예산만 16 으로 올리면 16항 규칙은 **노드 상한에서 거부된다** — "예산
-# 16 이 효과가 없다" 가 아니라 "16항을 쓸 수 없었다" 를 재게 된다.
+# An 8-term rule has a measured median of 271 AST nodes and a maximum of 383,
+# against a cap of 400. Raising only the budget to 16 makes 16-term rules
+# **refused at the node cap** — what gets measured is not "a budget of 16 has
+# no effect" but "16 terms could not be used".
 
 
 def test_limits_scale_with_the_budget():
@@ -138,7 +148,8 @@ def test_limits_scale_with_the_budget():
 
 
 def test_prompt_states_the_scaled_node_cap():
-    """프롬프트가 상수 400 을 말하면 검사기(800)와 달라진다."""
+    """If the prompt says the constant 400 it diverges from the checker
+    (800)."""
     from kernelrule.agents.openai_client import load_prompt
     from kernelrule.rules.checks import limits_for
 
@@ -150,7 +161,8 @@ def test_prompt_states_the_scaled_node_cap():
 
 
 def test_a_sixteen_term_rule_fits_only_under_the_raised_cap():
-    """★ 실제 16항 규칙으로 확인한다 — 숫자만 맞춰 놓으면 소용없다."""
+    """★ Confirmed with a real 16-term rule — matching the numbers alone is
+    useless."""
     from kernelrule.rules.checks import check_rule, limits_for
 
     terms = "\n".join(
@@ -163,21 +175,23 @@ def test_a_sixteen_term_rule_fits_only_under_the_raised_cap():
           "shape_value_names": ["is_memory_bound"], "n_weights": 16}
     lo = check_rule(code, limits=limits_for(8), **kw)
     hi = check_rule(code, limits=limits_for(16), **kw)
-    assert not lo.ok, "예산 8 에서 16항이 통과하면 검사기가 안 걸러진다"
+    assert not lo.ok, (
+        "if 16 terms pass at a budget of 8, the checker is not filtering")
     assert hi.n_nodes > limits_for(8)["ast_nodes"], (
-        f"노드가 {hi.n_nodes} 뿐이라 상한 검사를 못 건드린다 — "
-        "이 시험이 재려던 것을 못 잰다")
-    assert hi.ok, f"예산 16 에서도 거부됐다: {hi.violations}"
+        f"there are only {hi.n_nodes} nodes, so the cap check is never "
+        f"touched — this test cannot measure what it meant to")
+    assert hi.ok, f"refused even at a budget of 16: {hi.violations}"
 
 
 # ---------------------------------------------------------------------------
-# ★ 출력 스키마 (D-107) — 네 번째 자리
+# ★ The output schema (D-107) — the fourth place
 # ---------------------------------------------------------------------------
 #
-# `RuleOutput` 의 필드 설명은 `pydantic-ai` 가 **도구 스키마로 모델에
-# 보낸다.** 거기에 "★ 항은 최대 8개" 가 굳어 있어서, 프롬프트가 "상한
-# 16개" 라고 말해도 예산 16 캠페인의 규칙 29개가 전부 8항이었다.
-# 스키마 거부는 36라운드 내내 0 이었다 — 모델은 시도조차 안 했다.
+# `pydantic-ai` **sends `RuleOutput`'s field descriptions to the model as the
+# tool schema.** With "★ at most 8 terms" frozen in there, all 29 rules of
+# the budget-16 campaign had 8 terms even though the prompt said "a cap of
+# 16". Schema refusals were 0 across all 36 rounds — the model never even
+# tried.
 
 
 def _twelve_terms() -> str:
@@ -200,18 +214,20 @@ def test_output_schema_states_the_budget(budget):
 
 
 def test_output_schema_validation_follows_the_budget():
-    """★ 설명만 고치고 검증이 8 이면 모델은 시도했다가 거부당한다."""
+    """★ If only the description is fixed and the validation stays at 8,
+    the model tries and gets refused."""
     from kernelrule.agents.schemas import rule_output_for
 
     kw = {"code": _twelve_terms(), "w0": [1.0] * 12, "changes": "",
           "hypothesis_id": ""}
     with pytest.raises(Exception, match="12"):
         rule_output_for(8)(**kw)
-    rule_output_for(16)(**kw)          # 예산 16 에서는 통과해야 한다
+    rule_output_for(16)(**kw)          # at a budget of 16 it must pass
 
 
 def test_dict_path_validation_follows_the_budget():
-    """MockLLM / 구조화 출력을 안 쓰는 경로도 같은 예산을 봐야 한다."""
+    """The MockLLM path and any path not using structured output must see
+    the same budget."""
     from kernelrule.agents.schemas import (
         SchemaViolation,
         validate_rule_proposal,
@@ -223,11 +239,12 @@ def test_dict_path_validation_follows_the_budget():
     validate_rule_proposal(d, parameters=16)
 
 
-#: ★ 예산 숫자가 나가는 **모든 면**. 하나라도 빠지면 조건이 달라진다.
+#: ★ **Every surface** the budget number goes out on. One missed and the
+#: condition changes.
 #:
-#:   D-105  검사기만 닿았다 (프롬프트 파일 / 사용자 프롬프트)
-#:   D-106  딸린 상한(ast_nodes)이 안 따라왔다
-#:   D-107  출력 스키마 설명이 8 로 굳어 있었다
+#:   D-105  only the checker was reached (the prompt files / the user prompt)
+#:   D-106  the attached cap (ast_nodes) did not follow
+#:   D-107  the output schema's description was frozen at 8
 def test_all_four_surfaces_say_the_same_budget():
     from kernelrule.agents.openai_client import assemble_instructions
     from kernelrule.agents.schemas import rule_output_for
@@ -236,12 +253,12 @@ def test_all_four_surfaces_say_the_same_budget():
     for b in (8, 16):
         llm = _llm(b)
         surfaces = {
-            "시스템 프롬프트": assemble_instructions(
+            "system prompt": assemble_instructions(
                 "rule_editor", objective="rank", parameters=llm._parameters),
-            "사용자 프롬프트": llm._user_prompt(
+            "user prompt": llm._user_prompt(
                 "rule_editor", "", parent=None, parent_n_terms=0,
                 analyst=False),
-            "출력 스키마": json.dumps(
+            "output schema": json.dumps(
                 rule_output_for(b).model_json_schema(), ensure_ascii=False),
         }
         for name, txt in surfaces.items():
@@ -253,11 +270,13 @@ def test_all_four_surfaces_say_the_same_budget():
 
 
 # ---------------------------------------------------------------------------
-# ★ 목표 정의의 숫자 (k, lambda) 와 곱 항 (D-109 / D-110)
+# ★ The numbers of the goal definition (k, lambda) and the product term
+# (D-109 / D-110)
 # ---------------------------------------------------------------------------
 #
-# `rank` 목표 블록이 "config 100개" 를 **상수로** 적고 있었다. `k` 스윕을
-# 그대로 돌렸으면 프롬프트만 100 이라고 말하는 다섯 번째 면이 됐다.
+# The `rank` goal block wrote "100 configs" as **a constant**. Running the
+# `k` sweep as it was would have made the prompt a fifth surface saying 100
+# on its own.
 
 
 @pytest.mark.parametrize("k", [10, 20, 100])
@@ -270,14 +289,15 @@ def test_objective_block_states_the_running_k(k):
         f"the objective block does not state k={k}")
     for other in (10, 20, 100):
         if other != k:
-            assert f"config {other}개" not in txt
+            assert f"the {other} genuinely fastest" not in txt
 
 
 def test_objective_block_states_lambda_only_when_set():
     from kernelrule.agents.openai_client import assemble_instructions
 
     kw = {"objective": "rank", "parameters": 8}
-    assert "가중치 1 를" not in assemble_instructions("rule_editor", **kw)
+    assert ("getting the true first place right"
+            not in assemble_instructions("rule_editor", **kw))
     on = assemble_instructions("rule_editor", rank_lambda=1.0, **kw)
     assert "getting the true first place right" in on
 
@@ -302,13 +322,15 @@ def test_product_hint_is_off_by_default_and_lands_on_every_surface():
 
 
 # ---------------------------------------------------------------------------
-# ★ 적합기는 **파라미터 수가 정한다** (D-128)
+# ★ The fitter is **decided by the parameter count** (D-128)
 # ---------------------------------------------------------------------------
 def test_fitter_is_derived_from_the_parameter_count():
-    """8 이하면 Nelder-Mead, 넘으면 CMA. **한 곳에서만 정한다.**
+    """At most 8, Nelder-Mead; above it, CMA. **Decided in one place
+    only.**
 
-    근거: 8차원에서는 두 적합기가 구분 불가고(D-125), 16차원에서는
-    Nelder-Mead 도달률이 92% 로 미달이다 (D-77·D-123).
+    Rationale: in 8 dimensions the two fitters are indistinguishable
+    (D-125), and in 16 dimensions Nelder-Mead's reach rate is 92%, short of
+    the mark (D-77 · D-123).
     """
     from kernelrule.rules.checks import PARAMETERS, fitter_for
 
@@ -324,7 +346,8 @@ def test_fitter_is_derived_from_the_parameter_count():
 
 
 def test_fitter_keys_are_loopconfig_fields():
-    """★ `**fitter_for(n)` 이 그대로 펼쳐져야 한다 — 달라질 자리를 안 만든다."""
+    """★ `**fitter_for(n)` must splat straight in — it leaves no place to
+    diverge."""
     import dataclasses
 
     from kernelrule.core.loop import LoopConfig
@@ -337,14 +360,15 @@ def test_fitter_keys_are_loopconfig_fields():
 
 
 def test_pipeline_has_no_fitter_or_rank_flags():
-    """★ `--fit-method` / `--objective` 는 **사라졌다** (D-128).
+    """★ `--fit-method` / `--objective` are **gone** (D-128).
 
-    적합기는 파라미터에서 유도하고, 진화 목적함수는 regret 뿐이다.
-    플래그가 남아 있으면 "조건을 손으로 줄 수 있다" 가 되어 규칙이 샌다.
+    The fitter is derived from the parameters, and the evolution objective is
+    only regret. A remaining flag would mean "the condition can be given by
+    hand", and the rule leaks.
     """
     src = (Path(__file__).resolve().parents[1]
            / "experiments" / "f1_pipeline.py").read_text()
     for flag in ('"--fit-method"', '"--fit-restarts"', '"--max-evals"',
                  '"--objective"', '"--objective-switch"', '"--rank-top-k"',
                  '"--rank-lambda"'):
-        assert flag not in src, f"{flag} 가 아직 있다"
+        assert flag not in src, f"{flag} is still there"

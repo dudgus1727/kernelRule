@@ -1,26 +1,31 @@
-"""피처 레지스트리 (§8.2, §8.4).
+"""The feature registry (§8.2, §8.4).
 
-피처는 **판단하지 않는다.** `(Problem, Hardware, Config) -> float` 의 순수
-함수이고, "좋다/나쁘다" 는 규칙이 가중치로 표현한다.
+A feature **does not judge.** It is a pure function
+`(Problem, Hardware, Config) -> float`, and "good/bad" is what the rule
+expresses through weights.
 
-## 작성 규칙 — LLM 에게도 동일하게 강제한다
+## Writing rules — enforced identically on the LLM
 
-    - 순수 함수. 부작용 없음
-    - (Problem, Hardware, Config) 만으로 계산. 실측값/프로파일러 지표 금지
-    - float 하나 반환. 0~1 정규화 권장. **클수록 나쁜 방향으로 통일**
-    - 하드웨어 상수는 hw.* 에서 읽기. 84, 101376 하드코딩 금지
-    - cfg.ext 참조 금지 (아키텍처 전이 전제 — §4.3)
-    - 물리적 의미가 있을 것. 임의 조합 금지
-    - 10줄 이내
+    - Pure function. No side effects
+    - Computed from (Problem, Hardware, Config) only. No measurements, no
+      profiler counters
+    - Returns a single float. Normalising to 0~1 is recommended. **Unify the
+      direction so that larger is worse**
+    - Read hardware constants from hw.*. No hardcoding of 84 or 101376
+    - No reference to cfg.ext (the architecture-transfer premise — §4.3)
+    - It must have physical meaning. No arbitrary combinations
+    - At most 10 lines
 
-**부호 통일이 중요하다.** "클수록 나쁨" 으로 맞추면 규칙이 항상 "가중합 후
-오름차순 정렬" 이 되고, LLM 이 부호를 헷달라질 여지가 사라진다.
+**Unifying the sign matters.** Fixing it to "larger is worse" makes the rule
+always "weighted sum, then ascending sort", and removes any room for the LLM
+to get the sign confused.
 
-## 라이프사이클 — append-only 금지 (§8.4)
+## Lifecycle — append-only, no rewriting (§8.4)
 
-`deprecate` 는 지우지 않고 표시만 한다. 기존 규칙은 계속 돌고, 새 규칙 생성
-시 프롬프트의 피처 목록에서만 빠진다. **in-place 수정은 금지** — 버그를
-고칠 때는 `_v2` 를 새로 추가한다. 과거 실험이 무효가 되면 재현이 안 된다.
+`deprecate` does not delete, it only marks. Existing rules keep running, and
+the feature only drops out of the feature list in the prompt when new rules
+are generated. **In-place modification is forbidden** — to fix a bug, add a
+`_v2`. If past experiments become invalid, they cannot be reproduced.
 """
 
 from __future__ import annotations
@@ -46,7 +51,8 @@ Direction = str   # "higher_is_worse" | "higher_is_better" | "neutral"
 
 @dataclass(frozen=True)
 class Feature:
-    """피처 하나. 메타데이터가 자동 검증(§8.3)의 재료다."""
+    """One feature. The metadata is the material for the automatic checks
+    (§8.3)."""
 
     name: str
     fn: Callable                      # (Problem, Hardware, Config) -> float
@@ -55,37 +61,45 @@ class Feature:
     direction: Direction
     doc: str = ""
     # ------------------------------------------------------------------
-    # ★ 설명을 두 층으로 나눈다 (§8.2 / RuleWriter A 조건)
+    # ★ The description is split into two layers (§8.2 / RuleWriter
+    # condition A)
     # ------------------------------------------------------------------
-    # 전이 주장을 시험하려면 "표를 안 보고 규칙을 쓸 수 있는가" 를 물어야
-    # 하는데, 피처 설명에 표에서 나온 문장이 섞여 있으면 그 시험이 성립하지
-    # 않는다. 두 층을 **필드로** 갈라 놓아야 프롬프트를 조립할 때 섞이지
-    # 않는다 — 주석으로 구분하면 반드시 섞인다.
+    # To test the transfer claim you have to ask "can a rule be written
+    # without looking at the table", and if sentences that came from the
+    # table are mixed into the feature descriptions that test does not hold.
+    # The two layers must be separated **as fields** so they do not mix when
+    # the prompt is assembled — separating them by comment always mixes.
     #
-    #   physical_meaning  "마지막 wave 에서 노는 SM 슬롯의 비율"
-    #                     새 GPU 에서도 그대로. A 조건에 넣는다.
-    #   observed          "A6000 에서 스필 커널은 최적을 낸 적이 없다"
-    #                     ★ 표에서 나왔다. A 조건에서 뺀다.
+    #   physical_meaning  "the fraction of SM slots idle in the last wave"
+    #                     the same on a new GPU. It goes into condition A.
+    #   observed          "on the A6000 a spilling kernel was never optimal"
+    #                     ★ it came from the table. It is left out of A.
     #
-    #: 비면 `doc` 을 쓴다.
+    #: If empty, `doc` is used.
     physical_meaning: str = ""
-    #: 표에서 관측된 성질. **반드시 학습 분할에서만** 나온 것이어야 한다
-    #: (§12.3 / D-28) — 전수 표에서 계산하면 홀드아웃이 프롬프트로 샌다.
+    #: Properties observed in the table. It **must** have come from the
+    #: training split only (§12.3 / D-28) — computing it on the full table
+    #: leaks the holdout into the prompt.
     observed: tuple[str, ...] = ()
-    #: 형상 수준인가 (Config 무관). True 면 `ShapeInfo` 에 스칼라로 들어간다.
+    #: Is it shape-level (Config-independent)? If True it enters
+    #: `ShapeInfo` as a scalar.
     shape_level: bool = False
-    #: 선택적 벡터화 구현. `(df, hw, info) -> np.ndarray`.
-    #: 있으면 FeatureMatrix 가 이쪽을 쓰고, 없으면 스칼라를 100만 번 부른다.
-    #: **스칼라 구현과 일치해야 한다** — `verify_vectorized()` 가 검사한다.
+    #: Optional vectorised implementation. `(df, hw, info) -> np.ndarray`.
+    #: If present FeatureMatrix uses it; otherwise the scalar is called a
+    #: million times.
+    #: **It must agree with the scalar implementation** —
+    #: `verify_vectorized()` checks that.
     vec: Callable | None = None
     deprecated_at_round: int | None = None
     deprecation_reason: str = ""
-    #: 소스 해시. `features.lock` 과 FeatureMatrix 캐시 키에 쓴다 (§25).
+    #: Source hash. Used in `features.lock` and in the FeatureMatrix cache
+    #: key (§25).
     code_hash: str = ""
-    #: ★ 소스 코드. **`exec` 로 만든 피처는 `inspect.getsource` 가 실패한다**
-    #: (OSError). §8.3 의 스케일 불변성 검사가 "hw 를 쓰는가" 를 소스에서
-    #: 읽으므로, 없으면 하드웨어 무관 피처를 전부 기각한다 — 실제로 F1
-    #: 첫 실행에서 정상 피처가 그렇게 버려졌다 (D-37).
+    #: ★ The source code. **For a feature built with `exec`,
+    #: `inspect.getsource` fails** (OSError). §8.3's scale-invariance check
+    #: reads "does it use hw" out of the source, so without this it rejects
+    #: every hardware-independent feature — in the first F1 run a perfectly
+    #: good feature was thrown away exactly that way (D-37).
     source: str = ""
 
     @property
@@ -94,33 +108,37 @@ class Feature:
 
     @property
     def physics(self) -> str:
-        """★ 아키텍처 무관한 정의. A 조건 프롬프트가 쓰는 유일한 설명."""
+        """★ The architecture-independent definition. The only description
+        the condition-A prompt uses."""
         return self.physical_meaning or self.doc
 
     def describe(self, *, include_observed: bool) -> str:
-        """프롬프트 한 줄. `include_observed=False` 가 A 조건이다."""
+        """One prompt line. `include_observed=False` is condition A."""
         return self.describe_with(include_observed=include_observed)
 
     def describe_with(self, *, include_observed: bool,
                       extra: tuple[str, ...] = ()) -> str:
-        # ★ 접근 형태를 그대로 보여준다. 이름만 주면 config 수준 피처를
-        #   `p.` 로 쓰는 규칙이 나온다 — 실제로 첫 RuleWriter 호출이 그랬다.
+        # ★ Show the access form as it is. Giving only the name produces
+        #   rules that use a config-level feature as `p.` — the very first
+        #   RuleWriter call did exactly that.
         ref = f"{'p' if self.shape_level else 'f'}.{self.name}"
-        # ★ 범위와 단위는 **피처의 물리적 정의의 일부**다 (표가 아니다).
-        #   없으면 상대 가중치를 세울 수 없다 — 자릿수가 다른 항을 그냥
-        #   더하게 되고, 수치 최적화기도 그 지점에서 못 빠져나온다.
-        #   실제로 RuleWriter A 첫 시도가 regret 8.4 를 냈다.
+        # ★ The range and unit are **part of the feature's physical
+        #   definition** (they are not the table). Without them relative
+        #   weights cannot be set — terms of different magnitudes just get
+        #   added, and the numerical optimiser cannot escape that point
+        #   either. The first RuleWriter A attempt really did produce regret
+        #   8.4.
         lo, hi = self.expected_range
         rng = f"[{lo:g}, {hi:g}]"
         head = f"{ref:28s} {rng:>14s}  {self.physics}"
         if include_observed:
             for o in (*self.observed, *extra):
-                head += f"\n{'':28s}   [관측] {o}"
+                head += f"\n{'':28s}   [observed] {o}"
         return head
 
 
 class FeatureRegistry:
-    """이름 -> Feature. **오타가 조용히 통과하지 않게 한다** (§21.3)."""
+    """Name -> Feature. **Keeps a typo from passing silently** (§21.3)."""
 
     def __init__(self, name: str = "default") -> None:
         self.name = name
@@ -129,21 +147,25 @@ class FeatureRegistry:
     def add(self, f: Feature, *, replace: bool = False) -> Feature:
         if f.name in self._items and not replace:
             raise ValueError(
-                f"피처 {f.name!r} 가 이미 있다. **in-place 수정 금지** (§8.4) — "
-                f"버그를 고치려면 {f.name}_v2 를 추가하고 구 버전을 deprecate 하라.")
+                f"feature {f.name!r} already exists. **In-place "
+                f"modification is forbidden** (§8.4) — to fix a bug, add "
+                f"{f.name}_v2 and deprecate the old version.")
         self._items[f.name] = f
         return f
 
     def annotate(self, name: str, *, physical_meaning: str = "",
                  expected_range: tuple[float, float] | None = None) -> None:
-        """설명과 범위를 **나중에** 붙인다. 데코레이터를 어지럽히지 않는다.
+        """Attaches the description and range **afterwards**. It does not
+        clutter the decorator.
 
-        24개 피처의 "왜 성능을 좌우하는가" 를 한 곳에서 검토할 수 있어야
-        빠진 것이 보인다. 데코레이터에 흩어 놓으면 `has_spill` 만 고치고
-        나머지를 놓친다 — 실제로 그렇게 됐다.
+        The "why does this drive performance" of all 24 features has to be
+        reviewable in one place for a gap to be visible. Scattered across
+        decorators, you fix `has_spill` only and miss the rest — which is
+        what happened.
 
-        ⚠️ **표에서 관측한 것을 여기 넣지 마라** (§12.3b). "왜 느린가" 는
-        물리이고 "이 표에서 몇 번" 은 관측이다.
+        ⚠️ **Do not put anything observed in the table here** (§12.3b). "Why
+        is it slow" is physics; "how many times in this table" is an
+        observation.
         """
         f = self[name]
         d = dict(f.__dict__)
@@ -164,8 +186,8 @@ class FeatureRegistry:
             return self._items[name]
         except KeyError:
             raise KeyError(
-                f"등록되지 않은 피처: {name!r}. "
-                f"사용 가능: {sorted(self._items)}") from None
+                f"unregistered feature: {name!r}. "
+                f"available: {sorted(self._items)}") from None
 
     def __contains__(self, name: str) -> bool:
         return name in self._items
@@ -188,7 +210,8 @@ class FeatureRegistry:
         return [self._items[n] for n in self.names(**kw)]
 
     def lock_hash(self, *, active_only: bool = True) -> str:
-        """레지스트리 스냅샷 해시. FeatureMatrix 캐시 키 + `features.lock`."""
+        """A snapshot hash of the registry. The FeatureMatrix cache key +
+        `features.lock`."""
         h = hashlib.sha256()
         for n in self.names(active_only=active_only):
             h.update(n.encode())
@@ -203,7 +226,7 @@ class FeatureRegistry:
                 for n in self.names(active_only=False)}
 
 
-#: 전역 레지스트리. `features/physical.py` 가 여기 등록한다.
+#: The global registry. `features/physical.py` registers into it.
 REGISTRY = FeatureRegistry("physical")
 
 
@@ -223,7 +246,8 @@ def feature(*, unit: str = "dimensionless",
             shape_level: bool = False,
             physical_meaning: str = "",
             observed: tuple[str, ...] = ()):
-    """config 수준 피처를 등록한다. 배열로 계산되어 `Feats.<name>` 이 된다."""
+    """Registers a config-level feature. It is computed as an array and
+    becomes `Feats.<name>`."""
 
     def deco(fn: Callable) -> Callable:
         f = Feature(name=fn.__name__, fn=fn, unit=unit,
@@ -233,15 +257,18 @@ def feature(*, unit: str = "dimensionless",
                     physical_meaning=physical_meaning,
                     observed=tuple(observed),
                     code_hash=_hash_fn(fn))
-        # ★ 레지스트리는 **필수**다. 기본값을 두면 F0~F3 조건에서 조용히
-        #   사람이 쓴 24개에 등록된다 (§30.9). `registry or REGISTRY` 도
-        #   안 된다 — `__len__` 이 있어서 **빈 레지스트리가 falsy** 이고,
-        #   그러면 첫 피처만 전역으로 새는 더 나쁜 형태가 된다.
+        # ★ The registry is **mandatory**. With a default, under the
+        #   F0~F3 conditions it silently registers into the 24 a human
+        #   wrote (§30.9). `registry or REGISTRY` will not do either —
+        #   `__len__` exists, so **an empty registry is falsy**, and then
+        #   only the first feature leaks into the global one, which is a
+        #   worse shape of the same bug.
         if registry is None:
             raise ValueError(
-                "feature(registry=...) 는 필수다. 기본값을 두면 어느 "
-                "레지스트리에 등록되는지 호출부에서 안 보이고, F0~F3 "
-                "조건에서 사람이 쓴 24개가 조용히 섞인다 (§26.4).")
+                "feature(registry=...) is mandatory. With a default, "
+                "which registry it registers into is invisible at the call "
+                "site, and under the F0~F3 conditions the 24 a human wrote "
+                "get mixed in silently (§26.4).")
         registry.add(f)
         fn.feature = f          # type: ignore[attr-defined]
         return fn
@@ -250,12 +277,14 @@ def feature(*, unit: str = "dimensionless",
 
 
 def shape_feature(**kw):
-    """형상 수준 피처. **스칼라**라서 규칙이 `if p.<name>:` 을 쓸 수 있다.
+    """A shape-level feature. It is a **scalar**, so a rule may write
+    `if p.<name>:`.
 
-    이것이 §8.1(부록 대체본)이 허용하는 종류의 분기다 — "메모리 바운드면
-    다르게 판단한다" 는 일반화되지만 "M 이 4096 이면 17번 config" 는 암기다.
-    config 수준 피처는 배열이라 `if` 가 `ValueError` 를 내고, 그 비대칭이
-    조건부 특수화를 문법적으로 어렵게 만든다.
+    This is the kind of branch §8.1 (the appendix replacement) allows —
+    "judge differently when memory-bound" generalises, whereas "config #17
+    when M is 4096" is memorisation. A config-level feature is an array, so
+    `if` raises `ValueError`, and that asymmetry makes conditional
+    specialisation syntactically hard.
     """
     kw.setdefault("shape_level", True)
     kw["shape_level"] = True
@@ -265,34 +294,36 @@ def shape_feature(**kw):
 def render_features(registry: FeatureRegistry, *,
                     include_observed: bool, active_only: bool = True,
                     extra_observed: dict[str, list[str]] | None = None) -> str:
-    """프롬프트에 넣을 피처 목록.
+    """The feature list to put in the prompt.
 
-    ★ `include_observed=False` 가 **A 조건**이다 — 표에서 나온 문장이 하나도
-    들어가지 않는다. 그래야 "표를 안 보고 물리만으로 규칙을 쓸 수 있는가" 를
-    실제로 물은 것이 된다.
+    ★ `include_observed=False` is **condition A** — not one sentence that
+    came from the table goes in. Only then has "can a rule be written from
+    physics alone, without looking at the table" actually been asked.
 
-    호출부에서 문자열을 이어붙이지 말고 **반드시 이 함수를 쓴다.** 조립을
-    손으로 하면 섞인다 — 블록 3.5 가 그렇게 오염됐다 (D-28).
+    Do not concatenate strings at the call site — **always use this
+    function.** Assembling by hand mixes them; that is how block 3.5 got
+    contaminated (D-28).
 
-    `extra_observed` 는 **학습 분할에서 계산한** 관측을 피처별로 붙인다
-    (`report/table_facts.py` 가 만든다). 정적 `Feature.observed` 필드에
-    표에서 나온 수치를 넣지 않는 이유가 이것이다 — 그 값은 분할마다 다르고,
-    소스에 박아 두면 어느 분할에서 나왔는지 알 수 없게 된다.
+    `extra_observed` attaches per-feature observations **computed on the
+    training split** (`report/table_facts.py` builds them). This is why
+    numbers that came from the table are not put into the static
+    `Feature.observed` field — such a value differs per split, and nailed
+    into the source there is no way to tell which split it came from.
 
-    ⚠️ `include_observed=False` 면 `extra_observed` 도 **무시된다.**
+    ⚠️ With `include_observed=False`, `extra_observed` is **ignored too.**
 
-    ⚠️ `registry` 에 기본값이 없다. 있으면 F0~F3 조건에서 조용히 사람이 쓴
-    24개가 들어간다 — 그 실험은 "LLM 이 피처를 만들 수 있는가" 를 묻는데
-    프롬프트에 답이 들어가 있게 된다.
+    ⚠️ `registry` has no default. With one, the 24 a human wrote silently
+    enter under the F0~F3 conditions — that experiment asks "can the LLM
+    invent features", and the answer would be sitting in the prompt.
     """
     extra = extra_observed or {}
-    # ★ 기본값을 두지 않는다. 프롬프트에 **어느 레지스트리가 들어가는지**가
-    #   실험 조건 자체다 — 빠뜨리면 F1 조건에 사람이 쓴 24개가 조용히
-    #   렌더링된다 (§30.9, 원칙 1).
+    # ★ No default. **Which registry goes into the prompt** is the
+    #   experimental condition itself — leave it out and the 24 a human
+    #   wrote get rendered silently into condition F1 (§30.9, principle 1).
     if registry is None:
         raise ValueError(
-            "render_features 는 레지스트리를 반드시 받는다. 어느 피처 "
-            "목록이 프롬프트에 들어가는지가 실험 조건이다 (§26.4).")
+            "render_features must be given a registry. Which feature list "
+            "goes into the prompt is an experimental condition (§26.4).")
     reg = registry
     items = [reg[n] for n in sorted(reg._items)]
     if active_only:
@@ -316,15 +347,18 @@ def render_features(registry: FeatureRegistry, *,
 
 def verify_vectorized(f: Feature, df, hw, info, *, n: int = 256,
                       rtol: float = 1e-9, seed: int = 0) -> None:
-    """벡터화 구현이 스칼라 구현과 일치하는지 검사한다.
+    """Checks that the vectorised implementation agrees with the scalar
+    one.
 
-    ⚠️ 불일치는 **기각**이다 (§26.4). 벡터화가 조용히 다르면 학습(행렬)과
-    배포(스칼라)가 다른 함수를 쓰게 되고, 그건 §8.1 이 없애려던 오류다.
+    ⚠️ A mismatch is a **rejection** (§26.4). If the vectorisation silently
+    differs, training (the matrix) and deployment (the scalar) use different
+    functions, and that is the error §8.1 set out to remove.
     """
     from kernelrule.core.types import Problem, config_from_row
 
     if f.vec is None:
-        raise ValueError(f"{f.name}: 벡터화 구현이 없다.")
+        raise ValueError(
+            f"{f.name}: there is no vectorised implementation.")
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(df), size=min(n, len(df)), replace=False)
     sub = df.iloc[idx]
@@ -337,5 +371,6 @@ def verify_vectorized(f: Feature, df, hw, info, *, n: int = 256,
         bad = int((~np.isclose(got, want, rtol=rtol, atol=1e-12,
                                equal_nan=True)).sum())
         raise ValueError(
-            f"{f.name}: 벡터화 구현이 스칼라와 다르다 ({bad}/{len(sub)}행). "
-            "기각한다 — 학습과 배포가 다른 함수를 쓰게 된다.")
+            f"{f.name}: the vectorised implementation differs from the "
+            f"scalar one ({bad}/{len(sub)} rows). Rejected — training and "
+            "deployment would use different functions.")

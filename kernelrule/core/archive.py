@@ -1,38 +1,43 @@
-"""MAP-Elites 아카이브 (§13, §27).
+"""The MAP-Elites archive (§13, §27).
 
-## 왜 단일 최고로는 안 되는가
+## Why a single best will not do
 
-항상 최고에서만 출발하면 근처만 뒤진다. 언덕 꼭대기까지는 가지만 옆의 더
-높은 산은 못 본다. **특정 영역 최고면 전체가 낮아도 살려둔다.**
+Always starting from the best only searches nearby. It reaches the top of one
+hill but never sees the higher mountain beside it. **A rule that is best in
+one region is kept alive even if it is poor overall.**
 
-    전체 최고        규칙#47   1.12
-    mem-bound 최고   규칙#31   1.08 (전체 1.24)   <- 단일 최고 방식이면 버려진다
-    compute 최고     규칙#40   1.03 (전체 1.31)
+    overall best      rule #47   1.12
+    mem-bound best    rule #31   1.08 (overall 1.24)  <- discarded by a
+                                                          single-best scheme
+    compute best      rule #40   1.03 (overall 1.31)
 
-그리고 **둘을 합치면 양쪽 다 잘하는 규칙이 나올 수 있다.** 그것이 교차이고
-도약이 나오는 지점이다.
+And **combining the two can produce a rule that is good at both.** That is
+the crossover, and it is where the leaps come from.
 
-## 셀 축 (§27) — ★ 크기 체제로 바꿨다
+## Cell axes (§27) — ★ changed to the size regime
 
-    code_len      AST 노드 수                  4구간
-    short_objective  학습 분할 안의 **짧은** 형상   4구간
-    long_objective   학습 분할 안의 **긴** 형상     4구간
-                                                -> 64 셀
+    code_len         the number of AST nodes            4 bands
+    short_objective  the **short** shapes in the        4 bands
+                     training split
+    long_objective   the **long** shapes in the         4 bands
+                     training split
+                                                        -> 64 cells
 
-**원래는 mem-bound / compute-bound 였다.** 크기 층화가 난이도 층화보다
-5배 더 달라진다는 §30.5 결과, 그리고 진화가 **소수 크기 체제를 희생한다**는
-실측(§10.1)에 맞춰 바꿨다. 전이가 되는 규칙을 별도 셀에 보존하는 것이
-목적이다 — 균형 잡힌 학습에서도 9개 중 1개는 여전히 폭발한다.
+**It was originally mem-bound / compute-bound.** It was changed to follow the
+§30.5 result that size stratification moves 5x more than difficulty
+stratification, and the measurement (§10.1) that evolution **sacrifices a
+minority size regime**. The purpose is to preserve rules that transfer in
+their own cells — even under balanced training, 1 in 9 still blows up.
 
-⚠️ **검증 분할을 셀 축에 쓰면 홀드아웃이 오염된다** (§10.2).
-축은 **학습 분할 안에서** 체제를 가른다.
+⚠️ **Using the validation split as a cell axis contaminates the holdout**
+(§10.2). The axes split regimes **within the training split**.
 
-초반 20라운드에 채워지는 셀 수를 보고 조정한다 — **10개 미만이면 경계가
-너무 성기고 50개 이상이면 너무 촘촘하다.**
+Adjust by watching how many cells fill over the first 20 rounds — **under 10
+means the boundaries are too coarse, over 50 too fine.**
 
-## 갱신은 노이즈 바닥으로 판정한다 (§7.4, §13.4)
+## Updates are judged against the noise floor (§7.4, §13.4)
 
-"조금 좋아졌다" 로 갱신하면 아카이브가 노이즈를 축적한다.
+Updating on "slightly better" makes the archive accumulate noise.
 """
 
 from __future__ import annotations
@@ -44,22 +49,23 @@ from pathlib import Path
 
 __all__ = ["Archive", "Elite", "CELL_AXIS_NAMES", "N_QUANTILES"]
 
-#: ★ 셀 축 셋 (2026-09-08, D-144).
+#: ★ The three cell axes (2026-09-08, D-144).
 #:
 #: ```
-#: 옛   code_len · short_objective(SOL<0.5ms) · long_objective   4x4x4
-#: ★ 새 mem_objective · comp_objective · all_objective          3x3x3
+#: old   code_len · short_objective(SOL<0.5ms) · long_objective   4x4x4
+#: ★ new mem_objective · comp_objective · all_objective           3x3x3
 #: ```
 #:
-#: 구간은 `t_memory > t_compute` (roofline 하한 두 항의 비교)로 가른다 —
-#: `SOL 0.5 ms` 같은 **임의 문턱을 쓰지 않는다** (D-143 이 그 문턱을
-#: 방어할 수 없음을 보였다).
+#: The bands are cut by `t_memory > t_compute` (a comparison of the two
+#: roofline lower-bound terms) — **no arbitrary threshold** such as
+#: `SOL 0.5 ms` is used (D-143 showed that threshold cannot be defended).
 #:
-#: `all_objective` 가 중복이 아닌 것을 확인했다 — 같은 (mem, comp) 칸
-#: 안에서 전체 구간이 갈리는 칸이 13/16 이었다.
+#: `all_objective` was confirmed not to be redundant — within the same
+#: (mem, comp) cell, the overall band differed in 13 of 16 cells.
 CELL_AXIS_NAMES = ("mem_objective", "comp_objective", "all_objective")
 
-#: 축마다 칸 수. ★ 동적 3분위다 — **절대 경계는 없다** (아래 참고).
+#: Bands per axis. ★ Dynamic tertiles — **there are no absolute
+#: boundaries** (see below).
 N_QUANTILES = 3
 
 
@@ -69,13 +75,17 @@ class Elite:
     code: str
     w: list[float]
     regret: float
-    #: 학습 분할 안의 **memory 구간**(t_memory > t_compute) 목적함수 값.
-    #: ★ 이름 이력: `short_regret` -> `short_objective`(D-101) ->
-    #: `mem_objective`(D-144). 축이 크기(SOL 0.5ms)에서 roofline 으로 바뀌었다.
+    #: The objective value on the **memory band** (t_memory > t_compute)
+    #: within the training split.
+    #: ★ Name history: `short_regret` -> `short_objective` (D-101) ->
+    #: `mem_objective` (D-144). The axis changed from size (SOL 0.5ms) to
+    #: the roofline.
     mem_objective: float
-    #: 학습 분할 안의 **compute 구간** 목적함수 값
+    #: The objective value on the **compute band** within the training
+    #: split
     comp_objective: float
-    #: ★ 학습 분할 **전체**의 목적함수 값 (D-144 에서 새로 생긴 축)
+    #: ★ The objective value over the **whole** training split (the axis
+    #: added in D-144)
     all_objective: float
     code_len: int
     round: int
@@ -83,92 +93,105 @@ class Elite:
     hypothesis_id: str = ""
     parent_ids: list[str] = field(default_factory=list)
     val_regret: float = float("nan")
-    #: ★ 순위 손실 (D-101). `Archive(select_by="rank")` 일 때 채택 기준이
-    #: 된다. `regret` 은 그때도 **계속 채워진다** — 기록은 양쪽 다 한다.
+    #: ★ The rank loss (D-101). It becomes the acceptance criterion when
+    #: `Archive(select_by="rank")`. `regret` **keeps being filled in** even
+    #: then — both are recorded.
     rank_loss: float = float("nan")
 
     @property
     def regime_gap(self) -> float:
-        """compute 구간과 memory 구간의 격차. **전이 신호다.**
+        """The gap between the compute band and the memory band. **A
+        transfer signal.**
 
-        크면 그 규칙은 한 구간을 희생하고 있다.
+        When it is large, that rule is sacrificing one band.
         """
         return abs(self.comp_objective - self.mem_objective)
 
     def to_dict(self) -> dict:
-        """★ `cell` 은 여기서 못 만든다 — 3분위는 **모집단**이 정한다.
-        `Archive.dump` 가 그때의 칸을 채워 넣는다 (D-144)."""
+        """★ `cell` cannot be built here — the tertiles are decided by the
+        **population**. `Archive.dump` fills in the cell at that moment
+        (D-144)."""
         return dict(self.__dict__)
 
 
 class Archive:
-    """셀당 최고 하나 + 전체 최고."""
+    """One best per cell + the overall best."""
 
     def __init__(self, noise_tol: float = 0.0, *,
                  select_by: str = "regret") -> None:
-        #: 갱신을 인정할 최소 개선. `is_significant` 가 준다 (§7.4).
+        #: The smallest improvement that counts as an update. Given by
+        #: `is_significant` (§7.4).
         self.noise_tol = float(noise_tol)
-        #: ★ 무엇으로 채택하나 (D-101). 기본은 `regret` — 지금까지의 모든
-        #: 실행이 그 조건이다. `"rank"` 는 **명시할 때만** 돈다.
+        #: ★ What acceptance is judged on (D-101). The default is `regret`
+        #: — every run so far is under that condition. `"rank"` runs **only
+        #: when stated explicitly**.
         #:
-        #: ⚠️ 셀 **축**은 안 바뀐다 (코드 길이 / 체제별 regret). 축은
-        #: 다양성을 만드는 장치이고 채택이 목표를 정한다 — 둘을 함께
-        #: 바꾸면 변수가 둘이 된다 (`rank-evo-prereg.md` 정정).
+        #: ⚠️ The cell **axes** do not change (code length / per-regime
+        #: regret). The axes are the device that creates diversity and
+        #: acceptance sets the goal — changing both together makes two
+        #: variables (`rank-evo-prereg.md` correction).
         if select_by not in ("regret", "rank"):
-            raise ValueError(f"알 수 없는 채택 기준: {select_by!r}")
+            raise ValueError(f"unknown acceptance criterion: {select_by!r}")
         self.select_by = select_by
-        # ★ 칸은 **언제나 동적 3분위**다 (D-144). `cell_mode="absolute"` 를
-        #   없앴다 — 절대 경계 [1.0, 1.05, 1.15, 1.35, inf] 로 두면 진화가
-        #   진행되며 한 칸에 몰린다 (실측: 셀 점유 2칸 / 채택 3-12 /
-        #   전구간 tau -0.093, D-42 셋째 후보).
+        # ★ The cells are **always dynamic tertiles** (D-144).
+        #   `cell_mode="absolute"` was removed — with absolute boundaries
+        #   [1.0, 1.05, 1.15, 1.35, inf], everything piles into one cell as
+        #   evolution proceeds (measured: 2 cells occupied / 3-12 accepted /
+        #   tau -0.093 over the whole range, the third candidate of D-42).
         #
-        #   ⚠️ 대가: 칸의 뜻이 라운드마다 바뀐다. 전체가 좋아지면 1분위의
-        #   절대값이 내려간다. 그 대신 칸이 고르게 찬다. 경계가 바뀌면
-        #   **보유 엘리트를 전부 다시 배치한다** (`_consider_quantile`).
+        #   ⚠️ The price: what a cell means changes every round. As the
+        #   whole improves, the absolute value of the first tertile falls.
+        #   In exchange the cells fill evenly. When the boundaries move,
+        #   **every held elite is re-placed** (`_consider_quantile`).
         self.cells: dict[tuple, Elite] = {}
         self.best: Elite | None = None
         self.history: list[dict] = []
         self.n_seen = 0
         self.n_accepted = 0
-        #: 셀이 새로 채워진 라운드. 조기 종료 판정에 쓴다 (§14.3).
+        #: The round in which a cell was newly filled. Used for the
+        #: early-stop verdict (§14.3).
         self.last_new_cell_round = -1
 
     def _key(self, e: Elite) -> float:
-        """채택에 쓰는 값. **작을수록 좋다.**"""
+        """The value acceptance uses. **Lower is better.**"""
         if self.select_by == "regret":
             return e.regret
         v = e.rank_loss
         if not math.isfinite(v):
             raise ValueError(
-                "select_by='rank' 인데 Elite.rank_loss 가 없다. "
-                "조용히 regret 으로 떨어지지 않는다 (§26.4).")
+                "select_by='rank' but Elite.rank_loss is missing. It does "
+                "not silently fall back to regret (§26.4).")
         return v
 
     @property
     def _tol(self) -> float:
-        """★ 순위 손실에는 `noise_tol` 을 안 쓴다.
+        """★ `noise_tol` is not used for the rank loss.
 
-        `noise_tol` 은 regret 규모에 맞춰 `is_significant` 가 준 값이고
-        순위 손실은 규모가 다르다. 그리고 **순위 손실의 쌍은 이미
-        `resolvable` 로 걸러져 있어** 그 자체가 노이즈를 반영한다 —
-        허용치를 또 붙이면 두 번 빼는 것이 된다.
+        `noise_tol` is a value `is_significant` produced at the scale of
+        regret, and the rank loss is at a different scale. Besides, **the
+        pairs behind the rank loss have already been filtered by
+        `resolvable`**, so it already accounts for noise — adding a
+        tolerance on top would subtract it twice.
         """
         return self.noise_tol if self.select_by == "regret" else 0.0
 
     def _quantile_cells(self, pool: list[Elite]) -> dict:
-        """★ 보유분 + 후보를 **체제별 값으로** 정렬해 4분위 칸을 매긴다.
+        """★ Sorts the held elites + the candidate **by the per-regime
+        values** and assigns quantile cells.
 
-        ⚠️ 정렬하는 것은 `CELL_AXIS_NAMES` 의 셋이고, 이 값은
-        **언제나 체제별 regret** 이다 (`ev.at(1, mask=...)`). 목적함수가
-        `rank` 여도 그렇다 — **축은 다양성 장치이고 채택이 목표를 정한다**
-        는 설계 그대로다 (D-101). 처음에 "목적함수로 정렬" 이라고 적었는데
-        부정확했다 (D-104 에서 정정).
+        ⚠️ What is sorted are the three of `CELL_AXIS_NAMES`, and those
+        values are **always per-regime regret** (`ev.at(1, mask=...)`). That
+        holds even when the objective is `rank` — exactly as designed:
+        **the axes are the diversity device and acceptance sets the goal**
+        (D-101). It was first written as "sorted by the objective", which
+        was inaccurate (corrected in D-104).
 
-        경계값이 없는 것이 요점이다 — 절대 경계는 regret 규모에 맞춰
-        정한 값이라 값 분포가 바뀌면 전부 한 칸에 몰린다. 아카이브가
-        최대 64개라 정렬이 공짜다.
+        The point is that there are no boundary values — absolute boundaries
+        are set at the scale of regret, so when the value distribution moves
+        everything piles into one cell. The archive holds at most 64, so
+        sorting is free.
 
-        **동률은 같은 칸**이다 (`argsort(argsort(.))` 를 안 쓴다, D-41).
+        **Ties share a cell** (`argsort(argsort(.))` is not used, D-41).
         """
         n = len(pool)
         out: dict[int, tuple] = {}
@@ -189,7 +212,8 @@ class Archive:
         return out
 
     def _consider_quantile(self, e: Elite) -> list[str]:
-        """칸을 다시 매기고 칸마다 최선만 남긴다. `e` 가 남으면 이겼다."""
+        """Re-assigns the cells and keeps only the best per cell. If `e`
+        survives, it won."""
         pool = [*self.cells.values(), e]
         cells = self._quantile_cells(pool)
         best: dict[tuple, int] = {}
@@ -208,21 +232,23 @@ class Archive:
         return won
 
     def consider(self, e: Elite) -> list[str]:
-        """넣어 본다. 어느 자리를 차지했는지 돌려준다. 빈 리스트면 폐기.
+        """Tries to insert it. Returns which slots it took. An empty list
+        means discarded.
 
-        ⚠️ 검사를 **맨 앞에서** 한다. `self.best is None or _key(e) < ...`
-        는 아카이브가 비었을 때 단락 평가로 `_key` 를 건너뛴다 — 첫
-        후보만 검사 없이 들어가는 fail-open 이었다 (시험이 잡았다).
+        ⚠️ The check happens **first**. `self.best is None or _key(e) < ...`
+        short-circuits past `_key` when the archive is empty — a fail-open
+        where only the first candidate got in unchecked (a test caught it).
         """
         self.n_seen += 1
-        self._key(e)          # ★ 검사. 값은 아래에서 다시 쓴다
+        self._key(e)          # ★ the check. The value is used again below
         won: list[str] = []
         if self.best is None or self._key(e) < self._key(self.best) - self._tol:
             won.append("best")
             self.best = e
         won.extend(self._consider_quantile(e))
-        # ★ 3분위 칸은 **모집단**이 정하므로 Elite 혼자서는 자기 칸을 모른다.
-        #   기록에는 실제로 들어간 칸을 남긴다. 밀려났으면 빈 튜플이다.
+        # ★ The tertile cell is decided by the **population**, so an Elite
+        #   alone does not know its own cell. What is recorded is the cell
+        #   it actually landed in. An empty tuple if it was pushed out.
         c = next((k for k, v in self.cells.items() if v is e), ())
         if won:
             self.n_accepted += 1
@@ -232,9 +258,10 @@ class Archive:
                              "won": won, "changes": e.changes})
         return won
 
-    # -- 부모 선택 (§13.3) ------------------------------------------------
+    # -- Parent selection (§13.3) -----------------------------------------
     def parents(self, n: int, rng) -> list[tuple[str, list[Elite]]]:
-        """6 착실한 개선 / 3 다른 언덕 탐색 / 3 교차 (n=12 기준 비율)."""
+        """6 steady improvements / 3 explorations of another hill / 3
+        crossovers (the ratio at n=12)."""
         elites = list(self.cells.values())
         if not elites:
             return [("fresh", []) for _ in range(n)]
@@ -254,7 +281,7 @@ class Archive:
                 out.append(("exploit", [self.best or elites[0]]))
         return out[:n]
 
-    # -- 상태 -------------------------------------------------------------
+    # -- State ------------------------------------------------------------
     @property
     def n_cells(self) -> int:
         return len(self.cells)
@@ -266,9 +293,11 @@ class Archive:
                 "last_new_cell_round": self.last_new_cell_round}
 
     def dump(self, path: str | Path) -> None:
-        """★ 마지막 아카이브 **상태**를 쓴다 (D-139 — 개선 이력이 아니다).
+        """★ Writes the final archive **state** (D-139 — not the history of
+        improvements).
 
-        칸은 3분위라 Elite 혼자서는 모른다 — 지금 배치를 함께 적는다.
+        The cells are tertiles, so an Elite alone does not know them — the
+        current placement is written alongside.
         """
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)

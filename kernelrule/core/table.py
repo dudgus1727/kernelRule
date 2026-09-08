@@ -1,27 +1,31 @@
-"""`PerfTable` — 표 조회. **측정 시간은 여기에만 존재한다** (§7.1, §3).
+"""`PerfTable` — table lookups. **The measured times exist only here**
+(§7.1, §3).
 
-## 구조적 격리
+## Structural isolation
 
-규칙/피처 쪽에 나가는 것과 시간이 **다른 객체**다.
+What goes out to the rule/feature side and the times are **different
+objects**.
 
-    table.candidates(p)  -> CandidateSet    시간 없음. 규칙/피처가 본다
-    table.times_of(p)    -> np.ndarray      채점기만 부른다. 읽기 전용
+    table.candidates(p)  -> CandidateSet    no times. rules/features see this
+    table.times_of(p)    -> np.ndarray      only the scorer calls it. read-only
 
-`CandidateSet` 에 시간 필드가 없으므로 `sorted(..., key=(score, time))` 이나
-`idxmin()` 을 쓰려면 없는 필드를 참조해야 하고, 그러면 `AttributeError` 다.
-이것이 §30.7 의 버그를 **자료구조 수준에서** 막는 방법이다.
+`CandidateSet` has no time field, so writing `sorted(..., key=(score, time))`
+or `idxmin()` requires referencing a field that does not exist, and that is
+an `AttributeError`. This is how the §30.7 bug is blocked **at the data
+structure level**.
 
-실제로 이 표에서 확인했다: 66형상 중 **29개가 최적시간에 정확한 동점**이고
-최대 84중 동점이다 (타이머 양자화). "그 형상의 최적 config" 는 tie-break
-규칙의 함수이지 물리적 사실이 아니다. 그래서 이 클래스는 `best_config()` 를
-**제공하지 않는다** — 정의 가능한 것은 `best_time()` (스칼라, tie-break 무관)과
-`answer_mask()` (집합)뿐이다.
+It was confirmed on this table: of 66 shapes, **29 have an exact tie at the
+best time**, with up to 84 tied (timer quantisation). "The optimal config for
+that shape" is a function of the tie-break rule, not a physical fact. So this
+class **does not provide** `best_config()` — what can be defined is only
+`best_time()` (a scalar, tie-break independent) and `answer_mask()` (a set).
 
-## env_hash 는 조인 키가 아니라 격리 경계다 (§3.4)
+## env_hash is not a join key but an isolation boundary (§3.4)
 
-`env_hash` 는 **기본값 없는 필수 인자**다. kernelTab 이 이 함정을 다섯 번
-밟았고 전부 "여러 조건이 섞인 데이터를 필터 없이 집계" 였으며 **에러 없이
-조용히 틀렸다.**
+`env_hash` is a **required argument with no default**. kernelTab stepped into
+this trap five times, every one of them "aggregating data with several
+conditions mixed in, without a filter", and every one **silently wrong, with
+no error.**
 """
 
 from __future__ import annotations
@@ -47,34 +51,40 @@ from kernelrule.core.types import (
 
 __all__ = ["PerfTable", "TableError"]
 
-#: 조인 키. ranking 표와 scoring 표가 같은 행을 가리키는지 검사하는 데 쓴다.
+#: The join key. Used to check that the ranking table and the scoring table
+#: point at the same rows.
 _JOIN = ("M", "N", "K", "kernel_id", "split_k", "split_k_mode")
 
-#: 크기 층화 경계 (§30.4). 이보다 짧으면 노이즈가 순위를 지배한다.
+#: The size-stratification boundary (§30.4). Shorter than this and noise
+#: dominates the ranking.
 SIZE_STRATA_MS = 0.5
 
-#: 표 전체에서 값이 하나인 **조건 메타데이터**. 행마다 들고 있을 이유가 없다.
-#: 980,915행 x 문자열이면 100MB 를 넘는다. `PerfTable.meta` 로 옮긴다.
+#: **Condition metadata** that has a single value across the whole table.
+#: There is no reason to carry it per row. 980,915 rows x a string exceeds
+#: 100MB. It is moved to `PerfTable.meta`.
 _CONSTANT_META = ("bundle_id", "gpu_name", "cutlass_commit", "nvcc_arch",
                   "clock_locked", "locked_mhz", "sm_count",
                   "peak_tflops_used", "ridge_point_spec")
 
-#: 반복되는 짧은 문자열. category 로 두면 메모리가 한 자릿수 줄어든다.
+#: Short repeated strings. Keeping them as categories cuts memory by an
+#: order of magnitude.
 _CATEGORICAL = ("dtype", "acc_dtype", "layout_a", "layout_b", "layout_c",
                 "split_k_mode", "pipeline_kind", "arch", "ext_swizzle_type",
                 "workspace_dtype", "partials_dtype")
 
 
 class TableError(RuntimeError):
-    """표를 신뢰할 수 없다. **기본값으로 진행하지 않는다.**"""
+    """The table cannot be trusted. **Do not proceed with a default.**"""
 
 
 @dataclass(frozen=True, slots=True)
 class ShapeStats:
-    """형상 하나의 정답 쪽 통계. **채점기/층화 전용. 규칙에 넘기지 마라.**
+    """Answer-side statistics for one shape. **For the scorer and
+    stratification only. Do not hand it to a rule.**
 
-    `difficulty` 는 `ANSWER_COLS` 다 — 규칙이 "여긴 어려우니 신중하게" 를
-    알면 정답을 훔쳐본 것이다. 평가 층화(§7.3)에만 쓴다.
+    `difficulty` is an `ANSWER_COLS` quantity — a rule that knows "this one
+    is hard, be careful" has peeked at the answer. It is used only for
+    evaluation stratification (§7.3).
     """
 
     key: ShapeKey
@@ -90,23 +100,26 @@ class ShapeStats:
 
     @property
     def distinct_time_frac(self) -> float:
-        """계측 분해능 지표 (§30.4b). 난이도와 **다른 축**이다.
+        """A measurement-resolution indicator (§30.4b). **A different axis**
+        from difficulty.
 
-        난이도 낮음 = 실제로 성능이 비슷하다 (물리)
-        이 값 낮음  = 측정이 구분을 못 한다 (계측)
+        low difficulty  = performance really is similar (physics)
+        low here        = the measurement cannot tell them apart (instrument)
         """
         return self.n_distinct_times / self.n_candidates if self.n_candidates else 0.0
 
     @property
     def is_small(self) -> bool:
-        """노이즈 지배 구간인가 (§30.4). A6000 표에서 66형상 중 45개."""
+        """Is it in the noise-dominated band (§30.4)? 45 of the 66 shapes
+        in the A6000 table."""
         return self.best_ms < SIZE_STRATA_MS
 
 
 class PerfTable:
-    """(형상, config) -> 시간 조회.
+    """(shape, config) -> time lookup.
 
-    ⚠️ 생성자를 직접 부르지 말고 `from_bundle` / `from_frames` 를 써라.
+    ⚠️ Do not call the constructor directly — use `from_bundle` /
+    `from_frames`.
     """
 
     __slots__ = ("_X", "__times", "_rows", "_stats", "_cands", "_order",
@@ -117,9 +130,11 @@ class PerfTable:
                  meta: dict) -> None:
         if len(X) != len(times):
             raise TableError(
-                f"피처 행 {len(X)} != 시간 행 {len(times)}. 조인이 어긋났다.")
+                f"feature rows {len(X)} != time rows {len(times)}. The "
+                f"join is misaligned.")
         self._X = X.reset_index(drop=True)
-        # 이름 맹글링 + 읽기 전용. 실수로 정렬 키에 섞이는 것을 어렵게 한다.
+        # Name mangling + read-only. Makes it hard for this to slip into a
+        # sort key by accident.
         t = np.asarray(times, dtype=np.float64).copy()
         t.setflags(write=False)
         self.__times = t
@@ -128,8 +143,9 @@ class PerfTable:
         self._env_hash = env_hash
         self._meta = dict(meta)
 
-        # ★ 형상 그룹은 **벡터화**로 만든다. 파이썬 루프로 100만 개 튜플과
-        #   리스트를 만들면 표 자체보다 메모리를 더 쓴다 (실측 3.7GB -> ).
+        # ★ The shape groups are built **vectorised**. Building a million
+        #   tuples and lists in a Python loop uses more memory than the
+        #   table itself (measured at 3.7GB -> ).
         idx = self._X.groupby(["M", "N", "K", "dtype"], sort=False,
                               observed=True).indices
         self._rows = {(int(k[0]), int(k[1]), int(k[2]), str(k[3])):
@@ -139,18 +155,18 @@ class PerfTable:
         self._stats: dict[ShapeKey, ShapeStats] = {}
         self._build_stats()
 
-    # -- 생성 -------------------------------------------------------------
+    # -- Construction -----------------------------------------------------
     @classmethod
     def from_bundle(cls, ref: str | Path, *, env_hash: str,
                     ok_only: bool = False,
                     unexpected: str = "warn") -> PerfTable:
-        """kernelTab 번들에서 만든다.
+        """Builds from a kernelTab bundle.
 
-        `env_hash` 는 **필수**다 (§3.4). 기본값을 두지 않는다.
+        `env_hash` is **required** (§3.4). There is no default.
 
-        `ok_only=False` 가 기본인 이유: `high_outlier_frac` 도 유효한 측정이다
-        (전체의 10.7%). 이 결정은 `RunConfig` 에 기록되어야 하며, 통과 조건 리포트는
-        양쪽을 다 낸다.
+        Why `ok_only=False` is the default: `high_outlier_frac` is a valid
+        measurement too (10.7% of the total). This decision must be recorded
+        in `RunConfig`, and the gate-condition report gives both.
         """
         from kerneltab.core.bundle import load_bundle
 
@@ -158,9 +174,10 @@ class PerfTable:
         full = str(b.env_hash)
         if not full.startswith(str(env_hash)):
             raise TableError(
-                f"env_hash 불일치. 요청 {env_hash!r}, 번들 {full[:16]!r}\n"
-                "  env_hash 는 조인 키가 아니라 격리 경계다 (§3.4). "
-                "다른 조건의 데이터를 섞지 마라.")
+                f"env_hash mismatch. requested {env_hash!r}, bundle "
+                f"{full[:16]!r}\n"
+                "  env_hash is not a join key but an isolation boundary "
+                "(§3.4). Do not mix data from different conditions.")
 
         noise = NoiseModel.from_bundle(b)
         env = b.env()
@@ -186,20 +203,22 @@ class PerfTable:
                     hw: Hardware | None, noise: NoiseModel, env_hash: str,
                     meta: dict | None = None,
                     unexpected: str = "warn") -> PerfTable:
-        """정규화 + 조인 검증 후 만든다.
+        """Builds after normalisation and join verification.
 
-        `X` 는 `load_for_ranking` 결과(정답 없음), `y` 는 `load_for_scoring`
-        결과(정답 포함)여야 한다. **두 프레임이 같은 행을 가리키는지 검사한다** —
-        `ok_only` 를 다르게 줘서 어긋나면 채점이 조용히 틀린다.
+        `X` must be the result of `load_for_ranking` (no answers) and `y`
+        that of `load_for_scoring` (answers included). **It checks that the
+        two frames point at the same rows** — if they diverge because
+        `ok_only` was given differently, scoring is silently wrong.
         """
         if len(X) != len(y):
             raise TableError(
-                f"ranking {len(X)}행 != scoring {len(y)}행. 같은 ok_only 로 "
-                "로드했는지 확인하라.")
+                f"ranking {len(X)} rows != scoring {len(y)} rows. Check "
+                f"that both were loaded with the same ok_only.")
         Xn = normalize(X, unexpected=unexpected)
         for c in _JOIN:
             if c not in y.columns:
-                raise TableError(f"scoring 표에 조인 키 {c!r} 가 없다.")
+                raise TableError(
+                    f"the scoring table has no join key {c!r}.")
             a = Xn[c].to_numpy()
             b_ = y[c].to_numpy()
             if a.dtype.kind in "OU" or b_.dtype.kind in "OU":
@@ -210,17 +229,19 @@ class PerfTable:
             if not same.all():
                 bad = int((~same).sum())
                 raise TableError(
-                    f"ranking/scoring 조인이 어긋났다: {c!r} 에서 {bad}행 불일치. "
-                    "행 순서가 같다는 전제가 깨졌다.")
+                    f"the ranking/scoring join is misaligned: {bad} rows "
+                    f"differ on {c!r}. The premise that the row order is the "
+                    f"same is broken.")
         if "time_ms" not in y.columns:
-            raise TableError("scoring 표에 time_ms 가 없다.")
+            raise TableError("the scoring table has no time_ms.")
         if "env_hash" in y.columns and y["env_hash"].nunique() > 1:
             raise TableError(
-                f"scoring 표에 env_hash 가 {y['env_hash'].nunique()}개 섞여 있다. "
-                "조건을 섞어 집계하지 마라 (§3.4).")
+                f"the scoring table mixes {y['env_hash'].nunique()} "
+                f"env_hash values. Do not aggregate across conditions "
+                f"(§3.4).")
 
         meta = dict(meta or {})
-        # 상수 메타데이터는 행에서 빼고 `meta` 로 옮긴다.
+        # Constant metadata is taken out of the rows and moved to `meta`.
         drop = ["env_hash"]
         for c in _CONSTANT_META:
             if c in Xn.columns:
@@ -235,11 +256,12 @@ class PerfTable:
         return cls(Xn, y["time_ms"].to_numpy(dtype=np.float64),
                    hw=hw, noise=noise, env_hash=env_hash, meta=meta)
 
-    # -- 조회 -------------------------------------------------------------
+    # -- Lookup -----------------------------------------------------------
     @property
     def hw(self) -> Hardware:
         if self._hw is None:
-            raise TableError("이 표에 Hardware 가 없다 (env.json 미제공).")
+            raise TableError(
+                "this table has no Hardware (env.json was not supplied).")
         return self._hw
 
     @property
@@ -255,16 +277,18 @@ class PerfTable:
         return self._env_hash
 
     def shapes(self) -> list[Problem]:
-        """형상 목록. 표에 나타난 순서를 유지한다 (결정론)."""
+        """The list of shapes. It keeps the order they appear in the table
+        (determinism)."""
         return [Problem(M=k[0], N=k[1], K=k[2], dtype=k[3])
                 for k in self._order]
 
     def frame_for(self, p: Problem) -> pd.DataFrame:
-        """형상 하나의 **피처 행들**. 정답 없음. FeatureMatrix 가 쓴다."""
+        """The **feature rows** of one shape. No answers. Used by
+        FeatureMatrix."""
         return self._X.iloc[self._rows[self._k(p)]]
 
     def candidates(self, p: Problem) -> CandidateSet:
-        """규칙/피처에 넘기는 후보 집합. **시간 없음.**"""
+        """The candidate set handed to rules/features. **No times.**"""
         k = self._k(p)
         cs = self._cands.get(k)
         if cs is None:
@@ -280,16 +304,18 @@ class PerfTable:
         return cs
 
     def configs(self, p: Problem) -> tuple[Config, ...]:
-        """`Config` 객체 배열. 배포 shim / 리포트용. 채점 경로에서는 안 쓴다."""
+        """An array of `Config` objects. For the deployment shim and
+        reports. Not used on the scoring path."""
         sub = self.frame_for(p)
         return tuple(config_from_row(r) for r in sub.to_dict("records"))
 
-    # -- 정답 쪽 (채점기만) -------------------------------------------------
+    # -- The answer side (scorer only) ------------------------------------
     def times_of(self, p: Problem) -> np.ndarray:
-        """★ **채점기 전용.** 후보 순서와 정렬된 시간 배열 (읽기 전용).
+        """★ **Scorer only.** The time array aligned with the candidate
+        order (read-only).
 
-        규칙 함수에 이 배열을 넘기면 §3 의 격리가 무너진다. 호출부를 세 곳
-        (scoring / baselines / report) 으로 한정한다.
+        Handing this array to a rule function breaks §3's isolation. The
+        call sites are limited to three (scoring / baselines / report).
         """
         v = self.__times[self._rows[self._k(p)]]
         v.setflags(write=False)
@@ -305,28 +331,30 @@ class PerfTable:
         return [self._stats[k] for k in self._order]
 
     def difficulty(self, p: Problem) -> float:
-        """중앙값 시간 / 최적 시간. **`ANSWER_COLS` 다. 층화에만 쓴다.**"""
+        """Median time / best time. **An `ANSWER_COLS` quantity. Used for
+        stratification only.**"""
         return self._stats[self._k(p)].difficulty
 
     def answer_mask(self, p: Problem) -> np.ndarray:
-        """정답으로 인정할 후보의 불리언 마스크.
+        """A boolean mask of the candidates accepted as answers.
 
-        허용치는 **형상별 노이즈 바닥의 2σ** 다 (§30.3). 고정 1% 가 아니다 —
-        15µs 커널에서 1% 는 재현되지 않는 차이라 노이즈를 정답/오답으로 가른다.
+        The tolerance is **2σ of the per-shape noise floor** (§30.3), not a
+        fixed 1% — on a 15µs kernel 1% is a difference that does not
+        reproduce, so it would split noise into right and wrong answers.
 
-        ⚠️ `kerneltab.core.table.answer_set()` 대신 이걸 쓴다. 그쪽은 **모듈
-        전역 상수**를 쓰므로 다른 GPU 번들에서 A6000 눈금을 조용히 쓴다
-        (`core/noise.py` 참조).
+        ⚠️ Use this instead of `kerneltab.core.table.answer_set()`. That one
+        uses a **module-level global constant**, so on another GPU's bundle
+        it silently uses the A6000 tick (see `core/noise.py`).
         """
         t = self.times_of(p)
         st = self._stats[self._k(p)]
         return t <= st.best_ms * (1.0 + st.answer_tol)
 
-    # -- 내부 -------------------------------------------------------------
+    # -- Internals --------------------------------------------------------
     def _k(self, p: Problem) -> ShapeKey:
         k = p.key if isinstance(p, Problem) else tuple(p)
         if k not in self._rows:
-            raise KeyError(f"표에 없는 형상: {k}")
+            raise KeyError(f"shape not in the table: {k}")
         return k
 
     def _build_stats(self) -> None:
@@ -336,7 +364,8 @@ class PerfTable:
             finite = t[np.isfinite(t) & (t > 0)]
             if finite.size == 0:
                 raise TableError(
-                    f"형상 {k} 에 유효한 측정이 하나도 없다. 표를 확인하라.")
+                    f"shape {k} has not one valid measurement. Check the "
+                    f"table.")
             best = float(finite.min())
             med = float(np.median(finite))
             tol = self._noise.answer_tol(best)
@@ -351,7 +380,8 @@ class PerfTable:
             )
 
     def summary(self) -> pd.DataFrame:
-        """형상별 정답 쪽 통계. **리포트/층화 전용.**"""
+        """Per-shape answer-side statistics. **For reports and
+        stratification only.**"""
         return pd.DataFrame([{
             "M": s.key[0], "N": s.key[1], "K": s.key[2], "dtype": s.key[3],
             "n_candidates": s.n_candidates, "best_ms": s.best_ms,

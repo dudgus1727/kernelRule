@@ -1,32 +1,37 @@
-"""★ 표본 크기가 문제인가 표본 **선택**이 문제인가. LLM 0회.
+"""★ Is the problem the sample size or the sample **selection**? 0 LLM calls.
 
     python3 experiments/subset_design.py --workers 6
 
-**실험 계획서** `docs/artifacts/subset-design-prereg.md`
+The **pre-registration** is `docs/artifacts/subset-design-prereg.md`
 
-## 무작위 뽑기는 최악의 경우를 잰다
+## A random draw measures the worst case
 
-`refit_sample.py` 는 체제별 층화 뒤 **무작위**로 뽑는다. 실무에서는
-새 GPU 에서 "어느 형상을 잴까" 를 **우리가 정한다** — 형상 그리드
-설계는 kernelTab 이 매 캠페인 하는 일이다.
+`refit_sample.py` stratifies by regime and then draws **at random**. In
+practice **we decide** which shapes to measure on a new GPU — designing the
+shape grid is what kernelTab does every campaign.
 
-## ★ 표를 재기 전에 계산되는 것만 쓴다
-
-```
-쓴다     SOL 하한 / arith_intensity / ridge 대비 위치 / 층 라벨
-★ 안 쓴다  난이도 / best_ms / distinct_time_frac — 표를 재야 안다
-```
-
-표 유래 값으로 고르면 **그 자체가 누출**이고 "표 없이 고른다" 는
-시나리오가 깨진다. 아래 `_features_without_table` 이 그 경계다.
-
-## 전략
+## ★ Only what can be computed before the table is measured is used
 
 ```
-sol      각 체제 안에서 log(SOL) 분위수를 고르게 덮는다
-ridge    ★ ridge 경계에 가까운 것부터 — 거기서 분류가 뒤집힌다
-sol+ridge  절반씩
-layer    kernelTab 의 층에서 고르게 (★ d_alignment 는 학습 41에 0개다)
+used       the SOL lower bound / arith_intensity / the position relative to
+           ridge / the layer label
+★ not used difficulty / best_ms / distinct_time_frac — they need the table
+           to be measured
+```
+
+Choosing by a table-derived value **is itself a leak** and breaks the
+"choosing without a table" scenario. `_features_without_table` below is that
+boundary.
+
+## The strategies
+
+```
+sol        it covers the log(SOL) quantiles evenly within each regime
+ridge      ★ nearest to the ridge boundary first — that is where the
+           classification flips
+sol+ridge  half and half
+layer      evenly from kernelTab's layers (★ d_alignment has 0 in the
+           training 41)
 ```
 """
 
@@ -52,7 +57,7 @@ G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
 SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 KS = (2, 4, 8, 10, 12)
 STRATEGIES = ("sol", "ridge", "sol+ridge", "layer")
-#: 파국의 문턱. 실험 계획서에 박았다.
+#: The catastrophe threshold. Nailed down in the pre-registration.
 CATASTROPHE = 1.15
 
 _W: dict = {}
@@ -72,10 +77,11 @@ def _splits(table: PerfTable) -> SplitSet:
 
 
 def _features_without_table(p, hw) -> dict:
-    """★ **표를 재기 전에** 계산되는 값만. 이것이 이 실험의 경계다.
+    """★ Only values computable **before the table is measured**. This is the
+    boundary of this experiment.
 
-    `difficulty` / `best_ms` / `distinct_time_frac` 은 여기 없다 —
-    표를 재야 알 수 있고, 쓰면 누출이다 (실험 계획서 §3-2).
+    `difficulty` / `best_ms` / `distinct_time_frac` are not here — they need
+    the table to be known, and using them is a leak (pre-registration §3-2).
     """
     from kernelrule.core.splits import _DUMMY_CFG
     from kernelrule.features.physical import arith_intensity, log_sol_ms
@@ -83,14 +89,17 @@ def _features_without_table(p, hw) -> dict:
     ai = arith_intensity(p, hw, _DUMMY_CFG)
     return {"log_sol": log_sol_ms(p, hw, _DUMMY_CFG),
             "arith_intensity": ai,
-            # ridge 대비 위치. 1 에 가까울수록 체제 경계다
+            # The position relative to ridge. The closer to 1, the closer to
+            # the regime boundary
             "roofline_ratio": ai / hw.ridge_point}
 
 
 def _spread_pick(vals: np.ndarray, n: int) -> list[int]:
-    """`vals` 분포를 고르게 덮는 n개. **분위수 중앙에 가장 가까운 것.**
+    """n values covering the `vals` distribution evenly. **The nearest to each
+    quantile centre.**
 
-    결정론이다 — 같은 입력이면 같은 답이다. 동률이면 작은 인덱스.
+    It is deterministic — the same input gives the same answer. On a tie, the
+    smaller index.
     """
     if n >= len(vals):
         return list(range(len(vals)))
@@ -107,7 +116,8 @@ def _spread_pick(vals: np.ndarray, n: int) -> list[int]:
 
 
 def _select(strategy: str, k: int) -> list:
-    """전략대로 k개. **체제별 층화는 두 팔이 공유하는 조건이다.**"""
+    """k by the strategy. **The per-regime stratification is a condition
+    shared by both arms.**"""
     by_regime, feats, layers = _W["by_regime"], _W["feats"], _W["layers"]
     names = sorted(by_regime)
     sizes = np.array([len(by_regime[n]) for n in names], dtype=float)
@@ -123,7 +133,8 @@ def _select(strategy: str, k: int) -> list:
         pool = by_regime[name]
         n = int(min(want, len(pool)))
         if strategy == "layer":
-            # 층별로 돌아가며 하나씩. 층 안에서는 SOL 중앙에 가까운 것
+            # One at a time round the layers. Within a layer, the nearest to
+            # the SOL centre
             buckets: dict = {}
             for p in pool:
                 buckets.setdefault(layers.get((p.M, p.N, p.K), "?"), []).append(p)
@@ -142,7 +153,8 @@ def _select(strategy: str, k: int) -> list:
             out.extend(picked)
             continue
         if strategy == "ridge":
-            # 경계에 가까운 것부터 (|roofline_ratio - 1| 오름차순)
+            # Nearest to the boundary first (ascending
+            # |roofline_ratio - 1|)
             d = np.array([abs(feats[q.key]["roofline_ratio"] - 1.0)
                           for q in pool])
             idx = list(np.argsort(d, kind="stable")[:n])
@@ -197,7 +209,8 @@ def _job(arg):
 
 
 def _wilson_hi(k: int, n: int, z: float = 1.96) -> float:
-    """0/n 을 '파국 없음' 으로 쓰지 않기 위한 95% 상한 (원칙 27)."""
+    """The 95% upper bound, so that 0/n is not used as 'no catastrophe'
+    (principle 27)."""
     if n == 0:
         return 1.0
     ph = k / n
@@ -212,7 +225,7 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--out", default="docs/artifacts/subset-design.json")
     ap.add_argument("--random-json", default="docs/artifacts/refit-sample.json",
-                    help="무작위 팔. 같은 k 끼리만 견준다")
+                    help="the random arm. Only the same k are compared")
     a = ap.parse_args()
     warnings.simplefilter("ignore")
 
@@ -221,8 +234,8 @@ def main() -> None:
     sp = _splits(table)
     train = list(sp.train.shapes)
 
-    # ★ 조인 키를 맞춘다. `p.key` 는 (M,N,K,dtype) 이고 `shape_layers`
-    #   는 [M,N,K] 다 — 그대로 넣으면 **하나도 안 맞는다.**
+    # ★ The join key is matched up. `p.key` is (M,N,K,dtype) and
+    #   `shape_layers` is [M,N,K] — putting it in as is matches **nothing**.
     layers: dict = {}
     for name, shs in (table.meta.get("shape_layers") or {}).items():
         for sh in shs:
@@ -244,29 +257,31 @@ def main() -> None:
               feats=feats, layers=layers)
 
     print("=" * 78)
-    print("표본 크기인가 표본 선택인가 — 설계된 부분집합")
+    print("sample size or sample selection — the designed subset")
     print("=" * 78)
-    print(f"  5090 학습 {len(train)}형상  "
+    print(f"  5090 training {len(train)} shapes  "
           + "  ".join(f"{n} {len(v)}" for n, v in sorted(by_regime.items())))
     lay_n: dict = {}
     for p in train:
         key = layers.get((p.M, p.N, p.K), "?")
         lay_n[key] = lay_n.get(key, 0) + 1
-    print(f"  층 분포 {dict(sorted(lay_n.items()))}")
-    # ★ 라벨이 안 붙으면 `layer` 전략은 **한 통에서 뽑는 것**이 된다.
-    #   숫자는 나오는데 전략이 안 돈 것이다 (원칙 1). 멈춘다.
+    print(f"  layer distribution {dict(sorted(lay_n.items()))}")
+    # ★ If the labels do not attach, the `layer` strategy becomes **drawing
+    #   from one bucket**. The numbers come out but the strategy did not run
+    #   (principle 1). It stops.
     if lay_n.get("?", 0):
         raise SystemExit(
-            f"★ 층 라벨이 안 붙은 형상 {lay_n['?']}개. `shape_layers` 조인 "
-            "키를 확인하라 — `p.key` 는 (M,N,K,dtype) 이고 번들은 "
-            "[M,N,K] 다.\n  조용히 두면 `layer` 전략이 한 통에서 뽑으면서 "
-            "결과는 그럴듯하게 나온다.")
+            f"★ {lay_n['?']} shapes have no layer label. Check the "
+            "`shape_layers` join key — `p.key` is (M,N,K,dtype) and the "
+            "bundle is [M,N,K].\n  Leaving it silent makes the `layer` "
+            "strategy draw from one bucket while the result still looks "
+            "plausible.")
     absent = sorted(set(table.meta.get("shape_layers") or {}) - set(lay_n))
     if absent:
-        print(f"  ★ 학습 41형상에 **없는 층**: {absent}  "
-              "— '층 균등' 은 나머지 층 균등이다")
-    print(f"  구조 {len(rules)}개   전략 {list(STRATEGIES)}")
-    print("  ★ 설계 팔은 결정론이다 — 뽑기 운이 없다\n")
+        print(f"  ★ layers **absent** from the training 41 shapes: {absent}  "
+              "— 'layer-even' means even over the remaining layers")
+    print(f"  {len(rules)} structures   strategies {list(STRATEGIES)}")
+    print("  ★ the design arm is deterministic — there is no draw luck\n")
 
     jobs = [(ri, k, st) for ri in range(len(rules)) for k in KS
             for st in STRATEGIES]
@@ -285,8 +300,8 @@ def main() -> None:
         for row in json.loads(rp.read_text())["rows"]:
             rnd[row["k"]] = row["values"]
 
-    print(f"  {'k':>4} {'전략':>10} {'중앙':>8} {'최악':>8} "
-          f"{'파국':>7} {'95%상한':>8}   {'무작위 파국':>12}")
+    print(f"  {'k':>4} {'strategy':>10} {'median':>8} {'worst':>8} "
+          f"{'catastr':>8} {'95% hi':>8}   {'random catastr':>15}")
     rows = []
     for k in KS:
         for st in STRATEGIES:
@@ -298,19 +313,20 @@ def main() -> None:
             nc = int((v > CATASTROPHE).sum())
             hi = _wilson_hi(nc, len(v))
             rv = np.array(rnd.get(k, []))
-            rtxt = (f"{(rv > CATASTROPHE).mean():11.0%}" if len(rv)
-                    else f"{'—':>11}")
+            rtxt = (f"{(rv > CATASTROPHE).mean():14.0%}" if len(rv)
+                    else f"{'—':>14}")
             print(f"  {k:4d} {st:>10} {np.median(v):8.4f} {v.max():8.4f} "
-                  f"{nc:3d}/{len(v):<3d} {hi:8.0%}   {rtxt}")
+                  f"{nc:3d}/{len(v):<4d} {hi:8.0%}   {rtxt}")
             rows.append({"k": k, "strategy": st, "median": float(np.median(v)),
                          "max": float(v.max()), "n_catastrophe": nc,
                          "n": len(v), "wilson_hi": hi,
                          "values": [float(x) for x in v]})
         print()
 
-    print("  ⚠️ 설계 팔은 k마다 6건뿐이다 (구조 6 x 뽑기 1). "
-          "0/6 은 '파국 없음' 이 아니라 **95% 상한 39%** 다 (원칙 27).")
-    print("  ⚠️ 유의성은 붙이지 않는다.")
+    print("  ⚠️ the design arm has only 6 cases per k (6 structures x 1 "
+          "draw). 0/6 is not 'no catastrophe' but **a 95% upper bound of "
+          "39%** (principle 27).")
+    print("  ⚠️ no significance is attached.")
     Path(a.out).write_text(json.dumps(
         {"bundle": G5090[0], "n_train": len(train), "src_runs": SRC_RUNS,
          "strategies": list(STRATEGIES), "catastrophe": CATASTROPHE,

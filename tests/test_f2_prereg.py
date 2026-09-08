@@ -1,7 +1,12 @@
-"""F2 실험 계획서 — 문서와 코드가 달라지지 않는가 (원칙 2).
+"""The F2 pre-registration — do the document and the code diverge
+(principle 2)?
 
-실험 계획서는 **문서**로 읽히고 **코드**로 실행된다. 문서만 고치고 코드를
-안 고치면 "실험 계획서대로 했다" 가 거짓이 된다.
+A pre-registration is read as **a document** and executed as **code**. Fixing
+only the document and not the code makes "we did it as pre-registered" false.
+
+⚠️ 2026-09-08 (D-146): **the asserted strings stay in Korean.** They are the
+text of `docs/artifacts/f2-preregistration.md` and of the frozen `F2_PREREG`
+that mirrors it, and `docs/` is not translated.
 """
 from __future__ import annotations
 
@@ -26,18 +31,19 @@ def test_doc_says_it_was_written_before_any_llm_call():
     body = DOC.read_text()
     assert "실행 **전**에 박는다" in body
     assert "LLM 호출 0회 상태에서 작성" in body
-    # ★ "실행 직전이 더 위험하다" 는 논지가 남아 있어야 한다
+    # ★ the argument "just before the run is more dangerous" has to remain
     assert "실행 직전이 오히려 더 위험하다" in body
 
 
 def test_numbers_match_between_doc_and_code(pre):
     body = DOC.read_text()
     for text in (f"{pre['start_library']}개", f"고정 {pre['areas']}개",
-                 # ★ 실험 계획서는 옛 이름으로 쓰였다. 문서도 코드도 그때의
-                 # 기록이므로 둘 다 안 고친다 (D-93, 문서 규칙 2).
+                 # ★ The pre-registration was written with the old name. Both
+                 # the document and the code are a record of that time, so
+                 # neither is changed (D-93, documentation rule 2).
                  f"Architect {pre['n_architect']}회",
                  f"{pre['n_seeds']}시드", f"{pre['rounds']}라운드"):
-        assert text in body, f"문서에 {text!r} 가 없다"
+        assert text in body, f"{text!r} is not in the document"
 
 
 def test_expected_result_is_written_down(pre):
@@ -47,13 +53,14 @@ def test_expected_result_is_written_down(pre):
 
 
 def test_rediscovery_is_explicitly_not_a_criterion(pre):
-    """★ 5개를 줬으니 재발견이 줄어드는 게 당연하다."""
+    """★ Five were given, so of course rediscoveries go down."""
     assert "재발견" in pre["not_a_criterion"]
     assert "판정 기준이 **아닌** 것" in DOC.read_text()
 
 
 def test_two_variables_are_acknowledged(pre):
-    """D-31 의 예외임을 **명시**한다 — 조용히 넘어가지 않는다."""
+    """It **states** that this is an exception to D-31 — it is not passed over
+    silently."""
     assert "분리하지 않는다" in pre["two_variables"]
     assert "D-31" in pre["two_variables"]
     assert "못 가른다" in pre["two_variables"]
@@ -77,7 +84,8 @@ def test_failure_policy_is_explicit(pre):
 
 
 def test_stop_condition_says_what_to_do_after_stopping(pre):
-    """★ "멈춘다" 만으로는 부족하다 — 무엇을 볼지 적어 둔다 (원칙 8)."""
+    """★ "it stops" alone is not enough — what to look at is written down
+    (principle 8)."""
     action = pre["on_failure"]["채택 절반 미만"]
     assert "거부 사유 분포" in action
     assert "원칙 8" in action
@@ -87,6 +95,7 @@ def test_stop_condition_says_what_to_do_after_stopping(pre):
 
 
 def test_threshold_rationale_is_not_calibrated_to_f1(pre):
-    """임계값이 F1 실측을 보고 조인 것이 아니라는 근거 (D-50)."""
+    """The ground that the threshold was not tightened after seeing F1's
+    measurement (D-50)."""
     assert "최소 요건" in pre["threshold_rationale"]
     assert "정상 동작" in pre["threshold_rationale"]

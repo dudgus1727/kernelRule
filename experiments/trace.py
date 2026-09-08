@@ -1,11 +1,12 @@
-"""★ 실행 트레이스를 **사람이 읽게** 편다 (D-133). LLM 0회.
+"""★ It unfolds a run trace **for a human to read** (D-133). 0 LLM calls.
 
     python3 experiments/trace.py <run> --round 7
-    python3 experiments/trace.py <run> --round 7 --full   # 프롬프트 전문까지
+    python3 experiments/trace.py <run> --round 7 --full   # the full prompts too
     python3 experiments/trace.py <run> --summary
 
-`trace.jsonl` 은 한 줄이 한 사건이고 시간순이다. 이 도구는 **읽기만**
-한다 — 세는 것은 사람이 읽어보고 정한다 (지시문 §5).
+In `trace.jsonl` one line is one event, in time order. This tool **only
+reads** — what to count is decided by a human after reading (the instruction
+§5).
 """
 
 from __future__ import annotations
@@ -20,38 +21,38 @@ def _load(run: str) -> list[dict]:
     p = Path("runs") / run / "trace.jsonl"
     if not p.exists():
         raise SystemExit(
-            f"{p} 가 없다. 트레이스는 D-133 이후 실행에만 있다 — "
-            "옛 실행은 llm_calls/ 와 rounds.jsonl 을 봐라.")
+            f"{p} does not exist. A trace only exists for runs after D-133 — "
+            "for an old run, look at llm_calls/ and rounds.jsonl.")
     return [json.loads(x) for x in p.read_text().splitlines() if x.strip()]
 
 
 def _fold(txt: str, n: int = 240) -> str:
     txt = (txt or "").strip()
-    return txt if len(txt) <= n else txt[:n] + f" … (+{len(txt) - n}자)"
+    return txt if len(txt) <= n else txt[:n] + f" … (+{len(txt) - n} chars)"
 
 
 def show_round(evs: list[dict], r: int, *, full: bool) -> None:
     sub = [e for e in evs if e.get("round") == r]
     if not sub:
-        raise SystemExit(f"라운드 {r} 의 사건이 없다.")
+        raise SystemExit(f"there is no event for round {r}.")
     start = next((e for e in sub if e["ev"] == "round_start"), {})
     end = next((e for e in sub if e["ev"] == "round_end"), {})
     print("=" * 92)
-    print(f"라운드 {r}   시작 best {start.get('archive_best')}  "
-          f"셀 {start.get('cells')}   ->   끝 best {end.get('best')}  "
-          f"셀 {end.get('cells')}   {end.get('seconds')}초")
+    print(f"round {r}   start best {start.get('archive_best')}  "
+          f"cells {start.get('cells')}   ->   end best {end.get('best')}  "
+          f"cells {end.get('cells')}   {end.get('seconds')}s")
     print("=" * 92)
 
     for e in sub:
         if e["ev"] == "hypotheses":
-            print(f"\n  가설 {len(e.get('ids') or [])}개"
-                  + (f" (되돌아가 교체 {e['n_replaced']}개)"
+            print(f"\n  {len(e.get('ids') or [])} hypotheses"
+                  + (f" ({e['n_replaced']} replaced on re-entry)"
                      if e.get("n_replaced") else ""))
             for hid, claim in zip(e.get("ids") or [],
                                   e.get("claims") or [], strict=False):
                 print(f"    {hid}  {_fold(claim, 400 if full else 160)}")
         elif e["ev"] == "parents":
-            print("\n  부모 배정")
+            print("\n  parent assignment")
             for pk in e.get("picks") or []:
                 print(f"    {pk['kind']:8s} {pk.get('rules')}")
 
@@ -59,36 +60,36 @@ def show_round(evs: list[dict], r: int, *, full: bool) -> None:
         for e in sub:
             if e["ev"] == "llm_call":
                 print(f"\n  --- LLM {e['role']} (seq {e['seq']}, "
-                      f"{e.get('n_in')}->{e.get('n_out')} 토큰, "
+                      f"{e.get('n_in')}->{e.get('n_out')} tokens, "
                       f"{e.get('ms')}ms) ---")
-                print("  [사용자 프롬프트]")
+                print("  [user prompt]")
                 print("  " + (e.get("user_prompt") or "").replace("\n", "\n  "))
-                print("  [응답]")
+                print("  [response]")
                 print("  " + json.dumps(e.get("response"), ensure_ascii=False,
                                         indent=1).replace("\n", "\n  "))
 
-    # 제안 -> 결과를 한 줄씩 잇는다
+    # The proposals -> the outcomes, joined one line each
     props = {e["i"]: e for e in sub if e["ev"] == "proposal"}
     rej = {e.get("i"): e for e in sub if e["ev"] == "reject"}
     dup = {e.get("i"): e for e in sub if e["ev"] == "duplicate"}
     scored = {e["code_sha"]: e for e in sub if e["ev"] == "scored"}
     arch = {e["rule"]: e for e in sub if e["ev"] == "archive"}
-    print(f"\n  제안 {len(props)}개")
-    print(f"  {'i':>2s} {'부모종류':8s} {'가설':5s} {'결과':10s} "
-          f"{'학습':>8s} {'검증':>8s} {'셀':>10s}  changes")
+    print(f"\n  {len(props)} proposals")
+    print(f"  {'i':>2s} {'parent':8s} {'hyp':5s} {'outcome':10s} "
+          f"{'train':>8s} {'val':>8s} {'cell':>10s}  changes")
     for i in sorted(set(props) | set(rej) | set(dup)):
         p = props.get(i, {})
         sha = p.get("code_sha")
         sc = scored.get(sha)
         a = arch.get(sc["rule"]) if sc else None
         if i in rej:
-            out, fit, val, cell = f"거부:{rej[i].get('why')}", "", "", ""
+            out, fit, val, cell = f"refused:{rej[i].get('why')}", "", "", ""
         elif i in dup:
-            out, fit, val, cell = "중복", "", "", ""
+            out, fit, val, cell = "duplicate", "", "", ""
         elif sc is None:
-            out, fit, val, cell = "채점못함", "", "", ""
+            out, fit, val, cell = "not scored", "", "", ""
         else:
-            out = "★ 채택" if (a and a.get("accepted")) else "탈락"
+            out = "★ accepted" if (a and a.get("accepted")) else "dropped"
             fit = f"{sc['fit']:.4f}"
             val = ("" if sc.get("val") is None
                    else f"{sc['val']:.4f}")
@@ -98,23 +99,23 @@ def show_round(evs: list[dict], r: int, *, full: bool) -> None:
               f"{_fold(p.get('changes'), 400 if full else 70)}")
         if i in rej and rej[i].get("detail"):
             print(f"     ⛔ {_fold(rej[i]['detail'], 300)}")
-    print(f"\n  호출 {end.get('calls')}   제안 {end.get('proposed')} / "
-          f"채점 {end.get('scored')} / 채택 {end.get('accepted')} / "
-          f"거부 {end.get('rejected')}")
+    print(f"\n  calls {end.get('calls')}   proposed {end.get('proposed')} / "
+          f"scored {end.get('scored')} / accepted {end.get('accepted')} / "
+          f"refused {end.get('rejected')}")
     if not full:
-        print("  ★ 프롬프트 전문은 `--full` 로")
+        print("  ★ the full prompts are behind `--full`")
 
 
 def summary(evs: list[dict]) -> None:
     start = evs[0]
     print("=" * 92)
-    print(f"{start.get('run_id')}   커밋 {start.get('commit')}   "
-          f"라운드 {start.get('n_rounds')}   분할 {start.get('split')} "
+    print(f"{start.get('run_id')}   commit {start.get('commit')}   "
+          f"rounds {start.get('n_rounds')}   split {start.get('split')} "
           f"({start.get('n_train')}/{start.get('n_val')})   "
-          f"피처 {len(start.get('features') or [])}개")
+          f"features {len(start.get('features') or [])}")
     print("=" * 92)
-    print(f"  {'r':>2s} {'호출':>4s} {'제안':>4s} {'채점':>4s} {'채택':>4s} "
-          f"{'거부':>4s} {'중복':>4s} {'best':>9s} {'셀':>3s}")
+    print(f"  {'r':>2s} {'call':>4s} {'prop':>4s} {'scor':>4s} {'acpt':>4s} "
+          f"{'refu':>4s} {'dupl':>4s} {'best':>9s} {'cel':>3s}")
     for e in evs:
         if e["ev"] != "round_end":
             continue
@@ -129,11 +130,11 @@ def summary(evs: list[dict]) -> None:
     print()
     why = Counter(e.get("why") for e in evs if e["ev"] == "reject")
     if why:
-        print("  거부 사유:", dict(why))
+        print("  refusal reasons:", dict(why))
     kinds = Counter(e.get("kind") for e in evs if e["ev"] == "duplicate")
     if kinds:
-        print("  중복이 나온 부모 종류:", dict(kinds))
-    print("  ★ 무엇을 더 셀지는 읽어보고 정한다 (D-133 §6)")
+        print("  the parent kinds duplicates came from:", dict(kinds))
+    print("  ★ what else to count is decided after reading (D-133 §6)")
 
 
 def main() -> None:
@@ -142,7 +143,7 @@ def main() -> None:
     ap.add_argument("--round", type=int)
     ap.add_argument("--summary", action="store_true")
     ap.add_argument("--full", action="store_true",
-                    help="프롬프트·응답 전문까지 편다")
+                    help="unfold the full prompts and responses too")
     a = ap.parse_args()
     evs = _load(a.run)
     if a.round is not None:

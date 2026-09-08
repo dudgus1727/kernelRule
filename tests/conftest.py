@@ -1,15 +1,16 @@
-"""공용 픽스처 + **스킵 감시** (§26.3). GPU 를 전혀 쓰지 않는다.
+"""Shared fixtures + the **skip watchdog** (§26.3). It uses no GPU at all.
 
-kernelTab 의 `tests/conftest.py` 에서 검증된 구조를 그대로 가져왔다 (R-1).
-거기서 `test_table.py`/`test_bundle.py` 41개가 pyarrow 부재로 통째로 스킵되는데
-요약은 "2 skipped" 초록불이었다. 하필 그 둘이 **정답 누출 방지를 검증하는
-모듈**이었다.
+The structure was taken as validated from kernelTab's `tests/conftest.py`
+(R-1). There, 41 tests in `test_table.py`/`test_bundle.py` were skipped
+wholesale because pyarrow was missing, and the summary was a green
+"2 skipped". Those two happened to be **the modules that validate the
+answer-leak defences**.
 
-kernelRule 에서 그에 해당하는 것이 `CRITICAL_MODULES` 다. 이 모듈들이
-수집되지 않았거나 전부 스킵되면 **세션을 실패시킨다.**
+The equivalent here is `CRITICAL_MODULES`. If those modules are not collected
+or are skipped entirely, **the session fails.**
 
-우회: `KERNELRULE_ALLOW_SKIP=1`. 우회하면 큰 경고가 나가고, 그 실행 결과로
-누출 방지를 보증해서는 안 된다.
+The bypass is `KERNELRULE_ALLOW_SKIP=1`. Bypassing prints a loud warning, and
+the result of that run must not be used to guarantee the leak defences.
 """
 from __future__ import annotations
 
@@ -20,27 +21,32 @@ from pathlib import Path
 
 import pytest
 
-#: 중요 모듈이 이 비율 넘게 스킵되면 경고한다.
+#: Warns when a critical module is skipped above this fraction.
 #:
-#: kernelTab R-1 은 **모듈 전체**가 스킵되는 것을 잡았다. 그런데 한 층
-#: 아래가 남아 있었다 — `ran == 0` 조건이라 4개가 돌고 11개가 스킵되면
-#: 그냥 통과한다. `datasets/` 가 `.gitignore` 되어 있으므로 **새로 클론한
-#: 사람은 이 상태가 기본**인데 아무 신호도 없었다.
+#: kernelTab's R-1 caught **a whole module** being skipped. But one layer
+#: below remained — the condition was `ran == 0`, so 4 running and 11
+#: skipped simply passed. `datasets/` is `.gitignore`d, so **for someone who
+#: has just cloned, that state is the default** and there was no signal at
+#: all.
 #:
-#: 실측: 번들 없이 `test_leakage.py` 는 4 passed / 11 skipped (73% 스킵)다.
-#: 누출 방지 검증의 1/4 만 돌면서 초록불이 뜬다.
+#: Measured: without a bundle, `test_leakage.py` is 4 passed / 11 skipped
+#: (73% skipped). A quarter of the leak-defence validation runs and the light
+#: is green.
 MAX_SKIP_FRAC = 0.5
 
-#: 이 모듈들이 안 돌면 **실패**다.
+#: If these modules do not run, it is a **failure**.
 CRITICAL_MODULES = {
     "test_leakage.py", "test_scoring.py", "test_adapter.py",
     "test_noise.py", "test_weights.py", "test_synth.py",
-    # 2단계 추가 — 정적 검사와 샌드박스가 조용히 안 도는 것을 막는다
+    # Added in stage 2 — it stops the static checks and the sandbox
+    # silently not running
     "test_checks.py", "test_sandbox.py", "test_features.py",
     "test_baselines.py",
-    # 3단계 추가 — 리포트 자기모순 검사와 adversarial 차단이 핵심이다
+    # Added in stage 3 — the report self-contradiction check and the
+    # adversarial blocking are the core
     "test_diagnostic.py", "test_agents.py", "test_loop.py",
-    # 4단계 추가 — 키 부재 폴백 금지와 예산 상한이 조용히 꺼지면 안 된다
+    # Added in stage 4 — the no-fallback-on-missing-key rule and the budget
+    # caps must not switch off silently
     "test_openai_client.py",
 }
 ALLOW_SKIP_ENV = "KERNELRULE_ALLOW_SKIP"
@@ -63,22 +69,26 @@ def pytest_runtest_logreport(report):
 
 
 def _bad_modules() -> list[str]:
-    """세션을 **실패시켜야** 하는 것."""
+    """What **must fail** the session."""
     bad = []
     for mod in sorted(CRITICAL_MODULES):
         d = _seen.get(mod)
         if d is None or (d["ran"] == 0 and d["skipped"] == 0):
-            bad.append(f"{mod}: 수집되지 않았다 (import 실패이거나 파일이 없다)")
+            bad.append(f"{mod}: not collected (an import failure, or the "
+                       f"file is missing)")
         elif d["ran"] == 0:
-            bad.append(f"{mod}: {d['skipped']}개가 전부 스킵됐다 — 실제로 돈 것 0개")
+            bad.append(f"{mod}: all {d['skipped']} were skipped — 0 actually "
+                       f"ran")
     return bad
 
 
 def _partial_skips() -> list[str]:
-    """실패까지는 아니지만 **보증할 수 없는** 것 (§26.3 한 층 아래).
+    """Not a failure, but **not something that can be guaranteed** (one
+    layer below §26.3).
 
-    거부하지 않는 이유: 번들 없이 개발하는 것은 정상 경로다. 다만 그
-    실행으로 누출 방지를 보증해서는 안 되고, 그 사실이 **보여야** 한다.
+    Why it does not refuse: developing without a bundle is a normal path. It
+    is only that the leak defences must not be guaranteed from such a run,
+    and that fact has to be **visible**.
     """
     out = []
     for mod in sorted(CRITICAL_MODULES):
@@ -88,61 +98,68 @@ def _partial_skips() -> list[str]:
         total = d["ran"] + d["skipped"]
         if total and d["ran"] and d["skipped"] / total > MAX_SKIP_FRAC:
             out.append(f"{mod}: {d['skipped']}/{total} "
-                       f"({d['skipped'] / total:.0%}) 스킵")
+                       f"({d['skipped'] / total:.0%}) skipped")
     return out
 
 
 class _SkipGuardItem(pytest.Item):
-    """맨 마지막에 도는 합성 항목.
+    """A synthetic item that runs last.
 
-    `pytest_sessionfinish` 에서 `exitstatus` 를 바꾸는 방법은 pytest 버전에
-    따라 전파되지 않는다. 감시가 종료 코드로 이어지지 않으면 CI 에서
-    무의미하므로 진짜 테스트 항목으로 만들어 정상 실패 경로를 탄다.
+    Changing `exitstatus` in `pytest_sessionfinish` does not propagate on
+    every pytest version. A watchdog that does not reach the exit code is
+    meaningless in CI, so it is made a real test item and takes the normal
+    failure path.
     """
 
     def runtest(self):
-        # ★ 먼저 부분 스킵을 보고한다. 실패는 아니지만 조용히 넘어가면
-        #   "누출 방지 검증됨" 을 거짓으로 믿게 된다.
+        # ★ Partial skips are reported first. It is not a failure, but
+        #   passing over it silently makes "the leak defences are validated"
+        #   a false belief.
         partial = _partial_skips()
         if partial:
             self._warn_loudly(
-                "중요 모듈이 절반 넘게 스킵됐다\n"
+                "a critical module was skipped more than half\n"
                 + "\n".join("  - " + x for x in partial) + "\n\n"
-                "★ 이 실행 결과로 누출 방지를 보증하지 마라.\n"
-                "  대부분 `datasets/` 아래 번들이 없어서다. 받는 법:\n"
-                "    docs/design.md 의 데이터 절 참조\n"
-                "  번들 없이 개발하는 것은 정상이지만, 그때는 합성 표만\n"
-                "  검증된 것이다.")
+                "★ Do not guarantee the leak defences from this run.\n"
+                "  Usually it is because there is no bundle under "
+                "`datasets/`. How to get one:\n"
+                "    see the data section of docs/design.md\n"
+                "  Developing without a bundle is normal, but then only the "
+                "synthetic\n"
+                "  table has been validated.")
 
         bad = _bad_modules()
         if not bad:
             return
-        msg = ("중요 테스트 모듈이 실제로 돌지 않았다\n"
+        msg = ("a critical test module did not actually run\n"
                + "\n".join("  - " + b for b in bad) + "\n\n"
-               "이 모듈들은 **정답 누출 방지와 노이즈 바닥**을 검증한다.\n"
-               "스킵된 채 초록불이 뜨면 '검증됨' 을 거짓으로 믿게 된다.\n\n"
-               "  고치는 법:            pip install -e '.[test]'\n"
-               f"  의도적으로 넘기려면:  {ALLOW_SKIP_ENV}=1 pytest")
+               "These modules validate **the answer-leak defences and the "
+               "noise floor**.\n"
+               "A green light while they are skipped makes 'validated' a "
+               "false belief.\n\n"
+               "  How to fix:              pip install -e '.[test]'\n"
+               f"  To skip deliberately:    {ALLOW_SKIP_ENV}=1 pytest")
         if os.environ.get(ALLOW_SKIP_ENV) == "1":
             self._warn_loudly(msg)
-            pytest.skip(f"{ALLOW_SKIP_ENV}=1 로 우회 — 이 실행 결과로 "
-                        "누출 방지를 보증하지 마라")
+            pytest.skip(f"bypassed with {ALLOW_SKIP_ENV}=1 — do not "
+                        "guarantee the leak defences from this run")
         raise AssertionError(msg)
 
     def _warn_loudly(self, msg: str) -> None:
-        """우회 경고를 **반드시 보이게** 쓴다.
+        """Writes the bypass warning so that it is **certainly visible**.
 
-        두 번 틀렸다.
+        It was wrong twice.
 
-        1. `print` — 스킵된 항목의 캡처 출력은 표시되지 않는다.
-        2. `terminalreporter.write_line` — pytest 버전에 따라 `runtest`
-           안에서 **전역 캡처에 삼켜진다.** 이 환경(9.1.1)에서는 통과했지만
-           다른 버전에서는 실패했다. **감시의 보장이 pytest 버전에
-           의존하면 안 된다.**
+        1. `print` — the captured output of a skipped item is not shown.
+        2. `terminalreporter.write_line` — on some pytest versions it is
+           **swallowed by the global capture** inside `runtest`. It passed in
+           this environment (9.1.1) and failed on another version. **A
+           watchdog's guarantee must not depend on the pytest version.**
 
-        `capturemanager` 로 캡처를 명시적으로 끄고 쓴다.
+        The capture is disabled explicitly through `capturemanager`.
         """
-        lines = ("[경고] " + msg.replace("\n", "\n[경고] ")).split("\n")
+        lines = ("[warning] "
+                 + msg.replace("\n", "\n[warning] ")).split("\n")
         tr = self.config.pluginmanager.get_plugin("terminalreporter")
         cm = self.config.pluginmanager.get_plugin("capturemanager")
 
@@ -158,28 +175,32 @@ class _SkipGuardItem(pytest.Item):
                 _emit()
         else:                                            # pragma: no cover
             _emit()
-        # 스킵 사유에도 남긴다 — 터미널 출력이 어떤 이유로든 안 보여도
-        # `-rs` 요약에는 뜬다. 한 겹 더 둔다.
+        # It is recorded in the skip reason too — even if the terminal
+        # output is invisible for any reason, it shows in the `-rs` summary.
+        # One more layer.
         self.user_properties.append(("allow_skip_bypass", msg[:200]))
 
     def repr_failure(self, excinfo, style=None):
         return str(excinfo.value)
 
     def reportinfo(self):
-        return self.path, 0, "스킵 감시 (§26.3)"
+        return self.path, 0, "the skip watchdog (§26.3)"
 
 
 def _config_filtered(config) -> bool:
-    """**일부만** 고른 실행인가. 그럴 때만 감시를 떼어 낸다.
+    """Is this a run that selected **only part**? Only then is the watchdog
+    detached.
 
-    두 가지를 실제로 밟아 봤다.
+    Two things were actually stepped on.
 
-    1. `invocation_params.args` 를 직접 훑으면 `--deselect X` 의 X 같은
-       **옵션 값**을 위치 인자로 오해한다 (kernelTab 에서 그 버그로 감시가
-       통째로 무력화됐다). pytest 가 이미 파싱해 둔 것을 쓴다.
-    2. "위치 인자가 있으면 필터" 로 두면 `pytest /repo` / `pytest $(pwd)` 처럼
-       **전체를 도는 실행에서도 감시가 꺼진다.** 메타 테스트가 이걸 잡았다.
-       그래서 **디렉토리 지정은 필터가 아니다** — 파일 지정만 필터로 본다.
+    1. Sweeping `invocation_params.args` directly mistakes **option values**
+       such as the X of `--deselect X` for positional arguments (in
+       kernelTab that bug disarmed the watchdog entirely). What pytest has
+       already parsed is used instead.
+    2. "a positional argument means a filter" switches the watchdog off even
+       on **runs that cover everything**, such as `pytest /repo` /
+       `pytest $(pwd)`. A meta test caught this. So **naming a directory is
+       not a filter** — only naming a file counts.
     """
     opt = config.option
     if getattr(opt, "keyword", "") or getattr(opt, "markexpr", ""):
@@ -187,7 +208,7 @@ def _config_filtered(config) -> bool:
     if getattr(opt, "deselect", None):
         return True
     for raw in getattr(opt, "file_or_dir", []) or []:
-        # "path::TestClass::test_x" 형태도 파일 지정이다.
+        # A "path::TestClass::test_x" form names a file too.
         path = Path(str(raw).split("::")[0])
         if path.is_file() or path.suffix == ".py":
             return True
@@ -195,11 +216,13 @@ def _config_filtered(config) -> bool:
 
 
 def pytest_report_header(config):
-    """번들 유무를 **헤더에 항상 표시한다.** 없으면 무엇이 안 도는지 알린다."""
+    """**Always shows whether a bundle is present in the header.** Without
+    one it says what will not run."""
     if _have_real_bundle():
-        return f"kernelRule: 실제 번들 있음 ({REAL_BUNDLE.name})"
-    return ("kernelRule: ⚠️ 실제 번들 없음 — 계약/누출 검증의 상당수가 "
-            "스킵된다. 이 실행으로 누출 방지를 보증하지 마라")
+        return f"kernelRule: real bundle present ({REAL_BUNDLE.name})"
+    return ("kernelRule: ⚠️ no real bundle — much of the contract/leak "
+            "validation is skipped. Do not guarantee the leak defences from "
+            "this run")
 
 
 def pytest_collection_modifyitems(session, config, items):
@@ -212,11 +235,12 @@ def pytest_collection_modifyitems(session, config, items):
 
 
 # ---------------------------------------------------------------------------
-# 픽스처
+# Fixtures
 # ---------------------------------------------------------------------------
 @pytest.fixture(scope="session")
 def hw_a6000():
-    """A6000 을 1350/7601 MHz 로 고정했을 때의 **실효** 스펙 (§6.2)."""
+    """The **effective** specs of the A6000 with clocks locked at
+    1350/7601 MHz (§6.2)."""
     from kernelrule.core.types import Hardware
     return Hardware(name="NVIDIA RTX A6000", arch="sm_86", sm_count=84,
                     smem_per_block=101376, max_threads_per_sm=1536,
@@ -226,11 +250,13 @@ def hw_a6000():
 
 @pytest.fixture(scope="session")
 def hw_other():
-    """가상 GPU. 하드웨어 상수 하드코딩 검출용 (§8.3 6번).
+    """A fictitious GPU. For detecting hardcoded hardware constants (§8.3
+    item 6).
 
-    ★ **모든 수치 필드가 달라야 한다.** 하나라도 A6000 과 같으면 그 필드를
-    쓰는 피처는 스케일 검사를 그냥 통과한다 — `regs_per_sm` 을 같게 뒀다가
-    `reg_pressure` 가 "hw 를 안 쓴다" 로 잘못 걸렸다.
+    ★ **Every numeric field must differ.** If even one matches the A6000, a
+    feature using that field simply passes the scale check — leaving
+    `regs_per_sm` equal once made `reg_pressure` wrongly flagged as "it does
+    not use hw".
     """
     from kernelrule.core.types import Hardware
     return Hardware(name="FAKE", arch="sm_86", sm_count=128,
@@ -251,24 +277,29 @@ def _have_real_bundle() -> bool:
 
 @pytest.fixture(scope="session")
 def real_bundle_path():
-    """실제 번들. 없으면 스킵하되 **그 사실을 표시한다** (§23.4)."""
+    """The real bundle. Without it, skip — but **say so** (§23.4)."""
     if not _have_real_bundle():
-        pytest.skip(f"실제 번들 없음: {REAL_BUNDLE} — 계약 검증이 건너뛰어졌다")
+        pytest.skip(f"no real bundle: {REAL_BUNDLE} — the contract "
+                    f"validation was skipped")
     return REAL_BUNDLE
 
 
 @pytest.fixture(scope="session")
 def tiny_grid():
-    """작은 격자. 실제 번들이 있으면 거기서, 없으면 열거로 만든다.
+    """A small grid. From the real bundle if there is one, otherwise by
+    enumeration.
 
-    ★ 두 경로 모두 `load_for_ranking` 만 쓴다 — 실측 시간을 볼 수 없다.
+    ★ Both paths use `load_for_ranking` only — they cannot see the measured
+    times.
     """
     from kernelrule.tools.synth import Grid
     shapes = [(1, 4096, 4096), (128, 4096, 4096), (1024, 4096, 4096),
               (4096, 4096, 4096), (512, 512, 512), (1024, 4096, 512),
-              # ★ alignment 엣지. 없으면 `can_use_cp_async` 가 상수가 되어
-              #   "설명력 0" 으로 기각된다 — 격자가 좁은 것이지 피처 문제가
-              #   아니다. 층 D 를 반드시 하나는 넣는다.
+              # ★ An alignment edge case. Without it `can_use_cp_async`
+              #   becomes a constant and is rejected as "zero explanatory
+              #   power" — that is the grid being narrow, not a problem with
+              #   the feature. At least one layer-D shape is always
+              #   included.
               (1024, 4096, 4097), (1024, 4098, 4096)]
     if _have_real_bundle():
         with warnings.catch_warnings():
@@ -276,12 +307,13 @@ def tiny_grid():
             return Grid.from_bundle(REAL_BUNDLE, env_hash=REAL_ENV_HASH,
                                     shapes=shapes,
                                     max_configs_per_shape=400, seed=7)
-    pytest.skip("실제 번들 없음 — 열거 격자 경로는 test_synth.py 에서 따로 시험한다")
+    pytest.skip("no real bundle — the enumeration-grid path is tested "
+                "separately in test_synth.py")
 
 
 @pytest.fixture(scope="session")
 def synth_bundles(tmp_path_factory, tiny_grid):
-    """프리셋별 작은 합성 번들. 세션 내내 재사용한다."""
+    """A small synthetic bundle per preset. Reused across the session."""
     from kernelrule.tools.synth import generate
     out = tmp_path_factory.mktemp("synth")
     with warnings.catch_warnings():

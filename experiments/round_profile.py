@@ -1,21 +1,22 @@
-"""★ 한 라운드의 시간을 구간별로 나눈다 (§5-1). **LLM 호출 0회**.
+"""★ It splits one round's time into segments (§5-1). **0 LLM calls**.
 
     python3 experiments/round_profile.py
 
-병렬화를 하기 전에 **무엇이 병목인지** 본다. LLM 대기가 대부분이면
-채점·적합을 병렬화해도 이득이 작다.
+Before parallelising, it looks at **what the bottleneck is**. If most of it is
+waiting on the LLM, parallelising the scoring and the fitting gains little.
 
-## 두 축을 따로 잰다
+## The two axes are measured separately
 
 ```
-LLM 대기   ★ 실제 실행의 `llm_calls/*.json` 에 기록된 `seconds` 로 잰다
-           동시성 6 이므로 벽시계는 합/6 에 가깝다
-그 밖      ★ MockLLM 으로 한 라운드를 돌려 구간별로 잰다
-           정적 검사 / 샌드박스 / fit_weights / 채점
+LLM wait   ★ measured from the `seconds` recorded in a real run's
+           `llm_calls/*.json`
+           The concurrency is 6, so the wall clock is close to the sum / 6
+the rest   ★ measured per segment by running one round with MockLLM
+           the static check / the sandbox / fit_weights / the scoring
 ```
 
-**둘을 한 실행에서 재려면 LLM 호출이 필요하다.** 그래서 나눠 재고
-합쳐서 읽는다 — 그 사실을 결과에 적는다.
+**Measuring both in one run would need LLM calls.** So they are measured
+separately and read together — and that fact is written into the result.
 """
 
 from __future__ import annotations
@@ -31,12 +32,12 @@ RUNS = Path("runs")
 
 
 def llm_share() -> None:
-    """실제 실행에서 LLM 대기가 벽시계의 몇 %인가."""
+    """In a real run, what % of the wall clock is spent waiting on the LLM."""
     print("=" * 74)
-    print("A. LLM 대기 — 실제 실행 기록에서")
+    print("A. the LLM wait — from the real run records")
     print("=" * 74)
-    print(f"  {'실행':28s} {'라운드':>5} {'벽시계/R':>9} "
-          f"{'LLM합/R':>9} {'/동시성6':>9} {'비중':>6}")
+    print(f"  {'run':28s} {'rounds':>7} {'wall/R':>9} "
+          f"{'LLM sum/R':>11} {'/conc 6':>9} {'share':>6}")
     for d in sorted(RUNS.glob("*/rounds.jsonl")):
         run = d.parent
         R = [json.loads(x) for x in d.read_text().splitlines() if x.strip()]
@@ -50,14 +51,16 @@ def llm_share() -> None:
         llm = sum(secs) / len(R)
         print(f"  {run.name:28s} {len(R):5d} {wall:9.1f} {llm:9.1f} "
               f"{llm / 6:9.1f} {llm / 6 / wall:6.0%}")
-    print("  ★ 동시성 6 이므로 '/동시성6' 이 LLM 벽시계의 하한이다")
-    print("    (재시도·직렬 구간이 있어 실제는 그보다 크다)")
+    print("  ★ the concurrency is 6, so '/conc 6' is the lower bound of the "
+          "LLM wall clock")
+    print("    (with retries and serial stretches the real value is larger)")
 
 
 def non_llm_breakdown() -> None:
-    """MockLLM 으로 한 라운드를 돌려 LLM 밖 구간을 잰다."""
+    """It runs one round with MockLLM and measures the segments outside the
+    LLM."""
     print("\n" + "=" * 74)
-    print("B. LLM 밖 — MockLLM 한 라운드, 구간별")
+    print("B. outside the LLM — one MockLLM round, per segment")
     print("=" * 74)
     warnings.simplefilter("ignore")
     import kernelrule.features.physical  # noqa: F401
@@ -72,8 +75,9 @@ def non_llm_breakdown() -> None:
     t0 = time.perf_counter()
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
-    print(f"  표 + 피처 행렬 로드 {time.perf_counter() - t0:.1f}s "
-          "(라운드마다 다시 하지 않는다)")
+    print(f"  loading the table + feature matrix "
+          f"{time.perf_counter() - t0:.1f}s "
+          "(it is not redone every round)")
 
     def aligned(p) -> bool:
         x = table.frame_for(p)
@@ -102,15 +106,16 @@ def non_llm_breakdown() -> None:
         setattr(mod, name, wrap)
         return orig
 
-    olds = [(loop_mod, "check_rule", timed(loop_mod, "check_rule", "정적 검사")),
+    olds = [(loop_mod, "check_rule",
+             timed(loop_mod, "check_rule", "static check")),
             (loop_mod, "fit_weights", timed(loop_mod, "fit_weights",
                                             "fit_weights")),
             (loop_mod, "run_isolated", timed(loop_mod, "run_isolated",
-                                             "샌드박스")),
+                                             "sandbox")),
             (loop_mod, "evaluate_scores",
-             timed(loop_mod, "evaluate_scores", "채점")),
+             timed(loop_mod, "evaluate_scores", "scoring")),
             (loop_mod, "build_report", timed(loop_mod, "build_report",
-                                             "진단 리포트"))]
+                                             "diagnostic report"))]
     _ = (scoring_mod, weights_mod)
 
     from kernelrule.agents.mock import MockLLM
@@ -125,8 +130,8 @@ def non_llm_breakdown() -> None:
                   shape_values=matrix.shape_value_names())
     lp = RoundLoop(cfg=cfg, table=table, matrix=matrix, splits=splits, llm=llm)
     lp.seed(seed["code"], seed["w0"])
-    # ★ 씨앗 채점도 `fit_weights` 를 부른다 — 안 지우면 라운드 시간의
-    #   118% 가 나온다 (실제로 그렇게 찍혔다).
+    # ★ Scoring the seed also calls `fit_weights` — without clearing it, the
+    #   round time comes out at 118% (that really was printed).
     acc.clear()
     cnt.clear()
     t0 = time.perf_counter()
@@ -135,20 +140,23 @@ def non_llm_breakdown() -> None:
     for mod, name, orig in olds:
         setattr(mod, name, orig)
 
-    print(f"\n  라운드 벽시계 {wall:.1f}s   제안 {r.n_proposed} 채점 {r.n_scored}")
-    print(f"  {'구간':14s} {'초':>8} {'비중':>6} {'호출':>6}")
-    for k in ("진단 리포트", "정적 검사", "샌드박스", "fit_weights", "채점"):
-        print(f"  {k:14s} {acc[k]:8.1f} {acc[k] / wall:6.0%} {cnt[k]:6d}")
+    print(f"\n  round wall clock {wall:.1f}s   proposed {r.n_proposed} "
+          f"scored {r.n_scored}")
+    print(f"  {'segment':20s} {'sec':>8} {'share':>6} {'calls':>6}")
+    for k in ("diagnostic report", "static check", "sandbox", "fit_weights",
+              "scoring"):
+        print(f"  {k:20s} {acc[k]:8.1f} {acc[k] / wall:6.0%} {cnt[k]:6d}")
     other = wall - sum(acc[k] for k in acc)
-    print(f"  {'그 밖':14s} {other:8.1f} {other / wall:6.0%}")
+    print(f"  {'the rest':20s} {other:8.1f} {other / wall:6.0%}")
     if cnt["fit_weights"]:
-        print(f"\n  후보당 fit_weights {acc['fit_weights'] / cnt['fit_weights']:.1f}s"
-              f"  (채점된 후보 {cnt['fit_weights']}개)")
-        print(f"  ★ 12개가 다 채점되면 "
-              f"{acc['fit_weights'] / cnt['fit_weights'] * 12:.0f}s 가 된다 — "
-              "중복이 많을수록 이 구간이 싸 보인다")
-    print("\n  ★ MockLLM 이라 LLM 대기가 0 이다. 실제 라운드에서는 A 의 "
-          "비중만큼 이 값들이 희석된다")
+        print(f"\n  fit_weights per candidate "
+              f"{acc['fit_weights'] / cnt['fit_weights']:.1f}s"
+              f"  ({cnt['fit_weights']} candidates scored)")
+        print(f"  ★ if all 12 got scored it would be "
+              f"{acc['fit_weights'] / cnt['fit_weights'] * 12:.0f}s — "
+              "the more duplicates there are, the cheaper this segment looks")
+    print("\n  ★ with MockLLM the LLM wait is 0. In a real round these values "
+          "are diluted by A's share")
 
 
 def main() -> None:
@@ -162,12 +170,15 @@ if __name__ == "__main__":
 
 
 def parallel_speedup(workers: int = 6) -> None:
-    """★ 같은 라운드를 순차/병렬로 돌려 **시간과 값**을 비교한다 (D-95).
+    """★ It runs the same round serially and in parallel and compares **the
+    time and the values** (D-95).
 
-    시간만 보면 안 된다 — 값이 같아야 이득이다 (원칙 29).
+    Time alone must not be looked at — a gain only counts if the values are
+    the same (principle 29).
     """
     print("\n" + "=" * 74)
-    print(f"C. 병렬화 — 순차 vs {workers} 워커 (MockLLM, 같은 시드)")
+    print(f"C. parallelisation — serial vs {workers} workers (MockLLM, the "
+          f"same seed)")
     print("=" * 74)
     warnings.simplefilter("ignore")
     import kernelrule.features.physical  # noqa: F401
@@ -211,7 +222,9 @@ def parallel_speedup(workers: int = 6) -> None:
         if lp._pool_exec is not None:
             lp._pool_exec.shutdown(wait=True)
     (ts, ns, es), (tp, np_, ep) = out[0], out[workers]
-    print(f"  순차   {ts:6.1f}s  채점 {ns}")
-    print(f"  병렬   {tp:6.1f}s  채점 {np_}   ★ {ts / tp:.1f}배")
-    print(f"  ★ 값이 같은가: {'예' if es == ep else '★아니오 — 숨은 상태가 있다'}")
-    print("  ⚠️ 빠른 것이 좋은 것이 아니다 — 값이 같을 때만 이득이다 (원칙 29)")
+    print(f"  serial   {ts:6.1f}s  scored {ns}")
+    print(f"  parallel {tp:6.1f}s  scored {np_}   ★ {ts / tp:.1f}x")
+    print(f"  ★ are the values the same: "
+          f"{'yes' if es == ep else '★no — there is hidden state'}")
+    print("  ⚠️ faster is not better — it is a gain only when the values are "
+          "the same (principle 29)")

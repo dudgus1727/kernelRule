@@ -1,35 +1,39 @@
-"""홀드아웃 분할 (§10).
+"""Holdout splits (§10).
 
-## ★ 학습 분할과 홀드아웃 분할은 **다른 제약**을 받는다
+## ★ The training split and the holdout split are under **different
+constraints**
 
-    홀드아웃   블록이어야 한다.               보간을 막기 위해서
-    학습      모든 체제를 충분히 담아야 한다.   소수 체제 희생을 막기 위해서
+    holdout   must be a block.                     to block interpolation
+    training  must hold enough of every regime.    to stop a minority regime
+                                                   being sacrificed
 
-**두 요구가 충돌하면 학습 쪽이 우선이다.** 학습이 못 본 체제는 애초에
-평가할 자격이 없다.
+**When the two demands conflict, training wins.** A regime training never saw
+has no business being evaluated in the first place.
 
-원래 이 절은 "블록 분할을 쓰라, 무작위는 보간이다" 만 말했다. **블록 분할이
-체제를 통째로 한쪽에 몰아넣을 수 있다는 것**을 놓쳤다. `M > 2048` 이 정확히
-그 형태다 — 긴 형상 11개가 전부 홀드아웃으로 가고 학습은 82% 가 짧은 형상이
-된다.
+This section originally said only "use a block split, random is
+interpolation". It missed **that a block split can push a whole regime onto
+one side.** `M > 2048` is exactly that shape — all 11 long shapes go to the
+holdout and training becomes 82% short shapes.
 
-실측 (같은 루프/시드/예산, 분할만 바꿈):
+Measured (same loop / seed / budget, only the split changed):
 
-| 학습 구성 | 12라운드 후 검증 격차 | 전체 61형상 regret |
+| training composition | val gap after 12 rounds | regret over all 61 shapes |
 |---|---:|---:|
-| 짧은 82% / 긴 18% | **+2.629** | 1.390 (손규칙 1.177 보다 **나쁘다**) |
-| 짧은 69% / 긴 31% | +0.009 | 1.143 |
+| short 82% / long 18% | **+2.629** | 1.390 (**worse** than the hand rule's 1.177) |
+| short 69% / long 31% | +0.009 | 1.143 |
 
-**진화는 학습 분할의 체제 구성이 허용하는 거래를 한다.** 소수 체제를
-희생하는 것이 학습 점수에 유리하면 그렇게 한다. 그리고 홀드아웃이 그 소수
-체제와 겹치지 않으면 **폭발이 안 보일 뿐 규칙은 여전히 그 체제에서 나쁘다.**
+**Evolution makes whatever trade the regime composition of the training split
+allows.** If sacrificing a minority regime helps the training score, it does
+that. And if the holdout does not overlap that minority regime, **the blowup
+simply is not visible while the rule is still bad on that regime.**
 
-⚠️ **무작위 분할 금지.** M=4095 가 학습에 있으면 M=4096 은 시험이 아니다.
-블록 분할을 쓴다.
+⚠️ **No random splits.** If M=4095 is in training, M=4096 is not a test. Use
+a block split.
 
-이 파일이 1단계에 있는 이유는 `Split` **타입** 때문이다. `fit_weights` 가
-"학습 분할만 받는다" 를 강제하려면 역할이 타입에 박혀 있어야 한다 (§29.7).
-문서에 '학습 분할을 넣으세요' 라고 적는 것은 강제가 아니다 (§30.8).
+The reason this file is in stage 1 is the `Split` **type**. For `fit_weights`
+to enforce "it only takes a training split", the role has to be nailed into
+the type (§29.7). Writing "please pass a training split" in the documentation
+is not enforcement (§30.8).
 """
 
 from __future__ import annotations
@@ -51,21 +55,23 @@ Role = Literal["train", "val", "test"]
 
 
 class SplitError(RuntimeError):
-    """분할이 잘못됐다. **빈 집합으로 진행하지 않는다** (§26.4)."""
+    """The split is wrong. **Do not proceed with an empty set** (§26.4)."""
 
 
-#: ★ 최종 분할의 봉인을 푸는 환경변수 (§30.15).
+#: ★ The environment variable that unseals the final split (§30.15).
 #:
-#:   "끝에 딱 한 번" 은 **의도이지 강제가 아니었다.** `splits.test.shapes`
-#:   를 그냥 읽으면 됐다. 봉인을 코드로 만든다 — 실수로 열 수 없게.
+#:   "exactly once at the end" was **an intention, not enforcement.** One
+#:   could simply read `splits.test.shapes`. The seal is made out of code —
+#:   so it cannot be opened by accident.
 #:
-#:   푼 실행은 `config.json` 에 `unsealed: true` 로 남고, 그 수치는
-#:   **오염 가능**으로 표시한다.
+#:   A run that opened it is recorded in `config.json` as `unsealed: true`,
+#:   and its numbers are marked **possibly contaminated**.
 UNSEAL_ENV = "KERNELRULE_UNSEAL"
 
 
 def is_unsealed() -> bool:
-    """최종 분할이 열려 있는가. `config.json` 에 기록하기 위한 것이다."""
+    """Is the final split open? This exists to be recorded in
+    `config.json`."""
     import os
 
     return os.environ.get(UNSEAL_ENV, "") not in ("", "0", "false", "False")
@@ -73,56 +79,66 @@ def is_unsealed() -> bool:
 
 @dataclass(frozen=True, slots=True)
 class Split:
-    """형상 부분집합 + **역할**. 역할이 타입에 있는 것이 요점이다.
+    """A subset of shapes + a **role**. The point is that the role lives in
+    the type.
 
-        train  진단 리포트와 가중치 적합에 쓰인다. LLM 이 본다
-        val    라운드마다 채점. LLM 은 못 보지만 사람은 본다
-        test   프로젝트 끝에 딱 한 번. ★ **봉인** — `KERNELRULE_UNSEAL` 필요
+        train  used for the diagnostic report and weight fitting. The LLM
+               sees it
+        val    scored every round. The LLM cannot see it, but a human can
+        test   exactly once at the end of the project. ★ **sealed** —
+               `KERNELRULE_UNSEAL` required
 
-    ★ `role="test"` 의 `shapes` 는 봉인돼 있다 (§30.15). 접근하려면
-    환경변수를 명시해야 하고, 그 사실이 `config.json` 에 남는다.
-    **`len()` 과 `role` 은 봉인과 무관하다** — 분할이 존재한다는 것과
-    그 안을 보는 것은 다르다.
+    ★ The `shapes` of `role="test"` are sealed (§30.15). Reaching them
+    requires the environment variable to be set explicitly, and that fact
+    stays in `config.json`.
+    **`len()` and `role` are unaffected by the seal** — that a split exists
+    and looking inside it are different things.
     """
 
     role: Role
-    #: ⚠️ **직접 읽지 마라.** `role="test"` 면 봉인 검사를 우회한다.
-    #: 프로퍼티 `shapes` 를 쓴다.
+    #: ⚠️ **Do not read this directly.** For `role="test"` it bypasses the
+    #: seal check. Use the `shapes` property.
     _shapes: tuple[Problem, ...]
     name: str = ""
 
     @property
     def shapes(self) -> tuple[Problem, ...]:
-        """형상들. ★ `role="test"` 면 봉인 검사를 거친다 (§30.15)."""
+        """The shapes. ★ For `role="test"` it goes through the seal check
+        (§30.15)."""
         if self.role == "test" and not is_unsealed():
             raise SplitError(
-                "최종 분할은 **봉인돼 있다** (§10.2). 프로젝트 끝에 딱 한 번 "
-                f"연다.\n  열려면 {UNSEAL_ENV}=1 을 **명시**하라.\n"
-                "  그 실행은 config.json 에 `unsealed: true` 로 남고, "
-                "거기서 나온 수치는 **오염 가능**으로 표시된다.\n"
-                "  ⚠️ 한 번 보면 되돌릴 수 없다 — 사람이 그것을 알고 "
-                "다음 결정을 하게 된다 (§10.2 가 3분할을 쓰는 이유).")
+                "the final split is **sealed** (§10.2). It is opened "
+                f"exactly once, at the end of the project.\n  To open it, "
+                f"set {UNSEAL_ENV}=1 **explicitly**.\n"
+                "  That run is recorded in config.json as `unsealed: true`, "
+                "and the numbers from it are marked **possibly "
+                "contaminated**.\n"
+                "  ⚠️ Once seen it cannot be undone — a human now knows it "
+                "and makes the next decision knowing it (which is why §10.2 "
+                "uses three splits).")
         return self._shapes
 
     def __post_init__(self) -> None:
         if self.role not in ("train", "val", "test"):
-            raise SplitError(f"알 수 없는 역할: {self.role!r}")
+            raise SplitError(f"unknown role: {self.role!r}")
         if not self._shapes:
             raise SplitError(
-                f"분할 {self.name or self.role!r} 이 빈 집합이다. "
-                "빈 집합을 반환하고 통과시키지 않는다 (§26.4).")
+                f"split {self.name or self.role!r} is empty. An empty set "
+                f"is not returned and waved through (§26.4).")
 
     def __len__(self) -> int:
-        # ★ 봉인과 무관하다 — 크기를 아는 것과 안을 보는 것은 다르다.
+        # ★ Unaffected by the seal — knowing the size and looking inside
+        # are different things.
         return len(self._shapes)
 
     def __iter__(self):
-        return iter(self.shapes)          # 봉인 검사를 거친다
+        return iter(self.shapes)          # goes through the seal check
 
 
 @dataclass(frozen=True, slots=True)
 class SplitSet:
-    """3분할 (§10.2). 가운데가 필요한 이유는 **사람이 오염원**이기 때문이다."""
+    """The three-way split (§10.2). The middle one is needed because **the
+    human is the contaminant**."""
 
     train: Split
     val: Split
@@ -135,28 +151,31 @@ class SplitSet:
         overlap = a & b
         if overlap:
             raise SplitError(
-                f"train 과 val 이 {len(overlap)}개 형상을 공유한다: "
-                f"{sorted(overlap)[:5]}. 홀드아웃이 아니다.")
+                f"train and val share {len(overlap)} shapes: "
+                f"{sorted(overlap)[:5]}. That is not a holdout.")
         if self.test is not None:
             c = {p.key for p in self.test}
             if (a & c) or (b & c):
-                raise SplitError("test 가 train/val 과 겹친다. 봉인이 깨졌다.")
+                raise SplitError(
+                    "test overlaps train/val. The seal is broken.")
 
 
 def by_predicate(shapes: Sequence[Problem],
                  held_out: Callable[[Problem], bool], *,
                  name: str = "", val_frac_of_heldout: float = 1.0) -> SplitSet:
-    """술어 하나로 블록 분할한다. 술어가 참인 형상이 홀드아웃이다.
+    """A block split from a single predicate. The shapes where it is true
+    are the holdout.
 
-    2단계에서 `split_by_M_range` / `split_by_K_range` / `split_by_alignment` /
-    `split_by_arch` 가 이 위에 올라간다.
+    In stage 2, `split_by_M_range` / `split_by_K_range` /
+    `split_by_alignment` / `split_by_arch` sit on top of this.
     """
     train = tuple(p for p in shapes if not held_out(p))
     out = tuple(p for p in shapes if held_out(p))
     if not train or not out:
         raise SplitError(
-            f"분할 {name!r} 이 한쪽을 비웠다 (train={len(train)}, "
-            f"heldout={len(out)}). 에러로 낸다 — 진행하지 않는다 (§26.4).")
+            f"split {name!r} left one side empty (train={len(train)}, "
+            f"heldout={len(out)}). It raises — it does not proceed "
+            f"(§26.4).")
     n_val = max(1, int(round(len(out) * val_frac_of_heldout)))
     return SplitSet(
         train=Split("train", train, name=f"{name}:train"),
@@ -169,28 +188,30 @@ def by_predicate(shapes: Sequence[Problem],
 def stratified_kfold(shapes: Sequence[Problem], hw, *, k: int = 3,
                      seed: int = 0, fold: int | None = None,
                      name: str = "kfold") -> list[SplitSet]:
-    """★ memory/compute 비율을 유지한 무작위 k-fold (D-144).
+    """★ A random k-fold that preserves the memory/compute ratio (D-144).
 
-    ## 왜 층별인가
+    ## Why stratified
 
-    그냥 무작위로 나누면 fold 마다 구성이 흔들린다.
+    Splitting purely at random makes the composition wobble per fold.
 
     ```
-    61 shape 중  memory 20 / compute 41   (t_memory > t_compute)
-    무작위로 20개를 뽑으면 memory 가 2개인 fold 가 나올 수 있다
-    -> ★ 그 fold 의 val 은 사실상 compute 만 재는 것이 된다
+    of 61 shapes  memory 20 / compute 41   (t_memory > t_compute)
+    drawing 20 at random can produce a fold with 2 memory shapes
+    -> ★ that fold's val effectively measures compute alone
     ```
 
-    그래서 층마다 따로 섞어 k 등분하고, fold `i` 의 val 은 각 층의 조각
-    `i` 를 합친 것이다. val 크기가 ±1 인 것은 감수한다.
+    So each stratum is shuffled separately and cut into k parts, and fold
+    `i`'s val is the union of part `i` of every stratum. A ±1 difference in
+    val size is accepted.
 
-    ## ★ 분할 시드와 진화 시드를 분리한다
+    ## ★ The split seed and the evolution seed are separated
 
-    `seed` 는 **fold 를 만드는 난수**다. 루프의 `cfg.seed` 와 같은 값을
-    넣지 마라 — 둘이 얽히면 "분할이 달라서" 와 "진화가 달라서" 를 못 가른다.
+    `seed` is **the randomness that builds the folds**. Do not give it the
+    same value as the loop's `cfg.seed` — if the two are entangled, "because
+    the split differed" cannot be told from "because the evolution differed".
     """
     if k < 2:
-        raise SplitError(f"k={k} 로는 fold 를 못 만든다")
+        raise SplitError(f"folds cannot be built with k={k}")
     import numpy as np
 
     strata: dict[str, list] = {}
@@ -200,7 +221,8 @@ def stratified_kfold(shapes: Sequence[Problem], hw, *, k: int = 3,
     chunks: dict[str, list[list]] = {}
     for nm, group in sorted(strata.items()):
         g = [group[i] for i in rng.permutation(len(group))]
-        # ★ 앞쪽 조각이 하나 더 크다 (7/7/6). 나머지를 버리지 않는다.
+        # ★ The earlier parts are one larger (7/7/6). The remainder is not
+        # thrown away.
         chunks[nm] = [g[i::k] for i in range(k)]
     out: list[SplitSet] = []
     for i in range(k):
@@ -208,7 +230,7 @@ def stratified_kfold(shapes: Sequence[Problem], hw, *, k: int = 3,
         vk = {p.key for p in val}
         train = tuple(p for p in shapes if p.key not in vk)
         if not train or not val:
-            raise SplitError(f"fold {i} 가 한쪽을 비웠다 (§26.4)")
+            raise SplitError(f"fold {i} left one side empty (§26.4)")
         out.append(SplitSet(
             train=Split("train", train, name=f"{name}{i}:train"),
             val=Split("val", val, name=f"{name}{i}:val"),
@@ -217,16 +239,17 @@ def stratified_kfold(shapes: Sequence[Problem], hw, *, k: int = 3,
 
 
 # ---------------------------------------------------------------------------
-# 블록 분할 (§10.1)
+# Block splits (§10.1)
 # ---------------------------------------------------------------------------
 def split_by_M_range(shapes: Sequence[Problem], *, m_threshold: int = 2048
                      ) -> SplitSet:
-    """M > 2048 홀드아웃. **외삽**을 시험한다.
+    """M > 2048 as the holdout. It tests **extrapolation**.
 
-    kernelTab 의 GBDT 주 지표가 이 분할이다 (홀드아웃 11형상, 1.011).
-    형상 단위 5-fold(1.019)와의 0.8%p 격차가 **형상 일반화가 얼마나
-    어려운가**의 척도다 — 5-fold 는 M=1024 가 학습에, M=1000 이 검증에
-    들어가는 사실상 보간이다.
+    kernelTab's main GBDT metric is this split (11 holdout shapes, 1.011).
+    The 0.8 percentage-point gap against the shape-level 5-fold (1.019) is
+    the measure of **how hard shape generalisation is** — the 5-fold puts
+    M=1024 in training and M=1000 in validation, which is interpolation in
+    practice.
     """
     return by_predicate(shapes, lambda p: m_threshold < p.M,
                         name=f"M>{m_threshold}")
@@ -234,16 +257,17 @@ def split_by_M_range(shapes: Sequence[Problem], *, m_threshold: int = 2048
 
 def split_by_K_range(shapes: Sequence[Problem], *, k_threshold: int = 8192
                      ) -> SplitSet:
-    """층 B 의 K 구간 홀드아웃. mainloop 깊이 외삽."""
+    """Layer B's K band as the holdout. Extrapolation in mainloop
+    depth."""
     return by_predicate(shapes, lambda p: k_threshold < p.K,
                         name=f"K>{k_threshold}")
 
 
 def split_by_alignment(shapes: Sequence[Problem]) -> SplitSet:
-    """층 D 전체(alignment < 8) 홀드아웃.
+    """All of layer D (alignment < 8) as the holdout.
 
-    alignment 1 형상은 cp.async 를 못 써서 stages=2 만 가능하다 — 규칙이
-    본 적 없는 커널 계열만 남는 구간이다.
+    An alignment-1 shape cannot use cp.async, so only stages=2 is possible —
+    a band where only kernel families the rule has never seen remain.
     """
     def held(p: Problem) -> bool:
         return (p.K % 8 != 0) or (p.N % 8 != 0)
@@ -252,14 +276,15 @@ def split_by_alignment(shapes: Sequence[Problem]) -> SplitSet:
 
 def split_by_size(shapes: Sequence[Problem], hw, *, ms: float = 0.5
                   ) -> SplitSet:
-    """짧은 형상 홀드아웃 (§30.5 의 긴장).
+    """Short shapes as the holdout (the §30.5 tension).
 
-    여지가 거의 전부 0.5ms 미만에 있는데 그 구간이 측정 분해능이 가장
-    나쁜 곳이다. **긴 형상으로 배운 것이 짧은 형상에 전이되는가** 를
-    직접 시험한다.
+    Almost all the room is under 0.5ms, and that band is where the
+    measurement resolution is worst. It directly tests **whether what was
+    learned on long shapes transfers to short ones**.
 
-    ⚠️ 경계를 `best_ms`(정답)가 아니라 **roofline 하한**으로 잡는다.
-    `best_ms` 는 `ANSWER_COLS` 라 분할 정의에 쓰면 정답이 새어 들어간다.
+    ⚠️ The boundary is taken from the **roofline lower bound**, not from
+    `best_ms` (the answer). `best_ms` is `ANSWER_COLS`, so using it in a
+    split definition leaks the answer in.
     """
     import math
 
@@ -274,10 +299,11 @@ def split_by_size(shapes: Sequence[Problem], hw, *, ms: float = 0.5
 
 def split_by_waves(shapes: Sequence[Problem], hw, *, tile: int = 128,
                    waves_threshold: float = 1.0) -> SplitSet:
-    """참조 타일 기준 waves 로 자른다.
+    """Cuts on waves at a reference tile.
 
-    ★ 층 C 는 `sm_count` 에서 M 을 **역산**하므로 M 절대값 기준 분할이
-    GPU 마다 다른 것을 자른다 (§10.1). 전이 실험에서는 이 경로를 쓴다.
+    ★ Layer C derives M **backwards** from `sm_count`, so a split on the
+    absolute M cuts different things on different GPUs (§10.1). Transfer
+    experiments use this path.
     """
     import math
 
@@ -287,15 +313,16 @@ def split_by_waves(shapes: Sequence[Problem], hw, *, tile: int = 128,
     return by_predicate(shapes, held, name=f"waves<{waves_threshold}")
 
 
-#: 이름 -> 생성자. 리포트가 전부 돌린다.
+#: Name -> constructor. The report runs all of them.
 SPLITS = {
     "M_range": split_by_M_range,
     "K_range": split_by_K_range,
     "alignment": split_by_alignment,
 }
 
-#: `split_by_size` 가 형상 수준 피처를 부르는 데 필요한 자리표시자 config.
-#: 형상 수준 피처는 `cfg` 를 보지 않는다 (그것이 정의다).
+#: The placeholder config `split_by_size` needs in order to call a
+#: shape-level feature. A shape-level feature does not look at `cfg` (that is
+#: its definition).
 _DUMMY_CFG = None
 
 
@@ -312,27 +339,29 @@ _DUMMY_CFG = _make_dummy()
 
 
 # ---------------------------------------------------------------------------
-# ★ 체제 균형 (§10.1) — 조용히 통과시키지 않는다 (§26.4)
+# ★ Regime balance (§10.1) — it is not waved through silently (§26.4)
 # ---------------------------------------------------------------------------
-#: 학습 분할이 어떤 체제를 이 비율 미만으로 담으면 경고한다.
+#: Warns when the training split holds some regime below this fraction.
 #:
-#: 실측 (학습 24개 고정, 시드 3개, 고정 시험대 = 긴 형상 12개):
+#: Measured (training fixed at 24, 3 seeds, fixed test bench = 12 long
+#: shapes):
 #:
-#:     긴 비율   중앙    최악
-#:      8%      6.57   16.33
-#:     17%      1.17   10.41
-#:     25%      1.20    2.19
-#:     33%      1.22    1.79
+#:     long frac   median   worst
+#:      8%          6.57    16.33
+#:     17%          1.17    10.41
+#:     25%          1.20     2.19
+#:     33%          1.22     1.79
 #:
-#: **균형은 꼬리를 줄이지 중앙을 못 올린다.** 25% 는 하한이지 안전선이
-#: 아니다 — 33% 에서도 최악이 1.79 다. 분할을 바꾸는 실험은 시드 3개
-#: 이상으로 돌리고 **최악값을 함께 보고하라.**
+#: **Balance shrinks the tail; it cannot lift the median.** 25% is a lower
+#: bound, not a safety line — even at 33% the worst is 1.79. Run any
+#: experiment that changes the split with at least 3 seeds and **report the
+#: worst value alongside.**
 MIN_REGIME_FRAC = 0.25
 
 
 @dataclass(frozen=True, slots=True)
 class RegimeBalance:
-    """분할의 체제 구성. **항상 출력한다.**"""
+    """The regime composition of a split. **Always printed.**"""
 
     axis: str
     counts: dict
@@ -356,14 +385,16 @@ class RegimeBalance:
     def __str__(self) -> str:
         parts = " / ".join(f"{k} {v}({v / self.n:.0%})"
                            for k, v in sorted(self.counts.items()))
-        mark = "" if self.ok else "   ⚠️ 소수 체제 부족"
+        mark = "" if self.ok else "   ⚠️ minority regime too small"
         return f"[{self.axis}] n={self.n}  {parts}{mark}"
 
 
 def regime_of(p: Problem, hw, *, axis: str = "size") -> str:
-    """형상의 체제. **정답을 쓰지 않는다** — roofline 하한으로 자른다.
+    """The shape's regime. **It does not use the answer** — it cuts on the
+    roofline lower bound.
 
-    `best_ms` 는 `ANSWER_COLS` 라 분할 정의에 들어가면 홀드아웃이 오염된다.
+    `best_ms` is `ANSWER_COLS`, so putting it into a split definition
+    contaminates the holdout.
     """
     import math
 
@@ -374,15 +405,16 @@ def regime_of(p: Problem, hw, *, axis: str = "size") -> str:
                 else "long")
     if axis == "roofline":
         return ("mem" if is_memory_bound(p, hw, _DUMMY_CFG) else "comp")
-    raise ValueError(f"알 수 없는 체제 축: {axis!r}")
+    raise ValueError(f"unknown regime axis: {axis!r}")
 
 
 def check_balance(split: Split, hw, *, axis: str = "size",
                   strict: bool = False) -> RegimeBalance:
-    """학습 분할이 모든 체제를 충분히 담는가.
+    """Does the training split hold enough of every regime?
 
-    ⚠️ 부족하면 **경고**한다 (`strict=True` 면 에러). 조용히 통과시키지
-    않는다 — 소수 체제를 희생한 규칙이 학습 점수로는 개선처럼 보인다.
+    ⚠️ If not it **warns** (an error with `strict=True`). It is not waved
+    through silently — a rule that sacrificed a minority regime looks like an
+    improvement by the training score.
     """
     import warnings
     from collections import Counter
@@ -391,12 +423,15 @@ def check_balance(split: Split, hw, *, axis: str = "size",
     bal = RegimeBalance(axis=axis, counts=dict(c), n=len(split.shapes))
     if split.role == "train" and not bal.ok:
         k, f = bal.minority()
-        msg = (f"학습 분할 {split.name or split.role!r} 의 체제 {k!r} 가 "
-               f"{f:.0%} 뿐이다 (기준 {MIN_REGIME_FRAC:.0%}).\n"
+        msg = (f"regime {k!r} of the training split "
+               f"{split.name or split.role!r} is only {f:.0%} "
+               f"(threshold {MIN_REGIME_FRAC:.0%}).\n"
                f"  {bal}\n"
-               "  진화가 소수 체제를 희생하고도 학습 점수는 개선처럼 보인다. "
-               "실측에서 18% 구성이 전체 regret 을 1.177 -> 1.390 으로 "
-               "악화시키면서 학습 점수는 1.201 -> 1.118 로 좋아졌다 (§10.1).")
+               "  Evolution can sacrifice a minority regime and still look "
+               "like an improvement by the training score. In measurement, "
+               "the 18% composition worsened overall regret from 1.177 to "
+               "1.390 while the training score improved from 1.201 to 1.118 "
+               "(§10.1).")
         if strict:
             raise SplitError(msg)
         warnings.warn(msg, stacklevel=2)
@@ -404,8 +439,9 @@ def check_balance(split: Split, hw, *, axis: str = "size",
 
 
 def describe(ss: SplitSet, hw, *, axis: str = "size") -> str:
-    """분할의 체제 구성을 사람이 읽게 낸다. **항상 찍는다.**"""
-    lines = [f"분할 {ss.kind or '(이름 없음)'}"]
+    """Renders a split's regime composition for a human. **Always
+    printed.**"""
+    lines = [f"split {ss.kind or '(unnamed)'}"]
     for sp in (ss.train, ss.val, ss.test):
         if sp is None:
             continue

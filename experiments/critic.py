@@ -1,50 +1,56 @@
-"""★ Critic — 규칙을 **항 단위로** 심사한다. ★ **루프 밖이다** (D-92).
+"""★ Critic — it judges a rule **term by term**. ★ **It is outside the loop**
+(D-92).
 
-두 통과 조건(D-85 "빼도 안 나빠지나", D-87 "빼면 학습만 나빠지나")이 다
-실패했고 **목 Critic 이 실제보다 높았다** (0.79 vs 0.50 / 0.36).
-설명 가능성이 성능과 안 붙으므로 **벌점으로 진화 방향을 바꿀 근거가
-없고, 방향을 안 바꾸면 루프에 있을 이유가 없다.**
+Both pass conditions (D-85 "does it not get worse when removed", D-87 "does
+only the training get worse when removed") failed, and **the mock Critic
+scored higher than the real one** (0.79 vs 0.50 / 0.36). Explainability does
+not attach to performance, so **there is no ground for turning the direction
+of evolution with a penalty, and if it does not turn the direction there is
+no reason for it to be in the loop.**
 
-그래서 프롬프트와 스키마를 **이 파일이 들고 있다.** `kernelrule/agents/`
-는 루프가 부르는 넷만 안다 (`register_role`, D-92).
+So **this file holds** the prompt and the schema. `kernelrule/agents/` knows
+only the four the loop calls (`register_role`, D-92).
 
-남긴 쓰임 셋 중 둘이 여기 있다.
+Two of the three uses that were kept are here.
 
 ```
-(a) 항등 변환 검사   -> `rules/checks.py` 로 옮겼다 (D-92). 여기 없다
-(b) 실행 후 주석     -> `judge`. ★ **최종 규칙 하나에만** 부른다
-(c) 전이 검증        -> `gate --other <5090>` (표가 오면)
+(a) identity-transform check -> moved into `rules/checks.py` (D-92). Not here
+(b) after-the-run commentary -> `judge`. ★ Called **on one final rule only**
+(c) transfer verification    -> `gate --other <5090>` (when the table comes)
 ```
 
 
 ```
 python3 experiments/critic.py judge  --runs F3rw-p8-s0 ...   # LLM
-python3 experiments/critic.py ablate --judged docs/artifacts/critic.json  # LLM 0회
+python3 experiments/critic.py ablate --judged docs/artifacts/critic.json  # 0 LLM calls
 python3 experiments/critic.py rank   --campaign runs/F3rw-p8     # LLM
 ```
 
-## 왜 있나
+## Why it exists
 
-"해석 가능한 규칙" 이 이 연구의 주장인데, 지금은 **사람이 코드를 직접
-읽어야** 그 주장을 확인할 수 있다. 항별 물리 설명을 붙이는 것이 GBDT
-와의 차이를 눈에 보이게 만든다.
+"an interpretable rule" is this study's claim, but right now that claim can
+only be confirmed by **a human reading the code directly**. Attaching a
+physical explanation per term is what makes the difference from GBDT visible.
 
-## ★ 판정을 성능이 아니라 **정확도**로 잰다
+## ★ The judgement is measured by **accuracy**, not by performance
 
-`ablate` 가 통과 조건이다. Critic 이 "설명 못 하겠다" 고 한 항을 빼고 다시
-적합한다.
+`ablate` is the pass condition. The terms the Critic said it "cannot
+explain" are removed and refitted.
 
 ```
-빼도 regret 이 안 나빠진다   ★ 판정이 맞았다
-크게 나빠진다               틀렸거나, 설명 못 해도 유용한 항이다
+regret does not get worse when removed   ★ the judgement was right
+it gets much worse                       it was wrong, or the term is useful
+                                         even though it cannot be explained
 ```
 
-**★ 그리고 다른 항들도 하나씩 빼서 견준다.** "설명 불가 항을 빼도
-멀쩡하다" 는 **모든 항이 그렇다면** 아무 말도 아니다. 지표는
-**설명 불가 항의 손상 순위**다 — 정확하면 아래쪽(덜 아픈 쪽)에 있어야
-한다.
+**★ And the other terms are removed one at a time and compared.** "it is
+fine even with the unexplainable term removed" says nothing at all **if that
+holds for every term**. The metric is **the damage rank of the unexplainable
+term** — if the judgement is accurate it should be down at the bottom (the
+less painful end).
 
-regret 의 절대값은 보고하지 않는다 (D-56 §2). 차이와 순위만 쓴다.
+The absolute value of regret is not reported (D-56 §2). Only differences and
+ranks are used.
 """
 
 from __future__ import annotations
@@ -82,11 +88,12 @@ def _train_groups(table):
 
 
 def _best_rule(run: str) -> dict:
-    """★ 실행당 **최종 규칙 하나**. 시드당 1회다 (D-92).
+    """★ **One final rule per run**. Once per seed (D-92).
 
-    루프 안에서 라운드마다 부르지 않는다 — 그러면 방향을 바꾸게 되고,
-    두 통과 조건이 그럴 근거를 못 줬다. 그리고 규칙이 완성된 뒤라 **맥락이
-    온전하다**는 이점도 있다.
+    It is not called every round inside the loop — that would turn the
+    direction, and the two pass conditions could not give a ground for that.
+    And there is the advantage that **the context is whole**, because the
+    rule is finished.
     """
     arc = [json.loads(ln) for ln in
            (Path("runs") / run / "archive.jsonl").read_text().splitlines()
@@ -96,30 +103,38 @@ def _best_rule(run: str) -> dict:
 
 # ---------------------------------------------------------------- judge (LLM)
 def _register_critic(llm) -> None:
-    """★ 루프 밖 역할을 여기서 등록한다 (D-92).
+    """★ The roles outside the loop are registered here (D-92).
 
-    프롬프트도 스키마도 이 파일 곁에 둔다 — `kernelrule/agents/` 에 남기면
-    "언젠가 켤 것" 으로 읽히고 조건 목록과 ablation 표에 끌려다닌다.
+    Both the prompt and the schema are kept beside this file — leaving them
+    in `kernelrule/agents/` reads as "something to switch on some day" and
+    drags them into the condition list and the ablation table.
     """
     from pydantic import BaseModel, Field
 
     class TermOut(BaseModel):
-        index: int = Field(description="이 항에 곱해진 w 의 인덱스")
-        expression: str = Field(description="그 항의 식 (w[i] 제외)")
+        index: int = Field(description="the index of the w multiplied into "
+                                       "this term")
+        expression: str = Field(description="that term's expression "
+                                            "(excluding w[i])")
         physics: str = Field(
-            description="이 항이 재는 물리량 **한 문장**과 그것이 성능을 "
-                        "좌우하는 기전. '크면 좋다' 는 기전이 아니다")
+            description="**one sentence** on the physical quantity this term "
+                        "measures and the mechanism by which it governs "
+                        "performance. 'bigger is better' is not a mechanism")
         explainable: bool = Field(
-            description="물리적 기전으로 설명할 수 있는가. ★ False 가 정답인 "
-                        "항이 있다 — 억지로 지어 붙이지 마라")
-        why_not: str = Field(default="", description="못 하면 왜")
+            description="can it be explained by a physical mechanism? ★ There "
+                        "are terms for which False is the right answer — do "
+                        "not make one up by force")
+        why_not: str = Field(default="",
+                             description="if it cannot, why")
         regime_dependent: bool = Field(default=False)
         regime: str = Field(default="")
 
     class CritiqueOut(BaseModel):
         terms: list[TermOut] = Field(
-            description="w[i] 가 곱해진 항마다 하나씩. 빠뜨리지 마라")
-        overall: str = Field(description="규칙 전체가 무엇을 하는가. 한 문단")
+            description="one per term that has a w[i] multiplied in. Do not "
+                        "leave any out")
+        overall: str = Field(description="what the rule as a whole does. One "
+                                         "paragraph")
         defects: list[str] = Field(default_factory=list)
 
     body = (Path(__file__).parent / "prompts" / "critique.md").read_text()
@@ -127,15 +142,19 @@ def _register_critic(llm) -> None:
 
 
 def _critic_user_prompt(code: str, registry) -> str:
-    """규칙 코드 + **쓰인 물리량만**.
+    """The rule code + **only the physical quantities that were used**.
 
-    안 주는 것과 이유:
+    What is not given, and why:
 
     ```
-    점수 / 사례 / 부모   만든 맥락을 알면 판단이 그쪽으로 끌린다
-    가중치 값            표에 맞춘 값이라 "표가 골랐으니 맞겠지" 가 된다
-    하드웨어 상수        "물리적 의미가 있나" 를 묻지 "A6000 에 맞나" 를 안 묻는다
-    라이브러리 전체       "안 쓴 것을 쓰라" 는 제안이 섞인다 — Critic 의 일이 아니다
+    score / cases / parent  knowing the context it was made in pulls the
+                            judgement that way
+    the weight values       they are values fitted to the table, so it turns
+                            into "the table chose them, so they must be right"
+    hardware constants      it asks "does it have a physical meaning", not
+                            "does it suit an A6000"
+    the whole library       suggestions of "use what was not used" get mixed
+                            in — that is not the Critic's job
     ```
     """
     import re
@@ -143,15 +162,15 @@ def _critic_user_prompt(code: str, registry) -> str:
     from kernelrule.features import render_features
 
     if not code.strip():
-        raise ValueError("critique 는 규칙 코드를 받아야 한다")
+        raise ValueError("critique must be given the rule code")
     used = set(re.findall(r"\b[fp]\.(\w+)", code))
     sub = type(registry)(f"{registry.name}-used")
     for n in sorted(used & set(registry._items)):
         sub.add(registry[n])
     block = (render_features(sub, include_observed=False) if sub._items
-             else "(피처 목록 없음)")
-    return ("## 규칙 함수\n\n```python\n" + code.strip()
-            + "\n```\n\n## 쓰인 물리량\n\n" + block + "\n")
+             else "(no feature list)")
+    return ("## The rule function\n\n```python\n" + code.strip()
+            + "\n```\n\n## The physical quantities used\n\n" + block + "\n")
 
 
 def cmd_judge(a) -> None:
@@ -168,9 +187,10 @@ def cmd_judge(a) -> None:
                     registry=REGISTRY, cache=False,
                     budget=Budget(max_calls=len(a.runs) * 3))
     _register_critic(llm)
-    # ★ 순서 섞기 (D-86). 항 순서를 바꾸고 `w` 인덱스를 다시 매긴다 —
-    #   Critic 이 "마지막 항" 을 지목하는 것이 **위치 편향**인지 본다.
-    #   식 자체는 그대로이므로, 같은 식을 지목하면 편향이 아니다.
+    # ★ Shuffling the order (D-86). It changes the term order and renumbers
+    #   the `w` indices — it looks at whether the Critic pointing at "the last
+    #   term" is **a position bias**. The expressions themselves are
+    #   unchanged, so pointing at the same expression means it is not a bias.
     rng = np.random.default_rng(a.shuffle) if a.shuffle is not None else None
     out = []
     for run in a.runs:
@@ -180,27 +200,29 @@ def cmd_judge(a) -> None:
             exprs = term_exprs(code)
             order = [int(i) for i in rng.permutation(sorted(exprs))]
             code = reorder_terms(code, order)
-            print(f"  {run}  순서 {order}")
+            print(f"  {run}  order {order}")
         res = llm.complete("critique", _critic_user_prompt(code, REGISTRY))
         n_un = sum(1 for t in res["terms"] if not t.get("explainable", True))
-        print(f"  {run:32s} 항 {len(res['terms']):2d}  설명 불가 {n_un}")
+        print(f"  {run:32s} terms {len(res['terms']):2d}  "
+              f"unexplainable {n_un}")
         for t in res["terms"]:
-            mark = "  " if t.get("explainable", True) else "★설명불가"
+            mark = "   " if t.get("explainable", True) else "★UNEXPLAINABLE"
             print(f"     w[{t['index']}] {mark} {t.get('physics','')[:70]}")
         out.append({"run": run, "code": code, "critique": res,
                     "shuffle_order": order,
                     "exprs": {str(k): v for k, v in
                               term_exprs(code).items()}})
-    # ★ LLM 호출은 다시 만들 수 없다 (D-33 / D-51). 반드시 남긴다.
+    # ★ An LLM call cannot be made again (D-33 / D-51). It is always kept.
     llm.dump(Path(a.out).with_suffix("") / "llm_calls")
     Path(a.out).write_text(json.dumps(
-        {"_model": llm.cfg.model, "_note": "같은 모델이 쓰고 심사했다 — "
-         "오류가 상관될 수 있다 (D-85)", "rules": out},
+        {"_model": llm.cfg.model,
+         "_note": "the same model wrote it and judged it — the errors may be "
+                  "correlated (D-85)", "rules": out},
         ensure_ascii=False, indent=1))
-    print(f"\n  -> {a.out}   호출 {len(a.runs)}")
+    print(f"\n  -> {a.out}   calls {len(a.runs)}")
 
 
-# --------------------------------------------------------- ablate (LLM 0회)
+# ------------------------------------------------- ablate (0 LLM calls)
 def cmd_ablate(a) -> None:
     import numpy as np
 
@@ -215,7 +237,8 @@ def cmd_ablate(a) -> None:
     groups = _train_groups(table)
 
     def regret_of(code: str, w0) -> float:
-        """체제별로 적합하고 결합한다 — 최종 채점 절차와 같은 축이다."""
+        """It fits per regime and combines — the same axis as the final
+        scoring procedure."""
         fn = compile_rule(code)
         tot = n = 0.0
         for _name, g in groups.items():
@@ -247,22 +270,25 @@ def cmd_ablate(a) -> None:
             except Exception as e:                          # noqa: BLE001
                 refused[i] = f"{type(e).__name__}: {e}"[:80]
 
-        order = sorted(deltas, key=lambda i: deltas[i])      # 덜 아픈 것부터
+        order = sorted(deltas, key=lambda i: deltas[i])   # least painful first
         ranks = {i: k for k, i in enumerate(order)}
-        print(f"\n  {run}   항 {len(idx)}  설명불가 {sorted(flagged)}"
-              + (f"  제거불가 {sorted(refused)}" if refused else ""))
+        print(f"\n  {run}   terms {len(idx)}  "
+              f"unexplainable {sorted(flagged)}"
+              + (f"  not removable {sorted(refused)}" if refused else ""))
         for i in order:
-            m = "★설명불가" if i in flagged else "         "
-            print(f"     w[{i}] {m} 손상 {deltas[i]:+.4f}  순위 {ranks[i]}/"
+            m = "★UNEXPLAINABLE" if i in flagged else "              "
+            print(f"     w[{i}] {m} damage {deltas[i]:+.4f}  "
+                  f"rank {ranks[i]}/"
                   f"{len(order) - 1}")
         for i, why in refused.items():
-            print(f"     w[{i}] — 제거 불가: {why[:60]}")
+            print(f"     w[{i}] — not removable: {why[:60]}")
         rows.append(dict(run=run, n_terms=len(idx), flagged=sorted(flagged),
                          deltas={str(k): v for k, v in deltas.items()},
                          refused={str(k): v for k, v in refused.items()},
                          ranks={str(k): v for k, v in ranks.items()}))
 
-    # ★ 지표: 설명 불가 항의 손상 순위가 아래쪽에 몰리는가
+    # ★ The metric: do the damage ranks of the unexplainable terms gather at
+    #   the bottom?
     fr_ranks, other_ranks = [], []
     for r in rows:
         n = len(r["ranks"])
@@ -273,30 +299,36 @@ def cmd_ablate(a) -> None:
                 v / (n - 1))
     print("\n" + "=" * 70)
     if fr_ranks:
-        print(f"  설명 불가 항의 상대 손상 순위 (0=가장 덜 아픔)  "
-              f"중앙 {np.median(fr_ranks):.2f}  n={len(fr_ranks)}")
-        print(f"  나머지 항                                        "
-              f"중앙 {np.median(other_ranks):.2f}  n={len(other_ranks)}")
+        print(f"  relative damage rank of the unexplainable terms "
+              f"(0=least painful)  "
+              f"median {np.median(fr_ranks):.2f}  n={len(fr_ranks)}")
+        print(f"  the remaining terms                               "
+              f"median {np.median(other_ranks):.2f}  n={len(other_ranks)}")
         from scipy.stats import mannwhitneyu
         p = mannwhitneyu(fr_ranks, other_ranks, alternative="less").pvalue
-        print(f"  Mann-Whitney (설명불가 < 나머지)  p = {p:.4f}")
-        print("  ★ 표본 단위는 **항**이고 한 규칙의 항들은 독립이 아니다 "
-              "(원칙 28) — 규칙 수가 적으면 이 p 를 믿지 마라")
+        print(f"  Mann-Whitney (unexplainable < the rest)  p = {p:.4f}")
+        print("  ★ the sample unit is **a term** and the terms of one rule "
+              "are not independent (principle 28) — if the number of rules "
+              "is small, do not trust this p")
     else:
-        print("  ★ 설명 불가로 지목된 항이 없다 — Critic 이 전부 설명해 냈다")
+        print("  ★ no term was pointed at as unexplainable — the Critic "
+              "explained them all")
     Path(a.out).write_text(json.dumps(
-        {"_note": "regret 절대값은 보고 대상이 아니다 (D-56 §2). 차이만 쓴다",
+        {"_note": "the absolute value of regret is not a reporting target "
+                  "(D-56 §2). Only the differences are used",
          "rules": rows}, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
 
 
 # ----------------------------------------------------------- rank (LLM)
 def cmd_rank(a) -> None:
-    """RuleWriter 후보들을 심사해 **학습 점수와 다른 순서**가 되는지 본다.
+    """It judges the RuleWriter candidates and looks at whether **the order
+    comes out different from the training score**.
 
-    ★ 지금 씨앗 선택은 학습 regret 하나로 한다. 4차(D-84)가 보인 것은
-    씨앗의 **피처 다양성**이 하류를 규정한다는 것인데 학습 점수는 그것을
-    못 본다. **바꾸지는 않는다** — 순서가 얼마나 다른지만 기록한다.
+    ★ Right now the seed is chosen by the training regret alone. What the
+    4th campaign (D-84) showed is that the seed's **feature diversity**
+    governs what comes downstream, and the training score cannot see that.
+    **It is not changed** — only how different the order is gets recorded.
     """
     from scipy.stats import spearmanr
 
@@ -304,14 +336,15 @@ def cmd_rank(a) -> None:
     from kernelrule.agents.openai_client import Budget, LLMConfig, OpenAILLM
     from kernelrule.features import REGISTRY
 
-    # ★ 후보는 `summary.json` 의 `tries` 에 코드와 학습 점수가 함께 있다.
-    #   `candidates/` 디렉토리는 `.py` 사본이라 점수가 없다.
+    # ★ The candidates have the code and the training score together in
+    #   `tries` in `summary.json`. The `candidates/` directory is a `.py`
+    #   copy, so it has no score.
     summ = Path(a.campaign) / "stage2-rule-writer" / "summary.json"
     tries = json.loads(summ.read_text())["tries"]
     cands = [t for t in tries if t.get("ok") and t.get("code")
              and t.get("fit_regret") is not None]
     if not cands:
-        raise SystemExit(f"{summ} 에 채점된 후보가 없다")
+        raise SystemExit(f"there is no scored candidate in {summ}")
 
     llm = OpenAILLM(LLMConfig(),
                     feature_names=REGISTRY.names(shape_level=False),
@@ -328,27 +361,31 @@ def cmd_rank(a) -> None:
                          n_terms=len(res["terms"]), n_explainable=n_ok,
                          frac=n_ok / max(len(res["terms"]), 1),
                          defects=len(res.get("defects", []))))
-        print(f"  {rows[-1]['name']:20s} 설명 가능 {n_ok}/{len(res['terms'])}")
+        print(f"  {rows[-1]['name']:20s} explainable "
+              f"{n_ok}/{len(res['terms'])}")
     llm.dump(Path(a.out).with_suffix("") / "llm_calls")     # D-33
     rho, p = spearmanr([r["train"] for r in rows], [-r["frac"] for r in rows])
-    print(f"\n  학습 regret 순위 vs '설명 가능 비율' 순위  rho={rho:+.3f} "
-          f"p={p:.4f}  n={len(rows)}")
-    print("  ★ 기록만 한다 — 씨앗 선택 규칙은 바꾸지 않는다 (§13.4)")
+    print(f"\n  training-regret rank vs 'explainable fraction' rank  "
+          f"rho={rho:+.3f} p={p:.4f}  n={len(rows)}")
+    print("  ★ it only records — the seed selection rule is not changed "
+          "(§13.4)")
     Path(a.out).write_text(json.dumps(
         {"_model": llm.cfg.model, "rows": rows,
          "spearman": {"rho": rho, "p": p}}, ensure_ascii=False, indent=1))
     print(f"  -> {a.out}")
 
 
-# --------------------------------------------------------- gate (LLM 0회)
-#: 학습 41 을 나눌 fold 수. SOL 오름차순 라운드로빈이라 체제가 자동으로
-#: 균형 잡힌다 (fold 마다 느린 형상 3개).
+# ------------------------------------------------------- gate (0 LLM calls)
+#: The number of folds the training 41 is split into. It is a round robin in
+#: ascending SOL order, so the regimes balance out automatically (3 slow
+#: shapes per fold).
 N_FOLDS = 4
 
 
 def _folds(table, matrix, groups):
-    """★ SOL 오름차순 라운드로빈. 단일 30/11 분할은 검증에 느린 형상이
-    3개뿐이라 얇다 — 4-fold 면 같은 형상이 네 번 중 한 번은 검증에 온다."""
+    """★ A round robin in ascending SOL order. A single 30/11 split is thin
+    because it has only 3 slow shapes in validation — with 4 folds the same
+    shape comes to validation one time in four."""
     train = [p for g in groups.values() for p in g]
     srt = sorted(train, key=lambda p: matrix.for_shape(p)[1].log_sol_ms)
     out = [[] for _ in range(N_FOLDS)]
@@ -358,22 +395,28 @@ def _folds(table, matrix, groups):
 
 
 def cmd_gate(a) -> None:
-    """★ 통과 조건 2 — "쓸모없음" 이 아니라 **"일반화 안 됨"** 을 잰다 (D-87).
+    """★ Pass condition 2 — it measures **"does not generalise"**, not
+    "is useless" (D-87).
 
-    D-85 의 통과 조건은 "빼도 학습 점수가 안 나빠지면 판정이 맞다" 였다.
-    **틀린 정의였다** — 항 하나가 중요하면서 동시에 설명 불가일 수 있고,
-    그것이야말로 우리가 걱정하는 상황이다.
+    D-85's pass condition was "if the training score does not get worse when
+    it is removed, the judgement was right". **That was a wrong definition**
+    — a term can be important and unexplainable at the same time, and that is
+    exactly the situation we worry about.
 
     ```
-    설명 가능한 항   물리라서 다른 형상에도 적용된다
-                    -> 빼면 적합/검증이 비슷하게 나빠진다
-    설명 불가한 항   학습 형상에 맞춰진 것
-                    -> ★ 빼면 적합만 크게 나빠지고 검증은 덜 나빠진다
+    an explainable term     it is physics, so it applies to other shapes too
+                            -> removing it makes fit and validation get worse
+                               by a similar amount
+    an unexplainable term   it is tuned to the training shapes
+                            -> ★ removing it makes only the fit much worse
+                               and validation less so
 
-    지표   (적합 손상) - (검증 손상).  ★ 양수가 클수록 과적합 서명
+    metric   (fit damage) - (validation damage).  ★ the larger the positive
+             value, the stronger the overfitting signature
     ```
 
-    ⚠️ **구조 홀드아웃 20 은 안 건드린다.** 학습 41 안에서만 나눈다.
+    ⚠️ **The structural holdout 20 is not touched.** The split is made only
+    inside the training 41.
     """
     import statistics
 
@@ -390,11 +433,12 @@ def cmd_gate(a) -> None:
     groups = _train_groups(table)
     folds = _folds(table, matrix, groups)
     print(f"  {N_FOLDS}-fold  " + " ".join(
-        f"[{len(f)}형상, 느린 {sum(1 for p in f if regime_of(p, table.hw) == 'long')}]"
+        f"[{len(f)} shapes, slow "
+        f"{sum(1 for p in f if regime_of(p, table.hw) == 'long')}]"
         for f in folds))
 
     def one_fold(code: str, k: int) -> tuple[float, float]:
-        """fold k 를 검증으로 두고 (적합 regret, 검증 regret)."""
+        """With fold k as validation, (fit regret, validation regret)."""
         fn = compile_rule(code)
         n_w = len(term_indices(code))
         va = folds[k]
@@ -443,15 +487,16 @@ def cmd_gate(a) -> None:
         rows.append(dict(run=run, flagged=flagged, n_terms=len(idx),
                          diffs={str(k): v for k, v in diffs.items()},
                          refused={str(k): v for k, v in refused.items()}))
-        order = sorted(diffs, key=lambda i: -diffs[i])   # 양수가 큰 것부터
-        print(f"\n  {run}  설명불가 {flagged}")
+        order = sorted(diffs, key=lambda i: -diffs[i])   # largest positive
+        print(f"\n  {run}  unexplainable {flagged}")
         for r, i in enumerate(order):
-            m = "★설명불가" if i in flagged else "         "
-            print(f"     w[{i}] {m} (적합-검증) {diffs[i]:+.4f}  "
-                  f"순위 {1 - r / max(len(order) - 1, 1):.2f}")
+            m = "★UNEXPLAINABLE" if i in flagged else "              "
+            print(f"     w[{i}] {m} (fit-val) {diffs[i]:+.4f}  "
+                  f"rank {1 - r / max(len(order) - 1, 1):.2f}")
 
     def score_flagger(pick) -> float | None:
-        """규칙마다 지목 항의 상대 순위 중앙값 -> 그 중앙값 (원칙 28)."""
+        """Per rule, the median relative rank of the pointed-at terms -> the
+        median of those (principle 28)."""
         per = []
         for r in rows:
             ds = {int(k): v for k, v in r["diffs"].items()}
@@ -475,16 +520,24 @@ def cmd_gate(a) -> None:
             if r["flagged"] else [])
         for _ in range(200)])
     print("\n" + "=" * 70)
-    print("  지목 항의 (적합-검증) 상대 순위 — 규칙 단위 중앙값 (1=가장 양수)")
-    print(f"    ★ 실제 Critic          {real if real is None else f'{real:.2f}'}")
-    print(f"    목: 마지막 항 하나      {mock1 if mock1 is None else f'{mock1:.2f}'}")
-    print(f"    목: 마지막 k개 (수 일치) {mockk if mockk is None else f'{mockk:.2f}'}")
-    print(f"    무작위 k개 (200회 중앙)  {rand:.2f}")
-    print("    기준: >=0.65 판정이 맞다 / <=0.35 틀리다 / 사이는 구분 불가")
-    print("    ★ 목이 0.65 를 넘으면 실제 값이 얼마든 **판정 불가**다")
+    print("  the (fit-val) relative rank of the pointed-at terms — median "
+          "per rule (1=most positive)")
+    print(f"    ★ the real Critic         "
+          f"{real if real is None else f'{real:.2f}'}")
+    print(f"    mock: the last term alone "
+          f"{mock1 if mock1 is None else f'{mock1:.2f}'}")
+    print(f"    mock: the last k (count matched) "
+          f"{mockk if mockk is None else f'{mockk:.2f}'}")
+    print(f"    random k (median of 200)  {rand:.2f}")
+    print("    the line: >=0.65 the judgement is right / <=0.35 it is wrong "
+          "/ in between is indistinguishable")
+    print("    ★ if the mock goes over 0.65 then, whatever the real value "
+          "is, it is **not judgeable**")
     Path(a.out).write_text(json.dumps(
-        {"_note": "지표는 (적합 손상)-(검증 손상). 양수가 클수록 과적합 서명. "
-                  "regret 절대값은 보고 대상이 아니다 (D-56 §2)",
+        {"_note": "the metric is (fit damage)-(validation damage). The larger "
+                  "the positive value, the stronger the overfitting "
+                  "signature. The absolute value of regret is not a "
+                  "reporting target (D-56 §2)",
          "n_folds": N_FOLDS, "rules": rows,
          "score": {"critic": real, "mock_last1": mock1,
                    "mock_lastk": mockk, "random_k": rand}},
@@ -492,18 +545,21 @@ def cmd_gate(a) -> None:
     print(f"\n  -> {a.out}")
 
 
-# ------------------------------------------------------ compare (LLM 0회)
+# ------------------------------------------------ compare (0 LLM calls)
 def cmd_compare(a) -> None:
-    """원래 심사와 **순서를 섞은** 심사를 견준다 (D-86 위치 편향).
+    """It compares the original judgement with the **order-shuffled** one
+    (D-86 position bias).
 
-    항 번호가 아니라 **식**으로 견준다 — 섞으면 번호가 달라지므로.
+    The comparison is by **expression**, not by term number — because
+    shuffling changes the numbers.
     """
     import statistics
 
     from kernelrule.rules.ablate import term_exprs
 
     def exprs_of(r: dict) -> dict:
-        # ★ 첫 심사 산출물에는 `exprs` 가 없다 — 코드에서 다시 읽는다.
+        # ★ The first judgement artefact has no `exprs` — it is read again
+        #   from the code.
         return r.get("exprs") or {str(k): v
                                   for k, v in term_exprs(r["code"]).items()}
 
@@ -511,7 +567,7 @@ def cmd_compare(a) -> None:
     shuf = json.loads(Path(a.shuffled).read_text())["rules"]
     by = {r["run"]: r for r in shuf}
     jac, pos_hits, pos_tot = [], 0, 0
-    print(f"  {'실행':4s} {'원래':>5} {'섞은뒤':>6} {'공통':>5} {'자카드':>7}")
+    print(f"  {'run':4s} {'orig':>5} {'shuf':>6} {'both':>5} {'jaccard':>7}")
     for b in base:
         sh = by.get(b["run"])
         if sh is None:
@@ -532,15 +588,17 @@ def cmd_compare(a) -> None:
         print(f"  {b['run'][-2:]:4s} {len(A):5d} {len(B):6d} "
               f"{len(A & B):5d} {j:7.2f}")
     med = statistics.median(jac)
-    print(f"\n  ★ 자카드 중앙 {med:.2f}  (n={len(jac)}규칙)")
-    print("     >=0.60 편향 아님 / <=0.20 편향 / 사이는 부분 편향")
+    print(f"\n  ★ median jaccard {med:.2f}  (n={len(jac)} rules)")
+    print("     >=0.60 not a bias / <=0.20 a bias / in between, partly a bias")
     if pos_tot:
-        print(f"  ★ 섞은 뒤 마지막 두 자리의 지목 비율 {pos_hits}/{pos_tot} "
-              f"= {pos_hits / pos_tot:.0%}   (원래 8/13 = 62%)")
+        print(f"  ★ after shuffling, the rate of pointing at the last two "
+              f"positions {pos_hits}/{pos_tot} "
+              f"= {pos_hits / pos_tot:.0%}   (originally 8/13 = 62%)")
     Path(a.out).write_text(json.dumps(
         {"jaccard": jac, "jaccard_median": med,
          "late_position_rate": (pos_hits / pos_tot if pos_tot else None),
-         "_note": "식으로 견준다 — 섞으면 w 번호가 달라진다"},
+         "_note": "the comparison is by expression — shuffling changes the "
+                  "w numbers"},
         ensure_ascii=False, indent=1))
     print(f"  -> {a.out}")
 
@@ -552,8 +610,9 @@ def main() -> None:
     j.add_argument("--runs", nargs="+", required=True)
     j.add_argument("--out", default="docs/artifacts/critic.json")
     j.add_argument("--shuffle", type=int, metavar="SEED",
-                   help="항 순서를 섞어 심사한다 (D-86 위치 편향 검사). "
-                        "식은 그대로이고 w 인덱스만 다시 매긴다")
+                   help="judge with the term order shuffled (the D-86 "
+                        "position-bias check). The expressions stay the same "
+                        "and only the w indices are renumbered")
     j.set_defaults(fn=cmd_judge)
     b = sub.add_parser("ablate")
     b.add_argument("--judged", default="docs/artifacts/critic.json")

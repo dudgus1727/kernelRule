@@ -1,4 +1,5 @@
-"""항 절제 (D-85). Critic 의 정성 판정을 정량으로 검증하는 도구."""
+"""Term ablation (D-85). The tool that verifies the Critic's qualitative
+verdict quantitatively."""
 from __future__ import annotations
 
 import pytest
@@ -16,11 +17,12 @@ SIMPLE = """def score(f, p, hw, w):
 def test_drop_middle_term_and_renumber():
     out = drop_terms(SIMPLE, {1})
     assert "f.b" not in out
-    assert term_indices(out) == [0, 1], "가중치를 다시 번호 매기지 않았다"
+    assert term_indices(out) == [0, 1], "the weights were not renumbered"
 
 
 def test_drop_first_term_keeps_s_defined():
-    """★ 첫 항을 지우면 `s = s + …` 가 첫 대입이 된다 — `s` 가 없다."""
+    """★ Removing the first term makes `s = s + …` the first assignment —
+    and `s` does not exist."""
     out = drop_terms(SIMPLE, {0})
     assert "s = f.b * w[0]" in out, out
     ns: dict = {}
@@ -40,9 +42,10 @@ def test_drop_term_in_return_line():
 
 
 def test_refuses_when_two_terms_share_a_line():
-    """★ 조용히 건너뛰지 않는다 — 못 지운 것과 '지웠는데 영향 없음' 은 다르다."""
+    """★ Not skipped silently — "could not remove" differs from "removed
+    with no effect"."""
     code = "def score(f, p, hw, w):\n    return f.a * w[0] + f.b * w[1]\n"
-    with pytest.raises(AblateError, match="한 줄에 여러 항"):
+    with pytest.raises(AblateError, match="several terms on one line"):
         drop_terms(code, {1})
 
 
@@ -52,13 +55,13 @@ def test_refuses_when_branch_would_be_empty():
             "    if p.is_memory_bound:\n"
             "        s = s + f.b * w[1]\n"
             "    return s\n")
-    with pytest.raises(AblateError, match="분기 안이 비었다"):
+    with pytest.raises(AblateError, match="branch body is empty"):
         drop_terms(code, {1})
 
 
 def test_refuses_to_drop_everything():
     code = "def score(f, p, hw, w):\n    return f.a * w[0]\n"
-    with pytest.raises(AblateError, match="다 지우면"):
+    with pytest.raises(AblateError, match="removing every term"):
         drop_terms(code, {0})
 
 

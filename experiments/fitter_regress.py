@@ -1,20 +1,28 @@
-"""★ 적합기가 **과적합을 만드나** — CMA vs Nelder-Mead. LLM 0회.
+"""★ Does the fitter **create overfitting** — CMA vs Nelder-Mead. 0 LLM calls.
 
     python3 experiments/fitter_regress.py
 
-실험 계획서 `docs/artifacts/fitter-regress-prereg.md`.
+The pre-registration is `docs/artifacts/fitter-regress-prereg.md`.
 
-§3 에서 기준선을 다시 뽑았더니 방향이 반대였다 (1.0762 -> 1.0987).
-절차가 셋 달라(적합기·예산·시드 수) 판정에 못 썼다. **여기서는 변수를
-적합기 하나로 줄인다** — 같은 규칙을 두 적합기로 다시 맞춘다.
+Re-deriving the baseline in §3 turned the direction around (1.0762 ->
+1.0987). Three things about the procedure differed (the fitter, the budget,
+the number of seeds), so it could not be used for a judgement. **Here the
+variable is reduced to the fitter alone** — the same rules are refitted with
+both fitters.
 
 ```
-NM   nelder-mead · 재시작 4 · 적합 300 · 다듬기 600   ← 지금까지의 측정 절차
-CMA  cma         · 재시작 1 · 적합 300 · 다듬기 600   ← §3 이 쓴 것
+NM   nelder-mead · 4 restarts · fit 300 · polish 600  ← the procedure used so
+                                                        far
+CMA  cma         · 1 restart  · fit 300 · polish 600  ← what §3 used
 ```
 
-⚠️ 학습 regret 은 **판정에 안 쓴다** — CMA 가 학습을 더 잘 맞추는 것은
-설계상 당연하고, 그것은 과적합의 기전이지 판정이 아니다 (실험 계획서 §3).
+⚠️ The training regret is **not used for the judgement** — CMA fitting the
+training better is what it is designed to do, and that is the mechanism of
+overfitting, not the judgement (pre-registration §3).
+
+⚠️ 2026-09-08 (D-146): **the two group labels stay in Korean.** They are the
+top-level keys of `fitter-regress.json` and the row names of the document,
+and `docs/` is not translated.
 """
 
 from __future__ import annotations
@@ -34,16 +42,19 @@ from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 
-#: 주 대상 — regret 진화 6구조. D-77·D-123 이 쓴 것과 **같은 여섯**이다.
+#: The main target — the 6 regret-evolved structures. **The same six** D-77
+#: and D-123 used.
 MAIN = ("arch24 6구조", [f"F3rw-p8-s{i}" for i in range(6)])
-#: 부차 — §3 의 예산 8 팔. CMA 로 진화한 구조다. **따로** 본다.
+#: Secondary — the budget-8 arm of §3. Structures evolved with CMA. They are
+#: looked at **separately**.
 SIDE = ("rb08 3구조 (CMA 진화)", [f"F3rw-p8-cma-s{i}" for i in range(3)])
 
 ARMS = [("NM", "nelder-mead", 4), ("CMA", "cma", 1)]
 REPORT_KS = (1, 10, 50, 100)
-#: A6000 시드 폭. **크기를 읽는 자**이지 판정선이 아니다.
+#: The A6000 seed spread. It is **a ruler for reading the size**, not a
+#: decision line.
 SIGMA = 0.0124
-#: 비대응 참고선 (§29.5). 여기서 새로 정하지 않는다 (원칙 7).
+#: The unpaired reference line (§29.5). It is not set anew here (principle 7).
 DELTA = 0.0516
 
 
@@ -56,7 +67,8 @@ def _best(run: str) -> dict:
 def _one(group: tuple, T, M, train, hold, out: dict) -> None:
     label, runs = group
     print("\n" + "=" * 88)
-    print(f"{label} — 구조 {len(runs)}개, 변수는 **적합기 하나**")
+    print(f"{label} — {len(runs)} structures, the variable is **the fitter "
+          f"alone**")
     print("=" * 88)
     rows: dict = {}
     for name, method, nres in ARMS:
@@ -72,42 +84,46 @@ def _one(group: tuple, T, M, train, hold, out: dict) -> None:
             ks.append([h["regret_at_k"][k] for k in REPORT_KS])
         rows[name] = {"hold": ho, "train": tr,
                       "ks": np.array(ks).tolist()}
-    print(f"  {'':6s} {'학습 중앙':>10} {'홀드아웃 중앙':>13} {'격차':>9} "
-          f"{'홀드아웃 범위':>19}")
+    print(f"  {'':6s} {'train median':>13} {'holdout median':>16} {'gap':>9} "
+          f"{'holdout range':>20}")
     for name, _, _ in ARMS:
         d = rows[name]
         g = [h - t for h, t in zip(d["hold"], d["train"], strict=True)]
-        print(f"  {name:6s} {np.median(d['train']):10.4f} "
-              f"{np.median(d['hold']):13.4f} {np.median(g):+9.4f} "
-              f"{min(d['hold']):9.4f}~{max(d['hold']):.4f}")
+        print(f"  {name:6s} {np.median(d['train']):13.4f} "
+              f"{np.median(d['hold']):16.4f} {np.median(g):+9.4f} "
+              f"{min(d['hold']):10.4f}~{max(d['hold']):.4f}")
         d["gap"] = g
 
     dif = [c - n for n, c in zip(rows["NM"]["hold"], rows["CMA"]["hold"],
                                  strict=True)]
     worse = sum(1 for x in dif if x > 0)
-    print("\n  ★ 짝지은 차이 (CMA - NM, 양수 = CMA 가 **나쁘다**)")
+    print("\n  ★ the paired difference (CMA - NM, positive = CMA is "
+          "**worse**)")
     print("     " + "  ".join(f"{x:+.4f}" for x in dif))
-    print(f"     CMA 가 나쁜 구조 {worse}/{len(dif)}   "
-          f"중앙 {np.median(dif):+.4f}   (σ={SIGMA}, 참고선 {DELTA})")
+    print(f"     structures where CMA is worse {worse}/{len(dif)}   "
+          f"median {np.median(dif):+.4f}   "
+          f"(σ={SIGMA}, reference line {DELTA})")
     p = float("nan")
     if len(dif) >= 5 and any(abs(x) > 0 for x in dif):
         p = float(wilcoxon(dif, alternative="greater").pvalue)
-        print(f"     짝지은 Wilcoxon 단측 p = {p:.4f}  "
-              f"{'★ 유의 (<=0.05)' if p <= 0.05 else '유의하지 않다'}")
+        print(f"     paired one-sided Wilcoxon p = {p:.4f}  "
+              f"{'★ significant (<=0.05)' if p <= 0.05 else 'not significant'}")
     else:
-        print("     ★ n<5 라 Wilcoxon 을 안 쓴다 — 부호만 읽는다")
+        print("     ★ n<5, so Wilcoxon is not used — only the signs are read")
 
     dtr = [c - n for n, c in zip(rows["NM"]["train"], rows["CMA"]["train"],
                                  strict=True)]
-    print("\n  기전 확인 — 학습에서는? (CMA - NM, 음수 = CMA 가 잘 맞춘다)")
+    print("\n  checking the mechanism — what about the training? "
+          "(CMA - NM, negative = CMA fits better)")
     print("     " + "  ".join(f"{x:+.4f}" for x in dtr)
-          + f"   CMA 가 좋은 구조 {sum(1 for x in dtr if x < 0)}/{len(dtr)}")
+          + f"   structures where CMA is better "
+            f"{sum(1 for x in dtr if x < 0)}/{len(dtr)}")
     dg = [c - n for n, c in zip(rows["NM"]["gap"], rows["CMA"]["gap"],
                                 strict=True)]
-    print(f"     격차(홀드아웃-학습) 차 중앙 {np.median(dg):+.4f} "
-          "— 양수면 CMA 가 더 벌어진다")
+    print(f"     the median difference of the gap (holdout-train) "
+          f"{np.median(dg):+.4f} — positive means CMA widens it more")
 
-    print("\n  regret@k 중앙")
+    print("\n  the regret@k medians")
     print(f"  {'':6s} " + " ".join(f"{f'k={k}':>8s}" for k in REPORT_KS))
     for name, _, _ in ARMS:
         a = np.array(rows[name]["ks"])
@@ -134,19 +150,25 @@ def main() -> None:
 
     m = out[MAIN[0]]
     print("\n" + "=" * 88)
-    print("★ 판정 — 실험 계획서 §3 그대로")
+    print("★ the verdict — exactly as in pre-registration §3")
     print("=" * 88)
     if m["p_hold"] <= 0.05 and np.median(m["paired_hold"]) > 0:
-        print("  ★ 적합기가 과적합을 만든다 — 예산 8 에서는 NM, 16차원이")
-        print("     필요할 때만 CMA. 4090 전이의 (b) 재적합도 NM 으로 간다")
+        print("  ★ the fitter creates overfitting — NM at budget 8, and CMA")
+        print("     only when 16 dimensions are needed. The (b) refit of the "
+              "4090 transfer goes to NM too")
     elif m["p_hold"] <= 0.05:
-        print("  ★ 예상 밖 — CMA 가 유의하게 좋다. 실험 계획서에 없는 갈래다")
+        print("  ★ unexpected — CMA is significantly better. That is a branch "
+              "the pre-registration does not have")
     else:
-        print("  구분 불가 — 1.0762 -> 1.0987 은 적합기 탓이 아니다")
-        print("     남는 후보: 적합 예산(200 vs 300) · 시드 수(6 vs 3) ·")
-        print("     다듬기 수정(D-122) · 진화 경로 자체")
-    print("  ⚠️ 이 결과는 D-123(§2 통과 조건)을 뒤집지 않는다 — 거기는 **16차원")
-    print("     도달률**이고 여기는 **8차원 일반화**다 (실험 계획서 §5)")
+        print("  indistinguishable — 1.0762 -> 1.0987 is not the fitter's "
+              "fault")
+        print("     the remaining candidates: the fit budget (200 vs 300) · "
+              "the number of seeds (6 vs 3) ·")
+        print("     the polish fix (D-122) · the evolutionary path itself")
+    print("  ⚠️ this result does not overturn D-123 (the §2 pass condition) — "
+          "that is about the **16-dimensional")
+    print("     reach rate** and this is about **8-dimensional "
+          "generalisation** (pre-registration §5)")
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1,
                                       default=float))

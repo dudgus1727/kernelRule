@@ -1,22 +1,27 @@
-"""★ 재실행 — 단일 조건 6시드. 실험 계획서에 적힌 기준으로만 판정한다.
+"""★ The re-run — one condition, 6 seeds. Judged only by the criteria
+written in the pre-registration.
 
-    python3 experiments/rerun.py --verify     # 짧은 검증 (2실행 x 6라운드)
-    python3 experiments/rerun.py              # 본 실행 (6실행 x 12라운드)
-    python3 experiments/rerun.py --score-only # 이미 돈 것을 채점만
+    python3 experiments/rerun.py --verify     # a short verification
+                                              # (2 runs x 6 rounds)
+    python3 experiments/rerun.py              # the real run (6 runs x 12
+                                              # rounds)
+    python3 experiments/rerun.py --score-only # only score what already ran
 
-## 왜 재실행하나
+## Why it is re-run
 
-12실행 전부가 **절반이 적합 없이 채점된** 상태에서 진화했다 (D-54).
-채점이 틀렸으면 그 위의 선택 — 부모 선택, 아카이브 갱신, 조기 종료 —
-이 전부 틀렸다. 다듬기 전후로 규칙 순위도 바뀐다 (D-57).
+All 12 runs evolved in a state where **half of them were scored without a
+fit** (D-54). If the scoring was wrong, then everything chosen on top of it —
+parent selection, archive updates, early stopping — was wrong too. The rule
+ranking also changes before and after the polish (D-57).
 
-    재적합은 최종 산출물만 고친다. 진화 궤적은 못 되돌린다.  (원칙 13)
+    Refitting fixes only the final artefact. The evolutionary trajectory
+    cannot be undone.  (principle 13)
 
-## 실험 계획서
+## The pre-registration
 
-**판정 기준은 `PREREG` 에 있고 `docs/artifacts/rerun-preregistration.md`
-와 같은 내용이다.** 테스트가 그것을 고정한다. 결과를 보고 기준을 바꾸면
-오염이다 (D-50).
+**The decision criteria are in `PREREG`, and it is the same content as
+`docs/artifacts/rerun-preregistration.md`.** A test pins that down. Changing
+the criteria after seeing the results is contamination (D-50).
 """
 
 from __future__ import annotations
@@ -29,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-import kernelrule.features.physical  # noqa: F401  — REGISTRY 를 채운다
+import kernelrule.features.physical  # noqa: F401  — it fills REGISTRY
 from kernelrule.agents.openai_client import Budget, LLMConfig, OpenAILLM
 from kernelrule.core.loop import LoopConfig, RoundLoop
 from kernelrule.core.matrix import FeatureMatrix
@@ -40,8 +45,13 @@ from kernelrule.features import REGISTRY
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 OUT = Path("runs")
 
-#: ★ 실험 계획서. `docs/artifacts/rerun-preregistration.md` 와 **같은 내용**이다.
-#:   `tests/test_rerun_prereg.py` 가 둘이 안 달라지는지 검사한다.
+#: ★ The pre-registration. It is **the same content** as
+#: `docs/artifacts/rerun-preregistration.md`.
+#:   `tests/test_rerun_prereg.py` checks that the two do not diverge.
+#:
+#: ⚠️ 2026-09-08 (D-146): **the values stay in Korean.** They are a frozen
+#: record mirroring a `docs/` document, and `docs/` is not translated —
+#: translating here would break the doc-code equality the test enforces.
 PREREG = {
     "purpose": ("오염 없는 상태의 값을 얻는 것. **벤더를 이기는 것이 "
                 "아니다.**"),
@@ -69,26 +79,31 @@ PREREG = {
     "abort": ["LLMUnreachable 즉시", "3실행 연속 아카이브가 비면"],
 }
 
-#: 비용 상한. 기존 luna 6실행의 **실행당 최댓값 x 6 x 1.5 여유**다.
-#: 크레딧 소진을 두 번 겪었다 (D-43) — 넘으면 예외로 멈춘다.
+#: The cost cap. It is **the per-run maximum of the existing 6 luna runs
+#: x 6 x 1.5 headroom**.
+#: The credit has been used up twice (D-43) — going over stops with an
+#: exception.
 BUDGET = {"max_calls": 1395, "max_input_tokens": 12_140_928,
           "max_output_tokens": 2_157_264}
 
-#: 3실행 연속 아카이브가 비면 멈춘다. 인프라가 죽은 것이지 실험이 아니다.
+#: Three runs in a row with an empty archive stops it. That is the
+#: infrastructure being dead, not the experiment.
 MAX_EMPTY_STREAK = 3
 
 
 class Terminated(KeyboardInterrupt):
-    """SIGTERM 을 예외로 — 안 그러면 `finally` 가 안 돈다 (원칙 17)."""
+    """SIGTERM as an exception — otherwise `finally` does not run
+    (principle 17)."""
 
 
 def _install_signal_handlers() -> None:
     import contextlib
 
     def _die(signum, _frame):
-        raise Terminated(f"신호 {signal.Signals(signum).name}")
+        raise Terminated(f"signal {signal.Signals(signum).name}")
 
-    # ★ SIGTERM 만. SIGHUP 은 백그라운드 분리 신호라 잡으면 안 된다.
+    # ★ SIGTERM only. SIGHUP is the background-detach signal and must not be
+    #   caught.
     with contextlib.suppress(OSError, ValueError):
         signal.signal(signal.SIGTERM, _die)
 
@@ -112,7 +127,8 @@ def main() -> None:
     _install_signal_handlers()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--verify", action="store_true",
-                    help="짧은 검증 — 2실행 x 6라운드. ★ 대표값 수치가 아니다")
+                    help="a short verification — 2 runs x 6 rounds. ★ Not a "
+                         "representative number")
     ap.add_argument("--tag", default=None)
     ap.add_argument("--score-only", action="store_true")
     a = ap.parse_args()
@@ -126,15 +142,16 @@ def main() -> None:
     splits = _splits(table)
 
     print("=" * 78)
-    print(f"재실행 — 단일 조건 {n_seeds}시드 x {rounds}라운드"
-          + ("   ★ 검증 실행 (대표값 수치 아님)" if a.verify else ""))
+    print(f"the re-run — one condition, {n_seeds} seeds x {rounds} rounds"
+          + ("   ★ a verification run (not a representative number)"
+             if a.verify else ""))
     print("=" * 78)
-    print(f"  목적: {PREREG['purpose']}")
-    print(f"  예상: {PREREG['expected']}")
-    print(f"  학습 {len(splits.train.shapes)} / 구조 홀드아웃 "
+    print(f"  purpose: {PREREG['purpose']}")
+    print(f"  expected: {PREREG['expected']}")
+    print(f"  training {len(splits.train.shapes)} / structural holdout "
           f"{len(splits.val.shapes)}")
-    print(f"  비용 상한: 호출 {BUDGET['max_calls']} / 입력 "
-          f"{BUDGET['max_input_tokens']:,} / 출력 "
+    print(f"  the cost cap: calls {BUDGET['max_calls']} / input "
+          f"{BUDGET['max_input_tokens']:,} / output "
           f"{BUDGET['max_output_tokens']:,}\n")
 
     budget = Budget(**BUDGET)
@@ -151,7 +168,7 @@ def main() -> None:
     if not a.score_only:
         for s, run_id in enumerate(run_ids):
             if (OUT / run_id / "archive.jsonl").exists():
-                print(f"  [{run_id}] 이미 있다. 건너뛴다")
+                print(f"  [{run_id}] already there. Skipped")
                 continue
             llm = OpenAILLM(
                 LLMConfig(concurrency=6,
@@ -168,15 +185,16 @@ def main() -> None:
             try:
                 loop.run(rounds)
             except Exception as e:                          # noqa: BLE001
-                print(f"  ★ 중단: {type(e).__name__}: {str(e)[:120]}")
+                print(f"  ★ stopped: {type(e).__name__}: {str(e)[:120]}")
             arc = OUT / run_id / "archive.jsonl"
             n = sum(1 for ln in arc.open() if ln.strip()) if arc.exists() else 0
             empty_streak = 0 if n else empty_streak + 1
-            print(f"  아카이브 {n}개  누적 호출 {budget.calls}  "
+            print(f"  archive {n}  cumulative calls {budget.calls}  "
                   f"{time.perf_counter() - t0:.0f}s", flush=True)
             if empty_streak >= MAX_EMPTY_STREAK:
-                print(f"\n  ★ {MAX_EMPTY_STREAK}실행 연속 아카이브가 비었다. "
-                      "인프라 문제다 — 멈춘다 (실험 계획서).")
+                print(f"\n  ★ the archive was empty {MAX_EMPTY_STREAK} runs "
+                      "in a row. That is an infrastructure problem — it "
+                      "stops (the pre-registration).")
                 break
 
     _score(table, matrix, splits, run_ids, d, verify=a.verify)
@@ -188,11 +206,13 @@ def _dump(p: Path, obj) -> None:
 
 
 def _score(table, matrix, splits, run_ids, d: Path, *, verify: bool) -> None:
-    """실험 계획서에 적힌 지표만 낸다. **삭제한 값과 비교하지 않는다.**"""
+    """Reports only the metrics written in the pre-registration. **It does
+    not compare against a deleted value.**"""
     from kernelrule.core.canonical import canonical_score
 
     print("\n" + "=" * 78)
-    print("채점 — 실험 계획서에 적힌 지표만" + ("  ★ 검증 실행" if verify else ""))
+    print("scoring — only the metrics written in the pre-registration"
+          + ("  ★ a verification run" if verify else ""))
     print("=" * 78)
 
     done, missing = [], []
@@ -203,29 +223,33 @@ def _score(table, matrix, splits, run_ids, d: Path, *, verify: bool) -> None:
             continue
         rows = [json.loads(ln) for ln in arc.open() if ln.strip()]
         if not rows:
-            # ★ 빈 아카이브는 "나쁜 실행" 이 아니라 **실행이 안 된 것**이다.
-            #   0 으로 채워 넣으면 분포가 오염된다 (§26.4).
-            print(f"  {run_id:16s} ⚠️ 아카이브가 비었다 — 채점에서 제외")
+            # ★ An empty archive is not "a bad run" but **a run that did not
+            #   happen**. Filling it in as 0 pollutes the distribution
+            #   (§26.4).
+            print(f"  {run_id:16s} ⚠️ the archive is empty — excluded from "
+                  f"the scoring")
             missing.append(run_id)
             continue
         best = min(rows, key=lambda e: e["regret"])
         cs = canonical_score(best["code"], best["w"], table=table,
                              matrix=matrix, splits=splits)
         done.append((run_id, cs))
-        warn = f"  ★{len(cs.warnings)}건" if cs.warnings else ""
-        print(f"  {run_id:16s} 홀드아웃 {cs.holdout:.4f}{warn}")
+        warn = f"  ★{len(cs.warnings)}" if cs.warnings else ""
+        print(f"  {run_id:16s} holdout {cs.holdout:.4f}{warn}")
 
     if missing:
-        # ★ 부분 완주. **설계 규모를 명시한다** — 시드를 골라 쓰지 않는다.
-        print(f"\n  ★ 설계는 {len(run_ids)}시드였고 {len(done)}개가 끝났다. "
-              f"미완: {missing}")
+        # ★ A partial completion. **The designed scale is stated** — seeds
+        #   are not cherry-picked.
+        print(f"\n  ★ the design was {len(run_ids)} seeds and {len(done)} "
+              f"finished. Unfinished: {missing}")
     if not done:
-        print("  채점할 실행이 없다.")
+        print("  there is no run to score.")
         return
 
     ho = np.array([c.holdout for _, c in done])
     q1, med, q3 = np.percentile(ho, [25, 50, 75])
-    print(f"\n  구조 홀드아웃  중앙 {med:.4f}  사분위 [{q1:.4f}, {q3:.4f}]  "
+    print(f"\n  structural holdout  median {med:.4f}  "
+          f"quartiles [{q1:.4f}, {q3:.4f}]  "
           f"n={len(ho)}")
     _dump(d / "scores.json", {
         "runs": {r: {"holdout": c.holdout, "in_sample": c.in_sample,
@@ -234,11 +258,13 @@ def _score(table, matrix, splits, run_ids, d: Path, *, verify: bool) -> None:
         "median": float(med), "q1": float(q1), "q3": float(q3),
         "n_done": len(done), "n_designed": len(run_ids), "missing": missing,
         "verify": verify,
-        "note": ("★ 검증 실행이다 — 대표값 수치가 아니다" if verify else
-                 "이 저장소의 대표값 성능 수치")})
-    print(f"\n  기록: {d / 'scores.json'}")
+        "note": ("★ this is a verification run — not a representative number"
+                 if verify else
+                 "the representative performance numbers of this repository")})
+    print(f"\n  recorded: {d / 'scores.json'}")
     if verify:
-        print("  ★ 검증 실행 수치는 대표값이 아니다. 본 실행과 합치지 않는다.")
+        print("  ★ a verification-run number is not representative. It is "
+              "not pooled with the real run.")
 
 
 if __name__ == "__main__":

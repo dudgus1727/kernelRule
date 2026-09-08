@@ -1,59 +1,74 @@
-"""사람 지도 + 표 피드백으로 만든 기준선 규칙 (§9.4).
+"""The baseline rule built from human guidance + table feedback (§9.4).
 
-## ★ 이름을 **두 번** 고쳤다 — 이름이 주장을 하고 있었다
-
-```
-handwritten      "사람이 썼다"        ⛔ LLM 이 썼다
-physics_seeded   "물리에서 나왔다"     ⛔ 표를 보고 네 판 고쳤다 (1.776 -> 1.192)
-★ human_guided   사람 지도 + 표 피드백 + LLM        (D-128)
-```
-
-**실제 이력** — 이름이 또 주장하지 않게 여기 적는다:
+## ★ The name was fixed **twice** — the name was making a claim
 
 ```
-누가 썼나     LLM (Claude Code 가 물리 문서를 읽고 한 번에)
-사람의 몫     방향 결정 + ★ 물리 오류 지적 **3회**. 코드는 안 썼다
-표의 몫       ★ 네 판 (1.776 -> 1.428 -> 1.221 -> 1.192). 아래 "물리" 절
-             ★ 그러므로 "표를 안 보고 만들었다" 가 **아니다**
+handwritten      "a human wrote it"     ⛔ an LLM wrote it
+physics_seeded   "it came from physics" ⛔ it was fixed four times against the
+                                          table (1.776 -> 1.192)
+★ human_guided   human guidance + table feedback + LLM        (D-128)
 ```
 
-진화 규칙(`evolved`)과의 차이는 **"누가" 가 아니라 "무엇에 얼마나
-맞췄는가"** 다 — 이쪽은 요약 통계 네 판, 저쪽은 학습 분할에 직접 적합.
+**The actual history** — written here so the name does not make a claim
+again:
 
-두 옛 이름 위에 몇 턴의 결론이 쌓였다. `docs/artifacts/conclusion.md` 참조.
+```
+who wrote it   the LLM (Claude Code read the physics documents and wrote it
+               in one go)
+the human's    deciding the direction + ★ pointing out physical errors
+share          **3 times**. It wrote no code
+the table's    ★ four versions (1.776 -> 1.428 -> 1.221 -> 1.192). See the
+share          "physics" section below
+               ★ so it is **not** "built without looking at the table"
+```
 
-**LLM 루프보다 먼저 만든다.** 이것이 regret 1.03 을 찍으면 LLM 이 다툴 여지가
-3% 뿐이고 그건 측정 노이즈와 비슷한 크기다 — 가장 싼 반증 실험이다.
+The difference from the evolved rule (`evolved`) is **not "who" but "what it
+was fitted to, and how hard"** — this one to four rounds of summary
+statistics, that one directly to the training split.
 
-규칙과 **동일한 제약**을 받는다. 같은 조건이어야 비교가 공정하다.
+Several turns of conclusions accumulated on top of the two old names. See
+`docs/artifacts/conclusion.md`.
 
-    `score(f, p, hw, w)` 시그니처
-    등록된 피처만
-    숫자 리터럴 + len(W0) <= 8
-    config 수준 피처로 분기 금지 (`f.*` 는 배열이다)
-    형상 크기 직접 비교 금지
+**It is built before the LLM loop.** If this reaches regret 1.03, the LLM has
+only 3% to fight over, which is about the size of the measurement noise — it
+is the cheapest disproof experiment.
 
-`rules/checks.py` 로 검사되며 테스트가 그 사실을 고정한다.
+It is under **the same constraints** as a rule. The comparison is only fair
+under the same conditions.
 
-## 물리 — 왜 이 다섯 항인가
+    the `score(f, p, hw, w)` signature
+    registered features only
+    numeric literals + len(W0) <= 8
+    no branching on a config-level feature (`f.*` is an array)
+    no direct comparison against a shape size
 
-kernelTab 의 손규칙이 네 판에 걸쳐 물리를 고쳤고 그 이력이 여기 반영돼 있다
-(`docs/baselines.md`). **상수를 튜닝한 것이 아니라 모델이 틀린 것을 고쳤다.**
+It is checked by `rules/checks.py`, and a test pins that fact.
 
-    1.776  tail_waste 최소화를 1순위로 -> 32x128 타일에 wave 48개짜리를 고름
-           ★ 정적 top-1 보다 나빴다
-    1.428  트래픽 항 추가. 그러나 타일이 항상 꽉 찬다고 가정 -> M=1 에서 2.9
-    1.221  트래픽을 ceil(M/tm)*ceil(N/tn)*(tm+tn) 로 정확히
-    1.192  SM 활용률 1/(1-tail_waste) 추가 (선형 항으로는 5.3배가 안 나온다)
+## The physics — why these five terms
 
-우리 피처 라이브러리의 검증이 같은 것을 독립적으로 재현했다:
+kernelTab's hand rule fixed its physics over four versions, and that history
+is reflected here (`docs/baselines.md`). **Constants were not tuned; a wrong
+model was fixed.**
 
-    tail_waste 단독 AUC = 0.176   <- 선언한 방향과 **반대**로 예측한다
+    1.776  minimising tail_waste came first -> it picked a 32x128 tile with
+           48 waves. ★ Worse than the static top-1
+    1.428  a traffic term added. But it assumed tiles are always full -> 2.9
+           at M=1
+    1.221  traffic computed exactly as ceil(M/tm)*ceil(N/tn)*(tm+tn)
+    1.192  SM utilisation 1/(1-tail_waste) added (a linear term cannot
+           produce 5.3x)
 
-`tail_waste` 를 그냥 최소화하면 작은 타일을 고르게 된다 (타일이 작을수록
-타일 수가 많아 wave 가 커지고 tail_waste 가 0 에 가까워진다). **타일 크기와
-교락돼 있어서** 트래픽 항과 **함께** 있어야 의미가 산다. 그래서 이 규칙은
-트래픽을 1순위로 두고 wave 는 보정으로 쓴다.
+The validation of our own feature library reproduced the same thing
+independently:
+
+    tail_waste standalone AUC = 0.176   <- it predicts **opposite** to the
+                                           declared direction
+
+Minimising `tail_waste` on its own selects small tiles (the smaller the tile,
+the more tiles, so waves grows and tail_waste approaches 0). **It is
+confounded with tile size**, so it only means something **together with** a
+traffic term. That is why this rule puts traffic first and uses waves as a
+correction.
 """
 
 from __future__ import annotations
@@ -62,7 +77,8 @@ import numpy as np
 
 __all__ = ["CODE", "W0", "score"]
 
-#: LLM 이 제시하는 것과 같은 초기값. 수치 최적화기가 맞춘다 (§29).
+#: The same kind of initial values an LLM proposes. The numerical optimiser
+#: fits them (§29).
 W0 = [1.0, 0.5, 0.4, 3.0, 0.3, 0.4, 0.5]
 
 CODE = '''
@@ -80,52 +96,58 @@ def score(f, p, hw, w):
 
 
 # ---------------------------------------------------------------------------
-# ★ 형상 수준 분기는 **config 수준 항을 재가중해야** 의미가 있다
+# ★ A shape-level branch only means something if it **reweights a
+# config-level term**
 # ---------------------------------------------------------------------------
-# 처음에 이렇게 썼다가 틀렸다:
+# It was first written like this, and that was wrong:
 #
 #     if p.is_memory_bound:
-#         s = s * w[2]          # ⛔ 순위가 **하나도 안 바뀐다**
+#         s = s * w[2]          # ⛔ the ranking **does not change at all**
 #
-# 점수 전체에 형상 수준 스칼라를 곱하거나 더하는 것은 그 형상 안의 순위를
-# 바꾸지 못한다 (단조 변환이다). 규칙은 형상마다 독립적으로 정렬되므로
-# 형상 상수는 소거된다.
+# Multiplying or adding a shape-level scalar into the whole score cannot
+# change the ranking within that shape (it is a monotone transform). A rule
+# is sorted independently per shape, so a shape constant cancels out.
 #
-# 형상 수준 분기가 하는 일은 **config 수준 항들의 상대 가중치를 바꾸는 것**
-# 이어야 한다. 위 코드에서 메모리 바운드일 때 트래픽 항의 가중치가
-# `w[0]` 에서 `w[0]+w[6]` 이 되는 것이 그것이다.
+# What a shape-level branch has to do is **change the relative weights of
+# the config-level terms**. In the code above, that is the traffic term's
+# weight going from `w[0]` to `w[0]+w[6]` when memory-bound.
 #
-# 이것은 정적 검사로는 못 잡는다 (문법적으로 합법이다). 채점기가 "형상 수준
-# 분기가 순위를 바꾸는가" 를 볼 수 있으므로 §12 진단 리포트에 넣을 항목이다.
+# The static checks cannot catch this (it is syntactically legal). The
+# scorer can see "does a shape-level branch change the ranking", so it
+# belongs in the §12 diagnostic report.
 
 
 def score(f, p, hw, w) -> np.ndarray:
-    """낮을수록 좋다. 전 항이 무차원이다 (§8.1 — 전이 전제).
+    """Lower is better. Every term is dimensionless (§8.1 — the transfer
+    premise).
 
-    항의 순서가 물리적 우선순위다.
+    The order of the terms is the physical priority.
 
-    1. `log2(traffic_amplification)` — 실제 A/B DRAM 트래픽 / 이론 최소치의
-       **로그**. 주항이다. 타일이 클수록 재사용이 커져 트래픽이 준다.
-       M=1 이면 `gm=1` 이라 tile_m 을 키워도 타일 수가 안 줄고 `(tm+tn)` 만
-       늘어 자동으로 벌점이 된다 — decode 형상을 따로 다룰 필요가 없다.
+    1. `log2(traffic_amplification)` — the **log** of actual A/B DRAM
+       traffic / the theoretical minimum. The main term. A larger tile means
+       more reuse, so traffic falls. At M=1, `gm=1`, so raising tile_m does
+       not reduce the tile count and only `(tm+tn)` grows, which becomes a
+       penalty automatically — decode shapes need no special handling.
 
-       ★ **로그를 쓰는 것이 핵심이다.** 선형으로 쓰면 이 항이 폭주해서
-       256x256 처럼 트래픽은 최소지만 **스필하는** 타일을 고른다. 실측에서
-       256x256 의 rel 중앙값은 17.9 로 가장 나쁘다. 트래픽 이득은 타일이
-       커질수록 포화하므로 로그가 물리적으로도 맞다.
-    2. `sm_idle_cost` — wave 양자화의 **비선형** 형태. 512³ 에 128x128 을
-       쓰면 타일 16개로 84 SM 중 16개만 돌아 5.3배 손해인데, 선형
-       `tail_waste=0.81` 로는 그 크기가 안 나온다.
-    3. `smem_pressure` — smem 을 꽉 채우면 SM 당 상주 블록이 줄어든다.
-    4. `has_spill` — 스필 커널은 이 표에서 최적으로 뽑힌 적이 0회다
-       (rel 중앙 13.6). 이진 벌점으로 충분하다.
-    5. `split_k_cost` — 파티션마다 D 를 왕복하는 비용.
-    6. `pipeline_warmup_frac` — mainloop 이 짧은데 파이프라인이 깊으면
-       채우는 비용을 못 갚는다.
+       ★ **Taking the log is the crux.** Used linearly this term runs away
+       and picks tiles that minimise traffic but **spill**, such as
+       256x256. In measurement, 256x256's rel median of 17.9 is the worst.
+       The traffic gain saturates as the tile grows, so the log is also
+       physically right.
+    2. `sm_idle_cost` — the **non-linear** form of wave quantisation. Using
+       128x128 on 512³ gives 16 tiles, so only 16 of 84 SMs run and the loss
+       is 5.3x, which a linear `tail_waste=0.81` cannot produce.
+    3. `smem_pressure` — filling smem reduces the resident blocks per SM.
+    4. `has_spill` — a spilling kernel was picked as optimal 0 times in this
+       table (rel median 13.6). A binary penalty is enough.
+    5. `split_k_cost` — the cost of round-tripping D per partition.
+    6. `pipeline_warmup_frac` — a deep pipeline on a short mainloop cannot
+       pay back the cost of filling it.
 
-    메모리 바운드 형상에서는 **트래픽 항의 가중치를 올린다.** 대역폭 바닥에
-    닿았으면 연산 효율보다 바이트가 지배하기 때문이다. "M 이 4096 이면" 이
-    아니라 "대역폭 바닥에 닿았으면" 이므로 일반화된다.
+    On memory-bound shapes it **raises the weight of the traffic term.**
+    Once at the bandwidth floor, bytes dominate over compute efficiency. It
+    generalises because it says "once at the bandwidth floor", not "when M
+    is 4096".
     """
     s = np.log2(f.traffic_amplification) * w[0]
     s = s + f.sm_idle_cost * w[1]

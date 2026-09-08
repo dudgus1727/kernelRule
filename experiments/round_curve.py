@@ -1,30 +1,33 @@
-"""★ 라운드별 **최종 채점** 곡선 — "몇 라운드가 필요한가" 를 데이터로. LLM 0회.
+"""★ The per-round **final scoring** curve — "how many rounds are needed"
+from the data. 0 LLM calls.
 
-    python3 experiments/round_curve.py                      # 새 실행 + 옛 실행
+    python3 experiments/round_curve.py                # new runs + old runs
     python3 experiments/round_curve.py --group F3rw-p8
 
-## 왜
+## Why
 
-`12` 도 `patience 3` 도 근거 없이 정한 값이었다. 그리고 루프 내부
-점수(`best_val_regret`)로 멈추면 **최종 채점이 아직 오르고 있는데**
-멈춘다 (D-131 — 그렇게 +0.0187 을 잃었다).
+Both `12` and `patience 3` were values set without a ground. And stopping on
+the loop's internal score (`best_val_regret`) stops **while the final scoring
+is still rising** (D-131 — that is how +0.0187 was lost).
 
-**그래서 최종 채점 자체의 곡선을 낸다.**
-
-```
-각 라운드 r 까지의 아카이브에서 **학습 점수 최고**를 고르고
--> 체제별로 학습 분할에 재적합 -> 홀드아웃 20형상에서 채점
-= 그 라운드에서 멈췄다면 보고했을 값
-```
-
-## 판정 — 실험 계획서에 미리 박았다 (D-132 §2)
+**So the curve of the final scoring itself is produced.**
 
 ```
-rN 부터 σ(0.0113) 안에서 평평   ★ N 이 필요한 라운드다
-상한까지 계속 오른다            ★ 상한도 부족하다 — 그 사실을 적는다
+from the archive up to each round r, take **the training-score best**
+-> refit per regime on the training split -> score on the 20 holdout shapes
+= the value that would have been reported if it had stopped at that round
 ```
 
-★ LLM 0회. 시드마다 라운드 수만큼 재적합하므로 몇십 분 걸린다.
+## The verdict — nailed down in advance in the pre-registration (D-132 §2)
+
+```
+flat within σ(0.0113) from rN on   ★ N is the number of rounds needed
+it keeps rising to the cap         ★ the cap is not enough either — that
+                                     fact is written down
+```
+
+★ 0 LLM calls. It refits once per round per seed, so it takes tens of
+minutes.
 """
 
 from __future__ import annotations
@@ -44,16 +47,22 @@ from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
-#: (묶음 이름, 실행 접두, 시드 수, 설명)
+#: (group name, run prefix, number of seeds, note)
 GROUPS = [
-    ("F3rw-p8", "F3rw-p8", 6, "새 — 조기 종료 끔, 라운드 24 (D-132)"),
-    ("F3rw-p8-old", "F3rw-p8-old", 6, "옛 — 라운드 12, patience 10"),
-    # ★ D-131 이 프롬프트 효과를 잰 캠페인 (patience 3 으로 r4~r6 에서 멈췄다)
-    ("F3rw-p8-p3", "F3rw-p8-p3", 6, "새 — patience 3, r4~r6 에서 종료"),
-    # ★ D-136 이후의 대표값 재측정 — __import__ 수정만 F3rw-p8 과 다르다
-    ("F3rw-p8-nan", "F3rw-p8-nan", 6, "새 — __import__ 수정, 라운드 24"),
+    ("F3rw-p8", "F3rw-p8", 6,
+     "new — early stopping off, 24 rounds (D-132)"),
+    ("F3rw-p8-old", "F3rw-p8-old", 6, "old — 12 rounds, patience 10"),
+    # ★ The campaign D-131 measured the prompt effect on (it stopped at
+    #   r4~r6 with patience 3)
+    ("F3rw-p8-p3", "F3rw-p8-p3", 6,
+     "new — patience 3, ended at r4~r6"),
+    # ★ The representative re-measurement after D-136 — only the __import__
+    #   fix differs from F3rw-p8
+    ("F3rw-p8-nan", "F3rw-p8-nan", 6,
+     "new — the __import__ fix, 24 rounds"),
 ]
-#: 평평함 판정에 쓰는 시드 폭. **여기서 새로 정하지 않는다** (원칙 7).
+#: The seed spread used to judge flatness. **It is not set anew here**
+#: (principle 7).
 SIGMA = 0.0113
 
 
@@ -64,16 +73,17 @@ def _rows(run: str, name: str) -> list[dict]:
 
 
 def _series(run: str) -> tuple[list[dict], str]:
-    """라운드마다 '그때의 최고'. **출처를 함께 돌려준다.**
+    """The 'best at the time' per round. **It returns the source alongside.**
 
-    ★ `bests.jsonl` 이 정답이다 — 라운드마다 한 줄, 그 라운드의 최고를
-    코드·가중치까지 적는다.
+    ★ `bests.jsonl` is the right answer — one line per round, recording that
+    round's best down to the code and the weights.
 
-    ⚠️ `archive.jsonl` 은 **마지막 아카이브 상태**다 (`loop.py:1351`,
-    `archive.dump`). 거기서 "round <= r 인 것 중 최고" 를 고르면 **끝까지
-    살아남은 것만** 보게 된다 — 중간에 밀려난 elite 가 빠지므로 앞 라운드가
-    실제보다 나쁘게(또는 비어서 nan 으로) 나온다. **마지막 라운드에서만
-    정확하다.** `bests.jsonl` 이 없는 옛 실행에만 쓴다 (D-139).
+    ⚠️ `archive.jsonl` is **the final archive state** (`loop.py:1351`,
+    `archive.dump`). Picking "the best among those with round <= r" there
+    shows **only what survived to the end** — an elite pushed out along the
+    way is missing, so an earlier round comes out worse than it really was
+    (or empty, as a nan). **It is accurate only at the last round.** It is
+    used only for old runs that have no `bests.jsonl` (D-139).
     """
     bs = _rows(run, "bests.jsonl")
     if bs:
@@ -89,7 +99,8 @@ def _series(run: str) -> tuple[list[dict], str]:
 
 
 def _curve(run: str, T, M, sp) -> tuple[list[float], str]:
-    """라운드마다 '그때 멈췄다면 보고했을 값'."""
+    """The 'value that would have been reported if it had stopped there' per
+    round."""
     series, src = _series(run)
     out, prev_code = [], None
     for b in series:
@@ -97,7 +108,7 @@ def _curve(run: str, T, M, sp) -> tuple[list[float], str]:
             out.append(float("nan"))
             continue
         key = (b["code"], tuple(b["w"]))
-        if key == prev_code:            # ★ 최고가 안 바뀌면 다시 안 잰다
+        if key == prev_code:      # ★ if the best did not change, no remeasure
             out.append(out[-1])
             continue
         prev_code = key
@@ -128,7 +139,7 @@ def main() -> None:
         for i in range(n):
             run = f"{prefix}-s{i}"
             if not (Path("runs") / run / "archive.jsonl").exists():
-                print(f"  ⚠️ 없는 실행: {run}")
+                print(f"  ⚠️ missing run: {run}")
                 continue
             c, src = _curve(run, T, M, sp)
             srcs.add(src)
@@ -140,19 +151,22 @@ def main() -> None:
         L = max(len(c) for c in curves.values())
         med = [st.median([c[min(r, len(c) - 1)] for c in curves.values()])
                for r in range(L)]
-        print(f"\n  {'중앙':18s} " + " ".join(f"{x:.4f}" for x in med))
-        # ★ 평평해지는 지점 — 여기부터 끝까지 σ 안이다
+        print(f"\n  {'median':18s} " + " ".join(f"{x:.4f}" for x in med))
+        # ★ Where it flattens — from here to the end it is within σ
         final = med[-1]
         flat = next((r for r in range(L)
                      if all(abs(med[k] - final) < SIGMA for k in range(r, L))),
                     None)
-        print(f"  ★ 끝값에서 σ({SIGMA}) 안으로 들어오는 라운드: "
-              + (f"r{flat}" if flat is not None else "없음"))
-        print(f"  ★ 마지막 라운드까지의 개선 (r0 -> 끝): "
+        print(f"  ★ the round from which it stays within σ({SIGMA}) of the "
+              f"final value: "
+              + (f"r{flat}" if flat is not None else "none"))
+        print(f"  ★ the improvement up to the last round (r0 -> end): "
               f"{med[0] - final:+.4f}   "
-              f"마지막 4라운드 개선: {med[max(0, L - 5)] - final:+.4f}")
-        print(f"  ★ 출처: {sorted(srcs)}"
-              + ("   ⚠️ archive-snapshot 은 **마지막 라운드에서만 정확하다**"
+              f"the last 4 rounds' improvement: "
+              f"{med[max(0, L - 5)] - final:+.4f}")
+        print(f"  ★ source: {sorted(srcs)}"
+              + ("   ⚠️ archive-snapshot is **accurate only at the last "
+                 "round**"
                  if "archive-snapshot" in srcs else ""))
         out["groups"][name] = {"curves": curves, "median": med,
                                "source": sorted(srcs),
@@ -161,7 +175,8 @@ def main() -> None:
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1,
                                       default=float))
     print(f"\n  -> {a.out}")
-    print("  ★ 판정은 실험 계획서(D-132 §2)의 두 갈래로만 한다")
+    print("  ★ the verdict is made only by the two branches of the "
+          "pre-registration (D-132 §2)")
 
 
 if __name__ == "__main__":

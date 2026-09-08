@@ -1,46 +1,54 @@
-"""★ F0~F3 파이프라인 — 피처부터 규칙까지 LLM 이 만든다 (§30.9).
+"""★ The F0~F3 pipeline — the LLM builds everything from features to rules
+(§30.9).
 
     python3 experiments/f1_pipeline.py F1 --dry-run
     python3 experiments/f1_pipeline.py F1 --n-features 20 --n-seeds 3
-    python3 experiments/f1_pipeline.py F1 --stage 2      # 1단계 산출물 재사용
+    python3 experiments/f1_pipeline.py F1 --stage 2   # reuse stage-1 output
 
-## 왜 필요한가
+## Why it is needed
 
-지금까지의 모든 진화 실행은 **사람이 만든 재료를 조합**한 것이었다.
+Every evolution run so far **combined material a human made**.
 
-    피처   `features/physical.py` 의 24개   <- 사람이 물리 문서를 보고 씀
-    씨앗   `rules/human_guided.py`        <- 사람이 씀. 그 24개 중 6개를 씀
-    루프   24개 중 8개 고르기
+    features  the 24 in `features/physical.py`  <- written by a human from
+                                                   the physics documents
+    seed      `rules/human_guided.py`           <- written by a human. It
+                                                   uses 6 of those 24
+    loop      picking 8 of the 24
 
-`experiments/feature_writer.py` 로 "LLM 이 피처를 만들 수 있다" 는 확인했다.
-그러나 그 피처들은 **사람 24개에 더해진 상태**로만 시험됐다. 아직 안 해 본
-것이 근본 질문의 완성형이다.
+`experiments/feature_writer.py` confirmed "the LLM can build features". But
+those features were only ever tested **on top of the human 24**. What has not
+been done yet is the complete form of the fundamental question.
 
-    "F1 피처만으로 규칙을 만들 수 있는가"
+    "can a rule be built from F1 features alone"
 
-## 세 단계
+## Three stages
 
-    1  FeatureWriter   원시 값만 -> 피처 N개            -> stage1-features/
-    2  RuleWriter       1단계 피처 목록만 -> 씨앗 규칙   -> stage2-rule-writer/
-    3  RoundLoop       1단계 레지스트리 + 2단계 씨앗    -> stage3-evolution/
+    1  FeatureWriter  raw values only -> N features   -> stage1-features/
+    2  RuleWriter     the stage-1 feature list only -> a seed rule
+                                                      -> stage2-rule-writer/
+    3  RoundLoop      the stage-1 registry + the stage-2 seed
+                                                      -> stage3-evolution/
 
-**F1/F0 에서는 사람이 만든 24개가 세 단계 어디에도 안 들어간다.** 그것을
-보장하는 것이 `features/__init__.py` 의 "레지스트리 기본값 없음" 이고,
-`tests/test_features.py` 의 AST 검사가 그것을 고정한다.
+**Under F1/F0 the 24 a human made enter none of the three stages.** What
+guarantees that is "no registry default" in `features/__init__.py`, and the
+AST check in `tests/test_features.py` pins it.
 
-## 조건
+## The conditions
 
-    F3  REGISTRY(사람 24개) + 씨앗            = 지금까지의 모든 실행
-    F2  ★ 공개 지식 5개 + FeatureWriter 로 확장  (개명 전 F1-K, D-128)
-    F1  0개에서 시작 -> FeatureWriter -> RuleWriter 씨앗   ★ 근본 질문
+    F3  REGISTRY (the human 24) + a seed        = every run so far
+    F2  ★ the 5 public facts + extension by FeatureWriter
+        (F1-K before the rename, D-128)
+    F1  start from 0 -> FeatureWriter -> a RuleWriter seed  ★ the fundamental
+                                                              question
 
-**0 -> 5 -> 24 사다리다.** 셋 다 돌았다.
+**It is a 0 -> 5 -> 24 ladder.** All three have been run.
 
-★ 옛 이름 `F0`(피처 없음)과 옛 `F2`(원시 물리량 5개)는 **삭제했다** —
-둘 다 실행이 0회다. 옛 `F1-K` 가 지금의 `F2` 다 (D-128).
+★ The old name `F0` (no features) and the old `F2` (5 raw physical
+quantities) were **deleted** — both have 0 runs. The old
+`F1-K` is today's `F2` (D-128).
 
-F3 도 **이 경로로** 돌아야 한다. 다른 스크립트로 돌리면 경로 차이가
-결과에 섞인다 (§26.2).
+F3 must run **through this path** too. Running it through another script
+mixes path differences into the result (§26.2).
 """
 
 from __future__ import annotations
@@ -51,7 +59,7 @@ import signal
 import time
 from pathlib import Path
 
-import kernelrule.features.physical  # noqa: F401  — REGISTRY 를 채운다
+import kernelrule.features.physical  # noqa: F401  — it fills REGISTRY
 from kernelrule.agents.mock import MockLLM
 from kernelrule.agents.openai_client import DEFAULT_MODEL, Budget, LLMConfig
 from kernelrule.core.loop import LoopConfig, RoundLoop
@@ -68,16 +76,23 @@ from kernelrule.features.validate import alt_hw
 from kernelrule.report.table_facts import TableFacts
 from kernelrule.rules.checks import fitter_for
 
-#: 기본 표. ★ `--bundle` / `--env-hash` 로 바꾼다 — 5090 전이부터
-#: 하드코딩이면 안 된다. **실행마다 config.json 에 기록된다.**
+#: The default table. ★ Changed with `--bundle` / `--env-hash` — from the
+#: 5090 transfer on it must not be hardcoded. **It is recorded in
+#: config.json per run.**
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 BUNDLE_HASH = "c63710df"
 OUT = Path("runs")
 
-#: ★ F2 실험 계획서. `docs/artifacts/f2-preregistration.md` 와 **같은
-#: 내용**이고 `tests/test_f2_prereg.py` 가 달라지지 않는지 검사한다.
-#: **LLM 을 한 번도 안 부른 상태에서 박았다** — 실행 직전에 쓰면 배관을
-#: 만들며 생긴 감이 기준에 스며든다 (D-50).
+#: ★ The F2 pre-registration. It is **the same content** as
+#: `docs/artifacts/f2-preregistration.md`, and `tests/test_f2_prereg.py`
+#: checks that they do not diverge.
+#: **It was nailed down without calling the LLM even once** — written just
+#: before a run, the feel picked up while building the plumbing seeps into
+#: the criteria (D-50).
+#:
+#: ⚠️ 2026-09-08 (D-146): **the values stay in Korean.** They are a frozen
+#: record mirroring a `docs/` document, and `docs/` is not translated —
+#: translating here would break the doc-code equality the test enforces.
 F2_PREREG = {
     "purpose": ("알려진 축을 주면 새 축을 더 만드나. 그리고 라이브러리가 "
                 "좋아지나"),
@@ -87,9 +102,10 @@ F2_PREREG = {
     "start_library": 5,
     "areas": 7,
     "per_category": 3,
-    # ⚠️ 이 키는 **동결된 기록**이다. D-93 에서 역할 이름을 바꿨지만
-    #   실험 계획서는 그때의 이름으로 쓰였다 — 고치면 기록을 다시 쓰는 것이다
-    #   (문서 규칙 2). 살아 있는 이름은 `--n-rule-writer` 다.
+    # ⚠️ This key is a **frozen record**. D-93 renamed the roles, but the
+    #   pre-registration was written under the name of that time — changing
+    #   it would be rewriting the record (documentation rule 2). The live
+    #   name is `--n-rule-writer`.
     "n_architect": 10,
     "n_seeds": 6,
     "rounds": 12,
@@ -123,33 +139,36 @@ F2_PREREG = {
                             "가 정직한 서술이다"),
 }
 
-#: LLM 이 나눌 영역 수의 범위. **사람이 영역을 정하지 않는다** — 정하면
-#: 사전 지식을 건네는 것이다. 개수 범위만 준다 (§30.10).
+#: The range for how many areas the LLM partitions into. **A human does not
+#: decide the areas** — deciding them hands over prior knowledge. Only the
+#: count range is given (§30.10).
 CAT_MIN, CAT_MAX = 5, 8
 
-#: 한 영역에서 이만큼 연속 거부되면 그 영역을 건너뛴다.
-#: "이 영역은 원시 값으로 표현하기 어렵다" 가 기록으로 남는다.
+#: After this many consecutive refusals in one area, that area is skipped.
+#: "this area is hard to express from raw values" stays in the record.
 CAT_GIVE_UP = 3
 
 
 def _plan(cats: list[dict], n_features: int, per_cat: int) -> list[str | None]:
-    """무엇을 몇 번 만들지. ★ 개수를 **영역 수에서 유도**한다 (§30.10).
+    """What to build and how many times. ★ The count is **derived from the
+    number of areas** (§30.10).
 
-    전에는 20 고정이었다. 임의적이라 채우려고 억지 피처가 나온다.
-    영역이 6개면 `6 x per_cat` 이고, 영역이 없으면(자유 생성) 옛 방식대로
-    `n_features` 회다.
+    It used to be fixed at 20. That is arbitrary, and forced features appear
+    just to fill it. With 6 areas it is `6 x per_cat`, and with no areas
+    (free generation) it is `n_features` times, as before.
     """
     if not cats:
         return [None] * n_features
     plan: list[str | None] = []
-    for _ in range(per_cat):                # 라운드 로빈 — 한 영역에 몰리지 않게
+    for _ in range(per_cat):   # round robin — so one area does not pile up
         plan.extend(c["name"] for c in cats)
     return plan
 
 
 def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
           gen: FeatureRegistry, base: FeatureRegistry) -> str:
-    """이번 제안의 지시. 영역이 있으면 그 영역 안에서 만들게 한다."""
+    """The instruction for this proposal. With an area, it builds within
+    that area."""
     if cat is None:
         made = sorted(set(gen._items) - set(base._items))
         tail = (f"\n\nBuilt so far: {made}. Find an axis different from "
@@ -167,13 +186,15 @@ def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
             "nothing to build\nwhen that area's turn comes.")
 
 
-#: RuleWriter 산출물이 정적 검사에 걸릴 때 몇 번까지 다시 부를까.
-#: ★ 전부 실패하면 **에러다** — 씨앗 없이 조용히 진행하지 않는다 (§26.4).
+#: How many times to call again when a RuleWriter output is caught by the
+#: static checks.
+#: ★ If all of them fail it is an **error** — it does not silently proceed
+#: without a seed (§26.4).
 ARCH_RETRIES = 3
 
 
 # ---------------------------------------------------------------------------
-# 공통
+# Shared
 # ---------------------------------------------------------------------------
 
 
@@ -188,18 +209,22 @@ def _aligned_shapes(table: PerfTable) -> list:
 
 def _splits(table: PerfTable, *, fold: int | None = None,
             split_seed: int = 12345, k: int = 3) -> SplitSet:
-    """분할. 기본은 **구조 분할**(11008 레이어를 통째로 홀드아웃, §10.1).
+    """The split. The default is the **structural split** (the 11008 layer
+    held out whole, §10.1).
 
-    ★ `fold` 를 주면 **층별 무작위 k-fold** 다 (D-144). 두 분할이 묻는 것이
-    다르다:
+    ★ With `fold` it is a **stratified random k-fold** (D-144). The two
+    splits ask different things:
 
     ```
-    k-fold   "분할을 바꿔도 결과가 같은가"     — 무작위라 M·N·K 가 양쪽에 섞인다
-    11008    "본 적 없는 차원값에서도 되는가"  — 한 값을 통째로 뺀다
+    k-fold   "does the result hold when the split changes"  — random, so
+             M·N·K are mixed across both sides
+    11008    "does it work on a dimension value never seen" — one value is
+             removed whole
     ```
 
-    ⚠️ `split_seed` 는 **fold 를 만드는 난수**다. 루프의 진화 시드와
-    분리해야 "분할이 달라서" 와 "진화가 달라서" 를 가를 수 있다.
+    ⚠️ `split_seed` is **the randomness that builds the folds**. Separating
+    it from the loop's evolution seed is what lets "because the split
+    differed" be told from "because the evolution differed".
     """
     shapes = _aligned_shapes(table)
     if fold is not None:
@@ -217,16 +242,19 @@ def _splits(table: PerfTable, *, fold: int | None = None,
 
 
 def _base_registry(condition: str) -> FeatureRegistry:
-    """조건이 정하는 **출발 레지스트리**. `F1` 은 비어 있다.
+    """The **starting registry** the condition decides. `F1` is empty.
 
-    ★ 조건은 셋이다 (D-128). 0 -> 5 -> 24 사다리이고 alias 를 두지 않는다.
+    ★ There are three conditions (D-128). A 0 -> 5 -> 24 ladder, with no
+    aliases.
     """
     if condition == "F1":
         return FeatureRegistry("F1-empty")
     if condition == "F2":
-        # ★ 공개 지식 다섯 (§30.17). `physical.py` 의 원본이 아니라
-        #   **표 관측을 뺀 정리본**이다 — 원본 docstring 에는 "이 표에서
-        #   스필 커널은 최적 0회" 같은 측정 결과가 있다 (§12.3).
+        # ★ The five public facts (§30.17). Not `physical.py`'s originals
+        #   but the **cleaned-up version with the table observations
+        #   removed** — the original docstrings carry measurement results
+        #   such as "in this table a spilling kernel was optimal 0 times"
+        #   (§12.3).
         from kernelrule.features.known5 import KNOWN5
         r = FeatureRegistry("F2-known5")
         for n in sorted(KNOWN5._items):
@@ -237,17 +265,18 @@ def _base_registry(condition: str) -> FeatureRegistry:
         for n in sorted(REGISTRY._items):
             r.add(REGISTRY[n])
         return r
-    raise ValueError(f"알 수 없는 조건: {condition!r}. F1/F2/F3")
+    raise ValueError(f"unknown condition: {condition!r}. F1/F2/F3")
 
 
 def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
               table=None):
-    """★ `registry` 는 필수다 — 어느 피처 목록이 프롬프트에 들어가는지가
-    실험 조건 자체다 (§30.9). MockLLM 도 같은 목록을 받는다.
+    """★ `registry` is mandatory — which feature list goes into the prompt
+    is the experimental condition itself (§30.9). MockLLM receives the same
+    list.
 
-    ★ `table` 은 **하드웨어 사실을 어느 번들에서 만들지**를 정한다
-    (D-113). 안 넘기면 RuleWriter 를 부를 때 실패한다 — 기본값으로
-    떨어지면 다른 GPU 의 사실이 조용히 간다.
+    ★ `table` decides **which bundle the hardware facts are built from**
+    (D-113). Without it, calling RuleWriter fails — falling back to a
+    default silently sends another GPU's facts.
     """
     hw_text = None
     if table is not None:
@@ -257,7 +286,8 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
         )
         hw_text, _facts = hw_prompt_from_bundle(
             a.bundle, env_hash=getattr(a, "env_hash", None), table=table)
-        # ★ 만든 것과 이 표가 같은 하드웨어인가. 되돌려서 확인한다.
+        # ★ Is what was built the same hardware as this table? Verified in
+        #   reverse.
         check_hw_prompt(hw_text, table.hw, float(table.noise.tick_ms))
     names = sorted(n for n in registry._items if not registry[n].shape_level)
     svals = sorted(n for n in registry._items if registry[n].shape_level)
@@ -265,9 +295,10 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
         return MockLLM("mutate", seed=a.seed, feature_names=names,
                        shape_values=svals)
     from kernelrule.agents.openai_client import OpenAILLM
-    # ★ 목적함수를 프롬프트까지 넘긴다 (D-101). 안 넘기면 채택 기준과
-    #   모델이 듣는 말이 달라진다. ★ D-128 이후 진화는 regret 뿐이다 —
-    #   순위 손실은 지표로만 남는다 (D-118·D-121).
+    # ★ The objective is passed all the way to the prompt (D-101). Without
+    #   it the acceptance criterion and what the model is told diverge.
+    #   ★ Since D-128 evolution is regret only — the rank loss stays as a
+    #   metric (D-118 · D-121).
     return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
                                objective="regret",
                                parameters=getattr(a, "parameters", None),
@@ -286,22 +317,23 @@ def _dump_json(path: Path, obj) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 1단계 — FeatureWriter
+# Stage 1 — FeatureWriter
 # ---------------------------------------------------------------------------
 def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
-    """피처를 만든다. ★ 제안마다 즉시 append 한다 (D-33).
+    """Builds features. ★ Each proposal is appended immediately (D-33).
 
-    **영역을 먼저 나눈다** (§30.10). 전에는 `range(20)` 을 돌며 "지금까지
-    만든 것과 다른 축" 이라고만 지시했는데, 방향이 없어서 처음 몇 개가
-    앉은 자리 근처에서 맴돌았다 — luna 17개 중 `split_k_*` 가 3개,
-    `cta_*` 가 5개였다. 그리고 20 이라는 수가 임의적이라 채우려고 억지
-    피처가 나온다.
+    **The areas are partitioned first** (§30.10). It used to loop over
+    `range(20)` instructing only "an axis different from what you have built
+    so far", and with no direction the first few circled near where they
+    landed — of luna's 17, 3 were `split_k_*` and 5 were `cta_*`. And the
+    number 20 is arbitrary, so forced features appear just to fill it.
 
-        1  영역 나누기 (LLM 1회)      -> categories.json
-        2  영역별 생성 (영역당 N회)    -> 개수가 영역 수에서 유도된다
+        1  partition the areas (1 LLM call)  -> categories.json
+        2  generate per area (N per area)    -> the count is derived from
+                                                the number of areas
 
-    영역을 **사람이 주지 않는다** — 그것은 사전 지식을 건네는 것이다.
-    LLM 이 어떻게 나누는지 자체가 관찰 대상이다.
+    **A human does not give the areas** — that would hand over prior
+    knowledge. How the LLM partitions is itself an object of observation.
     """
     out = d / "stage1-features"
     out.mkdir(parents=True, exist_ok=True)
@@ -309,27 +341,29 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
     log.write_text("")
 
     gen = FeatureRegistry(f"{a.condition}-generated")
-    for n in sorted(base._items):          # F2/F3 는 기초 위에 쌓는다
+    for n in sorted(base._items):     # F2/F3 build on top of the base
         gen.add(base[n])
 
-    # ★ 기존 라이브러리를 **확장**한다 (D-63 후속). 앞선 실행의 채택분을
-    #   레지스트리에 먼저 넣어야 (1) 중복 판정이 그것들과도 이뤄지고
-    #   (2) 산출물이 합집합이 된다. 앞선 제안 이력을 그대로 앞에 복사하므로
-    #   `load_generated` 가 읽는 형식이 유지된다.
+    # ★ It **extends** an existing library (the D-63 follow-up). The
+    #   accepted features of the earlier run must go into the registry first
+    #   so that (1) the duplication verdict is made against them too and
+    #   (2) the artefact is the union. The earlier proposal history is
+    #   copied in front as it is, so the format `load_generated` reads is
+    #   preserved.
     prior_lines: list[str] = []
     if a.extend_from:
         src = Path(a.extend_from) / "proposals.jsonl"
         if not src.exists():
-            raise SystemExit(f"{src} 가 없다.")
+            raise SystemExit(f"{src} does not exist.")
         from kernelrule.features.loader import load_generated
         for f in load_generated(src, exclude=set(base._items), table=table):
             gen.add(f)
         prior_lines = [ln for ln in src.read_text().splitlines() if ln.strip()]
-        print(f"  ★ {src} 에서 {len(gen._items) - len(base._items)}개를 "
-              f"이어받았다 — 산출물은 **합집합**이다\n")
+        print(f"  ★ carried over {len(gen._items) - len(base._items)} from "
+              f"{src} — the artefact is the **union**\n")
     n_base = len(gen._items)
     n_prior = n_base - len(base._items)
-    if prior_lines:                       # 이어받은 이력을 앞에 둔다
+    if prior_lines:               # the carried-over history goes in front
         log.write_text("\n".join(prior_lines) + "\n")
 
     llm = _make_llm(a, registry=gen, budget=Budget(max_calls=a.n_features * 4),
@@ -338,24 +372,25 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
     rejects: dict[str, int] = {}
     t0 = time.perf_counter()
 
-    # -- 1. 영역 나누기 ---------------------------------------------------
+    # -- 1. partition the areas -------------------------------------------
     cats: list[dict] = []
     cat_notes = ""
     if (a.categorize or a.categorize_only) and not a.recategorize:
-        # ★ 고정 목록 (§30.18). LLM 호출 0회.
+        # ★ The fixed list (§30.18). 0 LLM calls.
         from kernelrule.agents.openai_client import load_prompt
 
         block = load_prompt("areas.md")
         body = block[block.index("```") + 3:block.rindex("```")]
-        # `이름 | 설명` 으로 나눈다. 공백으로 자르면 "연산 처리량" 이
-        # "연산" 에서 끊긴다.
+        # Split on `name | description`. Splitting on whitespace would cut
+        # "compute throughput" at "compute".
         cats = [{"name": ln.split("|", 1)[0].strip(),
                  "description": ln.split("|", 1)[1].strip()}
                 for ln in body.splitlines() if "|" in ln]
-        cat_notes = "고정 목록 (prompts/areas.md). --recategorize 로 다시 뽑는다"
+        cat_notes = ("the fixed list (prompts/areas.md). --recategorize "
+                     "draws it again")
         _dump_json(out / "categories.json",
                    {"categories": cats, "notes": cat_notes, "source": "fixed"})
-        print(f"  ★ 고정 영역 {len(cats)}개 (LLM 0회):")
+        print(f"  ★ {len(cats)} fixed areas (0 LLM calls):")
         for c in cats:
             print(f"     {c['name']:16s} {c['description'][:56]}")
         print()
@@ -367,29 +402,31 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
             cats = [dict(c) for c in res["categories"]]
             cat_notes = res.get("notes", "")
         except Exception as e:                              # noqa: BLE001
-            # ★ 조용히 자유 생성으로 떨어지지 않는다 — 조건이 바뀐다 (§26.4)
+            # ★ It does not silently fall back to free generation — that
+            #   changes the condition (§26.4)
             raise RuntimeError(
-                f"영역 나누기가 실패했다: {type(e).__name__}: {e}. "
-                "자유 생성으로 조용히 떨어지지 않는다 — 그것은 다른 "
-                "조건(F1-free)이다. `--no-categorize` 로 명시하라.") from e
+                f"partitioning the areas failed: {type(e).__name__}: {e}. "
+                f"It does not silently fall back to free generation — that "
+                f"is a different condition (F1-free). State it with "
+                f"`--no-categorize`.") from e
         _dump_json(out / "categories.json",
                    {"categories": cats, "notes": cat_notes,
                     "n_min": CAT_MIN, "n_max": CAT_MAX})
-        print(f"  ★ LLM 이 {len(cats)}개 영역으로 나눴다:")
+        print(f"  ★ the LLM partitioned into {len(cats)} areas:")
         for c in cats:
             print(f"     {c['name']:32s} {c['description'][:60]}")
         if cat_notes:
-            print(f"     (뺀 것) {cat_notes[:100]}")
+            print(f"     (left out) {cat_notes[:100]}")
         print()
         if a.categorize_only:
-            # ★ 진단만. 생성은 안 한다 (D-63).
-            print("  ★ --categorize-only — 여기서 끝낸다. "
-                  f"기록: {out / 'categories.json'}")
+            # ★ Diagnosis only. Nothing is generated (D-63).
+            print("  ★ --categorize-only — stopping here. "
+                  f"record: {out / 'categories.json'}")
             raise SystemExit(0)
 
-    #: 영역 -> 그 영역에서 만든 이름. 프롬프트에 되먹인다.
+    #: Area -> the names built in that area. Fed back into the prompt.
     made_in: dict[str, list[str]] = {c["name"]: [] for c in cats}
-    #: 영역 -> 연속 거부 횟수. 3회면 그 영역을 건너뛴다.
+    #: Area -> consecutive refusals. At 3 that area is skipped.
     streak: dict[str, int] = dict.fromkeys(made_in, 0)
     skipped: list[str] = []
 
@@ -401,7 +438,7 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
                             if gen[n].shape_level and n in SHAPE_LEVEL_REASON},
             "shape_level_needs_recheck": sorted(
                 n for n in gen._items if gen[n].shape_level
-                and "재판정" in SHAPE_LEVEL_REASON.get(n, "")),
+                and "Re-judgement" in SHAPE_LEVEL_REASON.get(n, "")),
             "categories": [c["name"] for c in cats],
             "made_by_category": made_in,
             "skipped_categories": skipped,
@@ -409,8 +446,8 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
             "n_planned": n_planned, "n_base": n_base, "n_prior": n_prior,
             "extend_from": a.extend_from, "only_category": a.only_category,
             "per_category": a.per_category, "categorize": a.categorize,
-            "n_accepted": len(made) - n_prior,     # ★ 이번에 새로 만든 것만
-            "n_total": len(made),                  # 이어받은 것 포함
+            "n_accepted": len(made) - n_prior,  # ★ only what was built now
+            "n_total": len(made),               # including carried-over
             "rejections": rejects, "seconds": round(time.perf_counter() - t0, 1),
             "feature_names": made,
             "physics_coverage": _physics_coverage(table, gen, base)})
@@ -419,26 +456,29 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
             llm.dump(out / "llm_calls")
 
     if a.only_category:
-        # 부분 일치. 영역 이름은 LLM 이 매번 새로 지으므로 정확히 못 박는다 —
-        # **사람이 영역을 정의하지 않는다는 원칙을 지키면서** 특정 축을
-        # 보강하기 위한 절충이다 (D-63).
-        # `|` 로 여러 키워드. **영역 이름은 LLM 이 매번 새로 짓고 언어도
-        #  바뀐다** — 1회차는 한국어(`산술_대역폭_압력`), 2회차는 영어
-        #  (`roofline_pressure`) 였다. 개념 키워드 여러 개로 고른다.
+        # A partial match. The LLM names the areas afresh every time, so
+        # they cannot be pinned exactly — it is a compromise for
+        # strengthening a particular axis **while keeping the principle that
+        # a human does not define the areas** (D-63).
+        # Several keywords with `|`. **The LLM names the areas afresh every
+        #  time and the language changes too** — the first round was Korean
+        #  (`산술_대역폭_압력`) and the second English
+        #  (`roofline_pressure`). Several conceptual keywords are used.
         keys = [k.strip() for k in a.only_category.split("|") if k.strip()]
         hit = [c for c in cats
                if any(k in c["name"] or k in c["description"] for k in keys)]
         if not hit:
             raise SystemExit(
-                f"키워드 {keys} 에 맞는 영역이 없다. "
-                f"이번에 나온 것: {[c['name'] for c in cats]}")
+                f"no area matches the keywords {keys}. "
+                f"What came out this time: {[c['name'] for c in cats]}")
         cats = hit[:1]
         made_in = {cats[0]["name"]: []}
         streak = {cats[0]["name"]: 0}
-        print(f"  ★ 영역 {cats[0]['name']!r} 만 생성한다 — **별도 조건**이다. "
-              "비교표에 섞지 마라\n")
+        print(f"  ★ generating for the area {cats[0]['name']!r} only — a "
+              f"**separate condition**. Do not mix it into the comparison "
+              f"table\n")
     plan = _plan(cats, a.n_features, a.per_category)
-    n_planned = len(plan)          # ★ 영역 기반이면 개수가 여기서 정해진다
+    n_planned = len(plan)   # ★ area-based, the count is decided here
     try:
         for i, cat in enumerate(plan):
             if cat is not None and cat in skipped:
@@ -472,9 +512,10 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
                     streak[cat] += 1
                     if streak[cat] >= CAT_GIVE_UP:
                         skipped.append(cat)
-                        print(f"       ★ 영역 {cat!r} 을 건너뛴다 — "
-                              f"{CAT_GIVE_UP}회 연속 거부. "
-                              "'원시 값으로 표현하기 어렵다' 가 기록된다")
+                        print(f"       ★ skipping the area {cat!r} — "
+                              f"{CAT_GIVE_UP} consecutive refusals. "
+                              f"'hard to express from raw values' is "
+                              f"recorded")
             except Exception as e:                          # noqa: BLE001
                 row.update(accepted=False, error=f"{type(e).__name__}: {e}"[:200])
                 rejects[type(e).__name__] = rejects.get(type(e).__name__, 0) + 1
@@ -482,28 +523,32 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
             with log.open("a") as fh:
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     finally:
-        dump()                              # ★ 중간에 죽어도 남긴다 (D-33)
+        dump()               # ★ it survives even if it dies midway (D-33)
 
-    print(f"\n  이번에 채택 {len(gen._items) - n_base}/{n_planned}  "
-          f"레지스트리 총 {len(gen._items)}개"
-          + (f"  (영역 {len(cats)}개 x {a.per_category})" if cats else ""))
+    print(f"\n  accepted this time {len(gen._items) - n_base}/{n_planned}  "
+          f"registry total {len(gen._items)}"
+          + (f"  ({len(cats)} areas x {a.per_category})" if cats else ""))
     return gen
 
 
-#: `human_guided` 가 쓰는 여섯 항. **여기 한 곳에서만 적는다** (원칙 2).
+#: The six terms `human_guided` uses. **Written in this one place only**
+#: (principle 2).
 _SEED_TERMS = ("traffic_amplification", "sm_idle_cost", "smem_pressure",
                "has_spill", "split_k_cost", "pipeline_warmup_frac")
 
 
 def _physics_coverage(table, gen: FeatureRegistry,
                       base: FeatureRegistry) -> dict:
-    """★ F1 라이브러리가 손씨앗의 물리를 덮는가 — **측정할 결과다.**
+    """★ Does the F1 library cover the hand seed's physics — **a result to
+    be measured.**
 
-    고칠 문제가 아니다. `has_spill` 하나로 1.1637 -> 3.1841 이 달라졌으니
-    (§8.2), 대응이 없다는 사실 자체가 결과다. LLM 0회로 계산된다.
+    It is not a problem to fix. `has_spill` alone moved 1.1637 to 3.1841
+    (§8.2), so the absence of a counterpart is itself the result. It is
+    computed with 0 LLM calls.
 
-    각 씨앗 항에 대해 생성 피처 중 스피어만·피어슨이 가장 높은 것을 찾는다.
-    판정 기준은 §8.4 와 같다 — 둘 다 0.95 초과여야 "덮었다" 다.
+    For each seed term it finds the generated feature with the highest
+    Spearman and Pearson. The criterion is the same as §8.4 — both must
+    exceed 0.95 to count as "covered".
     """
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.features.generated import _reference_columns
@@ -511,7 +556,7 @@ def _physics_coverage(table, gen: FeatureRegistry,
 
     made = sorted(set(gen._items) - set(base._items))
     if not made:
-        return {"note": "생성된 피처가 없다"}
+        return {"note": "there are no generated features"}
 
     human = FeatureRegistry("seed-terms")
     for n in _SEED_TERMS:
@@ -536,7 +581,7 @@ def _physics_coverage(table, gen: FeatureRegistry,
             if best is None or sp > best[1]:
                 best = (gname, float(sp), float(pe))
         if best is None:
-            out[name] = {"covered": False, "note": "비교 불가"}
+            out[name] = {"covered": False, "note": "not comparable"}
             continue
         out[name] = {"nearest": best[0], "spearman": round(best[1], 3),
                      "pearson": round(best[2], 3),
@@ -549,23 +594,25 @@ def _physics_coverage(table, gen: FeatureRegistry,
 
 
 def _features_module(gen: FeatureRegistry, base: FeatureRegistry) -> str:
-    """생성된 피처를 **다시 등록 가능한 형태**로 남긴다 (§11.4)."""
+    """Records the generated features **in a re-registrable form**
+    (§11.4)."""
     made = sorted(set(gen._items) - set(base._items))
-    head = ['"""1단계 FeatureWriter 산출물. 이 파일은 **기록**이다.',
+    head = ['"""The stage-1 FeatureWriter output. This file is a **record**.',
             "",
-            ("다시 쓰려면 `features/loader.py::load_generated` 로"
-             " `proposals.jsonl` 을"),
-            "읽어라 — 그쪽이 대표값이고 여기는 사람이 읽기 위한 것이다.",
+            ("To use them again, read `proposals.jsonl` through"
+             " `features/loader.py::load_generated`"),
+            "— that is the reference, and this is for humans to read.",
             '"""', "", "import numpy as np  # noqa: F401", ""]
-    body = [f"# {n}\n{gen[n].source or '(소스 없음)'}\n" for n in made]
+    body = [f"# {n}\n{gen[n].source or '(no source)'}\n" for n in made]
     return "\n".join(head) + "\n".join(body)
 
 
 # ---------------------------------------------------------------------------
-# 2단계 — RuleWriter
+# Stage 2 — RuleWriter
 # ---------------------------------------------------------------------------
 def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
-    """씨앗 규칙을 만든다. 학습 점수 최고를 고른다 — **홀드아웃은 안 본다**."""
+    """Builds the seed rule. It picks the best training score — **it does
+    not look at the holdout**."""
     from kernelrule.agents.schemas import validate_rule_proposal
     from kernelrule.core.splits import is_unsealed
     from kernelrule.rules.checks import check_rule, limits_for
@@ -574,11 +621,13 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
     (out / "candidates").mkdir(parents=True, exist_ok=True)
 
     if a.condition == "F3" and a.seed_source == "human_guided":
-        # ★ F3 는 정의상 손씨앗을 쓴다. 그래도 **같은 경로**를 밟는다.
+        # ★ F3 uses the hand seed by definition. It still takes **the same
+        #   path**.
         from kernelrule.rules.human_guided import CODE, W0
         chosen = {"source": "human_guided", "code": CODE, "w0": list(W0),
                   "fit_regret": None,
-                  "why": "F3 는 손씨앗이 조건이다 (지금까지의 모든 실행)"}
+                  "why": "for F3 the hand seed is the condition (every run "
+                         "so far)"}
         _dump_json(out / "chosen.json", chosen)
         _dump_json(out / "summary.json", {"condition": "F3", "n_tries": 0,
                                           "source": "human_guided"})
@@ -618,12 +667,12 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
                     row.update(ok=True, code=prop.code, w0=list(prop.w0),
                                fit_regret=e, attempt=attempt)
                     (out / "candidates" / f"try{i:02d}.py").write_text(prop.code)
-                    print(f"  arch #{i:02d}  ✓ 학습 {e:.4f}")
+                    print(f"  arch #{i:02d}  ✓ train {e:.4f}")
                     break
                 except Exception as ex:                     # noqa: BLE001
                     row.update(error=f"{type(ex).__name__}: {ex}"[:200],
                                attempt=attempt)
-                    print(f"  arch #{i:02d}  ✗ (시도 {attempt + 1}) "
+                    print(f"  arch #{i:02d}  ✗ (attempt {attempt + 1}) "
                           f"{type(ex).__name__}: {str(ex)[:70]}")
             rows.append(row)
     finally:
@@ -631,40 +680,44 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
 
     ok = [r for r in rows if r["ok"]]
     if not ok:
-        # ★ 조용히 씨앗 없이 진행하지 않는다 (§26.4). 씨앗이 없으면
-        #   1라운드가 빈 부모에서 출발하고, 그러면 "리포트를 읽고 고칠 수
-        #   있는가" 라는 질문 자체가 성립하지 않는다.
+        # ★ It does not silently proceed without a seed (§26.4). Without a
+        #   seed, round 1 starts from an empty parent, and then the question
+        #   "can it read the report and fix it" does not hold at all.
         raise RuntimeError(
-            f"RuleWriter {a.n_rule_writer}회 x 재시도 {ARCH_RETRIES} 가 전부 "
-            f"실패했다. 씨앗 없이 진행하지 않는다 — F1 피처가 규칙을 "
-            f"세우기에 부족하다는 것도 **결과**이므로 여기서 멈춘다. "
-            f"산출물은 {out} 에 있다.")
+            f"all {a.n_rule_writer} RuleWriter calls x {ARCH_RETRIES} "
+            f"retries failed. It does not proceed without a seed — that the "
+            f"F1 features are not enough to build a rule is itself a "
+            f"**result**, so it stops here. The artefacts are in {out}.")
     best = min(ok, key=lambda r: r["fit_regret"])
     chosen = {"source": f"rule_writer-try{best['i']:02d}", "code": best["code"],
               "w0": best["w0"], "fit_regret": best["fit_regret"],
-              "why": f"{len(ok)}/{a.n_rule_writer} 성공 중 학습 점수 최고",
+              "why": f"the best training score among {len(ok)}/"
+                     f"{a.n_rule_writer} successes",
               "all_fit_regret": sorted(r["fit_regret"] for r in ok),
-              # ★ 4-3 — 선택 시점에 무엇을 봤는가를 **기록으로** 남긴다.
-              #   절차로는 지켜지고 있지만 나중에 증거가 필요하다.
+              # ★ 4-3 — what was seen at selection time is left **in the
+              #   record**. Procedurally it is held, but evidence is needed
+              #   later.
               "selected_on": "train_split_regret_only",
               "holdout_seen_at_selection": False,
               "unsealed": is_unsealed(),
-              "_note": ("씨앗은 `RoundLoop.score_only()` 의 학습 분할 regret "
-                        "으로만 골랐다. 그 함수는 홀드아웃을 돌려주지 않는다 "
-                        "— 선택이 홀드아웃을 보면 그 홀드아웃은 홀드아웃이 "
-                        "아니다 (원칙 6, D-40/D-46/D-50).")}
+              "_note": ("the seed was picked purely on the training-split "
+                        "regret from `RoundLoop.score_only()`. That function "
+                        "does not return the holdout — if the selection sees "
+                        "the holdout, that holdout is not a holdout "
+                        "(principle 6, D-40/D-46/D-50).")}
     _dump_json(out / "chosen.json", chosen)
-    print(f"\n  씨앗: {chosen['source']}  학습 {best['fit_regret']:.4f}")
+    print(f"\n  seed: {chosen['source']}  train {best['fit_regret']:.4f}")
     return chosen
 
 
 # ---------------------------------------------------------------------------
-# 3단계 — RoundLoop
+# Stage 3 — RoundLoop
 # ---------------------------------------------------------------------------
 def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
     return RoundLoop(
         cfg=LoopConfig(run_id=run_id, max_rounds=a.rounds,
-                       # ★ 제안 수는 LoopConfig 기본값(6)을 쓴다 (D-144)
+                       # ★ The proposal count uses LoopConfig's default (6)
+                       #   (D-144)
                        seed=a.seed,
                        max_new_features_per_round=getattr(
                            a, "max_new_features", 0),
@@ -673,7 +726,8 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        n_workers=getattr(a, "workers", 0),
                        objective="regret",
                        parameters=getattr(a, "parameters", None),
-                       # ★ 적합기는 **파라미터 수가 정한다** (D-128)
+                       # ★ The fitter is **decided by the parameter count**
+                       #   (D-128)
                        **fitter_for(getattr(a, "parameters", None)),
                        hypothesis_pool=tuple(
                            getattr(a, "hypothesis_pool", []) or ())),
@@ -690,7 +744,8 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
         llm = _make_llm(a, registry=reg, budget=budget, table=table)
         loop = RoundLoop(
             cfg=LoopConfig(run_id=run_id, max_rounds=a.rounds,
-                           # ★ 제안 수는 LoopConfig 기본값(6) (D-144)
+                           # ★ The proposal count is LoopConfig's default
+                           #   (6) (D-144)
                            seed=100 + a.seed + s,
                            max_new_features_per_round=a.max_new_features,
                            feature_condition=a.condition,
@@ -698,19 +753,21 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
                            n_workers=a.workers,
                            objective="regret",
                            parameters=a.parameters,
-                           # ★ 적합기는 **파라미터 수가 정한다** (D-128)
+                           # ★ The fitter is **decided by the parameter
+                           #   count** (D-128)
                            **fitter_for(a.parameters),
                            hypothesis_pool=tuple(a.hypothesis_pool)),
             table=table, matrix=matrix, splits=splits, llm=llm)
-        loop.seed(seed_rule["code"], seed_rule["w0"], changes="stage2 씨앗")
+        loop.seed(seed_rule["code"], seed_rule["w0"],
+                  changes="the stage-2 seed")
         print(f"\n  --- {run_id} ---", flush=True)
         try:
-            loop.run(a.rounds)               # RoundLoop.run 이 finally 로 dump
+            loop.run(a.rounds)      # RoundLoop.run dumps in its finally
         except Exception as e:                              # noqa: BLE001
-            print(f"  ★ 중단: {type(e).__name__}: {str(e)[:100]}")
-        # ★ `llm_calls/` 는 디렉토리다. `glob("*")` + `is_file()` 로만
-        #   복사하면 **LLM 호출 기록이 통째로 빠진다** — 다시 만들 수 없는
-        #   것이 조용히 사라지는 경로다 (D-33).
+            print(f"  ★ stopped: {type(e).__name__}: {str(e)[:100]}")
+        # ★ `llm_calls/` is a directory. Copying only with `glob("*")` +
+        #   `is_file()` **loses the LLM call records entirely** — a path by
+        #   which something unrepeatable disappears silently (D-33).
         src = OUT / run_id
         if src.exists():
             import shutil
@@ -722,29 +779,34 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
 
 # ---------------------------------------------------------------------------
 class Terminated(KeyboardInterrupt):
-    """SIGTERM 을 예외로 바꾼다 — 안 그러면 `finally` 가 **안 돈다**.
+    """Turns SIGTERM into an exception — otherwise `finally` **does not
+    run**.
 
-    ★ 기본 SIGTERM 핸들러는 스택을 풀지 않고 즉시 죽는다. `try/finally` 로
-    산출물을 남기도록 짜 놨어도 그 `finally` 가 실행되지 않는다 (D-33).
-    실제로 확인했다: `timeout 25` 로 죽이면 증분 append 한
-    `proposals.jsonl` 만 남고 `summary.json` 은 안 써졌다.
+    ★ The default SIGTERM handler dies immediately without unwinding the
+    stack. Even code written to leave artefacts through `try/finally` never
+    reaches that `finally` (D-33). Confirmed in practice: killed with
+    `timeout 25`, only the incrementally appended `proposals.jsonl`
+    survived and `summary.json` was never written.
 
-    증분 append 가 1차 방어선이고(LLM 호출은 절대 못 되살린다), 이것은
-    2차 방어선이다.
+    The incremental append is the first line of defence (an LLM call can
+    never be revived), and this is the second.
     """
 
 
 def _install_signal_handlers() -> None:
     def _die(signum, _frame):
-        raise Terminated(f"신호 {signal.Signals(signum).name} 로 종료한다")
+        raise Terminated(
+            f"terminating on signal {signal.Signals(signum).name}")
 
     import contextlib
 
-    # ★ SIGTERM 만 잡는다. **SIGHUP 은 잡으면 안 된다** — 백그라운드로
-    #   분리될 때 오는 정상 신호인데, 종료 예외로 바꾸면 멀쩡한 실행이
-    #   시작하자마자 죽는다. 실제로 F1 실행을 두 번 그렇게 잃었다.
-    #   (원칙 1 의 쌍둥이 — 안전해 보이는 처리가 판정을 하고 있었다)
-    with contextlib.suppress(OSError, ValueError):   # 플랫폼/스레드 제약
+    # ★ Only SIGTERM is caught. **SIGHUP must not be** — it is the normal
+    #   signal that arrives on detaching into the background, and turning it
+    #   into a termination exception kills a perfectly good run the moment
+    #   it starts. Two F1 runs really were lost that way.
+    #   (The twin of principle 1 — a safe-looking handler was making a
+    #   verdict.)
+    with contextlib.suppress(OSError, ValueError):   # platform/thread limits
         signal.signal(signal.SIGTERM, _die)
 
 
@@ -753,153 +815,191 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("condition", choices=("F1", "F2", "F3"))
     ap.add_argument("--n-features", type=int, default=20,
-                    help="자유 생성(--no-categorize)일 때만 쓰인다. "
-                         "영역 기반이면 개수가 영역 수에서 유도된다")
+                    help="used only for free generation (--no-categorize). "
+                         "With areas, the count is derived from the number "
+                         "of areas")
     ap.add_argument("--per-category", type=int, default=3,
-                    help="영역당 제안 횟수. 총 개수 = 영역 수 x 이 값")
+                    help="proposals per area. Total = number of areas x "
+                         "this value")
     ap.add_argument("--categorize", dest="categorize", action="store_true",
-                    help="영역을 나눠 영역별로 생성한다. ★ 기본은 꺼짐 — "
-                         "편중 완화라는 목적이 새 프롬프트만으로 이미 "
-                         "달성됐고 재발견은 오히려 줄었다 (D-63)")
+                    help="partition the areas and generate per area. "
+                         "★ Off by default — the purpose (reducing "
+                         "concentration) was already achieved by the new "
+                         "prompt alone, and rediscovery actually fell "
+                         "(D-63)")
     ap.add_argument("--recategorize", action="store_true",
-                    help="★ 영역을 LLM 으로 **다시 뽑는다** (1호출). 기본은 "
-                         "`prompts/areas.md` 의 고정 일곱을 쓴다 — 매번 "
-                         "뽑으면 그 실행만 다른 조건이 되는데 조용히 "
-                         "그렇게 된다 (§30.18). 쓴 실행은 config 에 남는다")
+                    help="★ **draw the areas again** with the LLM (1 "
+                         "call). By default the fixed seven of "
+                         "`prompts/areas.md` are used — drawing them every "
+                         "time makes that run a different condition, and it "
+                         "happens silently (§30.18). A run that used it "
+                         "stays in the config")
     ap.add_argument("--categorize-only", action="store_true",
-                    help="★ 영역 나누기 **1회만** 하고 끝낸다 (진단용). "
-                         "생성에는 안 쓴다. 'LLM 이 무엇을 못 만드는가' 를 "
-                         "스스로 말하게 하는 값싼 장치다 — 이것이 dtype "
-                         "빈틈을 찾아냈다 (D-63)")
+                    help="★ partition the areas **once** and stop (for "
+                         "diagnosis). It is not used for generation. A cheap "
+                         "device that makes the LLM say for itself 'what it "
+                         "cannot build' — this is what found the dtype gap "
+                         "(D-63)")
     ap.add_argument("--only-category", metavar="NAME",
-                    help="이 영역만 생성한다 (`|` 로 여러 키워드, 이름과 "
-                         "설명 둘 다에서 찾는다). 기존 라이브러리를 특정 "
-                         "축으로 보강할 때 쓴다. ★ 보강분은 **별도 조건**"
-                         "이므로 비교표에 섞지 마라")
+                    help="generate for this area only (several keywords "
+                         "with `|`, searched in both the name and the "
+                         "description). Used to strengthen an existing "
+                         "library along a particular axis. ★ The addition "
+                         "is a **separate condition**, so do not mix it into "
+                         "the comparison table")
     ap.set_defaults(categorize=False)
     ap.add_argument("--n-rule-writer", type=int, default=10)
     ap.add_argument("--seed-source", choices=("rule_writer", "human_guided"),
                     default=None,
-                    help="씨앗을 어디서. 기본은 F3 면 human_guided, "
-                         "나머지는 architect. ★ F3 에 architect 를 주면 "
-                         "**대조군**이 된다 — 같은 프롬프트로 사람 24개와 "
-                         "F1 라이브러리를 비교할 수 있다")
+                    help="where the seed comes from. The default is "
+                         "human_guided for F3 and architect otherwise. "
+                         "★ Giving F3 an architect makes it a **control "
+                         "arm** — the human 24 and the F1 library can be "
+                         "compared under the same prompt")
     ap.add_argument("--n-seeds", type=int, default=3)
     ap.add_argument("--rounds", type=int, default=12,
-                    help="라운드 수. ★ 2026-09-06 (D-140): 24 -> 12 로 "
-                         "되돌렸다. 24 를 지지하던 근거(+0.0395, 6/6, "
-                         "p=0.0156)가 **틀린 곡선**에서 나왔고, bests.jsonl "
-                         "로 다시 재면 +0.0088, 9/12, p=0.146 이다 (D-139). "
-                         "★ '24 가 낫다는 증거가 없다' 이지 '12 로 "
-                         "수렴한다' 가 아니다 — 비용이 2배라 12 를 쓴다. "
-                         "옛 기본값 이력: 12 (~D-129) -> 24 (D-129) -> 12"
-                         " (D-140). patience 는 0 이다 (D-132)")
-    # ★ Analyst -> FeatureWriter 경로 (D-75). **0 이 기본 = 꺼짐** — 지금까지의
-    #   실행과 같은 조건이다. 켜면 그 시점 이후 실행은 **별도 계열**이다.
-    # ★ 다른 캠페인의 씨앗을 그대로 쓴다 (D-83). 한 캠페인의 6실행은 2단계
-    #   씨앗 하나를 공유하므로, 캠페인끼리 견줄 때 씨앗이 교락이 된다 —
-    #   씨앗에 대해서는 실효 표본이 1 대 1 이다 (D-82, 원칙 28).
+                    help="the number of rounds. ★ 2026-09-06 (D-140): "
+                         "reverted 24 -> 12. The evidence supporting 24 "
+                         "(+0.0395, 6/6, p=0.0156) came from the **wrong "
+                         "curve**, and re-measured on bests.jsonl it is "
+                         "+0.0088, 9/12, p=0.146 (D-139). ★ It is 'there is "
+                         "no evidence 24 is better', not 'it converges by "
+                         "12' — the cost is 2x, so 12 is used. Default "
+                         "history: 12 (~D-129) -> 24 (D-129) -> 12 (D-140). "
+                         "patience is 0 (D-132)")
+    # ★ The Analyst -> FeatureWriter path (D-75). **0 is the default = off**
+    #   — the same condition as the runs so far. Switched on, runs from that
+    #   point are a **separate family**.
+    # ★ Uses another campaign's seed as it is (D-83). The 6 runs of one
+    #   campaign share a single stage-2 seed, so when campaigns are compared
+    #   the seed is a confounder — with respect to the seed the effective
+    #   sample is 1 versus 1 (D-82, principle 28).
     ap.add_argument("--seed-from", metavar="RUN_DIR",
-                    help="다른 캠페인의 stage2-rule-writer/chosen.json 을 "
-                         "이 캠페인의 씨앗으로 쓴다. 출처를 chosen.json 에 "
-                         "기록한다 — 2단계가 만든 것으로 오인되면 안 된다")
-    # ★ §16.1 ablation. 끄면 진단 리포트도 가설도 없다 (D-89).
+                    help="use another campaign's "
+                         "stage2-rule-writer/chosen.json as this campaign's "
+                         "seed. The provenance is recorded in chosen.json — "
+                         "it must not be mistaken for something stage 2 "
+                         "built")
+    # ★ The §16.1 ablation. With it off there is neither a diagnostic report
+    #   nor hypotheses (D-89).
     ap.add_argument("--no-analyst", action="store_true",
-                    help="Analyst 를 끈다 (§16.1 ablation). 진단 리포트를 "
-                         "만들지도 않는다")
-    # ★ §16.1 대조군 C (D-91). Analyst 는 안 부르고 **남의 가설**을 넣는다.
+                    help="switch the Analyst off (the §16.1 ablation). The "
+                         "diagnostic report is not even built")
+    # ★ The §16.1 control arm C (D-91). The Analyst is not called and
+    #   **someone else's hypotheses** go in.
     ap.add_argument("--hypothesis-pool", nargs="+", default=[],
                     metavar="HYPOTHESES_JSONL",
-                    help="다른 실행의 hypotheses.jsonl. Analyst 없이 그 "
-                         "가설을 라운드마다 빌려 쓴다 — 같은 시드 번호의 "
-                         "실행은 자동으로 뺀다")
-    # ★ 채점·적합 병렬화 (D-95). 0 = 순차(기본). 결과는 같아야 한다.
+                    help="another run's hypotheses.jsonl. Without the "
+                         "Analyst, those hypotheses are borrowed per round "
+                         "— runs with the same seed number are excluded "
+                         "automatically")
+    # ★ Parallel scoring and fitting (D-95). 0 = sequential (the default).
+    #   The results must be identical.
     ap.add_argument("--workers", type=int, default=0, metavar="N",
-                    help="채점·적합을 N 프로세스로 (0=순차). 결과는 순차와 "
-                         "같다 — test_parallel_matches_sequential 이 고정한다")
+                    help="score and fit in N processes (0=sequential). The "
+                         "result equals the sequential one — "
+                         "test_parallel_matches_sequential pins it")
     ap.add_argument("--max-new-features", type=int, default=0,
                     metavar="N",
-                    help="라운드당 만들 수 있는 새 축 (0=경로 없음, D-75). "
-                         "1~2 를 넘기지 마라 — §21 피처 행렬 캐시가 무효화된다")
+                    help="new axes buildable per round (0=no path, D-75). "
+                         "Do not exceed 1~2 — the §21 feature-matrix cache "
+                         "is invalidated")
     ap.add_argument("--bundle", default=BUNDLE,
-                    help="측정 표. ★ 다른 GPU 로 바꾸면 **다른 조건**이다 — "
-                         "비교표에 섞지 마라 (§3.4)")
+                    help="the measurement table. ★ Changing to another GPU "
+                         "is a **different condition** — do not mix it into "
+                         "the comparison table (§3.4)")
     ap.add_argument("--env-hash", default=BUNDLE_HASH,
-                    help="표의 env_hash 접두. 조인 키가 아니라 격리 경계다")
+                    help="the table's env_hash prefix. Not a join key but "
+                         "an isolation boundary")
     ap.add_argument("--parameters", type=int, default=None,
-                    help="파라미터 상한 (가중치 + 숫자 리터럴). ★ 기본은 checks.PARAMETERS(8) — 지금까지의 "
-                         "모든 실행이 그 조건이다. 검사기와 프롬프트가 "
-                         "같은 값을 본다")
+                    help="the parameter cap (weights + numeric literals). "
+                         "★ The default is checks.PARAMETERS (8) — every run "
+                         "so far is under that condition. The checker and "
+                         "the prompt see the same value")
     ap.add_argument("--power-hint", action="store_true",
-                    help="★ 실험 (b) (D-112). 가중치를 **지수 자리**에 둘 "
-                         "수 있다고 명시한다. 밑은 f.<이름> 하나, 지수 "
-                         "가중치는 EXPONENT_BOUNDS(0~4) 로 묶인다 — "
-                         "하이퍼파라미터가 아니라 정규화다. 가드는 힌트와 "
-                         "무관하게 항상 걸린다")
+                    help="★ Experiment (b) (D-112). It states that a "
+                         "weight may sit **in the exponent slot**. The base "
+                         "is a single f.<name> and the exponent weight is "
+                         "bounded by EXPONENT_BOUNDS (0~4) — normalisation, "
+                         "not a hyperparameter. The guard applies always, "
+                         "regardless of the hint")
     ap.add_argument("--product-hint", action="store_true",
-                    help="★ 실험 B (D-110). 항 안에서 피처 둘을 곱해도 "
-                         "된다고 **명시한다.** 정적 검사는 원래 안 막았다 "
-                         "— 조건은 '푸는 것' 이 아니라 '말해 주는 것' 이다. "
-                         "네 면(시스템/사용자 프롬프트, 출력 스키마, 검사기) "
-                         "에 같이 실린다")
+                    help="★ Experiment B (D-110). It **states** that two "
+                         "features may be multiplied within a term. The "
+                         "static checks never blocked it — the condition is "
+                         "not 'loosening' but 'saying so'. It is carried on "
+                         "all four surfaces (the system and user prompts, "
+                         "the output schema, the checker)")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--seed", type=int, default=0)
-    # ★ 분할 (D-144). `--fold` 를 주면 층별 3-fold, 안 주면 구조 분할이다.
+    # ★ The split (D-144). With `--fold` it is a stratified 3-fold;
+    #   without it, the structural split.
     ap.add_argument("--fold", type=int, default=None,
-                    help="층별 k-fold 의 몇 번째 fold 인가 (0..k-1). "
-                         "안 주면 구조 분할(11008)")
-    ap.add_argument("--folds", type=int, default=3, help="k-fold 의 k")
+                    help="which fold of the stratified k-fold (0..k-1). "
+                         "Without it, the structural split (11008)")
+    ap.add_argument("--folds", type=int, default=3, help="the k of the k-fold")
     ap.add_argument("--split-seed", type=int, default=12345,
-                    help="★ fold 를 만드는 난수. **진화 시드와 분리한다**")
+                    help="★ the randomness that builds the folds. "
+                         "**Separated from the evolution seed**")
     ap.add_argument("--tag", default=None,
-                    help="★ 산출물 디렉토리 **이름 그대로** (D-128 태그 규칙: "
-                         "<피처><씨앗>-p<파라미터>[-<표현력>][-<실험명>], "
-                         "예: F3rw-p8 / F3rw-p16 / F3rw-p8-prod). 안 주면 "
-                         "옛 이름으로 떨어지고 같은 디렉토리에 겹쳐 쓸 수 "
-                         "있다 — 새 캠페인은 **반드시** 주라")
+                    help="★ the artefact directory name **verbatim** "
+                         "(the D-128 tag rule: "
+                         "<features><seed>-p<parameters>[-<expressivity>]"
+                         "[-<experiment>], e.g. F3rw-p8 / F3rw-p16 / "
+                         "F3rw-p8-prod). Without it, it falls back to the "
+                         "old name and can overwrite the same directory — "
+                         "a new campaign **must** give it")
     ap.add_argument("--dry-run", action="store_true",
-                    help="MockLLM 으로 배관만 확인한다. LLM 호출 0회")
+                    help="check the plumbing only, with MockLLM. 0 LLM "
+                         "calls")
     ap.add_argument("--stage", type=int, choices=(1, 2, 3),
-                    help="이 단계만 실행. 앞 단계 산출물을 읽는다")
+                    help="run only this stage. It reads the previous "
+                         "stage's artefacts")
     ap.add_argument("--extend-from", metavar="STAGE1_DIR",
-                    help="기존 1단계 산출물을 이어받아 **확장**한다. "
-                         "중복 판정이 그것들과도 이뤄지고 산출물은 합집합이 "
-                         "된다. ★ 확장분은 별도 조건이므로 비교표에 섞지 마라")
+                    help="carry over an existing stage-1 artefact and "
+                         "**extend** it. The duplication verdict is made "
+                         "against those too and the artefact is the union. "
+                         "★ The extension is a separate condition, so do not "
+                         "mix it into the comparison table")
     ap.add_argument("--import-featwriter", metavar="RUN_DIR",
-                    help="`experiments/feature_writer.py` 산출물을 1단계로 "
-                         "가져온다. 형식이 같아서 복사면 된다 — 20호출을 "
-                         "아낀다. 가져온 뒤 --stage 2 로 시작하라")
+                    help="import an `experiments/feature_writer.py` "
+                         "artefact as stage 1. The format is the same, so a "
+                         "copy suffices — it saves 20 calls. After importing, "
+                         "start with --stage 2")
     a = ap.parse_args()
-    # ★ 적합기는 파라미터 수가 정한다 (D-128). `cma` 가 필요한데 없으면
-    #   **지금** 멈춘다 (원칙 1) — 500호출 뒤 첫 적합에서 보는 것은 늦다.
+    # ★ The fitter is decided by the parameter count (D-128). If `cma` is
+    #   needed and missing, it stops **now** (principle 1) — seeing it at the
+    #   first fit after 500 calls is too late.
     _fit = fitter_for(a.parameters)
     if _fit["fit_method"] == "cma":
         try:
             import cma  # noqa: F401
         except ImportError:
             raise SystemExit(
-                f"파라미터 {a.parameters} 는 CMA-ES 로 적합하는데 `cma` "
-                "패키지가 없다. `pip install cma` (pyproject 의 `fit` 그룹)."
+                f"{a.parameters} parameters are fitted with CMA-ES, but "
+                f"the `cma` package is missing. `pip install cma` (the "
+                f"`fit` group in pyproject)."
             ) from None
-    print(f"  적합기: {_fit['fit_method']} / 재시작 "
+    print(f"  fitter: {_fit['fit_method']} / restarts "
           f"{_fit['fit_restarts']} / "
-          f"적합 {_fit['max_evals']}  ← 파라미터 "
-          f"{a.parameters if a.parameters is not None else 8} 이 정한다")
+          f"evals {_fit['max_evals']}  <- decided by "
+          f"{a.parameters if a.parameters is not None else 8} parameters")
     if a.seed_source is None:
         a.seed_source = "human_guided" if a.condition == "F3" else "rule_writer"
 
-    # ★ `--tag` 는 **디렉토리 이름 그대로**다 (D-128 의 태그 규칙).
-    #   전에는 `f1pipe-<조건>-<태그>` 로 조립해서 태그 규칙을 못 지켰다.
-    #   `--tag` 가 없을 때만 옛 이름으로 떨어진다.
+    # ★ `--tag` is **the directory name verbatim** (the D-128 tag rule).
+    #   It used to be assembled as `f1pipe-<condition>-<tag>`, which could
+    #   not follow the tag rule. Only without `--tag` does it fall back to
+    #   the old name.
     tag = a.tag
     d = OUT / tag if tag else OUT / (
         f"f1pipe-{a.condition}-" + ("mock" if a.dry_run else a.model))
-    # ★ 겹쳐 쓰기를 막는다. LLM 호출은 다시 만들 수 없다 (D-33).
+    # ★ Overwriting is blocked. An LLM call cannot be remade (D-33).
     if d.exists() and any(d.iterdir()) and a.stage in (None, 1):
         raise SystemExit(
-            f"{d} 가 이미 있고 비어 있지 않다. 겹쳐 쓰면 앞 실행의 LLM "
-            f"호출이 사라진다 (D-33). `--tag` 로 다른 이름을 주거나 "
-            f"지우고 다시 돌려라.")
+            f"{d} already exists and is not empty. Overwriting loses the "
+            f"previous run's LLM calls (D-33). Give another name with "
+            f"`--tag`, or delete it and run again.")
     d.mkdir(parents=True, exist_ok=True)
 
     table = PerfTable.from_bundle(a.bundle, env_hash=a.env_hash,
@@ -910,62 +1010,67 @@ def main() -> None:
     base = _base_registry(a.condition)
 
     print("=" * 78)
-    print(f"F0~F3 파이프라인 — 조건 {a.condition}  [{tag}]"
-          + ("  ★ DRY RUN (LLM 0회)" if a.dry_run else ""))
+    print(f"the F0~F3 pipeline — condition {a.condition}  [{tag}]"
+          + ("  ★ DRY RUN (0 LLM calls)" if a.dry_run else ""))
     print("=" * 78)
-    print(f"  출발 레지스트리 {base.name!r}: {len(base._items)}개")
-    print(f"  분할 {splits.kind}  학습 {len(splits.train.shapes)} / 홀드아웃 "
-          f"{len(splits.val.shapes)}")
-    print(f"  산출물 {d}\n")
+    print(f"  starting registry {base.name!r}: {len(base._items)}")
+    print(f"  split {splits.kind}  train {len(splits.train.shapes)} / "
+          f"holdout {len(splits.val.shapes)}")
+    print(f"  artefacts {d}\n")
 
     if a.import_featwriter:
         src = Path(a.import_featwriter) / "proposals.jsonl"
         if not src.exists():
-            raise SystemExit(f"{src} 가 없다.")
+            raise SystemExit(f"{src} does not exist.")
         dst = d / "stage1-features"
         dst.mkdir(parents=True, exist_ok=True)
         (dst / "proposals.jsonl").write_text(src.read_text())
         _dump_json(dst / "summary.json", {
             "condition": a.condition, "imported_from": str(src),
-            "note": ("`feature_writer.py` 산출물을 그대로 가져왔다. 형식이 "
-                     "같다 — `load_generated` 가 읽는 키가 동일하다. "
-                     "physics_coverage 는 계산되지 않았다 (1단계를 안 돌렸다)")})
+            "note": ("the `feature_writer.py` artefact was imported as is. "
+                     "The format is the same — the keys `load_generated` "
+                     "reads are identical. physics_coverage was not computed "
+                     "(stage 1 was not run)")})
         n = sum(1 for ln in src.open()
                 if ln.strip() and json.loads(ln).get("accepted"))
-        print(f"  ★ {src} 에서 채택 {n}개를 1단계로 가져왔다. "
-              f"--stage 2 로 시작하라.\n")
+        print(f"  ★ imported {n} accepted features from {src} as stage 1. "
+              f"Start with --stage 2.\n")
         return
 
     stages = (a.stage,) if a.stage else (1, 2, 3)
 
-    # ★ F3 는 **정의상 사람 24개 그대로**다 (지금까지의 모든 실행). 여기서
-    #   FeatureWriter 를 돌리면 레지스트리가 27개가 되어 "기존 조건" 이
-    #   아니게 된다. 조용히 건너뛰지 않고 **말한다** (§26.4).
+    # ★ F3 is **the human 24 as they are, by definition** (every run so
+    #   far). Running FeatureWriter here would make the registry 27 and it
+    #   would stop being "the existing condition". It does not skip silently
+    #   but **says so** (§26.4).
     if a.condition == "F3" and 1 in stages:
         stages = tuple(x for x in stages if x != 1)
-        print("  ★ F3 는 1단계(FeatureWriter)를 돌리지 않는다 — 조건이 "
-              "'사람 24개 그대로' 이기 때문이다. 새 축을 더하려면 F2 를 "
-              "쓰거나 `--stage 1` 을 명시하라.\n")
+        print("  ★ F3 does not run stage 1 (FeatureWriter) — because the "
+              "condition is 'the human 24 as they are'. To add a new axis, "
+              "use F2 or state `--stage 1`.\n")
     if a.stage == 1 and a.condition == "F3":
         raise SystemExit(
-            "F3 에 --stage 1 은 조건과 모순이다. F3 는 사람 24개 그대로가 "
-            "조건이고, 거기에 피처를 더하면 그것은 F2 다.")
+            "--stage 1 with F3 contradicts the condition. F3's condition is "
+            "the human 24 as they are, and adding features to them makes it "
+            "F2.")
 
-    # 1단계
+    # Stage 1
     if 1 in stages:
-        # ★ FeatureWriter 는 **기초 레지스트리로 만든 행렬**을 본다.
-        #   F1 이면 빈 행렬이라 사람 피처 값이 어디에도 안 나온다.
+        # ★ FeatureWriter sees **a matrix built from the base registry**.
+        #   Under F1 it is an empty matrix, so no human feature value appears
+        #   anywhere.
         m0 = FeatureMatrix(table, base)
-        print("--- 1단계 FeatureWriter ---")
+        print("--- stage 1 FeatureWriter ---")
         reg = stage1(a, d, table, m0, base)
     elif a.condition == "F3":
-        reg = base                       # 사람 24개 그대로
-        print(f"--- 1단계 없음 (F3) — 사람 피처 {len(reg._items)}개 ---")
+        reg = base                  # the human 24 as they are
+        print(f"--- no stage 1 (F3) — {len(reg._items)} human features ---")
     else:
         reg = _load_stage1(d, base, a.condition, table)
         n_sh = sum(1 for n in reg._items if reg[n].shape_level)
-        print(f"--- 1단계 건너뜀 — 저장된 피처 {len(reg._items)}개 "
-              f"(형상 수준 {n_sh}, config 수준 {len(reg._items) - n_sh}) ---")
+        print(f"--- stage 1 skipped — {len(reg._items)} stored features "
+              f"(shape level {n_sh}, config level "
+              f"{len(reg._items) - n_sh}) ---")
 
     matrix = FeatureMatrix(table, reg)
     from kernelrule.core.splits import is_unsealed
@@ -973,10 +1078,10 @@ def main() -> None:
     _dump_json(d / "config.json", {
         "condition": a.condition, "model": a.model, "dry_run": a.dry_run,
         "seed_source": a.seed_source,
-        # ★ 영역을 LLM 으로 다시 뽑았는가 (§30.18). 뽑았으면 그 실행은
-        #   고정 목록을 쓴 실행과 **다른 조건**이다.
+        # ★ Were the areas drawn again with the LLM (§30.18)? If so, that
+        #   run is a **different condition** from one using the fixed list.
         "recategorize": a.recategorize,
-        # ★ 최종 분할이 열린 채로 돈 실행인가 (§30.15)
+        # ★ Did this run go with the final split open (§30.15)
         "unsealed": is_unsealed(),
         "seed": a.seed, "rounds": a.rounds, "n_seeds": a.n_seeds,
         "n_features": a.n_features, "n_rule_writer": a.n_rule_writer,
@@ -985,71 +1090,77 @@ def main() -> None:
         "registry": {"name": reg.name, "n": len(reg._items),
                      "names": sorted(reg._items)},
         "human_features_present": sorted(set(reg._items) & set(REGISTRY._items))
-        if a.condition == "F1" else "N/A (F2/F3 는 의도적으로 포함)"})
+        if a.condition == "F1"
+        else "N/A (F2/F3 include them deliberately)"})
 
-    # 2단계 — ★ 뒤 단계를 안 돌 거면 **읽지도 않는다.** 전에는 `--stage 1`
-    #   인데도 `chosen.json` 을 읽어서 FileNotFoundError 로 죽었다. 1단계
-    #   산출물은 멀쩡했지만 종료 코드가 1 이라 실패로 보인다.
-    # ★ 씨앗을 다른 캠페인에서 가져온다 (D-83). 2단계보다 **먼저** 처리해
-    #   `--stage 3` 만으로도 성립하게 한다.
+    # Stage 2 — ★ if the later stages will not run, it **is not even read**.
+    #   It used to read `chosen.json` even under `--stage 1` and die with
+    #   FileNotFoundError. The stage-1 artefacts were fine, but an exit code
+    #   of 1 looks like a failure.
+    # ★ Importing the seed from another campaign (D-83). It is handled
+    #   **before** stage 2 so that `--stage 3` alone holds.
     if a.seed_from:
         src = Path(a.seed_from) / "stage2-rule-writer" / "chosen.json"
         if not src.exists():
-            raise SystemExit(f"{src} 가 없다 — 가져올 씨앗이 없다")
+            raise SystemExit(
+                f"{src} does not exist — there is no seed to import")
         got = json.loads(src.read_text())
         got["copied_from"] = str(src)
-        got["source"] = f"{got.get('source', '?')} (복사: {a.seed_from})"
+        got["source"] = f"{got.get('source', '?')} (copied: {a.seed_from})"
         dst = d / "stage2-rule-writer"
         dst.mkdir(parents=True, exist_ok=True)
         (dst / "chosen.json").write_text(
             json.dumps(got, ensure_ascii=False, indent=1))
-        print(f"  ★ 씨앗을 {src} 에서 가져왔다 — 이 캠페인의 2단계가 만든 "
-              "것이 아니다")
+        print(f"  ★ the seed was imported from {src} — it was not built by "
+              f"this campaign's stage 2")
 
     if 3 in stages or 2 in stages:
         if 2 in stages:
-            print("\n--- 2단계 RuleWriter ---")
+            print("\n--- stage 2 RuleWriter ---")
             chosen = stage2(a, d, table, matrix, reg, splits)
         else:
             chosen = json.loads(
                 (d / "stage2-rule-writer" / "chosen.json").read_text())
-            print(f"\n--- 2단계 건너뜀 — 저장된 씨앗 {chosen['source']} ---")
+            print(f"\n--- stage 2 skipped — the stored seed "
+                  f"{chosen['source']} ---")
 
-        # 3단계
+        # Stage 3
         if 3 in stages:
-            print("\n--- 3단계 진화 ---")
+            print("\n--- stage 3 evolution ---")
             stage3(a, d, table, matrix, reg, splits, chosen)
 
-    print(f"\n완료. 산출물 {d}")
+    print(f"\ndone. artefacts {d}")
 
 
 def _load_stage1(d: Path, base: FeatureRegistry, condition: str, table):
-    """저장된 1단계 피처를 되살린다. ★ 없으면 조용히 기초만 쓰지 않는다.
+    """Restores the stored stage-1 features. ★ Without them it does not
+    silently use the base alone.
 
-    ★ `table` 을 반드시 넘긴다 — `shape_level` 을 **다시 판정**하기
-    위해서다 (§30.12). 안 넘기면 기록된 값(대부분 없음 = False)을 쓰고,
-    그러면 **형상 수준 피처가 0개인 채로** 2·3단계가 돈다. 실제로 F1
-    2단계를 그 상태로 한 번 돌렸다 — `p.*` 분기가 0/10 이었는데 그것은
-    LLM 에 대한 관찰이 아니라 이 결함이었다 (D-67).
+    ★ `table` must be passed — so that `shape_level` is **re-judged**
+    (§30.12). Without it the recorded value is used (mostly absent = False),
+    and then stages 2 and 3 run **with 0 shape-level features**. F1 stage 2
+    really was run once in that state — `p.*` branches were 0/10, and that
+    was not an observation about the LLM but this defect (D-67).
     """
     from kernelrule.features.loader import extended_registry, load_generated
 
     path = d / "stage1-features" / "proposals.jsonl"
     if not path.exists():
         raise FileNotFoundError(
-            f"{path} 가 없다. --stage 2/3 는 1단계 산출물이 필요하다. "
-            "기초 레지스트리로 조용히 떨어지지 않는다 — 그러면 조건이 "
-            "바뀐 채로 돌게 된다 (§26.4).")
+            f"{path} does not exist. --stage 2/3 need the stage-1 "
+            f"artefacts. It does not silently fall back to the base registry "
+            f"— that would run with the condition changed (§26.4).")
     made = load_generated(path, exclude=set(base._items), table=table)
-    # ★ 검사기 결함으로 버려졌다가 **재검사로 되살아난 것**을 함께 읽는다
-    #   (`experiments/revalidate.py`). 원본 `proposals.jsonl` 은 안 고친다 —
-    #   "그때 무엇이 거부됐는지" 가 사라지면 안 된다 (문서 규칙 2).
+    # ★ It also reads what was thrown away by a checker defect and
+    #   **revived by re-checking** (`experiments/revalidate.py`). The
+    #   original `proposals.jsonl` is not edited — "what was refused at the
+    #   time" must not disappear (documentation rule 2).
     revive = path.parent / "revalidated.jsonl"
     if revive.exists():
         extra = load_generated(revive, exclude=set(base._items) |
                                {f.name for f in made}, table=table)
         if extra:
-            print(f"  ★ 재검사로 되살아난 {len(extra)}개를 더한다: "
+            print(f"  ★ adding {len(extra)} revived by re-checking: "
                   f"{[f.name for f in extra]}")
         made = [*made, *extra]
     return extended_registry(base, made, name=f"{condition}-loaded")

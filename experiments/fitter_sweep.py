@@ -1,9 +1,11 @@
-"""★ 적합기가 왜 절반은 안 움직이나 — 심플렉스 스텝을 쓸어본다. LLM 0회.
+"""★ Why the fitter does not move half the time — sweeping the simplex step.
+0 LLM calls.
 
     python3 experiments/fitter_sweep.py
 
-판정 기준은 **실험 전에** `docs/artifacts/fitter-sweep.md` 에 박아 뒀다.
-결과를 보고 기준을 정하면 오염이다 (D-50).
+The decision criteria were nailed down in `docs/artifacts/fitter-sweep.md`
+**before the experiment**. Setting the criteria after seeing the results is
+contamination (D-50).
 """
 
 from __future__ import annotations
@@ -26,9 +28,10 @@ from kernelrule.features import REGISTRY
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 RULES = Path("docs/artifacts/rules")
-#: (이름, SIMPLEX_SCALE, SIMPLEX_ABS)
-SWEEP = [("상대 0.6 (지금)", 0.6, 0.0), ("상대 1.5", 1.5, 0.0),
-         ("상대 4.0", 4.0, 0.0), ("절대 1.0", 0.0, 1.0), ("절대 5.0", 0.0, 5.0)]
+#: (name, SIMPLEX_SCALE, SIMPLEX_ABS)
+SWEEP = [("relative 0.6 (now)", 0.6, 0.0), ("relative 1.5", 1.5, 0.0),
+         ("relative 4.0", 4.0, 0.0), ("absolute 1.0", 0.0, 1.0),
+         ("absolute 5.0", 0.0, 5.0)]
 
 
 def main() -> None:
@@ -46,11 +49,12 @@ def main() -> None:
     index = json.loads((RULES / "index.json").read_text())
 
     print("=" * 78)
-    print("적합기 심플렉스 스텝 쓸기 — 판정 기준은 fitter-sweep.md 에 있다")
+    print("sweeping the fitter's simplex step — the decision criteria are in "
+          "fitter-sweep.md")
     print("=" * 78)
-    print(f"  {len(index)}규칙 x 2체제 = {len(index) * 2}회\n")
-    print(f"  {'설정':16s} {'움직임':>10} {'구조HO 중앙':>12} {'개선':>8} "
-          f"{'악화 건수':>9} {'evals 중앙':>10}")
+    print(f"  {len(index)} rules x 2 regimes = {len(index) * 2} runs\n")
+    print(f"  {'setting':18s} {'moved':>10} {'struct HO median':>18} "
+          f"{'gain':>8} {'worsened':>10} {'evals median':>14}")
 
     base_ho = None
     for label, scale, absst in SWEEP:

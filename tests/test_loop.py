@@ -1,4 +1,4 @@
-"""라운드 루프와 아카이브 (§13, §14)."""
+"""The round loop and the archive (§13, §14)."""
 from __future__ import annotations
 
 import numpy as np
@@ -24,30 +24,33 @@ def _elite(regret=1.2, short=1.2, long=1.2, n=100, rnd=0, rid="r1",
 
 
 # ---------------------------------------------------------------------------
-# 아카이브
+# The archive
 # ---------------------------------------------------------------------------
 def test_cell_axes_are_27_cells():
-    """★ 3x3x3 = 27 칸 (D-144). 옛 값은 4x4x4 = 64 였다."""
+    """★ 3x3x3 = 27 cells (D-144). The old value was 4x4x4 = 64."""
     assert len(CELL_AXIS_NAMES) == 3
     assert N_QUANTILES ** len(CELL_AXIS_NAMES) == 27
 
 
 def test_specialist_survives_even_with_bad_overall():
-    """★ 전체 점수가 낮아도 **특정 영역 최고면 살려둔다** (§13.1)."""
+    """★ Even with a poor overall score, **best in one region is kept
+    alive** (§13.1)."""
     a = Archive()
     a.consider(_elite(regret=1.12, short=1.20, long=1.10, rid="all"))
     won = a.consider(_elite(regret=1.24, short=1.02, long=1.40, rid="shortspec"))
-    assert "new_cell" in won, "짧은 형상 전문가가 버려졌다"
+    assert "new_cell" in won, "the short-shape specialist was discarded"
     assert a.best.rule_id == "all"
     assert any(e.rule_id == "shortspec" for e in a.cells.values())
 
 
 def test_noise_tolerance_blocks_meaningless_updates():
-    """"조금 좋아졌다" 로 **전역 최고**를 갱신하면 노이즈를 축적한다 (§13.4).
+    """Updating the **global best** on "slightly better" accumulates noise
+    (§13.4).
 
-    ⚠️ 2026-09-08 (D-144): 칸이 동적 3분위가 되면서 "빈 리스트" 로는 못
-    본다 — 후보가 둘이면 3분위가 둘을 **다른 칸**에 넣으므로 `new_cell`
-    이 정당하게 잡힌다. 이 시험이 지키려는 것은 **`best` 갱신**이다.
+    ⚠️ 2026-09-08 (D-144): with the cells now dynamic tertiles, "an empty
+    list" no longer shows it — with two candidates the tertiles put them in
+    **different cells**, so `new_cell` is legitimately taken. What this test
+    holds is the **`best` update**.
     """
     a = Archive(noise_tol=0.01)
     a.consider(_elite(regret=1.20, rid="a"))
@@ -57,7 +60,8 @@ def test_noise_tolerance_blocks_meaningless_updates():
 
 
 def test_parent_mix_is_exploit_explore_cross():
-    """★ 제안 6 = exploit 3 / explore 2 / cross 1 (D-144). 옛 값은 12=6/3/3."""
+    """★ 6 proposals = exploit 3 / explore 2 / cross 1 (D-144). The old
+    value was 12 = 6/3/3."""
     a = Archive()
     for i in range(9):
         a.consider(_elite(regret=1.3 - 0.01 * i, short=1.0 + 0.05 * i,
@@ -77,7 +81,7 @@ def test_new_cell_round_is_tracked():
 
 
 # ---------------------------------------------------------------------------
-# 루프
+# The loop
 # ---------------------------------------------------------------------------
 @pytest.fixture
 def loop(synth_table, tmp_path):
@@ -107,16 +111,17 @@ def test_loop_runs_and_fills_the_archive(loop):
 
 
 def test_llm_call_budget_matches_the_design(loop):
-    """라운드당 진단 1회 + 규칙 n회 (§11.1 — 호출의 약 89%가 RuleEditor)."""
+    """1 diagnosis + n rules per round (§11.1 — about 89% of the calls are
+    RuleEditor)."""
     loop.run(3, verbose=False)
     for i, r in enumerate(loop.rounds):
         assert r.llm_calls["rule_editor"] == loop.cfg.n_rules_per_round
-        # 1라운드는 아카이브가 비어 진단을 건너뛴다
+        # Round 1 has an empty archive, so it skips the diagnosis
         assert r.llm_calls["analyze"] == (0 if i == 0 else 1)
 
 
 def test_adversarial_mode_scores_nothing(synth_table, tmp_path):
-    """★ adversarial 모드에서는 **하나도 채점되면 안 된다** (§24.3)."""
+    """★ In adversarial mode **not one may be scored** (§24.3)."""
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.features import REGISTRY
@@ -132,7 +137,8 @@ def test_adversarial_mode_scores_nothing(synth_table, tmp_path):
                    llm=llm)
     r = lp.run_round()
     assert r.n_proposed == 12
-    assert r.n_scored == 0, f"적대적 코드가 {r.n_scored}개 채점됐다"
+    assert r.n_scored == 0, (
+        f"{r.n_scored} adversarial rules were scored")
     assert lp.archive.best is None
 
 
@@ -146,7 +152,7 @@ def test_loop_dump_writes_everything(loop, tmp_path):
 
 
 def test_replay_reproduces_the_run(synth_table, tmp_path):
-    """★ 같은 LLM 응답으로 결과가 재현된다 (§24.4)."""
+    """★ The same LLM responses reproduce the result (§24.4)."""
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.features import REGISTRY
@@ -173,7 +179,8 @@ def test_replay_reproduces_the_run(synth_table, tmp_path):
 
 
 def test_early_stop_uses_the_validation_split(loop):
-    """★ 조기 종료는 **검증 분할**로 판정한다 (§10.2, §14.3)."""
+    """★ Early stopping is judged on the **validation split** (§10.2,
+    §14.3)."""
     import inspect
     src = inspect.getsource(RoundLoop.should_stop)
     assert "self.splits.val" in src
@@ -181,34 +188,36 @@ def test_early_stop_uses_the_validation_split(loop):
 
 
 def test_early_stop_path_is_sealed(loop):
-    """★ 조기 종료 경로가 **봉인**됐다 (D-144).
+    """★ The early-stop path is **sealed** (D-144).
 
-    옛 구현은 `best_val_regret` 을 읽었다 — 검증 분할이 종료 판정에
-    들어가는 경로다. `patience=0` 이라 안 돌았지만 **누가 켜면 그 순간
-    시험이 오염된다.** 그래서 켜면 에러다.
+    The old implementation read `best_val_regret` — a path by which the
+    validation split enters the stopping verdict. It did not run because
+    `patience=0`, but **the moment someone turns it on the test is
+    contaminated.** So turning it on is an error.
 
-    옛 시험은 "점수가 멈춰도 새 셀이 나오면 계속 돈다 (§14.3)" 였다.
+    The old test was "even when the score stalls it keeps running if a new
+    cell appears (§14.3)".
     """
     loop.run(1, verbose=False)
     assert loop.cfg.patience == 0
     assert loop.should_stop() == (False, "")
     loop.cfg.patience = 2
-    with pytest.raises(ValueError, match="봉인"):
+    with pytest.raises(ValueError, match="sealed"):
         loop.should_stop()
 
 
 def test_duplicate_code_is_not_rescored(loop):
-    """같은 코드가 나오면 재채점하지 않는다 (§15.4)."""
+    """The same code is not rescored (§15.4)."""
     loop.run(2, verbose=False)
     assert len(loop._seen_code) <= sum(r.n_scored for r in loop.rounds)
 
 
 def test_seed_puts_the_baseline_in_the_archive(loop):
-    """★ 씨앗이 없으면 루프가 **다른 규칙의 리포트**를 본다.
+    """★ Without a seed the loop reads **the report of a different rule**.
 
-    손규칙을 기준선으로 "리포트를 읽고 그것을 고칠 수 있는가" 를 시험하려면
-    거기서 출발해야 한다. 처음 20라운드를 씨앗 없이 돌려서 실험 자체가
-    엉뚱한 것을 재고 있었다.
+    To test "can it read the report and fix that rule" with the hand rule as
+    the baseline, it has to start there. The first 20 rounds were run without
+    a seed and the experiment was measuring the wrong thing.
     """
     code = ("def score(f, p, hw, w):\n"
             "    return f.traffic_amplification * w[0]\n")
@@ -216,49 +225,54 @@ def test_seed_puts_the_baseline_in_the_archive(loop):
     assert loop.archive.best is not None
     assert loop.archive.best.rule_id == e.rule_id
     assert e.round == -1
-    # 같은 코드를 다시 채점하지 않는다
+    # The same code is not scored again
     assert code.strip() in loop._seen_code
 
 
 def test_seed_rejects_a_bad_rule(loop):
-    with pytest.raises(ValueError, match="초기 규칙이 거부됐다"):
+    with pytest.raises(ValueError, match="the initial rule was refused"):
         loop.seed("def score(f, p, hw, w):\n    return f.nope * w[0]\n", [1.0])
 
 
 def test_val_blowup_is_reported_not_hidden(loop):
-    """★ 아카이브는 **학습** 점수로 고른다 — 검증에서 무너지는 규칙이
-    "최고" 가 될 수 있다. 실제로 났다 (train 1.164 / val 6.085).
+    """★ The archive selects on the **training** score — a rule that
+    collapses on validation can become the "best". It really happened (train
+    1.164 / val 6.085).
 
-    선택 규칙은 그대로 두되(검증을 쓰면 홀드아웃이 오염된다) **경보를 낸다.**
+    The selection rule is left as it is (using validation would contaminate
+    the holdout), but **an alarm is raised.**
     """
     from kernelrule.core.archive import Elite
     from kernelrule.core.loop import VAL_GAP_ALARM
 
     loop.run(1, verbose=False)
-    # 진단 리포트가 최고 규칙을 컴파일하므로 유효한 코드여야 한다
+    # The diagnostic report compiles the best rule, so it must be valid
+    # code
     bad = Elite(rule_id="bad",
                 code="def score(f, p, hw, w):\n"
                      "    return f.waves * w[0]\n", w=[1.0], regret=1.0,
                 mem_objective=1.0, comp_objective=1.0, all_objective=1.0,
                 code_len=10, round=0,
-                # ★ 기본 채택 기준이 rank 다 (D-101). 없으면 아카이브가
-                #   **거부한다** — 조용히 regret 으로 안 떨어진다
+                # ★ The default acceptance criterion is rank (D-101).
+                #   Without it the archive **refuses** — it does not silently
+                #   fall back to regret
                 rank_loss=0.5,
                 val_regret=1.0 + VAL_GAP_ALARM * 10)
     loop.archive.consider(bad)
     r = loop.run_round()
-    assert r.n_val_blowups >= 1, "검증 폭발이 보고되지 않았다"
-    assert "폭발" in r.line()
+    assert r.n_val_blowups >= 1, "the validation blowup was not reported"
+    assert "blowups" in r.line()
 
 
 # ---------------------------------------------------------------------------
-# ★ 체제 균형 (§10.1) — 학습이 소수 체제를 희생하는 것을 막는다
+# ★ Regime balance (§10.1) — it stops training sacrificing a minority
+# regime
 # ---------------------------------------------------------------------------
 def test_regime_balance_flags_a_lopsided_train_split(real_bundle_path):
-    """★ `M > 2048` 이 학습을 82%/18% 로 가른다 — 경고해야 한다.
+    """★ `M > 2048` splits training 82%/18% — it must warn.
 
-    실측: 그 구성에서 진화가 전체 regret 을 1.177 -> 1.390 으로 악화시키면서
-    학습 점수는 1.201 -> 1.118 로 좋아졌다.
+    Measured: under that composition, evolution worsened overall regret from
+    1.177 to 1.390 while the training score improved from 1.201 to 1.118.
     """
     import warnings
 
@@ -275,7 +289,7 @@ def test_regime_balance_flags_a_lopsided_train_split(real_bundle_path):
                       and (tb.frame_for(p).align_b == 8).all()
                       and (tb.frame_for(p).align_c == 8).all())]
     sp = split_by_M_range(sh)
-    with pytest.warns(UserWarning, match="소수 체제"):
+    with pytest.warns(UserWarning, match="minority regime"):
         bal = check_balance(sp.train, tb.hw)
     assert not bal.ok
     assert bal.minority()[1] < MIN_REGIME_FRAC
@@ -283,7 +297,7 @@ def test_regime_balance_flags_a_lopsided_train_split(real_bundle_path):
 
 
 def test_regime_balance_accepts_a_crossing_split(real_bundle_path):
-    """체제를 가로지르는 분할은 통과한다 (실측 69%/31%)."""
+    """A split that crosses the regimes passes (69%/31% measured)."""
     import warnings
 
     import kernelrule.features.physical  # noqa: F401
@@ -299,12 +313,13 @@ def test_regime_balance_accepts_a_crossing_split(real_bundle_path):
                       and (tb.frame_for(p).align_b == 8).all()
                       and (tb.frame_for(p).align_c == 8).all())]
     sp = by_predicate(sh, lambda p: (p.N, p.K) == (11008, 4096), name="nk")
-    bal = check_balance(sp.train, tb.hw)      # 경고가 나면 안 된다
+    bal = check_balance(sp.train, tb.hw)      # it must not warn
     assert bal.ok and bal.counts["long"] == 16
 
 
 def test_balance_check_is_strictable():
-    """`strict=True` 면 에러다. 조용히 통과시키지 않는다 (§26.4)."""
+    """With `strict=True` it is an error. It is not waved through silently
+    (§26.4)."""
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.core.splits import Split, SplitError, check_balance
     from kernelrule.core.types import Hardware, Problem
@@ -314,15 +329,15 @@ def test_balance_check_is_strictable():
                   peak_tflops_f16=116.1, bandwidth_gbps=729.7,
                   l2_bytes=6291456)
     tiny = [Problem(1, 4096, 4096)] * 9 + [Problem(8192, 8192, 8192)]
-    with pytest.raises(SplitError, match="소수 체제"):
+    with pytest.raises(SplitError, match="minority regime"):
         check_balance(Split("train", tuple(tiny)), hw, strict=True)
 
 
 def test_cell_axes_use_roofline_regimes():
-    """★ 셀 축이 **roofline** 이다 (D-144).
+    """★ The cell axes are the **roofline** (D-144).
 
-    옛 축은 `code_len` + 크기 체제(SOL<0.5ms)였다. D-143 이 그 문턱을
-    방어할 수 없음을 보였고, D-144 가 축을 갈았다.
+    The old axes were `code_len` + the size regime (SOL<0.5ms). D-143 showed
+    that threshold could not be defended, and D-144 swapped the axes.
     """
     from kernelrule.core.archive import CELL_AXIS_NAMES
 
@@ -336,7 +351,8 @@ def test_regime_gap_is_exposed():
 
 
 def test_loop_warns_when_train_has_one_regime(synth_table, tmp_path):
-    """학습이 한 체제만 담으면 셀 축이 무의미해진다 — 경고한다."""
+    """If training holds only one regime the cell axes become meaningless —
+    it warns."""
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.core.splits import Split, SplitSet
@@ -347,12 +363,14 @@ def test_loop_warns_when_train_has_one_regime(synth_table, tmp_path):
     import math
 
     from kernelrule.core.splits import regime_of
-    # ★ 셀 축이 roofline 이 됐다 (D-144) — 경고도 그 축으로 본다.
+    # ★ The cell axes became the roofline (D-144) — the warning looks at
+    #   that axis too.
     del math
     short = [p for p in sh
              if regime_of(p, synth_table.hw, axis="roofline") == "mem"]
     if len(short) < 2 or len(short) == len(sh):
-        pytest.skip("합성 격자에 두 구간이 다 있어야 이 시험이 성립한다")
+        pytest.skip("this test needs both bands present in the synthetic "
+                    "grid")
     splits = SplitSet(train=Split("train", tuple(short)),
                       val=Split("val", tuple(p for p in sh
                                               if p not in short)))
@@ -360,23 +378,24 @@ def test_loop_warns_when_train_has_one_regime(synth_table, tmp_path):
     cfg = LoopConfig(run_id="one", n_rules_per_round=2, max_rounds=1,
                      max_evals=20, sandbox_first_seen=False,
                      out_dir=str(tmp_path))
-    with pytest.warns(UserWarning, match="한 roofline 구간"):
+    with pytest.warns(UserWarning, match="only one roofline band"):
         RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
                   llm=llm)
 
 
 # ---------------------------------------------------------------------------
-# LLM 전송 실패를 스키마 거부와 가른다 (D-43)
+# Telling LLM transport failures apart from schema refusals (D-43)
 # ---------------------------------------------------------------------------
-# HTTP 429(크레딧 소진)가 "거부 스키마 144건" 으로 집계됐다. 인프라 실패가
-# 로그에서 **모델의 실패로 보인다** — D-39 와 같은 부류다.
+# An HTTP 429 (exhausted credit) was tallied as "144 schema refusals". An
+# infrastructure failure **looks like a failure of the model** in the logs —
+# the same class as D-39.
 
 @pytest.mark.parametrize("exc,transport", [
     (RuntimeError("status_code: 429, body: You have no credits remaining"), True),
     (RuntimeError("invalid_api_key"), True),
     (ConnectionError("connection reset"), False),
     (ValueError("Exceeded maximum output retries (3)"), False),
-    (ValueError("가중치를 여러 항에 재사용했다"), False),
+    (ValueError("a weight is reused across terms"), False),
 ])
 def test_transport_errors_are_told_apart(exc, transport):
     from kernelrule.core.loop import _is_transport_error
@@ -393,25 +412,27 @@ def test_named_transport_exceptions_are_caught():
         pass
 
     for cls in (ModelHTTPError, APIConnectionError):
-        assert _is_transport_error(cls("무관한 본문"))
+        assert _is_transport_error(cls("an unrelated body"))
 
 
 def test_round_of_total_transport_failure_stops_the_run():
-    """★ 크레딧 문제는 저절로 낫지 않는다. 남은 라운드를 태우지 않는다."""
+    """★ A credit problem does not heal by itself. The remaining rounds
+    are not burned."""
     from kernelrule.core.loop import LLMUnreachable, RoundResult
 
     res = RoundResult(round=0, n_proposed=12, n_llm_error=12)
     res.rejections.append(("llm-transport", "429 no credits"))
     assert res.n_llm_error == res.n_proposed
-    assert "★LLM오류 12" in res.line()
+    assert "★LLM err 12" in res.line()
     assert issubclass(LLMUnreachable, RuntimeError)
 
 
 def test_dump_records_what_it_ran_with(loop, tmp_path):
-    """★ 무엇으로 돌렸는지 없으면 나중에 나란히 놓을 수 없다 (D-51).
+    """★ Without a record of what it ran with, they cannot be placed side
+    by side later (D-51).
 
-    30개 실행 중 2개만 `config.json` 이 있었다 — `dump()` 가 안 썼고,
-    그 둘은 다른 스크립트가 쓴 것이었다.
+    Only 2 of 30 runs had a `config.json` — `dump()` did not write it, and
+    those two were written by another script.
     """
     import json
 
@@ -420,14 +441,16 @@ def test_dump_records_what_it_ran_with(loop, tmp_path):
     assert cfg["split"]["n_train"] == len(loop.splits.train.shapes)
     assert cfg["split"]["n_val"] == len(loop.splits.val.shapes)
     assert cfg["n_features"] > 0
-    # MockLLM 이면 클래스 이름이라도 남아야 한다 — 빈칸이면 안 된다
+    # For MockLLM at least the class name must survive — it must not be
+    # blank
     assert cfg["llm"]
 
 
 # ---------------------------------------------------------------------------
-# D-75 — Analyst -> FeatureWriter 경로
+# D-75 — the Analyst -> FeatureWriter path
 # ---------------------------------------------------------------------------
-#: 씨앗 규칙. 미사용 피처가 남아야 목 Analyst 가 가설을 낸다.
+#: The seed rule. Unused features have to remain for the mock Analyst to
+#: produce hypotheses.
 _SEED_RULE = (("def score(f, p, hw, w):\n"
                "    return np.log2(f.traffic_amplification) * w[0]\n"), [1.0])
 
@@ -437,8 +460,8 @@ def _d75_loop(synth_table, tmp_path, *, cap: int):
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.features import REGISTRY, FeatureRegistry
 
-    # ★ 레지스트리를 **복제**한다. 루프가 여기에 축을 더하므로, 전역
-    #   `REGISTRY` 를 그대로 쓰면 다른 시험으로 새 나간다.
+    # ★ The registry is **copied**. The loop adds axes to it, so using the
+    #   global `REGISTRY` directly would leak into other tests.
     reg = FeatureRegistry("d75")
     for name in REGISTRY.names():
         reg.add(REGISTRY[name])
@@ -456,7 +479,8 @@ def _d75_loop(synth_table, tmp_path, *, cap: int):
 
 
 def test_feature_path_is_off_by_default(synth_table, tmp_path):
-    """★ 기본값은 **꺼짐**이다 — 지금까지의 실행과 같은 조건이어야 한다."""
+    """★ The default is **off** — it must be the same condition as the runs
+    so far."""
     loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
     assert loop.cfg.max_new_features_per_round == 0
     loop.seed(*_SEED_RULE)
@@ -467,32 +491,34 @@ def test_feature_path_is_off_by_default(synth_table, tmp_path):
 
 
 def test_analyst_request_reaches_the_feature_writer(synth_table, tmp_path):
-    """★ 요구가 **버려지지 않는다** (D-75).
+    """★ The request is **not thrown away** (D-75).
 
-    33실행에서 303번 채워진 필드를 `loop.py` 가 안 읽고 있었다. 경로가
-    생겼는지는 "요구가 있었다" 와 "피처 호출이 있었다" 로 본다.
+    `loop.py` was not reading a field that had been filled 303 times across
+    33 runs. Whether the path exists is checked by "there was a request" and
+    "there was a feature call".
     """
     loop, reg = _d75_loop(synth_table, tmp_path, cap=1)
     n_before = len(reg._items)
     loop.seed(*_SEED_RULE)
     r = loop.run_round()
-    assert r.n_feature_requests >= 1, "요구를 못 읽었다"
-    assert r.llm_calls.get("feature", 0) >= 1, "FeatureWriter 를 안 불렀다"
-    assert loop.features_made, "시도 기록이 없다"
+    assert r.n_feature_requests >= 1, "the request was not read"
+    assert r.llm_calls.get("feature", 0) >= 1, "FeatureWriter was not called"
+    assert loop.features_made, "there is no record of the attempt"
     row = loop.features_made[0]
-    assert row["requirement"], "요구 문장이 안 실렸다"
-    print("D-75 시도:", row)          # -s 로 보면 무엇이 만들어졌는지 나온다
+    assert row["requirement"], "the requirement sentence was not carried"
+    print("D-75 attempt:", row)   # with -s it shows what was built
     if row.get("accepted"):
         assert len(reg._items) == n_before + 1
         assert row["name"] in loop.matrix.feature_names() \
-            or row.get("shape_level"), "열이 안 만들어졌다"
+            or row.get("shape_level"), "the column was not built"
 
 
 def test_feature_writer_never_sees_the_diagnostic_report():
-    """★ 조건 1 — 진단 리포트를 주지 않는다 (D-75).
+    """★ Condition 1 — the diagnostic report is not given (D-75).
 
-    루프 안에서 만든 피처가 학습 형상에 맞춰지는 통로를 막는다. 넘어가는
-    것은 **요구 문장 하나**뿐이어야 한다.
+    It blocks the channel by which a feature built inside the loop could be
+    fitted to the training shapes. What crosses must be **one requirement
+    sentence** only.
     """
     import ast
     import inspect
@@ -500,79 +526,90 @@ def test_feature_writer_never_sees_the_diagnostic_report():
     from kernelrule.core import loop as loop_mod
     from kernelrule.core.loop import _feature_task
 
-    # (1) 요구 문장 **말고는 아무것도 변하지 않는다.** 문자열 포함 검사로
-    #     쓰면 안내문 자체("표도 사례도 보지 않고")에 걸린다 — 검사기가
-    #     자기가 허용한 문구를 금지하는 D-73 과 같은 실수다.
-    a = _feature_task("split-K 가 만드는 CTA 병렬성 이득")
-    b = _feature_task("L2 재사용 이득")
-    assert "split-K 가 만드는 CTA 병렬성 이득" in a
-    assert a.replace("split-K 가 만드는 CTA 병렬성 이득", "<X>") \
-        == b.replace("L2 재사용 이득", "<X>"), "요구 말고 다른 것이 변한다"
+    # (1) **Nothing changes except the requirement sentence.** Written as a
+    #     substring check it would catch the guidance text itself ("you see
+    #     no table and no cases") — the same mistake as D-73, where the
+    #     checker banned wording it had itself allowed.
+    a = _feature_task("the CTA parallelism gain split-K creates")
+    b = _feature_task("the L2 reuse gain")
+    assert "the CTA parallelism gain split-K creates" in a
+    assert a.replace("the CTA parallelism gain split-K creates", "<X>") \
+        == b.replace("the L2 reuse gain", "<X>"), (
+            "something other than the requirement changes")
 
-    # (2) 호출부가 **요구 문장 하나만** 넘긴다. 프롬프트 자리는 빈 문자열이다.
+    # (2) The call site passes **the requirement sentence only**. The prompt
+    #     slot is an empty string.
     import textwrap
     tree = ast.parse(textwrap.dedent(
         inspect.getsource(loop_mod.RoundLoop._write_features)))
     calls = [n for n in ast.walk(tree)
              if isinstance(n, ast.Call)
              and isinstance(n.func, ast.Attribute) and n.func.attr == "complete"]
-    assert len(calls) == 1, "FeatureWriter 호출이 하나가 아니다"
+    assert len(calls) == 1, "there is not exactly one FeatureWriter call"
     c = calls[0]
     assert c.args[0].value == "feature"
-    assert c.args[1].value == "", "프롬프트 자리에 리포트가 들어간다"
+    assert c.args[1].value == "", "the report goes into the prompt slot"
     kw = {k.arg for k in c.keywords}
-    assert kw == {"condition", "registry", "task"}, f"넘기는 것이 늘었다: {kw}"
+    assert kw == {"condition", "registry", "task"}, (
+        f"more is being passed: {kw}")
 
 
 def test_requirement_reads_the_old_field_name():
-    """두 이름을 다 읽는다 — 어느 쪽으로 만든 실행도 조용히 0건이 되면 안 된다."""
+    """Both names are read — a run made under either must not silently
+    become 0."""
     from kernelrule.core.loop import _requirement_of
 
-    assert _requirement_of({"needs_new_feature": "L2 재사용 이득"}) \
-        == "L2 재사용 이득"
-    # ★ 2026-08-28 에 잠깐 쓴 이름. 그때 만든 실행 3개를 계속 읽어야 한다
-    assert _requirement_of({"physical_requirement": "잠깐 쓴 이름"}) \
-        == "잠깐 쓴 이름"
+    assert _requirement_of({"needs_new_feature": "the L2 reuse gain"}) \
+        == "the L2 reuse gain"
+    # ★ The name used briefly on 2026-08-28. The 3 runs made then must still
+    #   be readable
+    assert _requirement_of({"physical_requirement": "the briefly used name"}) \
+        == "the briefly used name"
     assert _requirement_of({"needs_new_feature": None}) == ""
 
 
 def test_over_cap_requests_are_recorded_not_dropped(synth_table, tmp_path):
-    """★ 상한에 걸린 요구를 **조용히 버리지 않는다**.
+    """★ A request that hit the cap is **not dropped silently**.
 
-    상한은 §21 캐시 때문에 필요하지만, 넘친 요구를 안 남기면 "얼마나
-    요구했나" 를 못 잰다 — 그것이 D-75 의 주 관찰이다.
+    The cap is needed because of the §21 cache, but without recording the
+    overflow "how much was asked for" cannot be measured — and that is
+    D-75's main observation.
     """
     from kernelrule.core.loop import RoundResult
 
     loop, _reg = _d75_loop(synth_table, tmp_path, cap=1)
     res = RoundResult(round=0)
-    hyps = [{"id": "H0", "needs_new_feature": "L2 재사용 이득"},
-            {"id": "H1", "needs_new_feature": "CTA 절대 개수"},
-            {"id": "H2", "needs_new_feature": "split-K 병렬성 이득"}]
+    hyps = [{"id": "H0", "needs_new_feature": "the L2 reuse gain"},
+            {"id": "H1", "needs_new_feature": "the absolute CTA count"},
+            {"id": "H2", "needs_new_feature": "the split-K parallelism gain"}]
     loop._write_features(hyps, 0, res)
     assert res.n_feature_requests == 3
     assert res.n_feature_over_cap == 2
     over = [x for x in loop.features_made if x.get("over_cap")]
-    assert len(over) == 2, "상한 초과 요구가 기록되지 않았다"
+    assert len(over) == 2, "the over-cap requests were not recorded"
     assert {x["hypothesis_id"] for x in over} == {"H1", "H2"}
-    assert all(x["requirement"] for x in over), "요구 문장이 안 남았다"
+    assert all(x["requirement"] for x in over), (
+        "the requirement sentences did not survive")
 
 
 def test_analyze_prompt_matches_the_measured_baseline():
-    """★ 요구 필드 안내는 **기준선이 측정된 문구 그대로**여야 한다 (D-81).
+    """★ The guidance on the requirement field must be **exactly the
+    wording the baseline was measured with** (D-81).
 
-    17.9%(옛 6실행)는 아래 세 줄로 측정됐다. 여기에 무엇을 더하거나 빼면
-    비교 대상이 달라진다 — 실제로 안내를 늘렸다가 0~5.9% 로 눌렸다
-    (D-80). 억제 문구("대부분의 라운드에서는 null")도 **기준선의 일부**라
-    그대로 둔다.
+    The 17.9% (the old 6 runs) was measured with the three lines below.
+    Adding or removing anything here changes what is being compared — the
+    guidance really was expanded once and the rate was pressed down to
+    0~5.9% (D-80). The suppressing sentence ("in most rounds this is null")
+    is **part of the baseline** too, so it stays.
 
-    바꿔야 할 이유가 생기면 이 시험을 같이 고치고, **그 실행부터 새
-    계열**로 다뤄라.
+    If a reason to change it arises, change this test alongside and treat
+    **runs from that point on as a new family**.
     """
     from kernelrule.agents.openai_client import load_prompt
 
-    # ★ 2026-09-08 (D-146): 프롬프트가 영어가 됐다. **문구를 고정한다는
-    #   요구는 그대로다** — 여기서만 바꾸고 그 실행부터 새 계열로 다룬다.
+    # ★ 2026-09-08 (D-146): the prompt became English. **The requirement
+    #   to pin the wording is unchanged** — it is changed only here, and runs
+    #   from that point on are treated as a new family.
     baseline = (
         "In `measurable_with`, use **only names from the lists below**. If "
         "you need a\nquantity that is not listed, put its name in "
@@ -580,34 +617,41 @@ def test_analyze_prompt_matches_the_measured_baseline():
         "that many physical quantities).")
     txt = load_prompt("role/analyze.md")
     assert baseline in txt, (
-        "요구 필드 안내가 기준선 문구와 다르다. 그대로 두거나, 바꿀 거면 "
-        "이 시험을 고치고 새 계열로 다뤄라 (D-81)")
-    # 2026-08-28 에 넣었다가 되돌린 것들이 다시 들어오지 않았는가
-    for gone in ("physical_requirement", "전달되지 않고 버려집니다",
-                 "measurable_with 를 쓰는 편이 낫습니다"):
-        assert gone not in txt, f"되돌린 문구가 다시 들어왔다: {gone!r}"
+        "the guidance on the requirement field differs from the baseline "
+        "wording. Leave it, or if you change it, fix this test and treat it "
+        "as a new family (D-81)")
+    # Have the things added on 2026-08-28 and then reverted come back?
+    for gone in ("physical_requirement",
+                 "전달되지 않고 버려집니다",       # the old Korean wording
+                 "measurable_with 를 쓰는 편이 낫습니다",
+                 "is discarded rather than passed on",
+                 "you had better use measurable_with"):
+        assert gone not in txt, f"a reverted phrase came back: {gone!r}"
 
 
 # ---------------------------------------------------------------------------
 # §16.1 — Analyst ablation
 # ---------------------------------------------------------------------------
 def test_analyst_off_makes_no_analyze_call(synth_table, tmp_path):
-    """★ 끄면 진단 리포트를 **만들지도 않는다** (§16.1, D-89).
+    """★ With it off, the diagnostic report **is not even built** (§16.1,
+    D-89).
 
-    만들어 놓고 안 주면 "진단이 있는데 안 쓴다" 가 되어 조건이 달라진다.
-    호출 수와 가설 수 둘 다 0 이어야 한다.
+    Building it and not giving it would be "there is a diagnosis and it is
+    unused", a different condition. Both the call count and the hypothesis
+    count must be 0.
     """
     loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
     loop.cfg.use_analyst = False
     loop.seed(*_SEED_RULE)
     r = loop.run_round()
-    assert r.llm_calls.get("analyze", 0) == 0, "Analyst 를 껐는데 불렀다"
+    assert r.llm_calls.get("analyze", 0) == 0, (
+        "the Analyst is off yet it was called")
     assert loop.hypotheses == []
-    assert r.n_proposed > 0, "RuleEditor 는 그대로 돌아야 한다"
+    assert r.n_proposed > 0, "the RuleEditor must keep running"
 
 
 def test_analyst_on_is_the_default(synth_table, tmp_path):
-    """기본은 켬이다 — 지금까지의 모든 실행이 그 조건이다."""
+    """The default is on — every run so far is under that condition."""
     from kernelrule.core.loop import LoopConfig
 
     assert LoopConfig(run_id="x").use_analyst is True
@@ -618,9 +662,11 @@ def test_analyst_on_is_the_default(synth_table, tmp_path):
 
 
 def test_borrowed_hypotheses_skip_the_same_seed_index(synth_table, tmp_path):
-    """★ 대조군 C — `abl-B-s1` 의 가설을 `-s1` 에 주면 '다른 실행' 이 아니다.
+    """★ Control arm C — giving `abl-B-s1`'s hypotheses to `-s1` is not
+    "another run".
 
-    그리고 풀이 비면 **조용히 가설 없이 돌지 않는다** (§26.4).
+    And with an empty pool it **does not silently run without hypotheses**
+    (§26.4).
     """
     import json
 
@@ -633,7 +679,7 @@ def test_borrowed_hypotheses_skip_the_same_seed_index(synth_table, tmp_path):
     loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
     loop.cfg.use_analyst = False
     loop.cfg.hypothesis_pool = (str(pool),)
-    loop.cfg.run_id = "f1pipe-y-s1"          # 시드 번호가 다르다 -> 쓴다
+    loop.cfg.run_id = "f1pipe-y-s1"     # a different seed number -> used
     got = loop._pool_round(0)
     assert got and all("borrowed_from" in h for h in got)
     assert all("analyst_pass" not in h for h in got)
@@ -641,17 +687,19 @@ def test_borrowed_hypotheses_skip_the_same_seed_index(synth_table, tmp_path):
     loop2, _r2 = _d75_loop(synth_table, tmp_path, cap=0)
     loop2.cfg.use_analyst = False
     loop2.cfg.hypothesis_pool = (str(pool),)
-    loop2.cfg.run_id = "f1pipe-y-s0"          # ★ 같은 시드 번호 -> 뺀다
-    with pytest.raises(ValueError, match="가설 풀이 비었다"):
+    loop2.cfg.run_id = "f1pipe-y-s0"    # ★ the same seed number -> excluded
+    with pytest.raises(ValueError, match="hypothesis pool is empty"):
         loop2._pool_round(0)
 
 
 def test_borrowed_arm_calls_no_analyst_but_renders_the_section(synth_table,
                                                                tmp_path):
-    """★ C 는 Analyst 를 안 부르지만 **가설 절은 있어야 한다**.
+    """★ C does not call the Analyst but **the hypothesis section must
+    exist**.
 
-    A(가설 없음)와 C(남의 가설)를 프롬프트 구조까지 같게 만들면 무엇이
-    다른지 못 가른다 — C 의 차이는 **문장의 출처**뿐이어야 한다.
+    Making A (no hypothesis) and C (someone else's hypothesis) identical
+    down to the prompt structure makes it impossible to tell what differs —
+    C's only difference must be **the provenance of the sentences**.
     """
     import json
 
@@ -666,13 +714,14 @@ def test_borrowed_arm_calls_no_analyst_but_renders_the_section(synth_table,
     loop.cfg.hypothesis_pool = (str(pool),)
     loop.seed(*_SEED_RULE)
     r = loop.run_round()
-    assert r.llm_calls.get("analyze", 0) == 0, "C 인데 Analyst 를 불렀다"
-    assert loop.hypotheses, "빌려온 가설이 기록되지 않았다"
+    assert r.llm_calls.get("analyze", 0) == 0, (
+        "this is C, yet the Analyst was called")
+    assert loop.hypotheses, "the borrowed hypotheses were not recorded"
     assert all(h.get("analyst_pass") == 0 for h in loop.hypotheses)
 
 
 # ---------------------------------------------------------------------------
-# D-95 — 채점·적합 병렬화
+# D-95 — parallel scoring and fitting
 # ---------------------------------------------------------------------------
 def _parallel_pair(synth_table, tmp_path, workers: int):
     import kernelrule.features.physical  # noqa: F401
@@ -697,35 +746,41 @@ def _parallel_pair(synth_table, tmp_path, workers: int):
 
 
 def test_parallel_matches_sequential(synth_table, tmp_path):
-    """★ 병렬이 순차와 **완전히 같은 값**을 내야 한다 (D-95).
+    """★ Parallel must produce **exactly the same values** as sequential
+    (D-95).
 
-    다르면 `fit_weights` 안에 숨은 상태가 있다는 뜻이다. 빨라지는 것은
-    결과가 같을 때만 이득이고, 아니면 조건이 바뀐 것이다.
+    A difference means there is hidden state inside `fit_weights`. Being
+    faster is a gain only when the result is the same; otherwise the
+    condition changed.
 
-    ⚠️ 시간이 아니라 **값**을 본다 — "빠르다" 를 성능 지표로 쓰지 않는다
-    (원칙 29: D-89 에서 Analyst 를 끈 팔이 빨랐던 것은 일을 안 한 것이다).
+    ⚠️ It looks at the **values**, not the time — "it is fast" is not used as
+    a performance metric (principle 29: in D-89 the arm with the Analyst off
+    was fast because it did no work).
     """
     seq_r, seq = _parallel_pair(synth_table, tmp_path / "a", 0)
     par_r, par = _parallel_pair(synth_table, tmp_path / "b", 3)
-    assert seq, "순차에서 아무것도 안 나왔다 — 시험이 무의미하다"
-    assert seq == par, "병렬 결과가 순차와 다르다"
+    assert seq, ("the sequential run produced nothing — the test is "
+                 "meaningless")
+    assert seq == par, "the parallel result differs from the sequential one"
     for f in ("n_proposed", "n_scored", "n_accepted", "n_fit_moved",
               "n_rejected_static", "n_rejected_fit", "n_cells"):
         assert getattr(seq_r, f) == getattr(par_r, f), f
 
 
 def test_workers_default_is_sequential():
-    """기본은 순차다 — 지금까지의 모든 실행이 그 조건이다."""
+    """The default is sequential — every run so far is under that
+    condition."""
     from kernelrule.core.loop import LoopConfig
 
     assert LoopConfig(run_id="x").n_workers == 0
 
 
 def test_worker_does_not_do_the_sandbox(synth_table):
-    """★ 정적 검사·샌드박스는 **부모가** 한다 (D-95).
+    """★ The static checks and the sandbox are done by **the parent**
+    (D-95).
 
-    워커 안에서 `run_isolated` 를 부르면 프로세스가 중첩 spawn 된다.
-    그 둘은 라운드의 3% 라 병렬로 보낼 값어치도 없다.
+    Calling `run_isolated` inside a worker gives a nested process spawn.
+    Those two are 3% of a round, so they are not worth parallelising anyway.
     """
     import ast
     import inspect
@@ -741,14 +796,15 @@ def test_worker_does_not_do_the_sandbox(synth_table):
 
 
 # ---------------------------------------------------------------------------
-# D-96 — cross 계보 기록
+# D-96 — recording the cross lineage
 # ---------------------------------------------------------------------------
 def test_observation_keys_never_reach_the_prompt():
-    """★ `_` 로 시작하는 요청 키는 LLM 에 안 간다 (D-96).
+    """★ Request keys starting with `_` do not go to the LLM (D-96).
 
-    관찰용 부모 코드를 요청에 실었다. 그것이 프롬프트로 새면 `cross` 는
-    "부모 둘 + 부모 코드 또 둘" 을 받게 되고, 그러면 **관찰 장치가 조건을
-    바꾼다.** 여기서 막지 않으면 조용히 새는 종류의 오염이다.
+    The parent code was put into the request for observation. If that leaked
+    into the prompt, `cross` would receive "two parents + two more parent
+    codes", and then **the observation device changes the condition.**
+    Unblocked here, it is the kind of contamination that leaks silently.
     """
     from kernelrule.core.loop import RoundLoop
 
@@ -767,7 +823,8 @@ def test_observation_keys_never_reach_the_prompt():
 
 
 def test_cross_lineage_counts_mixing_not_just_presence():
-    """자식이 **두 부모 각각에만 있던** 피처를 둘 다 써야 `mixed` 다."""
+    """It is `mixed` only when the child used features unique to **each of
+    the two parents**."""
     import numpy as np
 
     from kernelrule.core.loop import RoundLoop
@@ -776,13 +833,15 @@ def test_cross_lineage_counts_mixing_not_just_presence():
     loop.cross_lineage = []
     loop._feats = ["waves", "tail_waste", "bytes_per_flop"]
     loop._shape_vals = []
-    # ★ `_record_cross` 가 예산을 본다. 없으면 `except` 가 삼켜서 피처
-    #   집합이 빈 채로 지나간다 — 실제로 그렇게 걸렸다.
+    # ★ `_record_cross` looks at the budget. Without it the `except`
+    #   swallows the error and the feature set passes through empty — that
+    #   really happened.
     loop._budget = 8
     loop._limits = None
-    # ★ 지수 자리 가드용 축 최소값 (D-112). 이것을 안 넣었을 때 `feats`
-    #   의 `except Exception` 이 `AttributeError` 를 삼켜 **또** 빈 집합이
-    #   나왔다 — 그래서 그 except 를 `SyntaxError` 로 좁혔다.
+    # ★ The per-axis minima for the exponent guard (D-112). Without them,
+    #   `feats`' `except Exception` swallowed an `AttributeError` and the
+    #   set came out empty **again** — which is why that except was narrowed
+    #   to `SyntaxError`.
     loop._fmins = {}
 
     def _code(*fs):
@@ -791,22 +850,24 @@ def test_cross_lineage_counts_mixing_not_just_presence():
 
     a, b = _code("waves"), _code("tail_waste")
     loop._record_cross(0, [a, b], _code("waves", "tail_waste"))
-    loop._record_cross(0, [a, b], a)                  # 한쪽을 그대로
-    loop._record_cross(0, [a, a], _code("waves"))     # 섞을 것이 없다
+    loop._record_cross(0, [a, b], a)               # one side copied whole
+    loop._record_cross(0, [a, a], _code("waves"))  # nothing to mix
     m, c, same = loop.cross_lineage
     assert m["mixed"] and m["mixable"] and not m["copied"]
     assert not c["mixed"] and c["copied"]
-    assert not same["mixable"], "고유 항이 없으면 분모에서 빠져야 한다"
+    assert not same["mixable"], (
+        "with no unique terms it must drop out of the denominator")
     assert np is not None
 
 
 # ---------------------------------------------------------------------------
-# D-104 — 목적함수 전환
+# D-104 — the objective switch
 # ---------------------------------------------------------------------------
 def test_switch_requires_matching_start():
-    """★ 시작 목적함수가 switch 앞쪽과 다르면 **멈춘다.**
+    """★ If the starting objective differs from the left-hand side of the
+    switch, it **stops**.
 
-    조용히 다른 실험이 되면 안 된다 (§26.4).
+    It must not silently become a different experiment (§26.4).
     """
     import pytest
 
@@ -816,15 +877,16 @@ def test_switch_requires_matching_start():
     loop.cfg = type("C", (), {"objective_switch": "rank->regret",
                               "switch_window": 3,
                               "switch_min_improve": 0.01})()
-    loop._objective = "regret"          # ← 어긋난다
+    loop._objective = "regret"          # <- mismatched
     loop._switched = False
     loop.rounds = [RoundResult(round=i, best_rank_loss=1.0) for i in range(5)]
-    with pytest.raises(ValueError, match="시작 목적함수"):
+    with pytest.raises(ValueError, match="the starting objective"):
         loop._maybe_switch()
 
 
 def test_switch_fires_only_when_improvement_stalls():
-    """개선이 문턱 미만일 때만 바꾼다. 그리고 **한 번뿐이다.**"""
+    """It switches only when the improvement is below the threshold. And
+    **only once.**"""
     from kernelrule.core.loop import RoundLoop, RoundResult
 
     calls = []
@@ -841,17 +903,18 @@ def test_switch_fires_only_when_improvement_stalls():
         return [RoundResult(round=i, best_rank_loss=v)
                 for i, v in enumerate(vals)]
 
-    loop.rounds = rounds([1.00, 0.90, 0.80, 0.70])   # 30% 개선
+    loop.rounds = rounds([1.00, 0.90, 0.80, 0.70])   # 30% improvement
     assert loop._maybe_switch() is False and not calls
-    loop.rounds = rounds([1.00, 0.999, 0.998, 0.997])  # 0.3% 개선
+    loop.rounds = rounds([1.00, 0.999, 0.998, 0.997])  # 0.3% improvement
     assert loop._maybe_switch() is True and calls == ["regret"]
-    # ★ 두 번은 안 바뀐다 — 두 번이면 "언제 바꾸나" 가 둘이 된다
+    # ★ It does not switch twice — twice would make two "when do we
+    #   switch" decisions
     loop._objective = "rank"
     assert loop._maybe_switch() is False and calls == ["regret"]
 
 
 def test_switch_needs_enough_rounds():
-    """창 크기보다 라운드가 적으면 판단하지 않는다."""
+    """With fewer rounds than the window it makes no verdict."""
     from kernelrule.core.loop import RoundLoop, RoundResult
 
     loop = RoundLoop.__new__(RoundLoop)

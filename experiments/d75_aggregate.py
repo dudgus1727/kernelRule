@@ -1,13 +1,15 @@
-"""★ 실행 단위 집계 — D-75 요구 빈도와 D-78 분기 상수. **LLM 호출 0회**.
+"""★ The per-run aggregate — the D-75 requirement frequency and the D-78
+branch constants. **0 LLM calls**.
 
     python3 experiments/d75_aggregate.py 'F3hg-p8-d75-b-s*'
 
-**표본 하나 = 실행 하나다** (원칙 28). 한 실행의 가설/제안은 같은 씨앗과
-계보에서 나오므로 독립이 아니다 — 제안 단위로 세면 n 이 부풀고 한 실행의
-습관이 모집단 비율로 읽힌다 (D-79 철회, D-80).
+**One sample = one run** (principle 28). The hypotheses and proposals of one
+run come from the same seed and lineage, so they are not independent —
+counting per proposal inflates n and reads one run's habit as a population
+rate (D-79 retracted, D-80).
 
-기준선은 `F3rw-p8-s*` 6실행이다 — 같은 조건(F3 사람24), 같은
-모델(`gpt-5.6-luna` medium), 같은 라운드 구간.
+The baseline is the 6 `F3rw-p8-s*` runs — the same condition (F3, the human
+24), the same model (`gpt-5.6-luna` medium), the same round band.
 """
 
 from __future__ import annotations
@@ -18,9 +20,10 @@ import json
 from pathlib import Path
 
 BASELINE = "F3rw-p8-s*"
-#: 옛 실행은 12라운드다. 새 실행이 4라운드면 **같은 구간만** 본다 (원칙 4).
+#: The old runs are 12 rounds. If a new run is 4 rounds, **only the same band**
+#: is looked at (principle 4).
 MAX_ROUND = 3
-#: 실행당 optimize 호출 상한 = 라운드 x 12.
+#: The per-run cap on optimize calls = rounds x 12.
 MAX_OPT = (MAX_ROUND + 1) * 12
 _DODGE = ("np.isfinite(", "np.sign(")
 
@@ -54,7 +57,8 @@ def per_run(pattern: str) -> list[dict]:
             if not ln.strip():
                 continue
             h = json.loads(ln)
-            # ★ 1차 Analyst 만. 옛 실행은 라운드당 Analyst 가 한 번이었다.
+            # ★ The 1st Analyst only. In the old runs there was one Analyst
+            #   per round.
             if h.get("analyst_pass", 1) != 1 or h.get("round", 0) > MAX_ROUND:
                 continue
             n += 1
@@ -87,15 +91,16 @@ def main() -> None:
 
     old, new = per_run(a.baseline), per_run(a.pattern)
     if not new:
-        raise SystemExit(f"{a.pattern} 에 맞는 실행이 없다")
+        raise SystemExit(f"there is no run matching {a.pattern}")
 
     print("=" * 76)
-    print(f"실행 단위 집계 (r0~r{MAX_ROUND}) — 표본 하나 = 실행 하나 (원칙 28)")
+    print(f"the per-run aggregate (r0~r{MAX_ROUND}) — one sample = one run "
+          f"(principle 28)")
     print("=" * 76)
-    for lbl, rows in (("기준선", old), ("새 조건", new)):
-        print(f"\n{lbl} {len(rows)}실행")
-        print(f"  {'실행':32s} {'요구':>10} {'r0~r1':>9} "
-              f"{'리터럴비교':>10} {'우회':>8}")
+    for lbl, rows in (("the baseline", old), ("the new condition", new)):
+        print(f"\n{lbl}, {len(rows)} runs")
+        print(f"  {'run':32s} {'req':>10} {'r0~r1':>9} "
+              f"{'literal cmp':>12} {'dodge':>8}")
         for r in rows:
             e = r["early"]
             print(f"  {r['run']:32s} {r['k']:2d}/{r['n']:2d}={r['rate']:5.1%} "
@@ -105,22 +110,27 @@ def main() -> None:
 
     ro = [r["rate"] for r in old]
     rn = [r["rate"] for r in new]
-    print("\n★ 요구 빈도 — Mann-Whitney U (단측: 새 < 옛)")
-    print(f"   옛 {[f'{x:.1%}' for x in ro]}")
-    print(f"   새 {[f'{x:.1%}' for x in rn]}")
+    print("\n★ the requirement frequency — Mann-Whitney U (one-sided: new < "
+          "old)")
+    print(f"   old {[f'{x:.1%}' for x in ro]}")
+    print(f"   new {[f'{x:.1%}' for x in rn]}")
     pv = mannwhitneyu(ro, rn, alternative="greater").pvalue
     floor = mannwhitneyu([1] * len(ro), [0] * len(rn),
                          alternative="greater").pvalue
-    print(f"   p = {pv:.4f}   (완전 분리 시 최소 가능 p = {floor:.5f})")
-    print("   " + ("★ 여전히 눌린다" if pv < 0.05 else
-                   "★ 기준선과 구분 불가 — '같다' 가 아니다 (원칙 27)"))
+    print(f"   p = {pv:.4f}   (the smallest possible p under complete "
+          f"separation = {floor:.5f})")
+    print("   " + ("★ it is still suppressed" if pv < 0.05 else
+                   "★ indistinguishable from the baseline — that is not "
+                   "'the same' (principle 27)"))
 
-    print("\n★ D-78 분기 상수 — 실행 단위 (한 번이라도 쓴 실행)")
-    for key, lbl in (("lit", "리터럴 비교"), ("dodge", "우회 isfinite/sign")):
+    print("\n★ the D-78 branch constants — per run (runs that used one at "
+          "least once)")
+    for key, lbl in (("lit", "literal comparison"),
+                     ("dodge", "dodge isfinite/sign")):
         ao = sum(1 for r in old if r[key] > 0)
         an = sum(1 for r in new if r[key] > 0)
         p = fisher_exact([[ao, len(old) - ao], [an, len(new) - an]])[1]
-        print(f"   {lbl:20s} 옛 {ao}/{len(old)}  새 {an}/{len(new)}  "
+        print(f"   {lbl:22s} old {ao}/{len(old)}  new {an}/{len(new)}  "
               f"Fisher p = {p:.4f}")
 
 

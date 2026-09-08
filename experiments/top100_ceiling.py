@@ -1,26 +1,36 @@
-"""★ 상위 100 안에서 피처가 후보를 가를 수 있나 — **상한**. LLM 0회.
+"""★ Can the features separate the candidates within the top 100 — **the
+ceiling**. 0 LLM calls.
 
     python3 experiments/top100_ceiling.py
 
-## 왜 진화 **전에** 재나
+## Why it is measured **before** the evolution
 
-손실을 아무리 잘 설계해도 넘을 수 없는 벽이 있다.
-
-```
-상위 100 안에서 피처값이 거의 같다   ★ 어떤 손실로도 못 배운다
-상위 100 안에서 피처값이 다르다      배울 수 있다 — 손실 설계가 값한다
-```
-
-그리고 이 값이 **판정을 읽는 근거**가 된다. tau 가 안 오를 때
-"손실이 나쁜가" 와 "피처가 못 재는가" 를 이것으로 가른다.
-
-## ★ 형상 수준 피처는 상한에 못 들어간다
+However well the loss is designed, there is a wall it cannot cross.
 
 ```
-p. 피처 5개   한 형상 안에서 **상수**다 -> 후보를 가르는 데 0 기여
-             `np.where(p.is_memory_bound, ...)` 분기로만 쓰인다
-f. 피처 19개  ★ 여기가 전부다
+the feature values are nearly the same within the top 100
+                                    ★ no loss can learn it
+the feature values differ within the top 100
+                                    it can be learned — designing the loss
+                                    is worth it
 ```
+
+And this value becomes **the ground for reading the verdict**. When tau does
+not rise, it separates "is the loss bad" from "can the features not measure
+it".
+
+## ★ A shape-level feature cannot enter the ceiling
+
+```
+the 5 p. features   they are **constant** within one shape -> 0 contribution
+                    to separating candidates
+                    they are only used as a branch,
+                    `np.where(p.is_memory_bound, ...)`
+the 19 f. features  ★ this is all of it
+```
+
+⚠️ 2026-09-08 (D-146): **the two block labels stay in Korean.** They are the
+top-level keys of `top100-ceiling.json`, and `docs/` is not translated.
 """
 
 from __future__ import annotations
@@ -68,28 +78,31 @@ def _report(label, table, matrix, shapes, out: dict) -> None:
         t = np.asarray(table.times_of(p))
         tops[p.key] = np.argsort(t, kind="stable")[:TOP_N]
 
-    # -- 시간 자체 --------------------------------------------------------
+    # -- the times themselves ---------------------------------------------
     span, uniq_t = [], []
     for p in shapes:
         t = np.asarray(table.times_of(p))[tops[p.key]]
         span.append(float(t.max() / t.min() - 1.0))
         uniq_t.append(int(len(np.unique(t))))
-    print(f"  {len(shapes)}형상, 상위 {TOP_N}")
-    print(f"  시간 폭 (최악/최적 - 1)   중앙 {np.median(span):.1%}  "
-          f"범위 {min(span):.1%}~{max(span):.1%}")
-    print(f"  고유 시간값               중앙 {int(np.median(uniq_t))}  "
-          f"범위 {min(uniq_t)}~{max(uniq_t)}")
+    print(f"  {len(shapes)} shapes, the top {TOP_N}")
+    print(f"  the time span (worst/best - 1)   median {np.median(span):.1%}  "
+          f"range {min(span):.1%}~{max(span):.1%}")
+    print(f"  distinct time values             median "
+          f"{int(np.median(uniq_t))}  "
+          f"range {min(uniq_t)}~{max(uniq_t)}")
 
-    # -- f. 피처가 가르나 --------------------------------------------------
-    print(f"\n  ★ config 수준 피처 {len(feats)}개 — 상위 {TOP_N} 안에서")
-    print(f"  {'피처':24s} {'고유값 중앙':>10} {'변동계수 중앙':>12} "
-          f"{'상수인 형상':>11}")
+    # -- do the f. features separate --------------------------------------
+    print(f"\n  ★ the {len(feats)} config-level features — within the top "
+          f"{TOP_N}")
+    print(f"  {'feature':24s} {'uniq median':>12} {'cv median':>11} "
+          f"{'constant in':>12}")
     frows = {}
     for name in feats:
         u, cv, const = [], [], 0
         for p in shapes:
-            # ★ 형상별 열을 직접 쓴다. 전역 `column()` 은 이어붙인 것이라
-            #   형상 경계를 다시 계산해야 하고, 그러면 정의가 둘이 된다.
+            # ★ The per-shape column is used directly. The global `column()`
+            #   is concatenated, so the shape boundaries would have to be
+            #   recomputed, and then the definition would be in two places.
             f_, _info = matrix.for_shape(p)
             v = np.asarray(getattr(f_, name))[tops[p.key]]
             v = v[np.isfinite(v)]
@@ -103,17 +116,19 @@ def _report(label, table, matrix, shapes, out: dict) -> None:
         frows[name] = {"uniq_median": float(np.median(u)),
                        "cv_median": float(np.median(cv)),
                        "n_const": const}
-        print(f"  {name:24s} {np.median(u):10.1f} {np.median(cv):12.4f} "
-              f"{const:8d}/{len(shapes)}")
+        print(f"  {name:24s} {np.median(u):12.1f} {np.median(cv):11.4f} "
+              f"{const:9d}/{len(shapes)}")
 
     n_dead = sum(1 for v in frows.values() if v["uniq_median"] <= 1.0)
     n_flat = sum(1 for v in frows.values() if v["cv_median"] < 0.01)
-    print(f"\n  ★ 상위 {TOP_N} 안에서 중앙적으로 **상수**인 피처 "
-          f"{n_dead}/{len(feats)}")
-    print(f"  ★ 변동계수 1% 미만(사실상 평평)인 피처 {n_flat}/{len(feats)}")
+    print(f"\n  ★ features that are **constant** at the median within the top "
+          f"{TOP_N}: {n_dead}/{len(feats)}")
+    print(f"  ★ features with a cv under 1% (effectively flat): "
+          f"{n_flat}/{len(feats)}")
 
-    # -- config 축 분포 ---------------------------------------------------
-    print(f"\n  ★ config 축 — 상위 {TOP_N} 안의 값 종류 (형상별 중앙)")
+    # -- the distribution of the config axes -------------------------------
+    print(f"\n  ★ the config axes — how many distinct values within the top "
+          f"{TOP_N} (median per shape)")
     arows = {}
     for ax in AXES:
         u = []
@@ -125,9 +140,9 @@ def _report(label, table, matrix, shapes, out: dict) -> None:
             u.append(int(len(np.unique(v))))
         if u:
             arows[ax] = float(np.median(u))
-            print(f"    {ax:16s} {np.median(u):5.1f}종")
+            print(f"    {ax:16s} {np.median(u):5.1f} kinds")
 
-    # -- 최적과 2~10등의 축 거리 -------------------------------------------
+    # -- the axis distance between the optimum and places 2~10 -------------
     dist = []
     for p in shapes:
         df = table.frame_for(p)
@@ -137,11 +152,12 @@ def _report(label, table, matrix, shapes, out: dict) -> None:
         base = arr[top[0]]
         for r in top[1:10]:
             dist.append(int((arr[r] != base).sum()))
-    print(f"\n  ★ 최적과 2~10등이 **몇 축** 다른가: 중앙 "
-          f"{int(np.median(dist))}  범위 {min(dist)}~{max(dist)}  "
-          f"(축 {len(AXES)}개 중)")
-    print(f"     0축 다름(완전 동일) {sum(1 for d in dist if d == 0)}"
-          f"/{len(dist)}쌍")
+    print(f"\n  ★ **how many axes** the optimum and places 2~10 differ in: "
+          f"median {int(np.median(dist))}  range {min(dist)}~{max(dist)}  "
+          f"(out of {len(AXES)} axes)")
+    print(f"     0 axes different (identical) "
+          f"{sum(1 for d in dist if d == 0)}"
+          f"/{len(dist)} pairs")
 
     out[label] = {"n_shapes": len(shapes), "top_n": TOP_N,
                   "span_median": float(np.median(span)),

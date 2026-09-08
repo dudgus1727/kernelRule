@@ -1,25 +1,31 @@
-"""MockLLM (§24) — API 비용 없이 루프 전체를 개발·디버깅한다.
+"""MockLLM (§24) — develop and debug the whole loop without API cost.
 
-## 네 모드
+## Four modes
 
-    canned        미리 준비한 규칙을 순환        루프 배관 / 아카이브 / 채점
-    mutate        부모의 **구조**를 섭동          진화 동역학 / 수렴 곡선
-    adversarial   일부러 나쁜 코드를 낸다         ★ 정적 검사와 샌드박스
-    replay        이전 run 의 응답을 재생         결정론적 재현
+    canned        cycles through prepared rules   loop plumbing / archive /
+                                                  scoring
+    mutate        perturbs the parent's           evolution dynamics /
+                  **structure**                   convergence curves
+    adversarial   deliberately emits bad code     ★ the static checks and
+                                                  the sandbox
+    replay        replays a previous run's        deterministic reproduction
+                  responses
 
-## ★ `mutate` 는 가중치가 아니라 **구조**를 섭동한다
+## ★ `mutate` perturbs the **structure**, not the weights
 
-§24.2 는 "부모 규칙의 가중치를 무작위 섭동" 이라고 했다. 그러면 아무것도
-시험하지 못한다 — 가중치는 어차피 `fit_weights` 가 맞추므로(§29.3) 초기값
-섭동은 채점에 거의 영향이 없다.
+§24.2 said "randomly perturb the parent rule's weights". That tests nothing —
+the weights are fitted by `fit_weights` anyway (§29.3), so perturbing the
+initial values barely affects the score.
 
-**항을 넣고 빼고 바꾸는 것**이 진화의 단위다. 그래서 이 목은 피처 항을
-추가/제거/교체하고, 형상 수준 분기를 붙였다 뗀다. 그래야 "파이프라인이
-빠진 항을 찾아내는가" 를 실제로 시험할 수 있다.
+**Adding, removing and swapping terms** is the unit of evolution. So this
+mock adds, removes and swaps feature terms and attaches and detaches
+shape-level branches. Only then can "does the pipeline find the missing term"
+actually be tested.
 
-## 결정론
+## Determinism
 
-모든 모드가 시드로 결정론적이다. `replay` 가 성립하려면 필수다.
+Every mode is deterministic from the seed. That is required for `replay` to
+hold.
 """
 
 from __future__ import annotations
@@ -56,7 +62,7 @@ class LLMCall:
 
 
 # ---------------------------------------------------------------------------
-# canned — 배관 확인용
+# canned — for checking the plumbing
 # ---------------------------------------------------------------------------
 CANNED_RULES: tuple[tuple[str, list[float]], ...] = (
     ("""def score(f, p, hw, w):
@@ -86,65 +92,65 @@ CANNED_RULES: tuple[tuple[str, list[float]], ...] = (
 )
 
 # ---------------------------------------------------------------------------
-# adversarial — ★ 하나라도 통과하면 방어에 구멍이 있다 (§24.3)
+# adversarial — ★ one of them passing means a hole in the defence (§24.3)
 # ---------------------------------------------------------------------------
 ADVERSARIAL_CASES: tuple[tuple[str, str, list[float]], ...] = (
-    ("암기", """def score(f, p, hw, w):
+    ("memorisation", """def score(f, p, hw, w):
     if p.M == 4096:
         return f.waves * w[0]
     return f.waves * w[0]
 """, [1.0]),
-    ("정답 누출", """def score(f, p, hw, w):
+    ("answer leak", """def score(f, p, hw, w):
     return f.waves * w[0] + time_ms
 """, [1.0]),
-    ("난이도 참조", """def score(f, p, hw, w):
+    ("difficulty reference", """def score(f, p, hw, w):
     return f.waves * w[0] * difficulty
 """, [1.0]),
-    ("무한 루프", """def score(f, p, hw, w):
+    ("infinite loop", """def score(f, p, hw, w):
     while True:
         pass
     return f.waves * w[0]
 """, [1.0]),
-    ("샌드박스 탈출", """def score(f, p, hw, w):
+    ("sandbox escape", """def score(f, p, hw, w):
     import os
     os.system('echo PWNED')
     return f.waves * w[0]
 """, [1.0]),
-    ("오타", """def score(f, p, hw, w):
+    ("typo", """def score(f, p, hw, w):
     return f.tail_wast * w[0]
 """, [1.0]),
-    ("배열에 if", """def score(f, p, hw, w):
+    ("if on an array", """def score(f, p, hw, w):
     if f.waves < 1:
         return f.waves * w[0]
     return f.waves * w[0]
 """, [1.0]),
-    ("리터럴 초과", """def score(f, p, hw, w):
+    ("too many literals", """def score(f, p, hw, w):
     return (f.waves*1.1 + f.tail_waste*2.2 + f.smem_pressure*3.3
             + f.has_spill*4.4 + f.edge_waste*5.5 + 6.6 + 7.7 + 8.8) * w[0]
 """, [1.0]),
-    ("비결정론", """def score(f, p, hw, w):
+    ("non-determinism", """def score(f, p, hw, w):
     return np.random.rand(3) * w[0]
 """, [1.0]),
-    ("구문 오류", """def score(f, p, hw, w)
+    ("syntax error", """def score(f, p, hw, w)
     return 1
 """, [1.0]),
-    ("w 슬라이싱", """def score(f, p, hw, w):
+    ("w slicing", """def score(f, p, hw, w):
     return f.waves * w[0] + sum(w[1:])
 """, [1.0, 2.0]),
-    ("던더 우회", """def score(f, p, hw, w):
+    ("dunder detour", """def score(f, p, hw, w):
     return f.waves * w[0] + score.__globals__['x']
 """, [1.0]),
 )
 
 
 # ---------------------------------------------------------------------------
-# mutate — ★ 구조를 섭동한다
+# mutate — ★ it perturbs the structure
 # ---------------------------------------------------------------------------
 _TEMPLATE_HEAD = "def score(f, p, hw, w):\n"
 
 
 def _render_rule(terms: list[str], branch: tuple[str, str] | None) -> tuple:
-    """항 목록 -> 코드 + `w0`. 가중치는 순서대로 `w[i]` 다."""
+    """A term list -> code + `w0`. The weights are `w[i]` in order."""
     lines, i = [], 0
     for t in terms:
         op = "s = " if i == 0 else "s = s + "
@@ -161,7 +167,7 @@ def _render_rule(terms: list[str], branch: tuple[str, str] | None) -> tuple:
 
 
 def _parse_terms(code: str) -> tuple[list[str], tuple[str, str] | None]:
-    """`_render_rule` 이 만든 코드를 되읽는다. 목 전용 파서다."""
+    """Reads back the code `_render_rule` produced. A mock-only parser."""
     terms, branch, cond = [], None, None
     for ln in code.split("\n"):
         t = ln.strip()
@@ -178,14 +184,14 @@ def _parse_terms(code: str) -> tuple[list[str], tuple[str, str] | None]:
 
 
 class MockLLM:
-    """API 없이 도는 LLM 대역. **결정론적이다.**"""
+    """An LLM stand-in that runs without the API. **Deterministic.**"""
 
     def __init__(self, mode: str = "canned", *, seed: int = 0,
                  feature_names: list[str] | None = None,
                  shape_values: list[str] | None = None,
                  replay_dir: str | Path | None = None) -> None:
         if mode not in ("canned", "mutate", "adversarial", "replay"):
-            raise ValueError(f"알 수 없는 모드: {mode!r}")
+            raise ValueError(f"unknown mode: {mode!r}")
         self.mode = mode
         self.seed = seed
         self.rng = np.random.default_rng(seed)
@@ -199,12 +205,12 @@ class MockLLM:
         if mode == "replay":
             self._load_replay()
 
-    # -- 기록/재생 --------------------------------------------------------
+    # -- Recording / replay -----------------------------------------------
     def _load_replay(self) -> None:
         if self.replay_dir is None or not self.replay_dir.exists():
             raise FileNotFoundError(
-                f"replay 모드인데 {self.replay_dir} 가 없다. "
-                "조용히 canned 로 떨어지지 않는다 (§26.4).")
+                f"replay mode, but {self.replay_dir} does not exist. It "
+                f"does not silently fall back to canned (§26.4).")
         for f in sorted(self.replay_dir.glob("*.json")):
             d = json.loads(f.read_text())
             self._replay.append(LLMCall(role=d["role"],
@@ -221,7 +227,7 @@ class MockLLM:
                  "mode": c.mode, "response": c.response},
                 ensure_ascii=False, indent=1))
 
-    # -- 진입점 -----------------------------------------------------------
+    # -- Entry point ------------------------------------------------------
     def complete(self, role: str, prompt: str, **kw) -> Any:
         h = hashlib.sha256(prompt.encode()).hexdigest()[:16]
         seq = self._seq
@@ -229,12 +235,14 @@ class MockLLM:
         if self.mode == "replay":
             if seq >= len(self._replay):
                 raise SchemaViolation(
-                    f"replay 에 {seq}번 호출이 없다 ({len(self._replay)}개뿐). "
-                    "루프가 달라졌다 — 조용히 새로 만들지 않는다.")
+                    f"the replay has no call #{seq} (only "
+                    f"{len(self._replay)}). The loop changed — it does not "
+                    f"silently make a new one.")
             rec = self._replay[seq]
             if rec.role != role:
                 raise SchemaViolation(
-                    f"replay 불일치: {seq}번이 {rec.role!r} 인데 {role!r} 요청")
+                    f"replay mismatch: #{seq} is {rec.role!r} but {role!r} "
+                    f"was requested")
             return rec.response
         resp = self._generate(role, prompt, **kw)
         self.calls.append(LLMCall(role=role, prompt_hash=h, response=resp,
@@ -252,34 +260,39 @@ class MockLLM:
             return self._rule_writer(**kw)
         if role == "categorize":
             return {"categories": [
-                {"name": f"mock_area_{i}", "description": f"목 영역 {i}"}
-                for i in range(5)], "notes": "목이 나눈 영역이다"}
-        raise ValueError(f"알 수 없는 역할: {role!r}")
+                {"name": f"mock_area_{i}",
+                 "description": f"mock area {i}"}
+                for i in range(5)],
+                "notes": "areas partitioned by the mock"}
+        raise ValueError(f"unknown role: {role!r}")
 
-    # -- FeatureWriter / RuleWriter — ★ 배관 확인용 (§30.9) ----------------
+    # -- FeatureWriter / RuleWriter — ★ for checking the plumbing (§30.9) --
     #
-    #   실제 LLM 없이 F0~F3 파이프라인이 **끝까지 도는지** 보려면 이 두
-    #   역할이 있어야 한다. 목이 만드는 피처는 물리적으로 의미 없다 —
-    #   `--dry-run` 의 목적은 성능이 아니라 배관이다.
+    #   These two roles are needed to see whether the F0~F3 pipeline runs
+    #   **all the way through** without a real LLM. The features the mock
+    #   builds have no physical meaning — the purpose of `--dry-run` is
+    #   plumbing, not performance.
 
-    #: 원시 값만으로 만드는 피처 틀. `RAW_FIELDS` 안의 이름만 쓴다.
+    #: Feature templates built from raw values only. They use only names
+    #: inside `RAW_FIELDS`.
     _FEATURE_FORMS = (
-        ("mock_tile_area_ratio", "타일 면적 / 문제 면적",
+        ("mock_tile_area_ratio", "tile area / problem area",
          "float(cfg.tile_m * cfg.tile_n) / max(1.0, float(p.M) * p.N)"),
-        ("mock_k_depth", "K 방향 반복 깊이",
+        ("mock_k_depth", "iteration depth along K",
          "float(p.K) / max(1.0, float(cfg.tile_k))"),
-        ("mock_thread_load", "스레드당 출력 원소",
+        ("mock_thread_load", "output elements per thread",
          "float(cfg.tile_m * cfg.tile_n) / max(1.0, float(cfg.threads))"),
-        ("mock_smem_share", "SM 공유메모리 점유율",
+        ("mock_smem_share", "shared-memory occupancy of the SM",
          "float(cfg.smem_bytes) / max(1.0, float(hw.smem_per_block))"),
-        ("mock_grid_per_sm", "SM 당 타일 수",
+        ("mock_grid_per_sm", "tiles per SM",
          ("float(p.M) * p.N / max(1.0, float(cfg.tile_m * cfg.tile_n))"
           " / max(1.0, float(hw.sm_count))")),
     )
 
     def _feature(self) -> dict:
-        """제안마다 **다른** 피처를 낸다. 같은 것을 반복하면 중복 판정에
-        전부 걸려서 배관 확인이 안 된다."""
+        """It emits a **different** feature per proposal. Repeating the
+        same one gets everything caught by the duplication check and the
+        plumbing cannot be checked."""
         i = self._n_features % len(self._FEATURE_FORMS)
         self._n_features += 1
         name, doc, expr = self._FEATURE_FORMS[i]
@@ -290,52 +303,61 @@ class MockLLM:
                 f"    return {expr}\n")
         return {"name": name + suffix, "code": code, "unit": "dimensionless",
                 "direction": "higher_is_worse", "expected_range": [0.0, 1e6],
-                "rationale": "목이 만든 피처다 — 배관 확인용이다"}
+                "rationale": "a feature built by the mock — for checking "
+                             "the plumbing"}
 
     def _rule_writer(self, **kw) -> dict:
-        """씨앗 규칙. **주어진 피처 이름만** 쓴다 (F1 이면 F1 피처).
+        """A seed rule. It uses **only the feature names it was given**
+        (under F1, the F1 features).
 
-        `self.features` 가 비어 있으면 조용히 사람 피처로 떨어지지 않고
-        예외를 낸다 — 그것이 §30.9 가 막으려는 경로다.
+        When `self.features` is empty it raises rather than silently falling
+        back to the human features — that is the path §30.9 blocks.
         """
         if not self.features:
             raise ValueError(
-                "MockLLM(feature_names=...) 이 비었다. 씨앗을 만들 피처가 "
-                "없다 — 조용히 사람이 쓴 24개로 떨어지지 않는다 (§26.4).")
+                "MockLLM(feature_names=...) is empty. There are no "
+                "features to build a seed from — it does not silently fall "
+                "back to the human 24 (§26.4).")
         n = min(4, len(self.features))
         pick = [self.features[int(i)] for i in
                 self.rng.choice(len(self.features), size=n, replace=False)]
         code, w0 = _render_rule([f"f.{x}" for x in pick], None)
         return {"code": code, "w0": w0,
-                "changes": "목 RuleWriter 씨앗 — 주어진 피처에서 골랐다"}
+                "changes": "mock RuleWriter seed — picked from the given "
+                           "features"}
 
     def _diagnose(self, prompt: str) -> dict:
-        """진단 — 리포트에서 **미사용 피처**를 읽어 가설로 만든다.
+        """Diagnosis — it reads the **unused features** out of the report
+        and turns them into hypotheses.
 
-        이 목이 하는 유일한 '지능' 이다. 리포트가 `★ 미사용` 열을 내므로
-        그것을 읽는다. **루프 배관이 그 정보를 전달하는지** 시험하는 것이
-        목적이다.
+        This is the only "intelligence" the mock has. The report emits an
+        `★ unused` column, so it reads that. The purpose is to test
+        **whether the loop plumbing carries that information**.
         """
         missing = []
         for ln in prompt.split("\n"):
-            # ★ 2026-09-08 (D-146): 리포트가 영어가 됐다. **옛 형태도 읽는다**
-            #   — 옛 리포트로 이 목을 돌릴 수 있어야 한다.
+            # ★ 2026-09-08 (D-146): the report became English. **The old
+            #   form is read too** — this mock must still run on an old
+            #   report.
             if "★ unused" in ln or "★ 미사용" in ln:
                 name = ln.split()[0]
                 if name in self.features and name not in missing:
                     missing.append(name)
         hyps = [Hypothesis(
-            id=f"H{i}", claim=f"규칙이 {n} 를 쓰지 않는다. 사례에서 선택과 "
-                              f"최적의 값이 크게 다르다",
-            measurable_with=[n], proposed_direction=f"{n} 항을 추가한다",
-            risk="다른 항의 효과를 희석할 수 있다")
+            id=f"H{i}", claim=f"the rule does not use {n}. In the cases, "
+                              f"its value differs greatly between the pick "
+                              f"and the optimum",
+            measurable_with=[n], proposed_direction=f"add a {n} term",
+            risk="it could dilute the effect of the other terms")
             for i, n in enumerate(missing[:5])]
-        # ★ 첫 가설만 없는 축을 요구한다 (D-75 경로 배관 확인용).
-        #   루프는 `max_new_features_per_round > 0` 일 때만 이것을 읽으므로
-        #   기존 dry-run 은 영향을 받지 않는다.
+        # ★ Only the first hypothesis asks for an axis that does not exist
+        #   (to check the D-75 path's plumbing). The loop reads it only when
+        #   `max_new_features_per_round > 0`, so existing dry-runs are
+        #   unaffected.
         if hyps:
             hyps[0].needs_new_feature = (
-                "타일 하나가 L2 에 남아 다음 타일이 재사용하는 양")
+                "how much of one tile stays in L2 for the next tile to "
+                "reuse")
         return {"hypotheses": [h.__dict__ for h in hyps]}
 
     def _optimize(self, prompt: str, *, parent: RuleProposal | None = None,
@@ -351,7 +373,8 @@ class MockLLM:
 
     def _mutate(self, parent: RuleProposal | None,
                 hypothesis: dict | None) -> dict:
-        """★ 구조를 섭동한다. 가중치가 아니다 (모듈 docstring 참조)."""
+        """★ It perturbs the structure, not the weights (see the module
+        docstring)."""
         base = (parent.code if parent is not None
                 else "def score(f, p, hw, w):\n"
                      "    s = f.traffic_amplification * w[0]\n    return s\n")
@@ -362,7 +385,7 @@ class MockLLM:
         unused = [t for t in pool if t not in terms
                   and (branch is None or t != branch[1])]
 
-        # 가설이 특정 피처를 지목하면 그것을 우선 추가한다
+        # If the hypothesis names a particular feature, add that first
         want = None
         if hypothesis:
             for n in hypothesis.get("measurable_with", []):
@@ -374,31 +397,33 @@ class MockLLM:
         changes = ""
         if want is not None and r < 0.65:
             terms.append(want)
-            changes = f"가설이 지목한 {want} 항 추가"
+            changes = f"added the {want} term the hypothesis named"
         elif unused and r < 0.55:
             t = unused[int(self.rng.integers(len(unused)))]
             terms.append(t)
-            changes = f"{t} 항 추가 (무작위 탐색)"
+            changes = f"added the {t} term (random exploration)"
         elif len(terms) > 1 and r < 0.72:
             i = int(self.rng.integers(len(terms)))
-            changes = f"{terms[i]} 항 제거"
+            changes = f"removed the {terms[i]} term"
             terms.pop(i)
         elif unused and len(terms) > 1 and r < 0.86:
             i = int(self.rng.integers(len(terms)))
             t = unused[int(self.rng.integers(len(unused)))]
-            changes = f"{terms[i]} -> {t} 교체"
+            changes = f"swapped {terms[i]} -> {t}"
             terms[i] = t
         elif branch is None and unused:
             cond = self.shape_values[int(self.rng.integers(
                 len(self.shape_values)))]
             t = unused[int(self.rng.integers(len(unused)))]
             branch = (cond, t)
-            changes = f"형상 수준 분기 추가: if p.{cond} -> {t} 재가중"
+            changes = (f"added a shape-level branch: if p.{cond} -> "
+                       f"reweight {t}")
         else:
             branch = None
-            changes = "형상 수준 분기 제거"
+            changes = "removed the shape-level branch"
 
-        # 리터럴 예산(8) 안으로 자른다. 넘으면 정적 검사가 거부한다.
+        # Trim into the literal budget (8). Over it, the static checks
+        # refuse.
         n_w = len(terms) + (1 if branch else 0)
         while n_w > 8 and len(terms) > 1:
             terms.pop()

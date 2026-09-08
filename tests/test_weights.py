@@ -1,4 +1,4 @@
-"""가중치 최적화 (§29). 구조와 파라미터의 분리."""
+"""Weight optimisation (§29). Separating structure from parameters."""
 from __future__ import annotations
 
 import numpy as np
@@ -11,18 +11,21 @@ from kernelrule.core.splits import Split, SplitError, SplitSet, by_predicate
 from kernelrule.core.weights import FitError, fit_weights, make_order_fn
 from kernelrule.features import FeatureRegistry, feature
 
-#: 생성 계수를 **알고 있는** 표를 만든다. 시간 = exp(w_true . f).
+#: Builds a table whose generating coefficients are **known**.
+#: time = exp(w_true . f).
 W_TRUE = np.array([2.0, 0.5, 1.5])
 
 
 @pytest.fixture(scope="module")
 def known():
-    """알려진 계수로 만든 표 + 같은 구조의 규칙 (§26.2)."""
+    """A table built from known coefficients + a rule of the same
+    structure (§26.2)."""
     rng = np.random.default_rng(0)
     n_cfg, n_shape = 24, 12
 
-    # ★ 형상마다 피처값이 다르다. 같으면 모든 형상의 최적 config 가 같아져
-    #   regret@1 이 24개 값만 갖는 계단이 되고, 그건 실제 표와 다르다.
+    # ★ The feature values differ per shape. If they were the same, every
+    #   shape would share one optimal config and regret@1 would become a
+    #   step with only 24 values, unlike the real table.
     times, cols = {}, {"f0": [], "f1": [], "f2": []}
     for s in range(n_shape):
         F = rng.uniform(0.0, 1.0, size=(n_cfg, 3))
@@ -41,7 +44,8 @@ def known():
                 return 0.0
             _f.__name__ = f"f{i}"
             return _f
-        # 이름을 바꾼 뒤 다시 등록해야 하므로 직접 만든다
+        # It has to be re-registered after renaming, so it is built
+        # directly
         from kernelrule.features import Feature
         r.add(Feature(name=f"f{i}", fn=lambda p, hw, cfg: 0.0,
                       unit="dimensionless", expected_range=(0.0, 1.0),
@@ -61,36 +65,43 @@ def _all_train(table) -> Split:
 
 
 def test_weight_fit_recovers_known_optimum(known):
-    """★ 알려진 계수와 같은 구조를 주면 최적화기가 그 최적을 되찾아야 한다.
+    """★ Given the same structure as the known coefficients, the optimiser
+    must recover that optimum.
 
-    regret 은 **순서**만 보므로 `w` 는 스케일까지만 식별된다. 방향(정규화한
-    벡터)이 맞고 regret 이 1.0 에 도달하는지로 판정한다.
+    regret looks only at **order**, so `w` is identified only up to scale.
+    The verdict is whether the direction (the normalised vector) matches and
+    regret reaches 1.0.
     """
     t, m, score = known
-    w0 = np.array([1.0, 1.0, 1.0])          # 일부러 틀린 초기값
+    w0 = np.array([1.0, 1.0, 1.0])       # deliberately wrong initial values
     fr = fit_weights(score, m, t, _all_train(t), w0, max_evals=400)
     assert fr.fit_regret == pytest.approx(1.0, abs=1e-9), fr
     cos = float(fr.w @ W_TRUE / (np.linalg.norm(fr.w) * np.linalg.norm(W_TRUE)))
-    assert cos > 0.99, f"복원된 방향이 다르다: {fr.w} vs {W_TRUE} (cos={cos:.4f})"
+    assert cos > 0.99, (
+        f"the recovered direction differs: {fr.w} vs {W_TRUE} "
+        f"(cos={cos:.4f})")
 
 
 def test_bad_initial_weights_would_have_lost_a_good_structure(known):
-    """★ §29.3 의 근거. 가중치 최적화 없이 채점하면 좋은 구조가 버려진다."""
+    """★ The rationale for §29.3. Scoring without optimising the weights
+    throws away good structures."""
     t, m, score = known
     w_bad = np.array([1.0, 4.0, -3.0])
     before = evaluate(make_order_fn(score, m, w_bad), t, ks=(1,)).at(1)
     fr = fit_weights(score, m, t, _all_train(t), w_bad, max_evals=400)
-    assert before > 1.05, "초기값이 충분히 나쁘지 않아 시험이 성립하지 않는다"
+    assert before > 1.05, (
+        "the initial values are not bad enough for this test to hold")
     assert fr.fit_regret < before
     assert fr.fit_regret == pytest.approx(1.0, abs=1e-9)
 
 
 def test_fit_never_worse_than_initial(known):
-    """계단 함수라 Nelder-Mead 가 초기값보다 나쁜 곳에 멈출 수 있다.
+    """It is a step function, so Nelder-Mead can stop somewhere worse than
+    the initial values.
 
-    ★ `objective="regret"` 를 **명시한다** (D-122). 이 불변식은 "적합하는
-    목적함수" 의 성질이고, 순위 손실로 적합하면 regret 은 나빠질 수 있다
-    (아래 `test_rank_fit_may_worsen_regret`).
+    ★ `objective="regret"` is **stated explicitly** (D-122). This invariant
+    is a property of "the objective being fitted", and fitting with the rank
+    loss can make regret worse (`test_rank_fit_may_worsen_regret` below).
     """
     t, m, score = known
     w0 = W_TRUE.copy()
@@ -101,10 +112,10 @@ def test_fit_never_worse_than_initial(known):
 
 
 def test_rank_fit_never_worse_than_initial_in_rank_loss(known):
-    """★ 같은 불변식을 **순위 손실 쪽에서** 지킨다 (D-122).
+    """★ The same invariant, held **on the rank-loss side** (D-122).
 
-    다듬기가 목적함수를 몰랐을 때는 이 검사가 의미가 없었다 — 다듬기가
-    아무것도 안 해서 자동으로 성립했다 (원칙 38).
+    While polish did not know the objective this check meant nothing — polish
+    did nothing, so it held automatically (principle 38).
     """
     from kernelrule.core.weights import _Problem
 
@@ -118,11 +129,12 @@ def test_rank_fit_never_worse_than_initial_in_rank_loss(known):
 
 
 def test_rank_fit_may_worsen_regret(known):
-    """★ 순위 손실로 적합하면 regret 이 **나빠질 수 있다** (D-122).
+    """★ Fitting with the rank loss **can make regret worse** (D-122).
 
-    참 계수에서 출발해 순위 손실을 낮추면 regret 이 1.0 에서 올라간다.
-    "채점은 regret, 학습은 순위 손실" 의 대가이고, D-118 이 잰 벽과 같은
-    방향이다. 이것을 **문서가 아니라 시험으로** 붙들어 둔다.
+    Starting from the true coefficients and lowering the rank loss raises
+    regret above 1.0. It is the price of "score by regret, train by the rank
+    loss", and it points the same way as the wall D-118 measured. This is
+    held **by a test, not by documentation**.
     """
     t, m, score = known
     w0 = W_TRUE.copy()
@@ -132,31 +144,34 @@ def test_rank_fit_may_worsen_regret(known):
 
 
 def test_weight_fit_uses_train_split_only(known):
-    """★ 검증/최종 분할이 목적함수에 들어가는 경로가 없다 (§29.7)."""
+    """★ There is no path by which the validation or final split enters
+    the objective (§29.7)."""
     t, m, score = known
     shapes = t.shapes()
     for role in ("val", "test"):
         bad = Split(role, tuple(shapes))
-        with pytest.raises(SplitError, match="학습 분할만"):
+        with pytest.raises(SplitError,
+                           match="Only the training split is accepted"):
             fit_weights(score, m, t, bad, [1.0, 1.0, 1.0])
 
 
 def test_weight_fit_refuses_a_bare_shape_list(known):
-    """분할을 명시하지 않으면 에러다. 어느 분할인지 알 수 없다 (§26.4)."""
+    """Not stating the split is an error. Which split it is cannot be known
+    (§26.4)."""
     t, m, score = known
-    with pytest.raises(SplitError, match="Split 을 받는다"):
+    with pytest.raises(SplitError, match="fit_weights takes a Split"):
         fit_weights(score, m, t, t.shapes(), [1.0, 1.0, 1.0])
 
 
 def test_val_split_must_be_val(known):
     t, m, score = known
     tr = _all_train(t)
-    with pytest.raises(SplitError, match="'val' 이어야"):
+    with pytest.raises(SplitError, match="It must be 'val'"):
         fit_weights(score, m, t, tr, [1.0, 1.0, 1.0], val_split=tr)
 
 
 def test_gap_is_recorded(known):
-    """학습/검증 격차를 라운드마다 기록한다 (§29.4)."""
+    """The training-validation gap is recorded every round (§29.4)."""
     t, m, score = known
     shapes = t.shapes()
     tr = Split("train", tuple(shapes[:6]))
@@ -168,11 +183,12 @@ def test_gap_is_recorded(known):
 
 
 def test_sensitivity_flags_dead_terms(known):
-    """0 근처로 수렴하거나 둔감한 항은 피처 정리 후보다 (§29.6)."""
+    """Terms that converge near 0 or are insensitive are candidates for
+    feature cleanup (§29.6)."""
     t, m, score = known
 
     def score4(f, p, hw, w):
-        # w[3] 은 아무 데도 안 쓰인다 -> 완전히 둔감해야 한다
+        # w[3] is used nowhere -> it must be completely insensitive
         return f.f0 * w[0] + f.f1 * w[1] + f.f2 * w[2] + 0.0 * w[3]
 
     fr = fit_weights(score4, m, t, _all_train(t), [1.0, 1.0, 1.0, 1.0],
@@ -182,18 +198,20 @@ def test_sensitivity_flags_dead_terms(known):
 
 
 def test_structure_that_never_scores_is_rejected(known):
-    """모든 가중치에서 유효한 점수를 못 내면 **구조를 기각**한다 (§26.4)."""
+    """Producing no valid score at any weights means **the structure is
+    rejected** (§26.4)."""
     t, m, score = known
 
     def broken(f, p, hw, w):
         return np.full(len(f.f0), np.nan)
 
-    with pytest.raises(FitError, match="구조를 기각"):
+    with pytest.raises(FitError, match="The structure is rejected"):
         fit_weights(broken, m, t, _all_train(t), [1.0], max_evals=20)
 
 
 def test_make_order_fn_uses_the_same_score_fn(known):
-    """★ 학습과 배포가 같은 `score()` 를 쓴다 (§8.1 대체본)."""
+    """★ Training and deployment use the same `score()` (the §8.1
+    replacement)."""
     t, m, score = known
     fr = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=400)
     ev = evaluate(make_order_fn(score, m, fr.w), t, ks=(1,))
@@ -201,21 +219,21 @@ def test_make_order_fn_uses_the_same_score_fn(known):
 
 
 def test_split_refuses_empty_and_overlap():
-    """분할이 빈 집합이거나 겹치면 에러다 (§26.4, §10)."""
+    """An empty or overlapping split is an error (§26.4, §10)."""
     from kernelrule.core.types import Problem
     a = Problem(1024, 4096, 4096)
     b = Problem(2048, 4096, 4096)
-    with pytest.raises(SplitError, match="빈 집합"):
+    with pytest.raises(SplitError, match="is empty"):
         Split("train", ())
-    with pytest.raises(SplitError, match="공유"):
+    with pytest.raises(SplitError, match="share"):
         SplitSet(train=Split("train", (a, b)), val=Split("val", (b,)))
-    with pytest.raises(SplitError, match="한쪽을 비웠다"):
+    with pytest.raises(SplitError, match="left one side empty"):
         by_predicate([a, b], lambda p: False, name="none")
 
 
 # ---------------------------------------------------------------- D-54/D-55
-# 적합기가 "아무것도 안 했는가" 를 스스로 신고해야 한다. 24회 중 13회가
-# 초기값 그대로였는데 아무도 몰랐다 — 그 침묵을 막는 검사다.
+# The fitter must report "did I do nothing" itself. 13 of 24 stayed at the
+# initial values and nobody knew — these tests block that silence.
 
 def test_fitted_rule_reports_that_it_did_not_move():
     from kernelrule.core.weights import FittedRule
@@ -224,11 +242,12 @@ def test_fitted_rule_reports_that_it_did_not_move():
                     fit_regret=1.1, n_evals=305, n_infeasible=0,
                     sensitivity=np.zeros(2), seconds=1.0)
     assert not fr.moved
-    assert any("움직이지 않았다" in m for m in fr.invariants())
+    assert any("did not move" in m for m in fr.invariants())
 
 
 def test_fitted_rule_flags_dominance_and_negative_weights():
-    """★ 절대 배율이 아니라 **실효 기여도**로 지배를 잡는다 (D-70)."""
+    """★ Dominance is caught by **effective contribution**, not by
+    absolute magnitude (D-70)."""
     from kernelrule.core.weights import FittedRule
 
     fr = FittedRule(w=np.array([500.0, -3.0, 1.0]), w0=np.array([1.0, 2.0, 1.0]),
@@ -237,33 +256,36 @@ def test_fitted_rule_flags_dominance_and_negative_weights():
                     contrib=np.array([1000.0, 1.0, 1.0]))
     assert fr.moved
     msgs = " ".join(fr.invariants())
-    assert "압도한다" in msgs and "음수" in msgs
+    assert "overwhelms" in msgs and "negative weights" in msgs
 
-    # 기여도가 고르면 |w| 가 아무리 커도 경고하지 않는다 — 배율은 무해하다
+    # With even contributions, no warning however large |w| is — magnitude is
+    # harmless
     ok = FittedRule(w=np.array([5e6, 4e6, 6e6]), w0=np.ones(3),
                     fit_regret=1.1, n_evals=10, n_infeasible=0,
                     sensitivity=np.zeros(3), seconds=1.0,
                     contrib=np.array([1.0, 0.9, 1.1]))
-    assert not any("압도" in m for m in ok.invariants())
+    assert not any("overwhelms" in m for m in ok.invariants())
 
 
 def test_dead_term_is_flagged():
-    """실효 기여도 0 = 순위에 관여하지 않는 항 (절대 규칙 2)."""
+    """Zero effective contribution = a term that takes no part in the
+    ranking (absolute rule 2)."""
     from kernelrule.core.weights import FittedRule
 
     fr = FittedRule(w=np.ones(3), w0=np.ones(3), fit_regret=1.1, n_evals=10,
                     n_infeasible=0, sensitivity=np.zeros(3), seconds=1.0,
                     contrib=np.array([1.0, 0.0, 1.2]))
-    assert any("기여도가 0" in m for m in fr.invariants())
+    assert any("zero effective contribution" in m for m in fr.invariants())
 
 
 def test_fit_weights_warns_about_its_own_invariants(known):
-    """적합이 이상하면 **조용히 넘어가지 않는다** (D-54).
+    """An odd fit **does not pass silently** (D-54).
 
-    ★ 예전에는 "평가 상한에 닿았다" 로 이것을 확인했다. 그 경고가 **늘
-    떠 있었기 때문**이고, 그래서 시험은 통과했지만 아무것도 안 지키고
-    있었다 (D-76). 이제는 **죽은 항**으로 확인한다 — `w[2]` 가 점수에
-    안 들어가므로 실효 기여도가 0 이고, 그것은 진짜 이상 신호다.
+    ★ This used to be checked through "the evaluation cap was reached".
+    That warning was **always up**, so the test passed while holding
+    nothing (D-76). It is now checked through a **dead term** — `w[2]` does
+    not enter the score, so its effective contribution is 0, and that is a
+    genuine anomaly signal.
     """
     import warnings
 
@@ -279,18 +301,21 @@ def test_fit_weights_warns_about_its_own_invariants(known):
         fit_weights(dead_term, m, t, _all_train(t), [1.0, 1.0, 1.0],
                     max_evals=200)
     msgs = [str(w.message) for w in got if issubclass(w.category, FitWarning)]
-    assert any("실효 기여도가 0" in x for x in msgs), \
-        f"죽은 항을 신고하지 않았다: {msgs}"
+    assert any("zero effective contribution" in x for x in msgs), \
+        f"the dead term was not reported: {msgs}"
 
 
 def test_polish_never_worsens_training_regret(known):
-    """좌표 다듬기는 훈련 regret 을 **개선하거나 같아야** 한다 (D-55).
+    """The coordinate polish must **improve or match** the training regret
+    (D-55).
 
-    받아들이는 조건이 `v < base` 라 구조적으로 그렇다. 이 검사가 깨지면
-    다듬기가 훈련 아닌 것을 보고 있다는 뜻이다 (§29.7).
+    The acceptance condition is `v < base`, so it is structurally so. If this
+    check breaks, polish is looking at something other than training
+    (§29.7).
 
-    ★ `objective="regret"` 를 명시한다 (D-122) — 기본값(`rank`)으로
-    부르면 이 검사는 **다듬기가 regret 을 안 보기 때문에** 통과한다.
+    ★ `objective="regret"` is stated explicitly (D-122) — called with the
+    default (`rank`), this check passes **because polish does not look at
+    regret**.
     """
     t, m, score = known
     tr = _all_train(t)
@@ -302,15 +327,16 @@ def test_polish_never_worsens_training_regret(known):
 
 
 def test_polish_actually_runs_on_the_rank_path(known):
-    """★ 순위 손실 경로에서 다듬기가 **일을 하는가** (D-122).
+    """★ Does polish **do any work** on the rank-loss path (D-122)?
 
-    예전에는 `_polish` 안에 `prob.regret` 이 박혀 있어서, 순위 손실
-    기준값(0.24)과 regret(1.2)을 견주고 있었다 — 어떤 걸음도 채택되지
-    않아 **600 평가를 쓰고 아무것도 안 했다.** 실측으로 확인했다:
-    `polish=True` 와 `False` 의 `w` 가 완전히 같았다.
+    `prob.regret` used to be nailed into `_polish`, so it was comparing a
+    rank-loss reference value (0.24) against regret (1.2) — no step was ever
+    accepted and it **spent 600 evaluations doing nothing.** Confirmed by
+    measurement: the `w` of `polish=True` and `False` were exactly equal.
 
-    원칙 38 의 자리다 — 검사(`test_polish_never_worsens_training_regret`)가
-    통과했지만 검사 대상이 안 돌고 있었다.
+    This is a case of principle 38 — the test
+    (`test_polish_never_worsens_training_regret`) passed while the thing
+    under test was not running.
     """
     t, m, score = known
     tr = _all_train(t)
@@ -320,12 +346,13 @@ def test_polish_actually_runs_on_the_rank_path(known):
                     objective="rank", polish=True, polish_budget=600,
                     warn_invariants=False)
     assert not np.array_equal(a.w, b.w), (
-        "순위 손실 경로에서 다듬기가 가중치를 하나도 안 바꿨다 — "
-        "목적함수가 안 넘어가고 있다")
+        "polish changed not one weight on the rank-loss path — the "
+        "objective is not being handed over")
 
 
 def test_polish_only_sees_the_training_split(known):
-    """다듬기에 검증 분할을 흘리는 경로가 없다 — 인자 자체가 없다 (§29.7)."""
+    """There is no path leaking the validation split into polish — the
+    argument does not exist (§29.7)."""
     import inspect
 
     from kernelrule.core.weights import _polish
@@ -335,11 +362,13 @@ def test_polish_only_sees_the_training_split(known):
 
 
 def test_contributions_are_scale_invariant(known):
-    """★ 실효 기여도는 **가중치를 통째로 배로 키워도** 비율이 그대로다.
+    """★ Effective contributions keep their ratios **even when every
+    weight is scaled up**.
 
-    절대 배율(|w|/|w0|)은 피처 스케일에 따라 자릿수가 달라져 라이브러리를
-    바꾸면 기준이 무의미해진다 — F1(피처 [0,0.2])에서 |w| 최대가
-    770,164 이고 사람 24개에서는 45.1 이었다 (D-70).
+    The absolute magnitude (|w|/|w0|) changes by orders with feature scale,
+    so the criterion becomes meaningless when the library changes — in F1
+    (features [0,0.2]) max |w| was 770,164 and in the human 24 it was 45.1
+    (D-70).
     """
     from kernelrule.core.weights import _contributions, _Problem
 
@@ -349,59 +378,68 @@ def test_contributions_are_scale_invariant(known):
     a = _contributions(prob, score, w)
     b = _contributions(prob, score, w * 1000.0)
     assert a is not None and b is not None
-    # 절대값은 1000배, **비율**은 같다
+    # The absolute values are 1000x, the **ratios** are the same
     ra, rb = a / a.max(), b / b.max()
     assert np.allclose(ra, rb, atol=1e-9), (ra, rb)
 
 
 def test_contribution_of_a_shape_constant_term_is_zero(known):
-    """형상 상수 항은 순위를 안 바꾸므로 기여도가 **정확히 0** 이어야 한다.
+    """A shape-constant term does not change the ranking, so its
+    contribution must be **exactly 0**.
 
-    `_rules_common.md` 절대 규칙 2 가 말하는 no-op 항을 잡는 검사다.
+    This catches the no-op term that absolute rule 2 of `_rules_common.md`
+    speaks of.
     """
     from kernelrule.core.weights import _contributions, _Problem
 
     t, m, _ = known
 
     def score_with_noop(f, p, hw, w):
-        # w[1] 항은 형상 상수라 그 형상 안에서 순위를 못 바꾼다
+        # The w[1] term is a shape constant, so it cannot change the
+        # ranking within that shape
         return f.f0 * w[0] + p.n_candidates * w[1]
 
     prob = _Problem(m, t, t.shapes(), 1)
     c = _contributions(prob, score_with_noop, np.array([1.0, 5.0]))
     assert c is not None
     assert c[0] > 0.0
-    assert c[1] == 0.0, f"형상 상수 항의 기여도가 0 이 아니다: {c[1]}"
+    assert c[1] == 0.0, (
+        f"the shape-constant term's contribution is not 0: {c[1]}")
 
 
 def test_contributions_never_touch_the_answer():
-    """★ 시간을 보는 경로가 없다 (§3)."""
+    """★ There is no path that looks at the times (§3)."""
     import ast
     import inspect
 
     from kernelrule.core.weights import _contributions
 
-    # ★ 독스트링을 빼고 **본문만** 본다. 문서에 "prob.regret 을 안 부른다"
-    #   라고 적어 두면 문자열 검사가 그걸 잡는다 (원칙 14 — 계측이 만드는 오탐).
+    # ★ It looks at **the body only**, excluding the docstring. Writing "it
+    #   does not call prob.regret" in the documentation would be caught by a
+    #   string check (principle 14 — false positives created by the
+    #   instrument).
     tree = ast.parse(inspect.getsource(_contributions).strip())
     fn = tree.body[0]
     body = fn.body[1:] if (isinstance(fn.body[0], ast.Expr)
                            and isinstance(fn.body[0].value, ast.Constant)
                            ) else fn.body
     src = "\n".join(ast.unparse(n) for n in body)
-    assert "prob.regret" not in src, "정답을 통과하는 regret 을 부른다"
+    assert "prob.regret" not in src, (
+        "it calls regret, which goes through the answer")
     assert "_times" in src and "_best" in src, (
-        "정답 자리를 `_` 로 안 받는다 — 이름이 없어야 손댈 수 없다")
-    # `score_fn` 만 부른다
+        "the answer slots are not bound to `_` — without names they cannot "
+        "be touched")
+    # It calls only `score_fn`
     assert src.count("score_fn(") == 2
 
 def test_cap_warning_ignores_polish_evals(known):
-    """★ 상한 경고는 **다듬기 전** 평가로 판정한다.
+    """★ The cap warning is judged on the evaluations **before polish**.
 
-    `n_evals` 는 다듬기까지 합한 값이다. 그것으로 `max_evals` 와 견주면
-    다듬기 예산(600)이 상한(300)을 언제나 넘어 **모든 적합에서** "평가
-    상한에 닿았다 — 수렴 전 중단" 이 뜬다. 다듬기가 기본으로 켜진 뒤
-    (D-56) 이 경고는 늘 켜져 있어 신호가 아니었다 (원칙 11).
+    `n_evals` includes polish. Comparing that against `max_evals` makes the
+    polish budget (600) always exceed the cap (300), so "the evaluation cap
+    was reached — cut before convergence" fires on **every fit**. After
+    polish became the default (D-56) this warning was always on and was
+    therefore not a signal (principle 11).
     """
     import warnings as _w
 
@@ -413,26 +451,31 @@ def test_cap_warning_ignores_polish_evals(known):
         _w.simplefilter("always")
         fr = fit_weights(score, m, t, sp, [1.0, 1.0, 1.0], max_evals=3000,
                          polish=True, polish_budget=400)
-    assert fr.n_fit_evals < fr.n_evals, "다듬기가 안 돌았다 — 시험이 무의미하다"
-    assert fr.n_fit_evals < 3000, "적합만으로 상한에 닿았다 — 예산을 올려라"
+    assert fr.n_fit_evals < fr.n_evals, (
+        "polish did not run — the test is meaningless")
+    assert fr.n_fit_evals < 3000, (
+        "the fit alone reached the cap — raise the budget")
     caps = [str(x.message) for x in got
-            if issubclass(x.category, FitWarning) and "평가 상한" in str(x.message)]
-    assert not caps, f"다듬기 평가 때문에 상한 경고가 떴다: {caps}"
+            if issubclass(x.category, FitWarning)
+            and "evaluation cap" in str(x.message)]
+    assert not caps, f"the polish evaluations raised the cap warning: {caps}"
 
 
 def test_cap_warning_needs_actual_improvement_at_cutoff(known):
-    """★ 예산을 다 쓴 것만으로는 경고하지 않는다.
+    """★ Exhausting the budget alone does not warn.
 
-    ⚠️ `objective="regret"` 을 **명시한다** (2026-09-01). 이 시험은
-    regret 경로의 재시작 일정(D-76)을 고정하는 것이고, 기본값이 `rank`
-    로 바뀌면서 다른 경로를 재게 됐다.
+    ⚠️ `objective="regret"` is **stated explicitly** (2026-09-01). This test
+    pins the restart schedule of the regret path (D-76), and when the
+    default changed to `rank` it started measuring a different path.
 
-    재시작 일정이 `max_evals` 를 **설계상 전부 쓰게** 돼 있어 "상한에
-    닿았다" 는 언제나 참이다. 늘 참인 것은 감시가 아니다 (원칙 11).
-    경고는 **잘리는 순간까지 나아지고 있었을 때**만 뜬다.
+    The restart schedule is **designed to spend all of** `max_evals`, so
+    "the cap was reached" is always true. Something always true is not a
+    watchdog (principle 11). The warning fires only **when it was still
+    improving at the moment it was cut**.
 
-    생성 계수 `W_TRUE` 로 출발하면 더 나아질 곳이 없다 — 예산은 다 쓰지만
-    개선은 없으므로 경고가 없어야 한다.
+    Starting from the generating coefficients `W_TRUE` there is nowhere
+    better to go — the budget is spent but there is no improvement, so there
+    must be no warning.
     """
     import warnings as _w
 
@@ -443,25 +486,30 @@ def test_cap_warning_needs_actual_improvement_at_cutoff(known):
         _w.simplefilter("always")
         fr = fit_weights(score, m, t, _all_train(t), W_TRUE.tolist(),
                          max_evals=120, objective="regret", polish=False)
-    assert fr.n_fit_evals >= 120, "예산을 다 쓰지 않았다 — 시험이 무의미하다"
+    assert fr.n_fit_evals >= 120, (
+        "the budget was not spent — the test is meaningless")
     caps = [str(x.message) for x in got
-            if issubclass(x.category, FitWarning) and "상한" in str(x.message)]
-    assert not caps, f"예산 소진만으로 경고가 떴다: {caps}"
+            if issubclass(x.category, FitWarning)
+            and "cap" in str(x.message)]
+    assert not caps, (
+        f"a warning fired on budget exhaustion alone: {caps}")
 
 
 # ---------------------------------------------------------------------------
-# D-101 — 순위 손실
+# D-101 — the rank loss
 # ---------------------------------------------------------------------------
 def test_objective_default_is_regret(known):
-    """★ 기본이 다시 `"regret"` 이다 (D-128).
+    """★ The default is `"regret"` again (D-128).
 
     ```
-    ~09-01  regret   지금까지의 모든 결과가 통과한 경로
-     09-01  rank     그때 하는 실험이 순위 손실이었다 (D-101)
-    ★09-04  regret   순위 손실은 틀린 목적함수로 결론났다 (D-118·D-121)
+    ~09-01  regret   the path every result so far passed through
+     09-01  rank     the experiment being run then was the rank loss (D-101)
+    ★09-04  regret   the rank loss was concluded to be the wrong objective
+                     (D-118 · D-121)
     ```
 
-    `"rank"` 는 **함수로는 남는다** — 지표로 쓰고, 옛 실행 재현에 쓴다.
+    `"rank"` **remains as a function** — used as a metric, and for
+    reproducing old runs.
     """
     t, m, score = known
     a = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60)
@@ -470,25 +518,28 @@ def test_objective_default_is_regret(known):
     assert np.array_equal(a.w, b.w)
     r = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
                     objective="rank", warn_invariants=False)
-    assert not np.array_equal(a.w, r.w), "objective 분기가 안 돈다"
+    assert not np.array_equal(a.w, r.w), (
+        "the objective branch does not run")
 
 
 def test_loop_refuses_the_rank_objective():
-    """★ 진화 경로는 순위 손실을 **거부한다** (D-128). 조용히 안 넘어간다."""
+    """★ The evolution path **refuses** the rank loss (D-128). It does not
+    pass silently."""
     import pytest as _pytest
 
     from kernelrule.core.loop import LoopConfig, RoundLoop
 
-    with _pytest.raises(ValueError, match="regret 뿐이다"):
+    with _pytest.raises(ValueError, match="only regret"):
         RoundLoop(cfg=LoopConfig(run_id="x", objective="rank"),
                   table=None, matrix=None, splits=None, llm=None)
 
 
 def test_explicit_regret_still_reproduces_the_old_path(known):
-    """★ 반대 방향 대조 — `objective="regret"` 이 옛 경로 그대로인가.
+    """★ The reverse check — is `objective="regret"` still the old path?
 
-    기본을 바꿨으므로 **옛 결과를 되짚는 경로**가 살아 있는지를 여기서
-    지킨다. 이것이 깨지면 지금까지의 모든 수치를 재현할 수 없다.
+    The default was changed, so this is where **the path that retraces old
+    results** is kept alive. If this breaks, none of the numbers so far can
+    be reproduced.
     """
     t, m, score = known
     a = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
@@ -496,17 +547,19 @@ def test_explicit_regret_still_reproduces_the_old_path(known):
     b = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
                     objective="regret")
     assert np.array_equal(a.w, b.w) and a.fit_regret == b.fit_regret
-    # 결정론이면서 rank 와는 달라야 한다 — 같으면 분기가 안 도는 것이다
+    # Deterministic, and it must differ from rank — equal means the branch
+    # does not run
     r = fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0], max_evals=60,
                     objective="rank")
-    assert not np.array_equal(a.w, r.w), "objective 분기가 안 돈다"
+    assert not np.array_equal(a.w, r.w), (
+        "the objective branch does not run")
 
 
 def test_rank_pairs_drop_the_noise_indistinguishable(known):
-    """★ 노이즈 바닥으로 못 가르는 쌍은 손실에서 빠진다.
+    """★ Pairs the noise floor cannot separate drop out of the loss.
 
-    안 빼면 잡음에 맞춘다. 빠지는 쌍이 하나도 없으면 `resolvable` 이
-    안 도는 것이다.
+    Without dropping them it fits noise. If not one pair drops,
+    `resolvable` is not running.
     """
     from kernelrule.core.weights import _Problem
 
@@ -519,10 +572,11 @@ def test_rank_pairs_drop_the_noise_indistinguishable(known):
 
 
 def test_rank_objective_still_records_regret(known):
-    """`objective="rank"` 여도 `fit_regret` 은 **regret 이다.**
+    """Even under `objective="rank"`, `fit_regret` is **regret**.
 
-    "채점은 regret, 학습은 순위 손실" — 채점 기준을 바꾸면 기존 결과와
-    나란히 못 놓는다 (`rank-evo-prereg.md` §3).
+    "score by regret, train by the rank loss" — changing the scoring
+    criterion makes it impossible to place alongside existing results
+    (`rank-evo-prereg.md` §3).
     """
     from kernelrule.core.weights import _Problem
 
@@ -534,10 +588,11 @@ def test_rank_objective_still_records_regret(known):
 
 
 def test_rank_loss_prefers_the_true_order(known):
-    """★ 참 계수에서 순위 손실이 **더 작아야 한다.** 부호 확인이다.
+    """★ At the true coefficients the rank loss must be **smaller**. A
+    sign check.
 
-    `s_i < s_j` 여야 맞는 순서인데(작을수록 좋다), 부호를 뒤집으면
-    손실이 조용히 반대를 학습한다.
+    The correct order is `s_i < s_j` (lower is better), and with the sign
+    flipped the loss silently learns the opposite.
     """
     from kernelrule.core.weights import _Problem
 
@@ -546,22 +601,24 @@ def test_rank_loss_prefers_the_true_order(known):
     pr.build_pairs(t, 100)
     good = pr.rank_loss(score, W_TRUE)
     bad = pr.rank_loss(score, -W_TRUE)
-    assert good < bad, f"부호가 뒤집혔다: 참 {good:.4f} vs 반대 {bad:.4f}"
+    assert good < bad, (
+        f"the sign is flipped: true {good:.4f} vs reversed {bad:.4f}")
 
 
 def test_unknown_objective_is_refused(known):
     t, m, score = known
-    with pytest.raises(FitError, match="알 수 없는 목적함수"):
+    with pytest.raises(FitError, match="unknown objective"):
         fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0],
                     objective="nope")
 
 
 def test_restarts_actually_run(known):
-    """★ `n_restarts` 를 적어 놓고 1회만 도는 것을 막는다.
+    """★ Blocks writing down `n_restarts` while only 1 runs.
 
-    실제로 났다 — rank 경로에서 L-BFGS 에 `maxfun=max_evals` 를 줬더니
-    **혼자 예산을 다 써서 재시작이 0회**였다. 주석에는 "재시작은 그대로
-    둔다" 라고 적혀 있었고 거짓이었다 (원칙 1).
+    It really happened — on the rank path, giving L-BFGS
+    `maxfun=max_evals` meant it **used the whole budget alone and 0 restarts
+    ran**. The comment said "the restarts are left as they are" and it was
+    false (principle 1).
     """
     import warnings as _w
 
@@ -575,16 +632,16 @@ def test_restarts_actually_run(known):
                         max_evals=200, n_restarts=4, objective=obj)
         bad = [str(x.message) for x in got
                if issubclass(x.category, FitWarning)
-               and "재시작이" in str(x.message)]
+               and "restarts ran" in str(x.message)]
         assert not bad, f"{obj}: {bad}"
 
 
 def test_canonical_scoring_pins_regret():
-    """★ 최종 채점은 **언제나 regret** 이다 — 명시돼 있어야 한다.
+    """★ Final scoring is **always regret** — and it must be stated.
 
-    `fit_weights` 의 기본값이 `rank` 로 바뀌었다 (D-101). `canonical.py`
-    가 명시하지 않으면 **이 프로젝트의 모든 수치가 조용히 다른 것이
-    된다.** 소스에서 직접 확인한다.
+    The default of `fit_weights` changed to `rank` (D-101). If
+    `canonical.py` does not state it, **every number in this project
+    silently becomes something else.** It is checked directly in the source.
     """
     import inspect
 
@@ -597,15 +654,17 @@ def test_canonical_scoring_pins_regret():
         depth += {"(": 1, ")": -1}.get(src[k], 0)
         k += 1
     assert 'objective="regret"' in src[i:k], (
-        "canonical 이 objective 를 명시하지 않는다 — 기본값이 바뀌면 "
-        "최종 채점이 조용히 달라진다")
+        "canonical does not state the objective — if the default changes, "
+        "final scoring silently changes with it")
 
 
 def test_history_experiments_pin_their_objective():
-    """★ 옛 조건을 재현하는 실험 스크립트가 목적함수를 명시하는가.
+    """★ Do the experiment scripts that reproduce old conditions state the
+    objective?
 
-    기본값을 바꾼 순간 `fit_weights` 를 그냥 부르던 20개 스크립트가
-    **전부 다른 것을 재게 됐다.** 조용히 바뀌는 종류라 시험으로 고정한다.
+    The moment the default changed, the 20 scripts that simply called
+    `fit_weights` **all started measuring something else.** It is the kind
+    that changes silently, so it is pinned by a test.
     """
     from pathlib import Path
 
@@ -624,4 +683,4 @@ def test_history_experiments_pin_their_objective():
             if "objective=" not in s[j:k]:
                 bad.append(f"{f.name}:{s[:j].count(chr(10)) + 1}")
             i = k
-    assert not bad, f"목적함수를 안 밝힌 호출: {bad}"
+    assert not bad, f"calls that do not state the objective: {bad}"

@@ -1,19 +1,27 @@
-"""★ 두 단계 목적함수(A) + 순위 규칙의 전이(B). LLM 0회.
+"""★ The two-stage objective (A) + the transfer of a rank rule (B). 0 LLM
+calls.
 
     python3 experiments/two_stage.py
 
-**실험 계획서** `docs/artifacts/two-stage-prereg.md` — 판정선을 먼저 박았다.
+The **pre-registration** is `docs/artifacts/two-stage-prereg.md` — the
+decision line was nailed down first.
 
-## A — 구조는 순위로, 가중치는 regret 으로
+## A — the structure by rank, the weights by regret
 
-순위 진화 3실행의 **최종 구조를 그대로** 쓰고 가중치만 다시 맞춘다.
+It takes **the final structure as it is** from the 3 rank-evolution runs and
+refits only the weights.
 
-## B — 순위 진화 규칙이 5090 으로 옮겨가나
+## B — does a rank-evolved rule move over to the 5090
 
-§29.5 는 `regret` 진화 규칙으로만 했다. 순위 규칙은 다를 수 있다.
+§29.5 was done with `regret`-evolved rules only. A rank rule can be
+different.
 
-⚠️ **전부 홀드아웃에서 잰다.** D-101 의 tau(0.389)는 학습 41형상
-값이라 나란히 못 놓는다 (원칙 4).
+⚠️ **Everything is measured on the holdout.** D-101's tau (0.389) is a value
+on the 41 training shapes and cannot be put alongside (principle 4).
+
+⚠️ 2026-09-08 (D-146): **the row labels stay in Korean.** They are the row
+names of `docs/artifacts/two-stage.md` (and `regret-at-k.md`) and the keys of
+`two-stage.json`, and `docs/` is not translated.
 """
 
 from __future__ import annotations
@@ -64,16 +72,18 @@ def _best(run: str, by: str) -> dict:
 def _fit(code, w0, table, matrix, train, objective, *,
          rank_top_k: int = TOP_N, rank_lambda: float = 0.0,
          method: str = "nelder-mead", n_restarts: int = 4):
-    """체제별로 맞춘다 — 최종 채점 절차 (§10).
+    """It fits per regime — the final scoring procedure (§10).
 
-    ★ `rank_top_k` / `rank_lambda` 는 **그 실행의 조건**이다. 기본값으로
-    두면 k 스윕·λ 스윕을 전부 k=100·λ=0 으로 재게 된다 (원칙 37).
+    ★ `rank_top_k` / `rank_lambda` are **conditions of that run**. Leaving
+    them at the default measures the whole k sweep and λ sweep at k=100 and
+    λ=0 (principle 37).
 
-    ★ `method` / `n_restarts` 도 조건이다 (D-123). 기본값은 **지금까지의
-    모든 보고서**가 쓴 값이라 기존 산출물은 한 글자도 안 바뀐다 (원칙 36).
-    16항 규칙을 재는 보고서는 `method="cma", n_restarts=1` 을 줘야 한다 —
-    Nelder-Mead 는 16차원에서 도달률이 92% 다 (D-77·D-123). 안 주면
-    "예산 16 이 나쁘다" 가 아니라 **재는 쪽 적합기의 실패**를 잰다.
+    ★ `method` / `n_restarts` are conditions too (D-123). The defaults are
+    the values **every report so far** used, so the existing artefacts do not
+    change by one character (principle 36). A report measuring a 16-term rule
+    has to pass `method="cma", n_restarts=1` — Nelder-Mead reaches only 92%
+    in 16 dimensions (D-77·D-123). Without it, what gets measured is **the
+    failure of the measuring side's fitter**, not "budget 16 is bad".
     """
     fn = compile_rule(code)
     ws = {}
@@ -89,12 +99,13 @@ def _fit(code, w0, table, matrix, train, objective, *,
 
 
 def _measure(fn, ws, table, matrix, shapes, top_n: int = TOP_N) -> tuple:
-    """(regret, 상위 `top_n` tau, 전구간 tau, **정의 안 되는 형상 수**).
+    """(regret, the top-`top_n` tau, the all-range tau, **the number of
+    shapes where it is undefined**).
 
-    ★ 네 번째 값을 꼭 보라. 규칙이 상위 `top_n` 안에서 **상수 점수**를
-    내면 tau 가 정의되지 않는다. 그것을 안 세고 중앙값을 내면 `nan` 이
-    번지거나(numpy) 조용히 형상이 빠진다. k=10 에서 실제로 났다 —
-    한 형상에서 점수 고유값이 1개였다.
+    ★ Do look at the fourth value. If the rule gives a **constant score**
+    inside the top `top_n`, tau is undefined. Not counting that and taking a
+    median either spreads a `nan` (numpy) or silently drops the shape. It
+    really happened at k=10 — one shape had exactly 1 distinct score value.
     """
     rng = np.random.default_rng(TAU_SEED)
     regs, tt, ta, undef = [], [], [], []
@@ -117,7 +128,8 @@ def _measure(fn, ws, table, matrix, shapes, top_n: int = TOP_N) -> tuple:
 
 
 def _floor(table, shapes, top_n: int = TOP_N) -> tuple:
-    """★ 무작위 바닥 (20뽑기 평균). 바닥도 표본이다 (원칙 7)."""
+    """★ The random floor (the mean of 20 draws). The floor is a sample too
+    (principle 7)."""
     rng = np.random.default_rng(0)
     R, T1, TA = [], [], []
     for _ in range(N_DRAWS):
@@ -160,18 +172,20 @@ def main() -> None:
     train = list(spA.train.shapes)
 
     print("=" * 82)
-    print("A. 목적함수 2x2 — 구조와 가중치 중 무엇이 순위 능력을 담나")
+    print("A. the objective 2x2 — which of the structure and the weights "
+          "holds the ranking ability")
     print("=" * 82)
-    print(f"  A6000 홀드아웃 {len(hold)}형상   ★ D-101 의 tau 는 학습 "
-          f"41형상 값이라 여기와 나란히 못 놓는다\n")
-    print(f"  {'':34s} {'regret':>8} {'상위100 tau':>12} {'전구간':>10}")
+    print(f"  A6000 holdout {len(hold)} shapes   ★ D-101's tau is a value on "
+          f"the 41 training shapes and cannot be put beside this\n")
+    print(f"  {'':34s} {'regret':>8} {'top-100 tau':>12} {'all':>10}")
 
     res: dict = {}
     for name, runs, by, obj in (
             ("순위 구조 + 순위 가중치", RANK_RUNS, "rank", "rank"),
             ("★ 순위 구조 + regret 가중치", RANK_RUNS, "rank", "regret"),
-            # ★ 2x2 의 빈 칸 (D-103). 세 칸으로 "가중치가 들고 있다" 고
-            #   말한 것은 **대각선만 보고 한 말**이었다.
+            # ★ The empty cells of the 2x2 (D-103). Saying "the weights hold
+            #   it" from three cells was **a statement made from the diagonal
+            #   alone**.
             ("★ regret 구조 + 순위 가중치", REG_RUNS, "regret", "rank"),
             ("regret 구조 + regret 가중치", REG_RUNS, "regret", "regret")):
         vals = []
@@ -182,21 +196,22 @@ def main() -> None:
         res[name] = vals
         _row(name, vals)
     fl = _floor(A, hold)
-    print(f"  {'★ 무작위 바닥 (20뽑기)':34s} {fl[0]:8.4f} {fl[1]:12.3f} "
+    print(f"  {'★ random floor (20 draws)':34s} {fl[0]:8.4f} {fl[1]:12.3f} "
           f"{fl[2]:10.3f}")
     out["A"] = {"rows": dict(res), "floor": fl,
                 "n_holdout": len(hold)}
 
     mid = np.array(res["★ 순위 구조 + regret 가중치"])
     r, t1 = float(np.median(mid[:, 0])), float(np.median(mid[:, 1]))
-    print("\n  판정 — 실험 계획서에 박은 선")
-    print(f"    regret {r:.4f} / 상위100 tau {t1:.3f}  ->  " + (
-        "★ 성공 (regret<=1.10 이면서 tau>=0.30)"
+    print("\n  the verdict — the line nailed down in the pre-registration")
+    print(f"    regret {r:.4f} / top-100 tau {t1:.3f}  ->  " + (
+        "★ success (regret<=1.10 and tau>=0.30)"
         if r <= 1.10 and t1 >= 0.30
-        else "가중치가 tau 를 지운다 (regret<=1.10, tau<=0.15)"
+        else "the weights erase the tau (regret<=1.10, tau<=0.15)"
         if r <= 1.10 and t1 <= 0.15
-        else "★ 구조가 regret 에 안 맞는다 (regret>=1.30) -> (2) 필요"
-        if r >= 1.30 else "구분 불가"))
+        else "★ the structure does not suit regret (regret>=1.30) -> (2) is "
+             "needed"
+        if r >= 1.30 else "indistinguishable"))
 
     if a.skip_b:
         Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
@@ -208,11 +223,12 @@ def main() -> None:
     spB = _splits(B)
     holdB, trainB = list(spB.val.shapes), list(spB.train.shapes)
     print("\n" + "=" * 82)
-    print("B. 순위 진화 규칙의 전이 — A6000 -> 5090")
+    print("B. the transfer of a rank-evolved rule — A6000 -> 5090")
     print("=" * 82)
-    print(f"  5090 홀드아웃 {len(holdB)}형상")
-    print("  ⚠️ 5090 상위 100 은 폭 1.2% / 고유값 5개다 — 배울 순위가 적다\n")
-    print(f"  {'':34s} {'regret':>8} {'상위100 tau':>12} {'전구간':>10}")
+    print(f"  5090 holdout {len(holdB)} shapes")
+    print("  ⚠️ the 5090's top 100 spans 1.2% with 5 distinct values — there "
+          "is little ranking to learn\n")
+    print(f"  {'':34s} {'regret':>8} {'top-100 tau':>12} {'all':>10}")
 
     resB: dict = {}
     for name, obj in (("(a) 완전 이식 (A6000 가중치)", None),
@@ -228,13 +244,14 @@ def main() -> None:
         resB[name] = vals
         _row(name, vals)
     flB = _floor(B, holdB)
-    print(f"  {'★ 무작위 바닥 (20뽑기)':34s} {flB[0]:8.4f} {flB[1]:12.3f} "
+    print(f"  {'★ random floor (20 draws)':34s} {flB[0]:8.4f} {flB[1]:12.3f} "
           f"{flB[2]:10.3f}")
     out["B"] = {"rows": resB, "floor": flB, "n_holdout": len(holdB)}
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
-    print("  ⚠️ 3시드는 유의성을 못 낸다 — 범위 분리로 읽는다")
+    print("  ⚠️ 3 seeds cannot give significance — it is read by range "
+          "separation")
 
 
 if __name__ == "__main__":

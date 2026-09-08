@@ -1,53 +1,63 @@
-<!-- ★ Critic 은 **루프 밖**이다 (D-92). 두 통과 조건(D-85, D-87)이 다 실패했고
-     목 Critic 이 실제보다 높았다 — 설명 가능성이 성능과 안 붙는다.
-     벌점으로 진화 방향을 바꿀 근거가 없고, 방향을 안 바꾸면 루프에 있을
-     이유가 없다.
+<!-- ★ The Critic is **outside the loop** (D-92). Both pass conditions (D-85,
+     D-87) failed and the mock Critic scored higher than the real one —
+     explainability does not attach to performance. There is no ground for
+     turning the direction of evolution with a penalty, and if it does not
+     turn the direction there is no reason for it to be in the loop.
 
-     그래서 프롬프트와 스키마를 **쓰는 쪽이 들고 온다.** `kernelrule/agents/`
-     는 루프가 부르는 넷만 안다.
+     So the prompt and the schema **are brought along by the caller.**
+     `kernelrule/agents/` knows only the four the loop calls.
 
-     안 주는 것: 점수 / 사례 / 부모 규칙 / 가중치 / 하드웨어 상수.
-     ⚠️ 한계 — 같은 모델이 쓰고 심사한다 (D-45 로 모델이 고정돼 있다). -->
+     What is not given: the scores / the cases / the parent rule / the
+     weights / the hardware constants.
+     ⚠️ A limit — the same model writes it and judges it (the model is fixed
+     by D-45). -->
 
-# 역할 — Critic (루프 밖)
+# Role — Critic (outside the loop)
 
-아래 점수 함수를 **항 단위로 반증**하세요.
+**Refute the score function below, term by term.**
 
-당신의 임무는 승인이 아니라 **결함 찾기**입니다. "그럴듯하다" 는
-답이 아닙니다.
+Your job is not approval but **finding defects**. "It seems plausible" is not
+an answer.
 
-규칙 함수와 그 안에 쓰인 물리량 목록을 받습니다. **그것이 전부입니다** —
-점수도, 사례도, 부모 규칙도, 가중치 값도, 하드웨어 상수도 없습니다.
+You are given the rule function and the list of physical quantities used
+inside it. **That is everything** — there are no scores, no cases, no parent
+rule, no weight values and no hardware constants.
 
-## 각 항마다 답하세요
+## Answer these for each term
 
-`w[i]` 가 곱해진 항 하나가 심사 단위입니다.
-
-```
-1  이 항이 재는 물리량은 무엇인가 — 한 문장
-2  ★ 그 물리량이 GEMM 커널 성능을 좌우하는 **기전**이 있는가
-   "타일이 크면 좋다" 는 기전이 아닙니다.
-   "타일이 크면 wave 당 CTA 가 줄어 마지막 wave 낭비가 커진다" 가 기전입니다
-3  설명할 수 없으면 그렇게 쓰세요 — ★ 이것이 이 심사의 요점입니다
-4  특정 체제에서만 말이 되는가 (메모리 바운드일 때만, 짧은 형상일 때만 …)
-```
-
-## 특히 볼 것
+One term with a `w[i]` multiplied into it is the unit of judgement.
 
 ```
-차원이 맞는가          로그와 비율과 개수를 더하고 있지 않은가
-곱과 합의 의미         두 물리량의 곱이 무엇을 뜻하는가. 그냥 섞은 것인가
-중복                   두 항이 같은 물리를 다르게 쓴 것인가
+1  what physical quantity does this term measure — one sentence
+2  ★ is there a **mechanism** by which that quantity governs GEMM kernel
+   performance
+   "a big tile is good" is not a mechanism.
+   "a big tile means fewer CTAs per wave, so the waste in the last wave
+   grows" is a mechanism
+3  if you cannot explain it, write that — ★ this is the point of this review
+4  does it only make sense in a particular regime (only when memory bound,
+   only on short shapes, …)
 ```
 
-## ★ 설명하지 못하는 것을 설명하지 마세요
+## What to look at in particular
 
-**"설명 못 하겠다" 가 정답인 항이 있습니다.** 억지로 이야기를 지어
-붙이면 이 심사가 아무 일도 안 하게 됩니다. 모든 항을 설명해 냈다면
-당신이 관대한 것인지 먼저 의심하세요.
+```
+do the dimensions match   are logs and ratios and counts being added together
+the meaning of a product  what does the product of two quantities mean. Is it
+or a sum                  just a mixture
+duplication               are two terms the same physics written differently
+```
 
-## 출력
+## ★ Do not explain what you cannot explain
 
-항마다 `index`(w 인덱스), `expression`(그 항의 식), `physics`(한 문장),
-`explainable`, `why_not`, `regime_dependent`, `regime`.
-그리고 규칙 전체가 무엇을 하는지 한 문단(`overall`)과 결함 목록.
+**There are terms for which "I cannot explain it" is the right answer.** If
+you force a story onto them, this review does nothing at all. If you managed
+to explain every term, suspect first that you are being generous.
+
+## Output
+
+Per term: `index` (the w index), `expression` (that term's expression),
+`physics` (one sentence), `explainable`, `why_not`, `regime_dependent`,
+`regime`.
+And one paragraph on what the rule as a whole does (`overall`), plus the list
+of defects.

@@ -1,7 +1,7 @@
-"""손계산용 장난감 표. **시간을 사람이 직접 지정한다.**
+"""A toy table for hand calculation. **The times are given by a human.**
 
-§26.2 의 "알려진 답 테스트" 는 합성 생성기가 아니라 이 위에서 돈다 —
-생성기가 틀렸을 때 채점기까지 같이 틀리는 것을 막기 위해서다.
+The "known-answer test" of §26.2 runs on this rather than on the synthetic
+generator — so that a wrong generator does not take the scorer down with it.
 """
 from __future__ import annotations
 
@@ -16,9 +16,10 @@ HW = Hardware(name="TOY", arch="sm_86", sm_count=84, smem_per_block=101376,
               max_threads_per_sm=1536, regs_per_sm=65536,
               peak_tflops_f16=116.1, bandwidth_gbps=729.7, l2_bytes=6291456)
 
-#: 눈금/노이즈가 개입하지 않는 모델. 손계산이 정확히 맞아야 하는 테스트용.
+#: A model with no tick and no noise. For tests where the hand calculation has
+#: to come out exactly.
 EXACT = NoiseModel(sigma_abs_ms=0.0, sigma_rel_coef=0.0, tick_ms=0.0,
-                   source="toy: 노이즈 없음")
+                   source="toy: no noise")
 
 
 def make_table(times_by_shape: dict[tuple[int, int, int], list[float]], *,
@@ -26,8 +27,8 @@ def make_table(times_by_shape: dict[tuple[int, int, int], list[float]], *,
                feature_cols: dict[str, list] | None = None) -> PerfTable:
     """`{(M,N,K): [t0, t1, ...]}` -> PerfTable.
 
-    config 는 `k0, k1, ...` 로 이름 붙고 split_k 는 1 로 고정한다.
-    `feature_cols` 는 **전체 행 순서**의 배열이다 (가중치 테스트용).
+    The configs are named `k0, k1, ...` and split_k is fixed at 1.
+    `feature_cols` is an array in **whole-row order** (for the weight tests).
     """
     rows = []
     for (M, N, K), ts in times_by_shape.items():
@@ -49,7 +50,8 @@ def make_table(times_by_shape: dict[tuple[int, int, int], list[float]], *,
         for name, vals in feature_cols.items():
             if len(vals) != len(df):
                 raise ValueError(
-                    f"feature_cols[{name!r}] 길이 {len(vals)} != 행 수 {len(df)}")
+                    f"feature_cols[{name!r}] has length {len(vals)} != "
+                    f"{len(df)} rows")
             df[name] = list(vals)
     t = df.pop("_t").to_numpy(np.float64)
     y = df[["kernel_id", "M", "N", "K", "split_k", "split_k_mode"]].copy()
@@ -61,7 +63,7 @@ def make_table(times_by_shape: dict[tuple[int, int, int], list[float]], *,
 
 
 def order_by_index(indices):
-    """고정된 순서를 내는 `order_fn`. 채점기 검증용."""
+    """An `order_fn` that returns a fixed order. For verifying the scorer."""
     idx = np.asarray(indices, dtype=np.int64)
 
     def fn(p, cand):
@@ -71,8 +73,10 @@ def order_by_index(indices):
 
 
 def constant_score_order(p, cand):
-    """★ 모든 후보의 점수가 같다. tie-break 만으로 순서가 정해진다 (§30.7).
+    """★ Every candidate has the same score. The order is decided by the
+    tie-break alone (§30.7).
 
-    이 규칙이 무작위 선택보다 좋으면 **tie-break 가 정답을 보고 있다.**
+    If this rule beats a random pick, **the tie-break is looking at the
+    answer.**
     """
     return cand.order_by(np.zeros(cand.n))

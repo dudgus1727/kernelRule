@@ -1,18 +1,22 @@
-"""★ 다양성·배정 실측 — 기존 산출물만 읽는다. **LLM 호출 0회**.
+"""★ Measuring diversity and assignment — it reads existing artefacts only.
+**0 LLM calls**.
 
     python3 experiments/diversity_audit.py
 
-다섯 가지를 잰다 (§3-1, §4-3, §4-5).
+It measures five things (§3-1, §4-3, §4-5).
 
 ```
-1  Analyst 가설이 실제로 **다른 축**을 말하나       hypotheses.jsonl
-2  RuleWriter 10개가 얼마나 다른가                stage2-*/summary.json
-3  changes x 부모 종류 — 중복률이 부모 종류를 따르나  archive/rounds
-4  cross 가 실제로 두 부모를 쓰나                  ★ 코드를 읽는다
-5  가설 배정이 앞쪽에 치우치나                     ★ 산술로 나온다
+1  do the Analyst hypotheses really name **different axes**  hypotheses.jsonl
+2  how different are the 10 RuleWriter outputs               stage2-*/summary.json
+3  changes x parent kind — does the duplicate rate follow     archive/rounds
+   the parent kind
+4  does cross really use two parents                         ★ it reads the code
+5  is the hypothesis assignment skewed to the front          ★ it falls out of
+                                                             the arithmetic
 ```
 
-**처방을 만들기 전에 잰다** — 겹침이 작으면 다양성 장치가 불필요하다.
+**It measures before any prescription is made** — if the overlap is small, a
+diversity device is unnecessary.
 """
 
 from __future__ import annotations
@@ -35,9 +39,9 @@ def _jaccard(a: set, b: set) -> float:
 
 # ---------------------------------------------------------------- 1. Analyst
 def analyst_overlap() -> None:
-    """같은 라운드의 가설들이 같은 축을 말하는가."""
+    """Do the hypotheses of the same round name the same axes?"""
     print("=" * 74)
-    print("1. Analyst — 같은 라운드 가설끼리 얼마나 겹치나")
+    print("1. Analyst — how much the hypotheses of the same round overlap")
     print("=" * 74)
     feats, regimes, words, n_pairs = [], [], [], 0
     per_round: dict[tuple, list[dict]] = {}
@@ -57,23 +61,26 @@ def analyst_overlap() -> None:
             regimes.append(
                 (a.get("affected_regime") or "").strip()
                 == (b.get("affected_regime") or "").strip() != "")
+            # ★ The `가-힣` class stays: old `claim` texts are in Korean and
+            #   must still be tokenised (D-146).
             wa = set(re.findall(r"[가-힣A-Za-z_]{2,}", a.get("claim", "")))
             wb = set(re.findall(r"[가-힣A-Za-z_]{2,}", b.get("claim", "")))
             words.append(_jaccard(wa, wb))
     import statistics as st
-    print(f"  라운드 {len(per_round)}개, 가설 쌍 {n_pairs}개")
-    print(f"  measurable_with 자카드   중앙 {st.median(feats):.2f}  "
-          f"평균 {st.mean(feats):.2f}  "
-          f"완전 일치 {sum(1 for x in feats if x == 1.0) / len(feats):.0%}")
-    print(f"  affected_regime 동일     {sum(regimes) / n_pairs:.0%}")
-    print(f"  claim 어휘 자카드        중앙 {st.median(words):.2f}")
-    print("  ★ 겹침이 크면 다양성 장치가 필요하다 / 작으면 지금으로 충분")
+    print(f"  {len(per_round)} rounds, {n_pairs} hypothesis pairs")
+    print(f"  measurable_with jaccard   median {st.median(feats):.2f}  "
+          f"mean {st.mean(feats):.2f}  "
+          f"exact match {sum(1 for x in feats if x == 1.0) / len(feats):.0%}")
+    print(f"  affected_regime identical {sum(regimes) / n_pairs:.0%}")
+    print(f"  claim vocabulary jaccard  median {st.median(words):.2f}")
+    print("  ★ a large overlap means a diversity device is needed / a small "
+          "one means what we have is enough")
 
 
 # ------------------------------------------------------------ 2. RuleWriter
 def rule_writer_spread() -> None:
     print("\n" + "=" * 74)
-    print("2. RuleWriter — 한 캠페인의 10개가 얼마나 다른가")
+    print("2. RuleWriter — how different the 10 of one campaign are")
     print("=" * 74)
     import statistics as st
     for summ in sorted(RUNS.glob("*/stage2-rule-writer/summary.json")):
@@ -86,19 +93,21 @@ def rule_writer_spread() -> None:
         nterm = [len(t.get("w0") or []) for t in ok]
         fits = sorted(t["fit_regret"] for t in ok)
         print(f"  {summ.parent.parent.name:26s} n={len(ok):2d}  "
-              f"피처 자카드 중앙 {st.median(js):.2f}  "
-              f"항 {min(nterm)}~{max(nterm)}  "
-              f"점수 최소 {fits[0]:.4f} 중앙 {st.median(fits):.4f} "
-              f"최대 {fits[-1]:.4f}")
-    print("  ★ 자카드가 높으면 '같은 것을 10번' 이다 — 격차는 운의 폭일 뿐")
+              f"feature jaccard median {st.median(js):.2f}  "
+              f"terms {min(nterm)}~{max(nterm)}  "
+              f"score min {fits[0]:.4f} median {st.median(fits):.4f} "
+              f"max {fits[-1]:.4f}")
+    print("  ★ a high jaccard means 'the same thing 10 times' — the spread is "
+          "only the width of luck")
 
 
-# ------------------------------------------------- 3. changes x 부모 종류
+# ------------------------------------------------- 3. changes x parent kind
 def parent_kind_effect() -> None:
-    """부모 종류별 중복률. `rounds.jsonl` 은 종류를 안 남기므로
-    `llm_calls` 의 프롬프트에서 읽는다 (`round=r parent=kind`)."""
+    """The duplicate rate per parent kind. `rounds.jsonl` does not record the
+    kind, so it is read from the prompts in `llm_calls`
+    (`round=r parent=kind`)."""
     print("\n" + "=" * 74)
-    print("3. 부모 종류별 — 제안이 실제로 채점까지 갔나")
+    print("3. per parent kind — did the proposal actually reach the scoring")
     print("=" * 74)
     kinds: Counter = Counter()
     seen_by_kind: dict[str, Counter] = {}
@@ -118,25 +127,31 @@ def parent_kind_effect() -> None:
             c["n"] += len(cs)
             c["uniq"] += len(set(cs))
     if not kinds:
-        print("  ★ `llm_calls` 에 프롬프트가 안 남아 있다 — 이 축으로는 못 잰다.")
-        print("     ⚠️ `dump()` 가 `prompt` 를 남기지만 옛 실행에는 비어 있다.")
-        print("     대신 라운드별 **중복률**을 본다 (부모 종류는 못 가른다).")
+        print("  ★ the prompts are not kept in `llm_calls` — this axis cannot "
+              "be measured.")
+        print("     ⚠️ `dump()` does keep `prompt`, but it is empty in the "
+              "old runs.")
+        print("     Instead the **duplicate rate** per round is looked at "
+              "(the parent kind cannot be separated).")
         for d in sorted(RUNS.glob("*/rounds.jsonl"))[:6]:
             R = [json.loads(x) for x in d.read_text().splitlines() if x.strip()]
             prop = sum(r["n_proposed"] for r in R)
             sc = sum(r["n_scored"] for r in R)
-            print(f"     {d.parent.name:28s} 채점 {sc}/{prop} = {sc / prop:.0%}")
+            print(f"     {d.parent.name:28s} scored {sc}/{prop} = "
+                  f"{sc / prop:.0%}")
         return
-    print(f"  {'부모 종류':10s} {'제안':>6} {'고유':>6} {'고유율':>7}")
+    print(f"  {'parent kind':12s} {'props':>6} {'uniq':>6} {'uniq rate':>10}")
     for k, c in sorted(seen_by_kind.items()):
-        print(f"  {k:10s} {c['n']:6d} {c['uniq']:6d} {c['uniq'] / c['n']:7.0%}")
-    print("  ★ explore/cross 의 고유율이 낮으면 '가설-부모 불일치' 다")
+        print(f"  {k:12s} {c['n']:6d} {c['uniq']:6d} "
+              f"{c['uniq'] / c['n']:10.0%}")
+    print("  ★ a low unique rate for explore/cross means "
+          "'hypothesis-parent mismatch'")
 
 
 # ------------------------------------------------------------- 4. cross
 def cross_uses_two_parents() -> None:
     print("\n" + "=" * 74)
-    print("4. ★ cross 가 실제로 두 부모를 쓰나 — 코드를 읽는다")
+    print("4. ★ does cross really use two parents — it reads the code")
     print("=" * 74)
     from kernelrule.core.archive import Archive
     from kernelrule.core.loop import RoundLoop
@@ -149,29 +164,33 @@ def cross_uses_two_parents() -> None:
     uses = sorted({ast.unparse(n) for n in ast.walk(tree)
                    if isinstance(n, ast.Subscript)
                    and ast.unparse(n).startswith("ps[")})
-    print(f"  archive.parents 가 cross 에 둘을 준다 : {gives_two}")
-    print(f"  run_round 가 실제로 쓰는 것           : {uses}")
+    print(f"  archive.parents gives cross two : {gives_two}")
+    print(f"  what run_round actually uses    : {uses}")
     if gives_two and uses == ["ps[0]"]:
-        print("  ★ 두 번째 부모가 **버려진다**. cross 는 explore 와 같다.")
-        print("     프롬프트에도 부모 자리가 하나뿐이다 (`{parent_code}`).")
-    print("  ⚠️ 아카이브의 다양성이 결합된 적이 없다 — D-42(앙상블 실패)와 "
-          "관련 있을 수 있다")
+        print("  ★ the second parent is **thrown away**. cross is the same as "
+              "explore.")
+        print("     The prompt has only one parent slot too "
+              "(`{parent_code}`).")
+    print("  ⚠️ the archive's diversity has never been combined — it may be "
+          "related to D-42 (the ensemble failure)")
 
 
-# --------------------------------------------------------- 5. 배정 편중
+# --------------------------------------------------------- 5. assignment bias
 def assignment_bias() -> None:
     print("\n" + "=" * 74)
-    print("5. 가설 배정 — 라운드로빈의 산술적 편중")
+    print("5. hypothesis assignment — the arithmetic bias of the round robin")
     print("=" * 74)
-    print("  hyps[i % len(hyps)],  부모 12개")
-    print(f"  {'가설 수':>6} {'배정 횟수':>28} {'최대/최소':>9}")
+    print("  hyps[i % len(hyps)],  12 parents")
+    print(f"  {'n hyps':>7} {'assignment counts':>28} {'max/min':>9}")
     for n in range(2, 9):
         cnt = Counter(i % n for i in range(12))
         v = [cnt[k] for k in range(n)]
-        print(f"  {n:6d} {str(v):>28} {max(v) / min(v):9.2f}")
-    print("  ★ 앞쪽 가설이 더 자주 쓰인다. Analyst 가 낸 **순서**가 "
-          "배정 빈도가 된다 — 의도가 아니다")
-    print("  ⚠️ 부모 종류와도 상관된다: i=0~5 exploit / 6~8 explore / 9~11 cross")
+        print(f"  {n:7d} {str(v):>28} {max(v) / min(v):9.2f}")
+    print("  ★ the earlier hypotheses get used more often. The **order** the "
+          "Analyst produced becomes the assignment frequency — that is not "
+          "the intent")
+    print("  ⚠️ it is correlated with the parent kind too: i=0~5 exploit / "
+          "6~8 explore / 9~11 cross")
 
 
 def main() -> None:

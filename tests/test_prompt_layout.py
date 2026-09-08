@@ -1,12 +1,14 @@
-"""프롬프트 두 축 배치 (§30.10).
+"""The two-axis prompt layout (§30.10).
 
-원 설계는 "하드웨어 무관/의존" 한 축으로만 나눴다. **"역할 무관/의존"
-으로는 안 나눠서** 역할별로 필요 없는 것이 공용에 쌓였다 — FeatureWriter
-가 regret 정의와 가중치 예산 8개와 규칙 거부 사례를 매번 받았다.
+The original design split along one axis only, "hardware-independent /
+dependent". **It did not split along "role-independent / dependent"**, so
+things no role needed piled up in the common part — the FeatureWriter
+received the regret definition, the weight budget of 8 and the gallery of
+refused rules every time.
 
-              하드웨어 무관      하드웨어 의존
-    역할 무관  _base.md          hw/sm_86.md
-    역할 의존  role/*.md         (없음)
+              hardware-independent   hardware-dependent
+    role-indep _base.md              hw/sm_86.md
+    role-dep   role/*.md             (none)
 """
 from __future__ import annotations
 
@@ -24,19 +26,21 @@ ROLES = ("analyze", "rule_editor", "feature", "rule_writer")
 PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 
 
-#: ★ 2026-09-03 이전 실행의 하드웨어 사실. **지우지 않는다** — 그
-#: 실행들의 조건이 이 파일이다. 새 실행은 번들에서 생성한다 (D-113).
+#: ★ The hardware facts of runs before 2026-09-03. **It is not deleted** —
+#: this file is those runs' condition. New runs generate it from the bundle
+#: (D-113).
 FROZEN_HW = "hw/sm_86.md"
 
 
 def _instructions(role: str, *, objective: str = "rank") -> str:
-    """★ `_agent()` 와 **같은 함수**를 부른다 (원칙 2).
+    """★ It calls **the same function** as `_agent()` (principle 2).
 
-    전에는 여기서 조립을 다시 썼다. `{objective_block}` 이 생기자
-    시험 쪽만 안 채워져서 달라졌다 — 조립은 한 곳에서만 한다.
+    The assembly used to be rewritten here. When `{objective_block}`
+    appeared, only the test side left it unfilled and they diverged —
+    assembly happens in one place only.
 
-    ★ `hw_file` 을 **명시한다.** 기본값이 사라졌기 때문이고(D-113),
-    시험이 기본값에 기대고 있으면 그 기본값이 조건이라는 것을 못 본다.
+    ★ `hw_file` is **stated explicitly.** The default is gone (D-113), and a
+    test leaning on a default cannot see that the default is a condition.
     """
     from kernelrule.agents.openai_client import assemble_instructions
 
@@ -45,85 +49,95 @@ def _instructions(role: str, *, objective: str = "rank") -> str:
 
 
 # ---------------------------------------------------------------------------
-# ★ FeatureWriter 가 규칙 얘기를 받지 않는가
+# ★ Does the FeatureWriter avoid receiving rule material
 # ---------------------------------------------------------------------------
 
-#: FeatureWriter 프롬프트에 있으면 안 되는 것. 전부 **규칙**의 얘기다.
-_RULE_ONLY = ("regret", "가중치 8개", "리터럴", "w[0]", "np.random",
-              "부모 규칙", "가설", "룩업 테이블")
+#: What must not be in the FeatureWriter prompt. All of it is **rule**
+#: material.
+_RULE_ONLY = ("regret", "8 parameters", "literal", "w[0]", "np.random",
+              "Parent rule", "hypothesis", "lookup table")
 
 
 def test_feature_prompt_has_no_rule_material():
     body = _instructions("feature")
     hit = [t for t in _RULE_ONLY if t in body]
     assert not hit, (
-        f"FeatureWriter 프롬프트에 규칙 얘기가 있다: {hit}\n"
-        "FeatureWriter 의 일은 원시 값으로 물리량을 찾는 것뿐이다 — "
-        "뒷단 파이프라인을 알 필요가 없다 (§30.10).")
+        f"there is rule material in the FeatureWriter prompt: {hit}\n"
+        "The FeatureWriter's job is only to find a physical quantity from "
+        "raw values — it need not know the downstream pipeline (§30.10).")
 
 
 def test_feature_and_rule_editor_prompts_have_no_hardware_constants():
-    """★ hw 를 안 보면 그 프롬프트는 **GPU 무관**해진다 (§16.2)."""
+    """★ Not seeing hw makes that prompt **GPU-independent** (§16.2)."""
     hw = load_prompt(FROZEN_HW)
     marks = [m for m in ("RTX A6000", "sm_86", "84", "101376") if m in hw]
-    assert marks, "하드웨어 파일에서 표식을 못 찾았다 — 검사가 무의미하다"
+    assert marks, (
+        "no marker was found in the hardware file — this check is moot")
     for role in ("feature", "rule_editor"):
         body = _instructions(role)
         hit = [m for m in ("RTX A6000", "sm_86") if m in body]
-        assert not hit, f"{role} 프롬프트에 하드웨어 상수가 샜다: {hit}"
+        assert not hit, (
+            f"a hardware constant leaked into the {role} prompt: {hit}")
 
 
 def test_rule_writers_get_the_budget():
-    """★ 예산이 **주어진 값으로** 들어가는가.
+    """★ Does the budget go in **as the value given**?
 
-    전에는 `"8" in body` 였다. 8 은 피처 설명에도 나오므로 예산이 16 으로
-    렌더링돼도 통과했고, 실제로 `--rule-budget 16` 캠페인 하나가 8 로
-    돌았다 (D-105). **바뀌는 값을 상수로 찾으면 안 된다.**
+    It used to be `"8" in body`. 8 also appears in the feature descriptions,
+    so it passed even when the budget rendered as 16, and a `--rule-budget
+    16` campaign really ran at 8 (D-105). **A changing value must not be
+    searched for as a constant.**
     """
     from kernelrule.agents.openai_client import assemble_instructions
 
     for role in ("rule_editor", "rule_writer"):
-        assert "w[0]" in _instructions(role), f"{role} 에 규칙 형태가 없다"
+        assert "w[0]" in _instructions(role), (
+            f"{role} has no rule shape")
         for b in (8, 16):
             body = assemble_instructions(role, objective="rank", parameters=b,
                                          hw_file=FROZEN_HW)
             assert (f"{b} per execution path" in body
                     or f"at most {b}" in body), (
-                f"{role}: 예산 {b} 이 안 보인다")
+                f"{role}: the budget {b} is not visible")
 
 
 def test_hw_goes_only_to_roles_that_need_it():
-    """★ RuleWriter 뿐이다. Analyst 는 리포트 블록 1 에서 같은 사실을 받는다."""
+    """★ RuleWriter only. The Analyst receives the same facts in block 1 of
+    the report."""
     assert set(_NEEDS_HW) == {"rule_writer"}
 
 
 def test_architect_does_not_get_the_edit_block():
-    """`role/rule_writer.md` 가 "점수 없음" 이라고 써 놓고 regret 정의를
-    받으면 정면으로 모순이다 (§30.10)."""
+    """`role/rule_writer.md` says "no scores"; receiving the regret
+    definition would contradict that head on (§30.10)."""
     assert "rule_writer" not in _EDITS_RULES
     body = _instructions("rule_writer")
     assert "no scores" in body, "the role file changed — this check is moot"
-    assert "regret` = " not in body, "RuleWriter 에 regret 정의가 샜다"
+    assert "regret` = " not in body, (
+        "the regret definition leaked into RuleWriter")
 
 
 def test_optimizer_gets_the_edit_block():
-    """RuleEditor 만 편집 블록(목표 정의 + 거부 사례)을 받는다.
+    """Only the RuleEditor receives the edit block (the goal definition +
+    the refused cases).
 
-    ★ 목표 정의는 목적함수에 따라 문장이 다르다 (D-101). 기본이 `rank`
-    이므로 "regret` = " 를 찾으면 안 된다 — **절이 있는가**로 본다.
+    ★ The goal definition's sentence differs per objective (D-101). The
+    default is `rank`, so "regret` = " must not be searched for — it checks
+    **whether the section exists**.
     """
     body = _instructions("rule_editor")
     assert "## How you are scored" in body and "actually got rejected" in body
-    assert "{objective_block}" not in body, "자리표시자가 안 채워졌다"
+    assert "{objective_block}" not in body, (
+        "the placeholder was not filled")
     assert "Lower is better" in body
 
 
 def test_objective_block_differs_and_only_for_the_editor():
-    """★ 목적함수를 바꾸면 **RuleEditor 만** 달라진다 (D-101).
+    """★ Changing the objective changes **only the RuleEditor** (D-101).
 
-    RuleWriter 는 "점수 없음" 이라 이 절을 안 받는다. 걸리면 목적함수
-    변경이 RuleWriter 의 조건까지 바꾸는 것이고, 그러면 실험 계획서의
-    "바꾸는 곳" 목록이 틀린 것이 된다.
+    RuleWriter has "no scores" and does not receive this section. A failure
+    here means changing the objective also changes RuleWriter's condition,
+    and then the experiment plan's list of "what changes" is wrong.
     """
     a = {r: _instructions(r, objective="regret")
          for r in ("rule_editor", "rule_writer", "analyze", "feature")}
@@ -131,14 +145,14 @@ def test_objective_block_differs_and_only_for_the_editor():
          for r in ("rule_editor", "rule_writer", "analyze", "feature")}
     assert a["rule_editor"] != b["rule_editor"]
     for r in ("rule_writer", "analyze", "feature"):
-        assert a[r] == b[r], f"{r} 가 목적함수에 걸린다"
+        assert a[r] == b[r], f"{r} is affected by the objective"
 
 
 # ---------------------------------------------------------------------------
-# ★ 같은 문장이 두 역할 파일에 있으면 달라진다 (원칙 2)
+# ★ The same sentence in two role files diverges (principle 2)
 # ---------------------------------------------------------------------------
 
-#: 중복으로 세지 않는 줄. 마크다운 구조나 너무 짧은 것.
+#: Lines not counted as duplicates. Markdown structure, or too short.
 def _meaningful(line: str) -> bool:
     t = line.strip()
     return (len(t) >= 30 and not t.startswith(("#", "```", "|", "-", ">", "<!--"))
@@ -157,9 +171,9 @@ def test_no_duplicate_sentences_between_role_files():
                 dupes.append(f"  {seen[t]} <-> {f.name}: {t[:60]}")
             seen.setdefault(t, f.name)
     assert not dupes, (
-        "역할 파일 사이에 같은 문장이 있다 — 하나만 고치면 달라진다 "
-        "(원칙 2). 진짜 공용이면 `_base.md` 나 `role/_rules_common.md` 로 "
-        "올려라:\n" + "\n".join(dupes))
+        "the same sentence appears in two role files — fixing one of them "
+        "makes them diverge (principle 2). If it is genuinely common, lift "
+        "it into `_base.md` or `role/_rules_common.md`:\n" + "\n".join(dupes))
 
 
 def test_base_is_not_duplicated_into_role_files():
@@ -170,31 +184,32 @@ def test_base_is_not_duplicated_into_role_files():
         for line in f.read_text().splitlines():
             if _meaningful(line) and line.strip() in base_lines:
                 dupes.append(f"  {f.name}: {line.strip()[:60]}")
-    assert not dupes, ("`_base.md` 의 문장이 역할 파일에 복사돼 있다:\n"
-                       + "\n".join(dupes))
+    assert not dupes, ("a sentence from `_base.md` is copied into a role "
+                       "file:\n" + "\n".join(dupes))
 
 
 # ---------------------------------------------------------------------------
-# 예시가 답을 건네주지 않는가 (D-35)
+# Does the example avoid handing over the answer (D-35)
 # ---------------------------------------------------------------------------
 def test_feature_examples_are_from_another_domain():
-    """★ **F1 에서는** GEMM config 축을 건드리는 예시가 답을 건네준다.
+    """★ **Under F1**, an example that touches a GEMM config axis hands
+    over the answer.
 
-    F2/F3 는 공개 지식을 주는 것이 조건의 정의이므로 실제 피처를
-    코드까지 보여준다 (§30.17) — 그쪽은 `examples/known5.md` 이고 이
-    검사의 대상이 아니다.
+    For F2/F3, giving public knowledge is the definition of the condition,
+    so they show the real features down to the code (§30.17) — those use
+    `examples/known5.md` and are not the subject of this check.
     """
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.features import REGISTRY
 
     block = load_prompt("examples/other_domain.md")
     leaked = [n for n in REGISTRY._items if n in block]
-    assert not leaked, f"예시가 실제 피처를 담고 있다: {leaked}"
-    # config 축 이름도 나오면 안 된다
+    assert not leaked, f"the example contains a real feature: {leaked}"
+    # Config axis names must not appear either
     axes = ("tile_m", "tile_n", "tile_k", "split_k", "stages", "warp_m",
             "smem", "cp_async")
     hit = [a for a in axes if a in block]
-    assert not hit, f"예시가 GEMM config 축을 건드린다: {hit}"
+    assert not hit, f"the example touches a GEMM config axis: {hit}"
 
 
 @pytest.mark.parametrize("role", ROLES)
@@ -203,18 +218,20 @@ def test_every_role_gets_the_base(role):
 
 
 def test_hw_block_does_not_reference_cases():
-    """★ `hw/*.md` 는 이제 **RuleWriter 만** 받는데 RuleWriter 는 사례를
-    안 받는다. "사례에 붙은 ... 을 보세요" 는 없는 것을 가리킨다 (§30.10).
+    """★ `hw/*.md` now goes to **RuleWriter only**, and RuleWriter receives
+    no cases. "look at the ... attached to the case" points at something
+    that does not exist (§30.10).
     """
     hw = load_prompt(FROZEN_HW)
-    assert "사례에 붙은" not in hw     # ★ 얼린 파일이라 한글이다 (D-113)
+    assert "사례에 붙은" not in hw   # ★ a frozen file, so it is Korean (D-113)
     arch = _instructions("rule_writer")
     assert "no cases" in arch, "the role file changed — this check is moot"
 
 
 def test_analyst_gets_hardware_facts_from_the_report_not_a_file():
-    """리포트 블록 1 과 `hw/*.md` 는 **같은 사실**이다. 리포트는 표에서
-    매번 생성되고 파일은 고정이라, 둘 다 주면 번들이 바뀔 때 달라진다.
+    """Block 1 of the report and `hw/*.md` are **the same facts**. The
+    report is generated from the table every time and the file is fixed, so
+    giving both makes them diverge when the bundle changes.
     """
     import warnings
 
@@ -222,23 +239,25 @@ def test_analyst_gets_hardware_facts_from_the_report_not_a_file():
     from kernelrule.report.diagnostic import hardware_block
 
     body = _instructions("analyze")
-    assert "RTX A6000" not in body, "Analyst 시스템 프롬프트에 hw 가 있다"
+    assert "RTX A6000" not in body, (
+        "hw is in the Analyst system prompt")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         t = PerfTable.from_bundle("datasets/rtx-a6000-sm_86-c63710df",
                                   env_hash="c63710df", ok_only=False)
     blk = hardware_block(t.hw, t.noise)
     for fact in ("RTX A6000", "84", "ridge point"):
-        assert fact in blk, f"리포트 블록 1 에 {fact!r} 가 없다"
+        assert fact in blk, f"block 1 of the report has no {fact!r}"
 
 
 # ---------------------------------------------------------------------------
-# ★ 프롬프트 어디에도 **실제 피처 이름**이 박혀 있으면 안 된다 (D-35, D-65)
+# ★ **A real feature name** must not be nailed into any prompt (D-35,
+# D-65)
 #
-#   `role/rule_writer.md` 의 크기 맞추기 예시가 `f.traffic_amplification` /
-#   `f.tail_waste` 를 하드코딩하고 있었다. F1 조건에서 그것은 **답을
-#   건네주는 것**이다 — 레지스트리에 없는 이름인데 물리를 지목한다.
-#   `_base.md` 의 `if p.is_memory_bound:` 도 같다.
+#   The magnitude-matching example in `role/rule_writer.md` hardcoded
+#   `f.traffic_amplification` / `f.tail_waste`. Under F1 that **hands over
+#   the answer** — a name that is not in the registry, yet it points at the
+#   physics. The `if p.is_memory_bound:` of `_base.md` was the same.
 # ---------------------------------------------------------------------------
 def test_no_prompt_hardcodes_a_registry_feature_name():
     import kernelrule.features.physical  # noqa: F401
@@ -254,15 +273,17 @@ def test_no_prompt_hardcodes_a_registry_feature_name():
             if n in body:
                 bad.append(f"  {rel}: {n}")
     assert not bad, (
-        "프롬프트가 실제 피처 이름을 박아 뒀다 — F1 에서는 레지스트리에 "
-        "없는 이름이고 물리를 지목한다 (D-35). `f.<이름>` 같은 자리표시자를 "
-        "써라. 공개 지식을 주는 조건의 예시면 `_KNOWN_BY_DESIGN` 에 "
-        "넣되 **그 파일이 F1 에 안 간다는 것**을 확인하라:\n"
+        "a prompt nailed in a real feature name — under F1 it is a name "
+        "not in the registry and it points at the physics (D-35). Use a "
+        "placeholder such as `f.<name>`. If it is an example for a condition "
+        "that gives public knowledge, put it in `_KNOWN_BY_DESIGN` but "
+        "**confirm that the file does not reach F1**:\n"
         + "\n".join(bad))
 
 
 def test_known_by_design_files_never_reach_f1():
-    """★ 예외 파일이 정말 F1 에 안 가는가 — 예외의 전제를 검사한다."""
+    """★ Does the exempted file really not reach F1 — the premise of the
+    exception is checked."""
     from kernelrule.agents.openai_client import _EXAMPLES
 
     for cond in ("F1",):
@@ -270,7 +291,7 @@ def test_known_by_design_files_never_reach_f1():
 
 
 # ---------------------------------------------------------------------------
-# ★ F2 — 공개 지식 다섯으로 시작하는 조건 (§30.17)
+# ★ F2 — the condition that starts from the five public facts (§30.17)
 # ---------------------------------------------------------------------------
 def _feature_prompt(condition: str):
     import os
@@ -289,30 +310,40 @@ def _feature_prompt(condition: str):
     return llm._user_prompt("feature", "", condition=condition, registry=reg)
 
 
-#: 실제 피처 이름을 **의도적으로** 담는 파일.
+#: Files that contain real feature names **deliberately**.
 #:
-#:   examples/known5.md      공개 지식을 주는 조건의 피처 예시 (§30.17)
-#:   examples/rule_known.md  같은 조건의 **규칙** 예시 (§30.20)
+#:   examples/known5.md      the feature example for the conditions that give
+#:                           public knowledge (§30.17)
+#:   examples/rule_known.md  the **rule** example for the same conditions
+#:                           (§30.20)
 #:
-#: 둘 다 "레지스트리에 이미 있는 이름만" 쓴다. 그 불변식은
-#: `test_rule_example_never_names_a_feature_outside_the_registry` 와
-#: `test_known_by_design_files_never_reach_f0_or_f1` 이 지킨다 —
-#: **예외를 만들면서 그 예외가 새는지를 함께 검사한다.**
+#: Both use "only names already in the registry". That invariant is held by
+#: `test_rule_example_never_names_a_feature_outside_the_registry` and
+#: `test_known_by_design_files_never_reach_f0_or_f1` — **the exception is
+#: made and whether it leaks is checked alongside.**
 _KNOWN_BY_DESIGN = {"examples/known5.md", "examples/rule_known.md"}
 
 
-#: 표를 봐야만 아는 서술. 하나라도 프롬프트에 있으면 §12.3 위반이다.
-_MEASURED = ("이 표에서", "최적 0회", "최적으로 뽑힌", "rel 중앙", "7.4%",
-             "13.6", "37.2", "26% 어긋", "정답 집합")
+#: Statements knowable only from the table. One of them in the prompt is a
+#: §12.3 violation.
+#:
+#: ⚠️ 2026-09-08 (D-146): the prompts became English, so these are the
+#: English wordings. The old Korean list was ("이 표에서", "최적 0회",
+#: "최적으로 뽑힌", "rel 중앙", "7.4%", "13.6", "37.2", "26% 어긋",
+#: "정답 집합").
+_MEASURED = ("in this table", "optimal 0 times", "picked as optimal",
+             "rel median", "7.4%", "13.6", "37.2", "off by 26%",
+             "answer set")
 
 
 def test_f2_prompt_has_no_measurement():
-    """★ 이번 작업의 가장 중요한 지점 — `has_spill` 의 표 관측을 빼는 것."""
+    """★ The most important point of this work — removing `has_spill`'s
+    table observations."""
     body = _feature_prompt("F2")
     hit = [m for m in _MEASURED if m in body]
     assert not hit, (
-        f"F2 프롬프트에 측정 서술이 있다: {hit}\n"
-        "표 없이 알 수 있는 것만 남긴다 (§12.3, §30.17).")
+        f"there is a measured statement in the F2 prompt: {hit}\n"
+        "Only what is knowable without the table stays (§12.3, §30.17).")
 
 
 def test_f2_shows_the_five_with_sources():
@@ -320,12 +351,12 @@ def test_f2_shows_the_five_with_sources():
 
     body = _feature_prompt("F2")
     for n in K.KNOWN5._items:
-        assert f"f.{n}" in body or f"p.{n}" in body, f"{n} 이 안 뜬다"
-    assert body.count("출처:") >= 5, "출처가 다섯 미만이다"
+        assert f"f.{n}" in body or f"p.{n}" in body, f"{n} does not appear"
+    assert body.count("Source:") >= 5, "there are fewer than five sources"
 
 
 def test_f2_does_not_leak_the_other_nineteen():
-    """★ 나머지 19개는 F3 조건이다."""
+    """★ The other 19 are the F3 condition."""
     import re
 
     import kernelrule.features.known5 as K
@@ -334,11 +365,12 @@ def test_f2_does_not_leak_the_other_nineteen():
     body = _feature_prompt("F2")
     rest = sorted(set(REGISTRY._items) - set(K.KNOWN5._items))
     leak = [n for n in rest if re.search(rf"\b{re.escape(n)}\b", body)]
-    assert not leak, f"나머지 19개가 샜다: {leak}"
+    assert not leak, f"the other 19 leaked: {leak}"
 
 
 def test_examples_differ_by_condition():
-    """F1 은 무관 도메인, 공개 지식을 주는 조건은 실제 피처 (D-35)."""
+    """F1 gets an unrelated domain; the conditions that give public
+    knowledge get the real features (D-35)."""
     f1 = _feature_prompt("F1")
     f2 = _feature_prompt("F2")
     assert "branch_divergence_cost" in f1 and "queue_backlog" in f1
@@ -347,20 +379,23 @@ def test_examples_differ_by_condition():
 
 
 def test_areas_are_fixed_and_do_not_name_features():
-    """영역은 "무엇을 재는 자리" 일 뿐 "무엇을 만들어라" 가 아니다 (§30.18)."""
+    """An area is only "a place where something is measured", not "build
+    this" (§30.18)."""
     from kernelrule.agents.openai_client import load_prompt
 
     areas = load_prompt("areas.md")
     body = areas[areas.index("```") + 3:areas.rindex("```")]
     rows = [ln for ln in body.splitlines() if "|" in ln]
-    assert len(rows) == 7, f"영역이 일곱이 아니다: {len(rows)}"
-    # 만들 피처를 지목하는 항목 나열이 없어야 한다
-    for banned in ("wave 양자화", "타일 낭비", "wave quantization"):
+    assert len(rows) == 7, f"there are not seven areas: {len(rows)}"
+    # There must be no enumeration naming the features to build
+    for banned in ("wave 양자화", "타일 낭비", "wave quantization",
+                   "tile waste"):
         assert banned not in areas, banned
 
 
 def test_known5_values_are_identical_to_physical(perf_table_for_known5):
-    """★ 정리본이 원본과 **같은 값**을 내야 "알려진 피처를 줬다" 가 참이다."""
+    """★ The cleaned-up version must produce **the same values** as the
+    original for "the known features were given" to be true."""
     import numpy as np
 
     import kernelrule.features.known5 as K
@@ -396,11 +431,11 @@ def perf_table_for_known5():
 
 
 def test_internal_notes_never_reach_the_model():
-    """★ `<!-- ... -->` 는 사람이 읽는 메모다. 모델에 가면 안 된다.
+    """★ `<!-- ... -->` is a note for humans. It must not go to the model.
 
-    실제로 `§30.18`, `D-45`, `D-47` 같은 **내부 결정 번호**가 그대로
-    나가고 있었다 — 토큰을 쓰고, 내부 참조가 새고, 조건에 따라서는
-    답을 건네줄 수도 있다.
+    **Internal decision numbers** such as `§30.18`, `D-45` and `D-47` really
+    were going out as they were — they cost tokens, leak internal
+    references, and under some conditions could hand over the answer.
     """
     from kernelrule.agents.openai_client import load_prompt
 
@@ -408,27 +443,30 @@ def test_internal_notes_never_reach_the_model():
     for f in sorted(PROMPTS.rglob("*.md")):
         rel = f.relative_to(PROMPTS).as_posix()
         if "<!--" not in f.read_text():
-            continue                       # 메모가 없는 파일
+            continue                       # a file with no notes
         if "<!--" in load_prompt(rel):
             bad.append(f"  {rel}")
-    assert not bad, ("주석이 걷히지 않는다:\n" + "\n".join(bad))
+    assert not bad, ("the comments are not stripped:\n" + "\n".join(bad))
 
-    # 렌더링된 전문에도 없어야 한다
+    # They must be absent from the fully rendered text too
     for cond in ("F1", "F2", "F3"):
         body = _feature_prompt(cond)
         assert "<!--" not in body, cond
         for tag in ("§30.", "D-45", "D-47", "D-63"):
-            assert tag not in body, f"{cond} 에 내부 참조 {tag} 가 있다"
+            assert tag not in body, (
+                f"the internal reference {tag} is in {cond}")
 
 
 # ---------------------------------------------------------------------------
-# ★ §30.20 — RuleWriter 규칙 예시도 조건별로 달라진다
+# ★ §30.20 — the RuleWriter rule example differs per condition too
 #
-#   FeatureWriter 는 예시가 조건별로 달라지는데 RuleWriter 는 자리표시자
-#   하나뿐이었다. 좋은 예시를 주되 **답을 건네지 않아야** 한다 (D-35).
+#   FeatureWriter's example differs per condition while RuleWriter had a
+#   single placeholder. Give a good example, but it **must not hand over the
+#   answer** (D-35).
 #
-#   조건 이름을 키로 쓰지 않는다 — RuleWriter 의 `condition` 은 A/B(표
-#   관측 유무)라 피처 조건과 축이 다르다. **레지스트리를 보고 정한다.**
+#   The condition name is not used as the key — RuleWriter's `condition` is
+#   A/B (with or without table observations), a different axis from the
+#   feature conditions. **It is decided by looking at the registry.**
 # ---------------------------------------------------------------------------
 def _reg(names):
     import kernelrule.features.physical  # noqa: F401
@@ -452,12 +490,14 @@ def test_rule_example_is_chosen_by_registry_contents():
 
     assert "f.tail_waste" in _rule_example_for(human)
     assert "f.tail_waste" in _rule_example_for(k5)
-    # 이름이 없는 레지스트리면 무관 도메인으로 떨어진다
+    # With a registry lacking the names it falls back to the unrelated
+    # domain
     assert "f.tail_waste" not in _rule_example_for(FeatureRegistry("empty"))
 
 
 def test_rule_example_never_names_a_feature_outside_the_registry():
-    """★ 이것이 진짜 불변식이다 — 조건 이름이 아니라 **누출 여부**."""
+    """★ This is the real invariant — not the condition name but **whether
+    it leaks**."""
     import re
 
     import kernelrule.features.known5 as K
@@ -467,36 +507,40 @@ def test_rule_example_never_names_a_feature_outside_the_registry():
     k5 = FeatureRegistry("k5")
     for n in sorted(K.KNOWN5._items):
         k5.add(K.KNOWN5[n])
-    cases = {"사람24": _reg(sorted(REGISTRY._items)), "known5": k5,
-             "빈": FeatureRegistry("empty"),
-             "일부": _reg(["waves", "edge_waste"])}
+    cases = {"human24": _reg(sorted(REGISTRY._items)), "known5": k5,
+             "empty": FeatureRegistry("empty"),
+             "partial": _reg(["waves", "edge_waste"])}
     for tag, r in cases.items():
         ex = _rule_example_for(r)
         leak = [n for n in REGISTRY._items
                 if re.search(rf"[fp]\.{re.escape(n)}\b", ex)
                 and n not in r._items]
-        assert not leak, f"{tag}: 레지스트리 밖 이름이 예시에 있다 {leak}"
+        assert not leak, (
+            f"{tag}: a name outside the registry is in the example {leak}")
 
 
 def test_rule_examples_keep_placeholders():
-    """완성된 규칙을 주면 그대로 제출하고 구조 비교가 무너진다 (D-35)."""
+    """Given a finished rule it submits it as is and the structural
+    comparison collapses (D-35)."""
     from kernelrule.agents.openai_client import load_prompt
 
     for f in ("examples/rule_known.md", "examples/rule_other_domain.md"):
         body = load_prompt(f)
-        assert "<" in body and ">" in body, f"{f} 에 자리표시자가 없다"
+        assert "<" in body and ">" in body, f"{f} has no placeholder"
         assert "re-weighting" in body and "selection" in body, (
             f"{f} does not show the difference between the two")
 
 
 def test_no_korean_on_the_llm_path():
-    """★ LLM 에 나가는 것은 **영어만** (D-146).
+    """★ What goes to the LLM is **English only** (D-146).
 
-    한글은 토큰이 비싸다 — 실측으로 `rule_editor` 입력이 글자당 1.08 토큰
-    (한글 비율 32.8%) 이었고 순수 영어면 3.5~4 자당 1 토큰이다. 15실행 x
-    12라운드 기준 약 100만 토큰(총 부하의 20~25%) 차이다.
+    Korean is expensive in tokens — measured, the `rule_editor` input was
+    1.08 tokens per character (32.8% Korean), while pure English is one
+    token per 3.5~4 characters. Over 15 runs x 12 rounds that is about a
+    million tokens (20~25% of the total load).
 
-    ⚠️ `docs/` 는 한글을 유지한다 — 사람이 읽는 것이고 LLM 에 안 나간다.
+    ⚠️ `docs/` stays in Korean — it is read by humans and does not go to the
+    LLM.
     """
     import json
     import re
@@ -509,17 +553,18 @@ def test_no_korean_on_the_llm_path():
     KO = re.compile(r"[가-힣]")
     bad: list[str] = []
 
-    # (1) 조립된 시스템 프롬프트 넷
+    # (1) the four assembled system prompts
     for role in ("analyze", "feature", "rule_writer", "rule_editor"):
         kw: dict = {"objective": "regret", "parameters": 8}
         if role == "rule_writer":
             kw["hw_text"] = "GPU: TEST\n"
         hits = KO.findall(assemble_instructions(role, **kw))
         if hits:
-            bad.append(f"시스템 프롬프트 {role}: {''.join(hits[:20])}")
+            bad.append(f"system prompt {role}: {''.join(hits[:20])}")
 
-    # (2) 프롬프트 파일 — ★ `hw/sm_86.md` 는 **얼린 파일**이라 뺀다 (D-113).
-    #     옛 실행의 조건 기록이고 지금 LLM 경로에 안 쓰인다.
+    # (2) the prompt files — ★ `hw/sm_86.md` is **frozen**, so it is
+    #     excluded (D-113). It is the condition record of old runs and is not
+    #     used on today's LLM path.
     from pathlib import Path
     root = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
     for f in sorted(root.rglob("*.md")):
@@ -529,7 +574,7 @@ def test_no_korean_on_the_llm_path():
         if hits:
             bad.append(f"{f.relative_to(root)}: {''.join(hits[:20])}")
 
-    # (3) 출력 스키마의 description
+    # (3) the descriptions of the output schemas
     from kernelrule.agents import schemas as S
     if S.HAVE_PYDANTIC:
         for name in ("AnalysisOutput", "CategoryOutput", "CritiqueOutput"):
@@ -537,16 +582,17 @@ def test_no_korean_on_the_llm_path():
                             ensure_ascii=False)
             hits = KO.findall(js)
             if hits:
-                bad.append(f"스키마 {name}: {''.join(hits[:20])}")
+                bad.append(f"schema {name}: {''.join(hits[:20])}")
         js = json.dumps(S.rule_output_for(8).model_json_schema(),
                         ensure_ascii=False)
         if (hits := KO.findall(js)):
-            bad.append(f"스키마 RuleOutput: {''.join(hits[:20])}")
+            bad.append(f"schema RuleOutput: {''.join(hits[:20])}")
 
-    # (4) 피처 블록 — 규칙 프롬프트에 통째로 들어간다
+    # (4) the feature block — it goes into the rule prompt whole
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.features import REGISTRY, render_features
     if (hits := KO.findall(render_features(REGISTRY, include_observed=False))):
-        bad.append(f"피처 블록: {''.join(hits[:20])}")
+        bad.append(f"feature block: {''.join(hits[:20])}")
 
-    assert not bad, "LLM 경로에 한글이 있다:\n  " + "\n  ".join(bad)
+    assert not bad, ("there is Korean on the LLM path:\n  "
+                     + "\n  ".join(bad))

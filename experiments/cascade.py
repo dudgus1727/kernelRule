@@ -1,16 +1,17 @@
-"""★ Cascade — regret 규칙이 영역을, 순위 규칙이 순서를. LLM 0회.
+"""★ Cascade — the regret rule picks the region, the rank rule the order.
+0 LLM calls.
 
     python3 experiments/cascade.py
 
-실험 계획서 `docs/artifacts/cascade-prereg.md`.
+The pre-registration is `docs/artifacts/cascade-prereg.md`.
 
 ```
-1단계   regret 규칙으로 상위 k 를 추린다      (영역 선택)
-2단계   순위 규칙으로 그 안에서 1등을 고른다   (순서)
+stage 1   the regret rule narrows to the top k      (region selection)
+stage 2   the rank rule picks first place inside it (the order)
 ```
 
-벽의 두 진술이 상보적이라 이어 붙인다 (D-118). **벽을 없애는 것이
-아니라 배포 시점에 우회하는 것이다.**
+The wall's two statements are complementary, so they are joined (D-118). **It
+does not remove the wall; it goes around it at deployment time.**
 """
 
 from __future__ import annotations
@@ -47,7 +48,8 @@ def _best(run: str, by: str) -> dict:
 
 
 def _scores(fn, ws, table, matrix, shapes) -> dict:
-    """형상별 점수 배열. 적합을 한 번만 하려고 미리 뽑아 둔다."""
+    """The score array per shape. It is pulled out in advance so the fit runs
+    only once."""
     out = {}
     for p in shapes:
         cand = table.candidates(p)
@@ -66,8 +68,8 @@ def main() -> None:
     ap.add_argument("--out", default="docs/artifacts/cascade.json")
     a = ap.parse_args()
     warnings.simplefilter("ignore")
-    assert_same_condition(REG_RUNS, label="regret 팔")
-    assert_same_condition(RANK_RUNS, label="순위 팔")
+    assert_same_condition(REG_RUNS, label="the regret arm")
+    assert_same_condition(RANK_RUNS, label="the rank arm")
 
     T = PerfTable.from_bundle(A6000[0], env_hash=A6000[1], ok_only=False)
     M = FeatureMatrix(T, REGISTRY)
@@ -78,12 +80,14 @@ def main() -> None:
     out: dict = {"ks": list(KS), "n_holdout": len(hold)}
 
     print("=" * 86)
-    print("Cascade — 1단계 regret 규칙(영역) -> 2단계 순위 규칙(순서)")
+    print("Cascade — stage 1 the regret rule (the region) -> stage 2 the rank "
+          "rule (the order)")
     print("=" * 86)
-    print(f"  A6000 홀드아웃 {len(hold)}형상 · regret 팔 {len(REG_RUNS)}구조 "
-          f"x 순위 팔 {len(RANK_RUNS)}구조 = {len(REG_RUNS) * len(RANK_RUNS)} 조합\n")
+    print(f"  A6000 holdout {len(hold)} shapes · the regret arm "
+          f"{len(REG_RUNS)} structures x the rank arm {len(RANK_RUNS)} "
+          f"structures = {len(REG_RUNS) * len(RANK_RUNS)} combinations\n")
 
-    # -- 적합은 구조마다 한 번 -------------------------------------------
+    # -- the fit runs once per structure ---------------------------------
     S1 = {}
     for r in REG_RUNS:
         e = _best(r, "regret")
@@ -95,21 +99,21 @@ def main() -> None:
         S2[r] = _scores(*_fit(e["code"], e["w"], T, M, train, "rank"),
                         T, M, hold)
 
-    # -- 기준선: regret 단독 --------------------------------------------
+    # -- the baseline: regret alone --------------------------------------
     solo = []
     for r in REG_RUNS:
         solo.append(_geo([times[p.key][int(cands[p.key].top_k(S1[r][p.key],
                                                               1)[0])]
                           / times[p.key].min() for p in hold]))
-    print(f"  기준선  regret 단독 regret@1   중앙 {np.median(solo):.4f}   "
-          f"범위 {min(solo):.4f}~{max(solo):.4f}")
+    print(f"  baseline  regret alone, regret@1   median {np.median(solo):.4f}"
+          f"   range {min(solo):.4f}~{max(solo):.4f}")
     out["solo"] = solo
 
     rng = np.random.default_rng(0)
-    print(f"\n  {'k':>4} {'★ cascade 중앙':>14} {'범위':>17} "
-          f"{'천장 oracle@k':>14} {'바닥 무작위in-k':>15} {'hit@k':>7}")
+    print(f"\n  {'k':>4} {'★ cascade median':>18} {'range':>17} "
+          f"{'ceiling oracle@k':>18} {'floor random-in-k':>19} {'hit@k':>7}")
     for k in KS:
-        # 천장 / 바닥 / hit@k 는 1단계 구조마다
+        # The ceiling / the floor / hit@k are per stage-1 structure
         ceil_, floor_, hit_ = [], [], []
         casc = []
         for r1 in REG_RUNS:
@@ -133,35 +137,36 @@ def main() -> None:
                     j = idx[int(np.argmin(S2[r2][p.key][idx]))]
                     v.append(times[p.key][j] / times[p.key].min())
                 casc.append(_geo(v))
-        print(f"  {k:>4} {np.median(casc):14.4f} "
-              f"{min(casc):8.4f}~{max(casc):<8.4f} {np.median(ceil_):14.4f} "
-              f"{np.median(floor_):15.4f} {np.median(hit_):7.1%}")
+        print(f"  {k:>4} {np.median(casc):18.4f} "
+              f"{min(casc):8.4f}~{max(casc):<8.4f} {np.median(ceil_):18.4f} "
+              f"{np.median(floor_):19.4f} {np.median(hit_):7.1%}")
         out.setdefault("cascade", {})[str(k)] = casc
         out.setdefault("ceiling", {})[str(k)] = ceil_
         out.setdefault("floor_in_k", {})[str(k)] = floor_
         out.setdefault("hit_at_k", {})[str(k)] = hit_
 
-    # -- 판정 ------------------------------------------------------------
+    # -- the verdict ------------------------------------------------------
     print("\n" + "=" * 86)
-    print("판정 — 실험 계획서에 박은 선")
+    print("the verdict — the line nailed down in the pre-registration")
     print("=" * 86)
     lo, hi = min(solo), max(solo)
-    print(f"  regret 단독 시드 범위  {lo:.4f}~{hi:.4f}")
+    print(f"  the seed range of regret alone  {lo:.4f}~{hi:.4f}")
     for k in KS:
         m = float(np.median(out["cascade"][str(k)]))
-        v = ("★ 우회된다" if m < lo else
-             "★ 안 된다 (범위 안)" if m <= hi else "★ 2단계가 해를 끼친다")
+        v = ("★ it goes around" if m < lo else
+             "★ it does not (inside the range)" if m <= hi
+             else "★ stage 2 does harm")
         f = float(np.median(out["floor_in_k"][str(k)]))
         c = float(np.median(out["ceiling"][str(k)]))
         pos = (m - c) / (f - c) if f > c else float("nan")
         print(f"  k={k:<3d} cascade {m:.4f}   {v}")
-        print(f"        천장 {c:.4f} · 바닥 {f:.4f} → "
-              f"2단계가 그 사이의 {1 - pos:.0%} 를 메운다")
+        print(f"        ceiling {c:.4f} · floor {f:.4f} → "
+              f"stage 2 closes {1 - pos:.0%} of the gap between them")
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
-    print("  ⚠️ 18조합은 독립 표본이 아니다 (구조 9개에서 나온다). "
-          "유의성을 안 낸다 (원칙 27)")
+    print("  ⚠️ the 18 combinations are not independent samples (they come "
+          "from 9 structures). No significance is given (principle 27)")
 
 
 if __name__ == "__main__":

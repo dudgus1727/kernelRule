@@ -1,15 +1,16 @@
-"""스키마 계약과 어댑터 (§23).
+"""The schema contract and the adapter (§23).
 
-kernelTab 은 지금도 바뀌고 있다 (`migration_plan.md` 11건, `env_hash` 재정의,
-`schema_version` 2 로의 이행). 오늘 스키마에 맞춰 짜면 본 캠페인 표가 넘어올
-때 깨진다. 그래서 표와 우리 타입 사이에 얇은 계층을 하나 둔다.
+kernelTab is still changing (`migration_plan.md` lists 11 items, `env_hash`
+was redefined, the move to `schema_version` 2). Coding against today's schema
+breaks when the main campaign's table arrives. So there is one thin layer
+between the table and our types.
 
-원칙 (§26.4 — 전부 실패 쪽으로 기운다):
+Principles (§26.4 — everything leans towards failing):
 
-    필수 컬럼이 없다        -> 에러       (기본값으로 때우지 않는다)
-    새 컬럼이 생겼다        -> 경고 후 진행
-    별칭으로 찾았다         -> 기록하고 진행
-    유도 컬럼을 만들 수 없다 -> 에러
+    a required column is missing   -> error     (no papering over with defaults)
+    a new column appeared          -> warn and continue
+    found via an alias             -> record it and continue
+    a derived column cannot be built -> error
 """
 
 from __future__ import annotations
@@ -31,29 +32,33 @@ __all__ = [
     "normalize",
 ]
 
-#: 우리 쪽 계약 버전. kernelTab 의 `BUNDLE.json` schema_version 과 다른 축이다.
+#: Our contract version. A different axis from kernelTab's `BUNDLE.json`
+#: schema_version.
 SCHEMA_VERSION = "1.0"
 
 
 class SchemaError(RuntimeError):
-    """표가 계약을 만족하지 않는다. **조용히 진행하지 않는다.**"""
+    """The table does not satisfy the contract. **Do not proceed
+    silently.**"""
 
 
-#: 규칙 입력(`load_for_ranking`)에 반드시 있어야 하는 컬럼.
-#: 여기 없으면 `Config` 를 만들 수 없거나 물리 피처를 계산할 수 없다.
+#: Columns that must exist in the rule input (`load_for_ranking`).
+#: Without them a `Config` cannot be built or a physical feature cannot be
+#: computed.
 REQUIRED_COLUMNS: frozenset[str] = frozenset({
-    # 형상
+    # shape
     "M", "N", "K", "dtype",
-    # config (아키텍처 공통) — 전이 피처가 이것만으로 계산되어야 한다 (§4.3)
+    # config (architecture-common) — transferable features must compute from
+    # these alone (§4.3)
     "tile_m", "tile_n", "tile_k",
     "align_a", "align_b", "align_c",
     "split_k", "split_k_mode",
     "kernel_id", "arch",
-    # 빌드 시점에 알 수 있는 커널 속성 (§3.2 — 실행 불필요하므로 허용)
+    # Kernel attributes known at build time (§3.2 — allowed, no execution)
     "regs_per_thread", "threads", "max_blocks_per_sm", "pipeline_kind",
 })
 
-#: 있으면 쓰고 없으면 넘어가는 것. **없다고 에러를 내지 않는다.**
+#: Used when present, skipped when not. **Absence is not an error.**
 OPTIONAL_COLUMNS: frozenset[str] = frozenset({
     "acc_dtype", "layout_a", "layout_b", "layout_c",
     "ext_warp_m", "ext_warp_n", "ext_warp_k", "ext_stages",
@@ -68,17 +73,19 @@ OPTIONAL_COLUMNS: frozenset[str] = frozenset({
     "cutlass_commit", "nvcc_arch", "locked_mhz",
 })
 
-#: 표의 이름과 우리가 쓰는 이름이 1:1 일 필요는 없다.
-#: 값: (우리 이름) -> (표에서 찾아볼 후보들, 앞에서부터)
+#: The table's names need not map 1:1 onto ours.
+#: Value: (our name) -> (candidates to look for in the table, in order)
 ALIASES: dict[str, tuple[str, ...]] = {
     "smem_bytes": ("smem_bytes", "smem_dynamic", "smem_computed",
                    "smem_static_bytes"),
 }
 
-#: 유도 컬럼 — 어댑터가 만든다 (§23.3). 규칙이 쓰는 이름과 표의 이름을
-#: 분리해 두면 kernelTab 이 컬럼을 쪼개거나 합쳐도 여기만 고치면 된다.
+#: Derived columns — built by the adapter (§23.3). Keeping the name the rule
+#: uses separate from the table's name means only this changes when kernelTab
+#: splits or merges a column.
 DERIVED: dict[str, tuple[str, ...]] = {
-    # 스필은 읽기/쓰기가 따로 기록된다. 규칙은 합계만 알면 된다.
+    # Spills are recorded separately for loads and stores. The rule only
+    # needs the total.
     "spill_bytes": ("spill_stores", "spill_loads"),
 }
 
@@ -95,9 +102,10 @@ class SchemaReport:
     def raise_if_bad(self) -> SchemaReport:
         if not self.ok:
             raise SchemaError(
-                f"표가 계약을 만족하지 않는다. 누락된 필수 컬럼: {self.missing}\n"
-                f"  core/adapter.py 의 REQUIRED_COLUMNS / ALIASES / DERIVED 를 "
-                f"확인하라. 기본값으로 때우지 않는다 (§26.4).")
+                "the table does not satisfy the contract. Missing required "
+                f"columns: {self.missing}\n"
+                "  Check REQUIRED_COLUMNS / ALIASES / DERIVED in "
+                "core/adapter.py. No papering over with defaults (§26.4).")
         return self
 
     def __str__(self) -> str:
@@ -109,12 +117,13 @@ class SchemaReport:
         if self.derived:
             parts.append(f"derived={self.derived}")
         if self.unexpected:
-            parts.append(f"new={len(self.unexpected)}개")
+            parts.append(f"new={len(self.unexpected)}")
         return "SchemaReport(" + ", ".join(parts) + ")"
 
 
 def _resolve(df: pd.DataFrame, name: str) -> str | None:
-    """`name` 을 표의 실제 컬럼 이름으로 푼다. 별칭을 훑는다."""
+    """Resolve `name` to the table's actual column name, scanning
+    aliases."""
     if name in df.columns:
         return name
     for cand in ALIASES.get(name, ()):
@@ -124,10 +133,11 @@ def _resolve(df: pd.DataFrame, name: str) -> str | None:
 
 
 def check_schema(df: pd.DataFrame, *, unexpected: str = "warn") -> SchemaReport:
-    """필수 컬럼 존재 / 별칭 / 유도 가능성 / 새 컬럼을 보고한다.
+    """Report required columns, aliases, derivability and new columns.
 
-    `unexpected="warn"` 이 기본이다 — kernelTab 이 컬럼을 추가하는 것은
-    정상이고, 그때마다 터지면 표를 못 쓴다. `"raise"` 로 올릴 수 있다.
+    `unexpected="warn"` is the default — kernelTab adding a column is normal,
+    and blowing up each time would make the table unusable. It can be raised
+    to `"raise"`.
     """
     cols = set(df.columns)
     missing: list[str] = []
@@ -157,7 +167,8 @@ def check_schema(df: pd.DataFrame, *, unexpected: str = "warn") -> SchemaReport:
             derived.append(name)
         else:
             have = [s for s in sources if s in cols]
-            missing.append(f"{name}(유도 불가: {sources} 중 {have} 만 있음)")
+            missing.append(f"{name} (cannot derive: of {sources} only {have} "
+                           "is present)")
 
     known = (REQUIRED_COLUMNS | OPTIONAL_COLUMNS | set(ALIASES)
              | set(DERIVED) | {s for v in DERIVED.values() for s in v}
@@ -168,11 +179,13 @@ def check_schema(df: pd.DataFrame, *, unexpected: str = "warn") -> SchemaReport:
                        unexpected=unexpected_cols, aliased=aliased,
                        derived=derived)
     if unexpected_cols:
-        msg = (f"표에 계약에 없는 컬럼 {len(unexpected_cols)}개: "
+        msg = (f"{len(unexpected_cols)} columns in the table are not in the "
+               "contract: "
                f"{unexpected_cols[:12]}{' ...' if len(unexpected_cols) > 12 else ''}\n"
-               "  kernelTab 이 컬럼을 추가한 것일 수 있다. 정답에서 유도된 값이면 "
-               "kernelTab 의 ANSWER_COLS 에 들어가야 하고, 피처면 여기 "
-               "OPTIONAL_COLUMNS 에 넣어라. 그전까지는 무시된다.")
+               "  kernelTab may have added a column. If it is derived from "
+               "the answer it belongs in kernelTab's ANSWER_COLS; if it is a "
+               "feature, add it to OPTIONAL_COLUMNS here. Until then it is "
+               "ignored.")
         if unexpected == "raise":
             raise SchemaError(msg)
         if unexpected == "warn":
@@ -181,20 +194,22 @@ def check_schema(df: pd.DataFrame, *, unexpected: str = "warn") -> SchemaReport:
 
 
 def normalize(df: pd.DataFrame, *, unexpected: str = "warn") -> pd.DataFrame:
-    """표를 우리 이름으로 정규화한다. 별칭을 풀고 유도 컬럼을 만든다.
+    """Normalise the table to our names: resolve aliases, build derived
+    columns.
 
-    ⚠️ **정답 컬럼을 만들지도 옮기지도 않는다.** 입력은 `load_for_ranking`
-    결과여야 한다. `time_ms` 가 섞여 있으면 여기서 터진다 — 어댑터가 정답을
-    통과시키는 경로가 되면 §3 의 격리가 무의미해진다.
+    ⚠️ **It neither creates nor carries answer columns.** The input must be
+    the result of `load_for_ranking`. If `time_ms` is mixed in it raises here
+    — an adapter that passes the answer through would make §3's isolation
+    meaningless.
     """
     from kerneltab.core.table import ANSWER_COLS
 
     leaked = sorted(set(df.columns) & set(ANSWER_COLS))
     if leaked:
         raise SchemaError(
-            f"normalize() 에 정답 컬럼이 들어왔다: {leaked}\n"
-            "  load_for_ranking() 결과를 넘겨라. 어댑터는 정답을 통과시키지 "
-            "않는다 (§3.2).")
+            f"answer columns reached normalize(): {leaked}\n"
+            "  Pass the result of load_for_ranking(). The adapter does not "
+            "pass the answer through (§3.2).")
 
     check_schema(df, unexpected=unexpected).raise_if_bad()
 
@@ -214,8 +229,8 @@ def normalize(df: pd.DataFrame, *, unexpected: str = "warn") -> pd.DataFrame:
             out = out.assign(spill_bytes=(out["spill_stores"].fillna(0)
                                           + out["spill_loads"].fillna(0)
                                           ).astype("int64"))
-        else:  # pragma: no cover - DERIVED 에 항목을 추가하면 여기도 채워라
-            raise SchemaError(f"유도 규칙이 구현되지 않았다: {name}")
+        else:  # pragma: no cover - adding to DERIVED means filling this too
+            raise SchemaError(f"no derivation rule is implemented: {name}")
 
     for name in ("acc_dtype", "layout_a", "layout_b", "layout_c"):
         if name not in out.columns:

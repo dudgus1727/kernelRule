@@ -1,4 +1,4 @@
-"""피처 라이브러리와 자동 검증 (§8.2, §8.3)."""
+"""The feature library and automatic validation (§8.2, §8.3)."""
 from __future__ import annotations
 
 import inspect
@@ -6,7 +6,7 @@ import warnings
 
 import pytest
 
-import kernelrule.features.physical  # noqa: F401  등록
+import kernelrule.features.physical  # noqa: F401  registration
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.features import REGISTRY
 from kernelrule.features.validate import validate_registry
@@ -18,16 +18,17 @@ def matrix(synth_table):
 
 
 def test_library_has_enough_features():
-    """§8.2 — 시작 전에 손으로 10~15개를 채워둔다."""
+    """§8.2 — 10~15 are written by hand before starting."""
     assert len(REGISTRY.names(shape_level=False)) >= 15
     assert len(REGISTRY.names(shape_level=True)) >= 4
 
 
 def test_no_feature_touches_ext():
-    """★ `cfg.ext` 참조 금지 — 아키텍처 전이 전제 (§4.3, §8.2).
+    """★ No reference to `cfg.ext` — the architecture-transfer premise
+    (§4.3, §8.2).
 
-    `ext_*` 는 SM90 에 대응물이 없다. 전이를 노리는 규칙이 그것을 쓰면
-    주 지표(아키텍처 홀드아웃)에서 무너진다.
+    `ext_*` has no counterpart on SM90. A rule aiming at transfer that uses
+    it collapses on the main metric (the architecture holdout).
     """
     bad = []
     for f in REGISTRY.items(active_only=False):
@@ -37,14 +38,14 @@ def test_no_feature_touches_ext():
             continue
         if "cfg.ext" in src or ".ext[" in src:
             bad.append(f.name)
-    assert not bad, f"`cfg.ext` 를 참조하는 피처: {bad}"
+    assert not bad, f"features that reference `cfg.ext`: {bad}"
 
 
 def test_no_feature_references_answers():
-    """정답 컬럼 이름을 **식별자로** 참조하지 않는다.
+    """No answer-column name is referenced **as an identifier**.
 
-    단순 부분문자열 검사는 안 된다 — `hw.peak_tflops_f16` 이 `tflops` 를
-    포함해서 오탐이 난다. 토큰 경계로 본다.
+    A plain substring check will not do — `hw.peak_tflops_f16` contains
+    `tflops` and gives a false positive. It looks at token boundaries.
     """
     import re
 
@@ -61,11 +62,11 @@ def test_no_feature_references_answers():
         for col in ANSWER_COLS:
             if re.search(rf"(?<![\w.]){re.escape(col)}\b", code):
                 bad.append((f.name, col))
-    assert not bad, f"정답 컬럼을 참조하는 피처: {bad}"
+    assert not bad, f"features that reference an answer column: {bad}"
 
 
 def test_all_features_are_short():
-    """§8.2 — 10줄 이내. 길면 물리가 아니라 조합이다."""
+    """§8.2 — at most 10 lines. Longer means combination, not physics."""
     long = []
     for f in REGISTRY.items(active_only=False):
         try:
@@ -74,30 +75,32 @@ def test_all_features_are_short():
             continue
         body = [ln for ln in src.split("\n")
                 if ln.strip() and not ln.strip().startswith("#")]
-        # docstring 과 데코레이터를 뺀 실질 줄 수
+        # The effective line count, excluding docstring and decorators
         n = len([ln for ln in body if not ln.lstrip().startswith(("@", '"""'))])
         if n > 22:
             long.append((f.name, n))
-    assert not long, f"너무 긴 피처: {long}"
+    assert not long, f"features that are too long: {long}"
 
 
 def test_registry_validates_clean(synth_table, matrix, hw_other):
-    """★ 전 피처가 자동 검증을 통과한다. 기각이 하나라도 있으면 실패다."""
+    """★ Every feature passes the automatic validation. A single rejection
+    is a failure."""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         reps = validate_registry(REGISTRY, synth_table, matrix,
                                  hw_alt=hw_other, n_shapes=4)
     failed = {n: [str(c) for c in r.fails()]
               for n, r in reps.items() if r.failed}
-    assert not failed, f"검증 기각: {failed}"
+    assert not failed, f"validation rejections: {failed}"
 
 
 def test_scale_invariance_catches_a_hardcoded_constant(synth_table, matrix,
                                                        hw_other):
-    """★ 하드웨어 상수를 하드코딩한 피처가 **잡히는가** (§8.3 6번).
+    """★ Is a feature with a hardcoded hardware constant **caught** (§8.3
+    item 6)?
 
-    감시가 실제로 작동하는지 확인한다. 검사가 있다는 사실만으로는 아무것도
-    보장되지 않는다 (§30.8).
+    It checks that the watchdog actually works. The mere existence of a check
+    guarantees nothing (§30.8).
     """
     from kernelrule.features import Feature, FeatureRegistry
     from kernelrule.features.validate import validate_feature
@@ -105,7 +108,7 @@ def test_scale_invariance_catches_a_hardcoded_constant(synth_table, matrix,
     r = FeatureRegistry("bad")
 
     def fake_waves(p, hw, cfg) -> float:
-        """hw.sm_count 를 읽는 척하지만 84 를 박아 뒀다."""
+        """It pretends to read hw.sm_count but has 84 nailed in."""
         import math
         return math.ceil(p.M / cfg.tile_m) * math.ceil(p.N / cfg.tile_n) / 84.0
 
@@ -115,13 +118,15 @@ def test_scale_invariance_catches_a_hardcoded_constant(synth_table, matrix,
     r.add(f)
     m2 = FeatureMatrix(synth_table, r)
     rep = validate_feature(f, synth_table, m2, hw_alt=hw_other, n_shapes=3)
-    # `hw.` 문자열이 docstring 에만 있으므로 하드웨어를 쓰는 것으로 보인다
-    assert rep.failed, "하드코딩된 84 를 못 잡았다"
-    assert any("스케일" in c.name for c in rep.fails())
+    # The string `hw.` appears only in the docstring, so it looks like it
+    # uses the hardware
+    assert rep.failed, "the hardcoded 84 was not caught"
+    assert any("scale" in c.name for c in rep.fails())
 
 
 def test_vectorized_matches_scalar_everywhere(synth_table, matrix):
-    """★ 학습(행렬)과 배포(스칼라)가 같은 함수를 쓰는가."""
+    """★ Do training (the matrix) and deployment (the scalar) use the same
+    function?"""
     from kernelrule.features import verify_vectorized
 
     p = synth_table.shapes()[0]
@@ -140,20 +145,23 @@ def test_directions_are_declared():
 
 
 def test_shape_features_ignore_config(synth_table, matrix):
-    """형상 수준 피처는 `cfg` 를 봐서는 안 된다 — 그것이 정의다."""
+    """A shape-level feature must not look at `cfg` — that is its
+    definition."""
     p = synth_table.shapes()[0]
     cfgs = synth_table.configs(p)
     for f in REGISTRY.items(shape_level=True):
         vals = {float(f.fn(p, matrix.hw, c)) for c in cfgs[:40]}
-        assert len(vals) == 1, f"{f.name} 이 config 마다 다른 값을 낸다: {vals}"
+        assert len(vals) == 1, (
+            f"{f.name} produces different values per config: {vals}")
 
 
 # ---------------------------------------------------------------------------
-# 생성 피처의 하드웨어 사용 판정 (D-37)
+# The hardware-usage verdict for generated features (D-37)
 # ---------------------------------------------------------------------------
-# `exec` 로 만든 함수는 `inspect.getsource` 가 OSError 를 낸다. 그때 "hw 를
-# 쓴다" 로 떨어지면 스케일 불변성 검사가 **하드웨어 무관 정상 피처를 전부
-# 기각한다.** F1 첫 실행에서 실제로 그렇게 버려졌다.
+# For a function built with `exec`, `inspect.getsource` raises OSError.
+# Falling back to "it uses hw" there makes the scale-invariance check
+# **reject every perfectly good hardware-independent feature.** In the first
+# F1 run features really were thrown away that way.
 
 _NO_HW = ("def tile_aspect(p, hw, cfg) -> float:\n"
           "    a = float(cfg.tile_m)\n"
@@ -179,10 +187,10 @@ def test_generated_feature_hardware_usage_is_read_from_source(code, expected):
 
 
 def test_unreadable_source_raises_instead_of_guessing():
-    """★ 소스를 못 읽으면 **판단하지 않는다** (§26.4).
+    """★ If the source cannot be read, **no verdict is made** (§26.4).
 
-    `True` 로 떨어지는 것은 "hw 를 쓴다" 는 주장이고, 그 주장이 틀리면
-    정상 피처를 기각한다.
+    Falling back to `True` is the claim "it uses hw", and if that claim is
+    wrong a perfectly good feature is rejected.
     """
     from kernelrule.features import Feature
     from kernelrule.features.generated import compile_feature
@@ -190,21 +198,23 @@ def test_unreadable_source_raises_instead_of_guessing():
 
     name, fn = compile_feature(_NO_HW, known=frozenset())
     f = Feature(name=name, fn=fn, unit="dimensionless",
-                expected_range=(0.0, 1.0), direction="neutral")  # source 없음
-    with pytest.raises(ValueError, match="소스를 읽을 수 없어"):
+                expected_range=(0.0, 1.0), direction="neutral")  # no source
+    with pytest.raises(ValueError, match="the source cannot be read"):
         _uses_hardware(f)
 
 
 # ---------------------------------------------------------------------------
-# ★ §30.9 — 라이브러리는 전역 레지스트리를 직접 참조하지 않는다
+# ★ §30.9 — the library never references the global registry directly
 #
-# F0~F3 는 레지스트리를 **갈아 끼워서** 성립한다. 라이브러리 어딘가가
-# `from kernelrule.features import REGISTRY` 를 하고 있으면, 조건을 바꿔도
-# 그 지점만 사람이 쓴 24개를 계속 본다 — 조용히, 에러 없이.
-# `is_reference()` / `top_k` / `DEFAULT_MODEL` 과 같은 부류의 사고다 (원칙 2).
+# F0~F3 exist by **swapping the registry**. If anywhere in the library does
+# `from kernelrule.features import REGISTRY`, then even when the condition
+# changes that one place keeps seeing the 24 a human wrote — silently, with
+# no error. The same class of accident as `is_reference()` / `top_k` /
+# `DEFAULT_MODEL` (principle 2).
 # ---------------------------------------------------------------------------
 
-#: 전역 레지스트리를 참조해도 되는 곳. **자기 자신과 등록부뿐이다.**
+#: Where referencing the global registry is allowed. **Only itself and the
+#: registration file.**
 _MAY_TOUCH_GLOBAL = {"kernelrule/features/__init__.py",
                      "kernelrule/features/physical.py"}
 
@@ -228,12 +238,14 @@ def test_library_never_imports_the_global_registry():
                   and isinstance(node.value, ast.Name)):
                 bad.append(f"  {rel}:{node.lineno} {node.value.id}.REGISTRY")
     assert not bad, (
-        "라이브러리가 전역 레지스트리를 직접 본다 — 조건을 바꿔도 이 "
-        "지점만 사람이 쓴 24개를 쓴다 (§30.9):\n" + "\n".join(bad))
+        "the library looks at the global registry directly — even when the "
+        "condition changes, this one place keeps using the 24 a human wrote "
+        "(§30.9):\n" + "\n".join(bad))
 
 
 def test_no_function_defaults_to_the_global_registry():
-    """★ (c) 유형 — 호출부가 안 넘기면 조용히 24개를 쓰는 기본값."""
+    """★ Type (c) — a default that silently uses the 24 when the caller
+    does not pass one."""
     import ast
     from pathlib import Path
 
@@ -251,13 +263,15 @@ def test_no_function_defaults_to_the_global_registry():
                     bad.append(f"  {rel}:{node.lineno} def {node.name}(...="
                                "REGISTRY)")
     assert not bad, (
-        "전역 레지스트리를 기본값으로 쓰는 함수가 있다. 호출부가 안 "
-        "넘기면 조용히 사람 24개를 쓴다 (§26.4, §30.9):\n" + "\n".join(bad))
+        "there is a function that defaults to the global registry. When "
+        "the caller does not pass one it silently uses the human's 24 "
+        "(§26.4, §30.9):\n" + "\n".join(bad))
 
 
 @pytest.fixture(scope="module")
 def perf_table():
-    """실측 번들. 형상 수준 판정은 **실제 config 집합**이 있어야 한다."""
+    """The measured bundle. The shape-level verdict needs **a real config
+    set**."""
     import warnings
 
     from kernelrule.core.table import PerfTable
@@ -269,17 +283,20 @@ def perf_table():
 
 
 # ---------------------------------------------------------------------------
-# ★ §30.12 — 형상 수준 자동 판정
+# ★ §30.12 — the automatic shape-level verdict
 #
-#   생성 경로에는 `shape_feature` 데코레이터가 없어서 **모든 생성 피처가
-#   config 수준으로 등록**되고 있었다. 그러면 규칙이 `if p.<x>:` 로 분기할
-#   수 없고, 형상 안에서 상수인 항은 순위를 하나도 못 바꾼다. F1 21개 중
-#   5개가 그 상태였다 (D-65).
+#   The generation path has no `shape_feature` decorator, so **every
+#   generated feature was being registered as config level.** Then a rule
+#   cannot branch with `if p.<x>:`, and a term constant within a shape
+#   cannot change the ranking at all. 5 of F1's 21 were in that state
+#   (D-65).
 # ---------------------------------------------------------------------------
 def test_detection_matches_the_hand_written_labels(perf_table):
-    """★ 판정 로직의 검증 — 사람이 손으로 붙인 표시와 일치하는가.
+    """★ Validating the verdict logic — does it agree with the labels a
+    human attached by hand?
 
-    일치하면 로직이 맞는 것이고, 어긋나면 판정에 결함이 있는 것이다.
+    Agreement means the logic is right; disagreement means the verdict has a
+    defect.
     """
     import inspect
     from dataclasses import replace
@@ -297,13 +314,15 @@ def test_detection_matches_the_hand_written_labels(perf_table):
         got, why = detect_shape_level(
             replace(f, source=src, shape_level=False), perf_table)
         if got != f.shape_level:
-            bad.append(f"  {n}: 사람 {f.shape_level} vs 자동 {got} ({why})")
-    assert not bad, ("형상 수준 판정이 사람 표시와 어긋난다:\n"
-                     + "\n".join(bad))
+            bad.append(f"  {n}: human {f.shape_level} vs automatic {got} "
+                       f"({why})")
+    assert not bad, ("the shape-level verdict disagrees with the human "
+                     "labels:\n" + "\n".join(bad))
 
 
 def test_detection_is_two_tiered():
-    """AST 겹이 있어야 "이 표에서만 상수" 를 구분할 수 있다."""
+    """The AST layer is what makes "constant only in this table"
+    distinguishable."""
     from kernelrule.features.generated import uses_cfg
 
     assert uses_cfg("def f(p, hw, cfg) -> float:\n    return float(cfg.tile_m)")
@@ -311,13 +330,14 @@ def test_detection_is_two_tiered():
 
 
 def test_recheck_warning_is_recorded(perf_table):
-    """★ cfg 를 참조하는데 상수인 것은 **번들이 바뀌면 다시 판정**해야 한다."""
+    """★ One that references cfg yet is constant **must be re-judged when
+    the bundle changes**."""
     from dataclasses import replace
 
     from kernelrule.features import Feature
     from kernelrule.features.generated import detect_shape_level
 
-    # cfg 를 참조하지만 값은 상수인 함수
+    # A function that references cfg but whose value is constant
     code = ("def probe_const(p, hw, cfg) -> float:\n"
             "    return float(cfg.tile_m) * 0.0 + float(p.M)\n")
     env: dict = {}
@@ -329,27 +349,29 @@ def test_recheck_warning_is_recorded(perf_table):
     is_shape, why = detect_shape_level(replace(f, shape_level=False),
                                        perf_table)
     assert is_shape
-    assert "재판정" in why, why
+    assert "Re-judgement" in why, why
 
 
 def test_load_generated_requires_a_table():
-    """★ `table` 에 기본값을 두면 호출부가 빠뜨린다 (D-67).
+    """★ Giving `table` a default makes callers leave it out (D-67).
 
-    두었더니 두 곳이 빠뜨렸고 그중 하나가 2단계 경로여서 **형상 수준
-    피처 0개**로 RuleWriter 가 돌았다. 재판정이 정말 필요 없으면
-    `table=None` 을 **명시**해야 한다 — 빠뜨린 것과 구분된다.
+    With one, two call sites left it out, and one of those was the stage-2
+    path, so RuleWriter ran with **0 shape-level features**. If re-judgement
+    really is unnecessary, `table=None` must be **stated explicitly** — that
+    is distinguishable from leaving it out.
     """
     import inspect
 
     from kernelrule.features.loader import load_generated
 
     prm = inspect.signature(load_generated).parameters["table"]
-    assert prm.default is inspect.Parameter.empty, "table 에 기본값이 있다"
+    assert prm.default is inspect.Parameter.empty, "table has a default"
     assert prm.kind is inspect.Parameter.KEYWORD_ONLY
 
 
 def test_every_load_generated_call_passes_table():
-    """호출부 전수 검사 — 원칙 23 (한 자리 말고 한 종류)."""
+    """An exhaustive sweep of the call sites — principle 23 (one kind, not
+    one place)."""
     import ast
     from pathlib import Path
 
@@ -363,15 +385,16 @@ def test_every_load_generated_call_passes_table():
                     and node.func.id == "load_generated"
                     and not any(k.arg == "table" for k in node.keywords)):
                 bad.append(f"  {f.name}:{node.lineno}")
-    assert not bad, ("load_generated 에 table 을 안 넘기는 호출부:\n"
-                     + "\n".join(bad))
+    assert not bad, ("call sites that do not pass table to "
+                     "load_generated:\n" + "\n".join(bad))
 
 
 # ---------------------------------------------------------------------------
-# ★ 4-4 — `expected_range` 는 **LLM 이 선언한 것**이어야 한다 (D-71)
+# ★ 4-4 — `expected_range` must be **what the LLM declared** (D-71)
 #
-#   파이프라인이 실측으로 덮어쓰면 표 정보가 프롬프트에 들어간다.
-#   LLM 은 표를 못 보므로 누출이 있다면 파이프라인이 만든 것이다.
+#   If the pipeline overwrites it with measurements, table information gets
+#   into the prompt. The LLM cannot see the table, so any leak was made by
+#   the pipeline.
 # ---------------------------------------------------------------------------
 def test_register_generated_keeps_the_declared_range(perf_table):
     from dataclasses import replace
@@ -394,36 +417,44 @@ def test_register_generated_keeps_the_declared_range(perf_table):
     f = register_generated(code, registry=reg, meta=meta, table=perf_table,
                            matrix=FeatureMatrix(perf_table, REGISTRY),
                            hw_alt=hw_alt)
-    # 실측은 [0, 7] 보다 훨씬 좁다. 그래도 선언이 그대로여야 한다.
+    # The observed range is far narrower than [0, 7]. The declaration must
+    # stay as it is anyway.
     assert f.expected_range == (0.0, 7.0), (
-        "파이프라인이 선언 범위를 덮어썼다 — 표 정보가 프롬프트에 들어간다")
+        "the pipeline overwrote the declared range — table information gets "
+        "into the prompt")
 
 
 def test_range_warning_never_reaches_a_rejection_message():
-    """범위 경고 문구에는 **실측 min/max** 가 들어간다. 그것이 거부
-    메시지로 새면 LLM 에 되먹여질 수 있다 (구 `feature_writer.py`).
+    """The range warning contains the **observed min/max**. If that leaks
+    into a rejection message it can be fed back to the LLM (the old
+    `feature_writer.py`).
     """
     import inspect
 
     from kernelrule.features import validate as V
 
     src = inspect.getsource(V)
-    assert "실측" in src, "범위 경고 문구가 바뀌었다 — 검사가 무의미하다"
-    # 범위 검사는 "warn" 이어야 한다. "fail" 이면 `fails()` 로 새어 나간다.
-    i = src.index("실측")
+    assert "observed" in src, (
+        "the range warning changed — this check is meaningless")
+    # The range check must be "warn". As "fail" it leaks out through
+    # `fails()`.
+    i = src.index("observed")
     ctx = src[max(0, i - 400):i]
-    assert '"범위", "warn"' in ctx, (
-        "범위 검사가 warn 이 아니다 — 실측 값이 FeatureRejected 로 샌다")
+    assert '"range", "warn"' in ctx, (
+        "the range check is not a warn — the observed values leak into "
+        "FeatureRejected")
 
 
 # ---------------------------------------------------------------------------
-# ★ D-73 — 검사기가 **자기가 허용한 필드**를 금지하고 있었다
+# ★ D-73 — the checker was banning **a field it had itself allowed**
 # ---------------------------------------------------------------------------
 def test_allowed_fields_are_not_caught_by_banned_words():
-    """`hw.peak_tflops_f16` 이 금지어 `"tflops"` 에 부분 문자열로 걸렸다.
+    """`hw.peak_tflops_f16` matched the banned word `"tflops"` as a
+    substring.
 
-    roofline 을 만들려던 제안이 그렇게 거부됐다 — 검사기의 결함이
-    LLM 의 실패로 보인다 (원칙 8, D-37 과 같은 부류).
+    A proposal trying to build a roofline was refused that way — a defect of
+    the checker looks like a failure of the LLM (principle 8, the same class
+    as D-37).
     """
     from kernelrule.features.generated import (
         _BANNED,
@@ -431,10 +462,11 @@ def test_allowed_fields_are_not_caught_by_banned_words():
         check_feature_code,
     )
 
-    # 허용 필드 중 금지어를 부분 문자열로 담는 것이 실제로 있다
+    # There really are allowed fields that contain a banned word as a
+    # substring
     risky = [f"{b}.{n}" for b, ns in RAW_FIELDS.items() for n in ns
              if any(x in f"{b}.{n}" for x in _BANNED)]
-    assert risky, "위험한 필드가 없다 — 이 검사가 무의미하다"
+    assert risky, "there is no risky field — this check is meaningless"
 
     for ref in risky:
         code = (f"def probe_ok(p, hw, cfg) -> float:\n"
@@ -443,7 +475,7 @@ def test_allowed_fields_are_not_caught_by_banned_words():
 
 
 def test_banned_words_still_catch_real_leaks():
-    """가리기가 진짜 누출까지 통과시키면 안 된다."""
+    """The masking must not let a real leak through."""
     from kernelrule.features.generated import FeatureRejected, check_feature_code
 
     for leak in ("best_ms", "time_ms", "difficulty"):

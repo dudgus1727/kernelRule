@@ -1,10 +1,11 @@
-"""★ 옛 로그로 셋을 센다 — 중복 / 거부 / 죽은 항. LLM 0회 (D-135 §2).
+"""★ Counting three things from the old logs — duplicates / refusals / dead
+terms. 0 LLM calls (D-135 §2).
 
     python3 experiments/read_logs.py
 
-트레이스가 없는 실행에서도 `llm_calls/` + `rounds.jsonl` + `archive.jsonl`
-로 셀 수 있는 것만 센다. **셀 수 없는 것은 그렇게 적는다** — 그것이
-트레이스가 필요한 자리다.
+Even for runs with no trace, it counts only what `llm_calls/` +
+`rounds.jsonl` + `archive.jsonl` can count. **What cannot be counted is
+written down as such** — that is where a trace is needed.
 """
 
 from __future__ import annotations
@@ -26,7 +27,8 @@ from kernelrule.core.weights import fit_weights
 from kernelrule.features import REGISTRY
 
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
-_BIG = 1e9   # ★ `bounds` 의 "안 묶음" 쪽. `_proj` 가 클립만 하므로 넉넉히
+_BIG = 1e9   # ★ the "unbound" side of `bounds`. `_proj` only clips, so it is
+             # generous
 RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 
 
@@ -37,7 +39,7 @@ def _rows(run: str, name: str) -> list[dict]:
 
 
 def _proposals(run: str) -> list[dict]:
-    """`llm_calls` 에서 RuleEditor 응답을 순서대로."""
+    """The RuleEditor responses from `llm_calls`, in order."""
     out = []
     for f in sorted((Path("runs") / run / "llm_calls").glob(
             "*-rule_editor.json")):
@@ -51,9 +53,10 @@ def _proposals(run: str) -> list[dict]:
 
 def dup_report() -> None:
     print("=" * 92)
-    print("1. 중복 — 이미 있는 코드를 다시 낸다")
+    print("1. duplicates — it proposes code that already exists")
     print("=" * 92)
-    print(f"  {'실행':16s} {'제안':>5s} {'중복':>5s} {'비율':>7s}   부모 종류별 중복")
+    print(f"  {'run':16s} {'prop':>5s} {'dup':>5s} {'rate':>7s}   "
+          f"duplicates per parent kind")
     tot = Counter()
     for run in RUNS:
         rs = _rows(run, "rounds.jsonl")
@@ -66,25 +69,30 @@ def dup_report() -> None:
                 d += v.get("dup", 0)
         tot.update(by)
         print(f"  {run:16s} {n:5d} {d:5d} {d / max(1, n):7.1%}   {dict(by)}")
-    print(f"\n  ★ 합계 부모 종류별 중복: {dict(tot)}")
-    # 같은 코드가 몇 번 반복되나 — 응답에서 직접 센다
-    print(f"\n  {'실행':16s} {'같은 코드가 2회 이상 나온 횟수':>28s}  최다 반복")
+    print(f"\n  ★ total duplicates per parent kind: {dict(tot)}")
+    # How many times the same code repeats — counted directly from the
+    # responses
+    print(f"\n  {'run':16s} "
+          f"{'times the same code appeared 2+ times':>38s}  most repeated")
     for run in RUNS:
         c = Counter(p["code"].strip() for p in _proposals(run))
         rep = [v for v in c.values() if v > 1]
-        print(f"  {run:16s} {sum(rep) - len(rep):28d}  {max(c.values())}회")
-    print("\n  ⚠️ **어떤 가설이 배정됐을 때 중복이 나오나는 옛 로그로 못 센다** —")
-    print("     제안별 가설 배정이 채택된 규칙에만 남는다. 트레이스가 그 자리다")
+        print(f"  {run:16s} {sum(rep) - len(rep):38d}  "
+              f"{max(c.values())} times")
+    print("\n  ⚠️ **which hypothesis was assigned when a duplicate appeared "
+          "cannot be counted from the old logs** —")
+    print("     the per-proposal hypothesis assignment is kept only for the "
+          "accepted rules. That is where the trace goes")
 
 
 def reject_report() -> None:
     print("\n" + "=" * 92)
-    print("2. 거부 — 사유와 분포")
+    print("2. refusals — the reasons and the distribution")
     print("=" * 92)
     keys = ("n_rejected_schema", "n_rejected_static", "n_rejected_sandbox",
             "n_rejected_fit", "n_llm_error")
-    print(f"  {'실행':16s} " + " ".join(f"{k[2:]:>10s}" for k in keys)
-          + "   사유 (rejections)")
+    print(f"  {'run':16s} " + " ".join(f"{k[2:]:>10s}" for k in keys)
+          + "   the reasons (rejections)")
     why: Counter = Counter()
     per_round: Counter = Counter()
     for run in RUNS:
@@ -97,22 +105,24 @@ def reject_report() -> None:
         det = Counter(k for x in rs for k, _ in (x.get("rejections") or []))
         print(f"  {run:16s} " + " ".join(f"{tot[k]:10d}" for k in keys)
               + f"   {dict(det)}")
-    print(f"\n  ★ 사유별 합계: {dict(why)}")
-    print("  ★ 라운드별 거부 수: "
+    print(f"\n  ★ totals per reason: {dict(why)}")
+    print("  ★ refusals per round: "
           + " ".join(f"r{r}:{n}" for r, n in sorted(per_round.items())))
     if not per_round:
-        print("     (거부가 없다)")
+        print("     (there were no refusals)")
 
 
 def dead_terms_report() -> None:
     print("\n" + "=" * 92)
-    print("3. 죽은 항 — 빼도 학습이 안 나빠지는 자리")
+    print("3. dead terms — the slots that can be removed without the training "
+          "getting worse")
     print("=" * 92)
     warnings.simplefilter("ignore")
     T = PerfTable.from_bundle(A6000[0], env_hash=A6000[1], ok_only=False)
     M, sp = FeatureMatrix(T, REGISTRY), _splits(T)
     train = list(sp.train.shapes)
-    print(f"  {'실행':16s} {'항':>3s} {'죽은 항':>7s}  자리별 손해 (0 에 묶었을 때 학습 regret 증가)")
+    print(f"  {'run':16s} {'trm':>3s} {'dead':>5s}  the loss per slot (the "
+          f"rise in training regret when it is pinned to 0)")
     for run in RUNS:
         arc = _rows(run, "archive.jsonl")
         if not arc:
@@ -131,9 +141,10 @@ def dead_terms_report() -> None:
         for i in range(n):
             w = list(best["w"])
             w[i] = 0.0
-            # ★ 그 자리를 **0 에 묶는다** (`bounds`). 묶지 않으면 적합기가
-            #   0 에서 되돌아 나오므로, 재는 것이 "죽은 항" 이 아니라
-            #   "시작점을 흔들어도 같은 점을 찾나" 가 된다 — D-136 의 정정.
+            # ★ That slot is **pinned to 0** (`bounds`). Without pinning, the
+            #   fitter comes back out of 0, so what gets measured is not "a
+            #   dead term" but "does it find the same point when the starting
+            #   point is shaken" — the D-136 correction.
             bnd = [(-_BIG, _BIG)] * n
             bnd[i] = (0.0, 0.0)
             ok, worst = True, 0.0
@@ -149,16 +160,20 @@ def dead_terms_report() -> None:
             cost[i] = worst
             if ok:
                 dead.append(i)
-        # ⚠️ "언제 들어왔나" 는 안 센다 — 씨앗 규칙이 이미 8자리를 다 쓰므로
-        #    `bests.jsonl` 의 코드에서 첫 등장은 전부 r0 이고, 아무것도
-        #    말해주지 않는다 (D-136). 대신 **자리마다 묶었을 때의 손해**를 적는다.
-        print(f"  {run:16s} {n:3d} {len(dead):7d}  " + " ".join(
+        # ⚠️ "when did it come in" is not counted — the seed rule already uses
+        #    all 8 slots, so in the code of `bests.jsonl` the first appearance
+        #    is r0 for everything and it says nothing (D-136). Instead **the
+        #    loss when each slot is pinned** is written down.
+        print(f"  {run:16s} {n:3d} {len(dead):5d}  " + " ".join(
             f"{'★' if i in dead else ' '}w{i}:{cost[i]:+.4f}"
             for i in range(n)))
-    print("\n  ★ 는 죽은 자리 (0 에 묶어도 두 체제 다 안 나빠진다)."
-          " 숫자는 묶었을 때 학습 regret 이 나빠지는 폭")
-    print("  ⚠️ '들어온 뒤 지워질 뻔했나' 는 옛 로그로 못 센다 — 제안의")
-    print("     changes 와 부모가 제안 단위로 안 남는다. 트레이스가 그 자리다")
+    print("\n  ★ marks a dead slot (pinning it to 0 makes neither regime "
+          "worse). The number is how much the training regret worsens when "
+          "it is pinned")
+    print("  ⚠️ 'was it nearly deleted after it came in' cannot be counted "
+          "from the old logs — the")
+    print("     proposal's changes and its parent are not kept per proposal. "
+          "That is where the trace goes")
 
 
 def main() -> None:

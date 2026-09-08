@@ -1,16 +1,16 @@
-"""★ 하드웨어 사실이 **그 표의 것**인가 (D-113).
+"""★ Are the hardware facts **the ones for this table** (D-113)?
 
-`LLMConfig.arch_prompt` 의 기본값이 `"hw/sm_86.md"` 로 고정돼 있었고
-`f1_pipeline` 이 그것을 안 바꿨다. `hw/` 에 파일이 하나뿐이라 다른
-아키텍처는 **애초에 고를 수 없었다.** 그래서 5090 표로 돌린 §29.5 (c)
-재생성이 A6000 사실을 받았다.
+The default of `LLMConfig.arch_prompt` was pinned to `"hw/sm_86.md"` and
+`f1_pipeline` did not change it. There was only one file in `hw/`, so another
+architecture **could not be chosen in the first place.** So the §29.5 (c)
+regeneration run on the 5090 table received A6000 facts.
 
-여기 시험이 지키는 것:
+What these tests hold:
 
 ```
-번들에서 **생성**한다        손으로 쓰면 또 달라진다 (원칙 2)
-기본값이 없다               없으면 실패다 (§26.4)
-되돌려서 잡는가              A6000 프롬프트를 5090 표에 붙여 보고
+**generated** from the bundle    writing it by hand diverges again (principle 2)
+there is no default              missing means failure (§26.4)
+does it catch it in reverse      by putting the A6000 prompt on the 5090 table
 ```
 """
 from __future__ import annotations
@@ -29,27 +29,28 @@ def _table(path, env_hash):
     from kernelrule.core.table import PerfTable
 
     if not (Path(path) / "BUNDLE.json").exists():
-        pytest.skip(f"번들 없음: {path}")
+        pytest.skip(f"no bundle: {path}")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return PerfTable.from_bundle(path, env_hash=env_hash, ok_only=False)
 
 
 # ---------------------------------------------------------------------------
-# ★ 기본값이 없다
+# ★ There is no default
 # ---------------------------------------------------------------------------
 
 
 def test_rule_writer_without_hardware_facts_fails():
-    """★ 조용히 기본값으로 떨어지면 안 된다 — 그것이 D-113 이었다."""
+    """★ It must not silently fall back to a default — that was D-113."""
     from kernelrule.agents.openai_client import assemble_instructions
 
-    with pytest.raises(ValueError, match="하드웨어 사실"):
+    with pytest.raises(ValueError, match="hardware facts"):
         assemble_instructions("rule_writer", objective="rank", parameters=8)
 
 
 def test_roles_without_hardware_still_assemble():
-    """RuleEditor/FeatureWriter 는 hw 를 안 받는다 (§16.2) — 막으면 안 된다."""
+    """RuleEditor/FeatureWriter do not receive hw (§16.2) — they must not
+    be blocked."""
     from kernelrule.agents.openai_client import assemble_instructions
 
     for role in ("rule_editor", "feature", "analyze"):
@@ -61,11 +62,11 @@ def test_llm_config_has_no_default_hardware():
 
     c = LLMConfig()
     assert c.arch_prompt is None and c.hw_text is None, (
-        "기본값이 살아 있다 — 그러면 또 조용히 간다 (D-113)")
+        "a default is still alive — then it goes silently again (D-113)")
 
 
 # ---------------------------------------------------------------------------
-# ★ 번들에서 생성한다
+# ★ Generated from the bundle
 # ---------------------------------------------------------------------------
 
 
@@ -82,24 +83,27 @@ def test_generated_prompt_matches_its_bundle(bundle, env_hash):
 
 
 def test_generated_a6000_prompt_reproduces_the_frozen_numbers():
-    """★ 손으로 쓴 옛 파일의 **숫자**를 생성기가 그대로 낸다.
+    """★ The generator reproduces the **numbers** of the old hand-written
+    file exactly.
 
-    본문은 다르다 (코드명 `GA102` 는 `env.json` 에 없다). 같아야 하는
-    것은 숫자다 — 그것이 조건이다.
+    The body differs (the codename `GA102` is not in `env.json`). What must
+    match is the numbers — those are the condition.
     """
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
     txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
                                    table=_table(*A6000))
-    # ★ 2026-09-08 (D-146): 프롬프트가 영어가 됐다. **재현해야 하는 것은
-    #   숫자**이므로 숫자만 본다 — 옛 파일(`hw/sm_86.md`)은 얼려 뒀다.
+    # ★ 2026-09-08 (D-146): the prompt became English. **What has to be
+    #   reproduced is the numbers**, so only the numbers are checked — the
+    #   old file (`hw/sm_86.md`) is frozen.
     for want in ("SMs        84", "101,376 B", "6 MB", "116.1 TFLOP/s",
                  "729.7 GB/s", "159.1 FLOP/byte", "tick (1.024 us)"):
         assert want in txt, f"cannot reproduce {want!r} from the frozen file"
 
 
 # ---------------------------------------------------------------------------
-# ★ 되돌려서 잡는가 (원칙 38 — 일부러 틀리게 만들어 한 번 떨어뜨려 본다)
+# ★ Does it catch it in reverse (principle 38 — break it on purpose and
+# watch it fail once)
 # ---------------------------------------------------------------------------
 
 
@@ -114,7 +118,8 @@ def test_a6000_prompt_on_a_5090_table_is_refused():
 
 
 def test_same_gpu_but_wrong_tick_is_refused():
-    """★ 이름만 보면 **같은 GPU 의 다른 눈금**이 통과한다."""
+    """★ Checking only the name lets **a different tick of the same GPU**
+    pass."""
     from kernelrule.agents.hwprompt import (
         HwPromptError,
         check_hw_prompt,
@@ -123,31 +128,35 @@ def test_same_gpu_but_wrong_tick_is_refused():
 
     t = _table(*A6000)
     txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1], table=t)
-    check_hw_prompt(txt, t.hw, float(t.noise.tick_ms))       # 맞으면 통과
-    with pytest.raises(HwPromptError, match="눈금"):
+    check_hw_prompt(txt, t.hw, float(t.noise.tick_ms))   # passes when right
+    with pytest.raises(HwPromptError, match="tick"):
         check_hw_prompt(txt, t.hw, float(t.noise.tick_ms) * 4)
 
 
 def test_tick_table_is_computed_not_hardcoded():
-    """5090 의 눈금은 A6000 의 1/64 다 — 표가 그것을 반영해야 한다."""
+    """The 5090's tick is 1/64 of the A6000's — the table must reflect
+    that."""
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
     a, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
                                  table=_table(*A6000))
     g, _ = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1],
                                  table=_table(*G5090))
-    assert "9.091%" in a, "A6000 의 최솟값 행이 바뀌었다"
+    assert "9.091%" in a, "the A6000's minimum row changed"
     assert "9.091%" not in g, (
-        "5090 프롬프트가 A6000 의 눈금 비율을 말한다 — 상수로 박혀 있다")
+        "the 5090 prompt states the A6000's tick ratio — it is nailed in as "
+        "a constant")
 
 
 # ---------------------------------------------------------------------------
-# ★ 측정 한계 절의 **결론**이 표마다 다르다 (D-116)
+# ★ The **conclusion** of the measurement-limit section differs per table
+# (D-116)
 # ---------------------------------------------------------------------------
 #
-# 노이즈 바닥은 `max(통계항, 눈금항)` 인데 어느 쪽이 이기는지가 달라진다.
-# 5090 에 A6000 의 결론("짧은 형상은 눈금 안에 묻힌다")을 보내면 **틀린
-# 경고**다 — 5090 은 어느 길이에서도 통계 항이 더 크다.
+# The noise floor is `max(statistical term, tick term)`, and which one wins
+# differs. Sending the A6000's conclusion ("short shapes are buried inside
+# the tick") to the 5090 is a **wrong warning** — on the 5090 the
+# statistical term is larger at every length.
 
 
 def test_tick_advisory_follows_which_term_binds():
@@ -168,7 +177,7 @@ def test_tick_advisory_follows_which_term_binds():
 
 
 def test_both_noise_terms_are_shown():
-    """★ 두 항을 다 보여야 모델이 **왜** 그런지 안다."""
+    """★ Both terms must be shown for the model to know **why**."""
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
     for bundle, env_hash in (A6000, G5090):
@@ -179,7 +188,7 @@ def test_both_noise_terms_are_shown():
 
 
 def test_binding_term_is_recorded_as_a_condition():
-    """조건이므로 산출물에 남아야 한다 (원칙 39)."""
+    """It is a condition, so it must stay in the artefact (principle 39)."""
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
     _, f = hw_prompt_from_bundle(G5090[0], env_hash=G5090[1],
@@ -189,13 +198,14 @@ def test_binding_term_is_recorded_as_a_condition():
 
 
 def test_judgement_point_comes_from_the_table_not_a_constant():
-    """★ 표에 없는 길이에서 판정하면 표와 무관한 기준이다 (D-117)."""
+    """★ Judging at a length not in the table is a criterion unrelated to
+    the table (D-117)."""
     import pytest as _pt
 
     from kernelrule.agents.hwprompt import HwPromptError, hw_prompt_from_bundle
 
     with _pt.raises(HwPromptError, match="min_ms"):
-        hw_prompt_from_bundle(A6000[0], env_hash=A6000[1])   # 둘 다 없다
+        hw_prompt_from_bundle(A6000[0], env_hash=A6000[1])   # neither given
     for bundle, env_hash in (A6000, G5090):
         t = _table(bundle, env_hash)
         _, f = hw_prompt_from_bundle(bundle, env_hash=env_hash, table=t)

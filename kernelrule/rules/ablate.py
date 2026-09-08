@@ -1,19 +1,20 @@
-"""규칙에서 **항 하나를 빼는** 변환 (D-85).
+"""The transform that **removes one term** from a rule (D-85).
 
-Critic 이 "이 항은 물리로 설명 못 하겠다" 고 한 것을 **정량으로 검증**하려면
-그 항을 빼고 다시 적합해 봐야 한다.
+To verify **quantitatively** what the Critic called "a term I cannot explain
+physically", the term has to be removed and the weights refitted.
 
-```
-빼도 regret 이 안 나빠진다   ★ Critic 판정이 맞았다
-크게 나빠진다               Critic 이 틀렸거나, 설명 못 해도 유용한 항이다
-```
+    regret does not get worse    ★ the Critic's verdict was right
+    it gets much worse           the Critic was wrong, or the term is useful
+                                 even though it cannot be explained
 
-⚠️ **가중치를 0 으로 두는 것과 다르다.** 0 으로 두면 적합기가 도로 키운다.
-항을 실제로 지우고 남은 가중치를 다시 번호 매겨야 `len(w0)` 규약이 산다.
+⚠️ **This is not the same as setting the weight to 0.** Set to 0, the fitter
+grows it right back. The term must actually be deleted and the remaining
+weights renumbered for the `len(w0)` convention to hold.
 
-⚠️ **모든 규칙에 되는 것은 아니다.** 한 줄에 여러 항이 있거나 분기 안에
-항이 하나뿐이면 지울 수 없다 — 그때는 `AblateError` 다. **조용히 건너뛰지
-않는다** (§26.4): 못 지운 것은 "지웠는데 영향 없음" 과 완전히 다르다.
+⚠️ **It does not work on every rule.** If a line holds several terms, or a
+branch holds only one, the term cannot be removed — then it is an
+`AblateError`. **It is not skipped silently** (§26.4): "could not remove" is
+completely different from "removed and it made no difference".
 """
 
 from __future__ import annotations
@@ -28,11 +29,11 @@ _W = re.compile(r"\bw\[(\d+)\]")
 
 
 class AblateError(RuntimeError):
-    """이 규칙에서 그 항을 지울 수 없다."""
+    """That term cannot be removed from this rule."""
 
 
 def term_indices(code: str) -> list[int]:
-    """이 규칙이 쓰는 `w` 인덱스들."""
+    """The `w` indices this rule uses."""
     return sorted({int(i) for i in _W.findall(code)})
 
 
@@ -41,10 +42,11 @@ def _line_indices(line: str) -> set[int]:
 
 
 def drop_terms(code: str, drop: set[int]) -> str:
-    """`w[i] (i in drop)` 가 곱해진 항을 지우고 가중치를 다시 번호 매긴다."""
+    """Remove terms multiplied by `w[i] (i in drop)` and renumber the
+    weights."""
     keep_idx = [i for i in term_indices(code) if i not in drop]
     if not keep_idx:
-        raise AblateError("항을 다 지우면 규칙이 남지 않는다")
+        raise AblateError("removing every term leaves no rule")
 
     lines = code.split("\n")
     out: list[str] = []
@@ -56,34 +58,36 @@ def drop_terms(code: str, drop: set[int]) -> str:
             continue
         if got - drop:
             raise AblateError(
-                f"한 줄에 여러 항이 있다: w{sorted(got)} — 이 줄만 지우면 "
-                "남은 항까지 사라진다")
+                f"several terms on one line: w{sorted(got)} — removing this "
+                "line would take the other terms with it")
         stripped = ln.strip()
         if stripped.startswith("return"):
             # `return s + expr * w[i]` -> `return s`
             indent = ln[:len(ln) - len(ln.lstrip())]
             out.append(f"{indent}return s")
-        # 그 외에는 줄을 통째로 뺀다
+        # Otherwise drop the whole line
     new = "\n".join(out)
 
-    # ★ 첫 항을 지웠으면 `s = s + …` 가 첫 대입이 된다 — `s` 가 없다.
+    # ★ If the first term went, `s = s + …` becomes the first assignment —
+    #   and `s` does not exist.
     new = _fix_first_assignment(new)
-    # 남은 가중치를 0..n-1 로 다시 번호 매긴다 (len(w0) 규약, §29.4)
+    # Renumber the remaining weights to 0..n-1 (the len(w0) convention, §29.4)
     remap = {old: k for k, old in enumerate(keep_idx)}
     new = _W.sub(lambda m: f"w[{remap[int(m.group(1))]}]", new)
 
-    # ★ 빈 블록을 **파싱 전에** 잡는다. 파싱은 IndentationError 를 내는데
-    #   그 메시지로는 "왜 못 지웠나" 를 못 읽는다.
+    # ★ Catch an empty block **before parsing**. Parsing raises
+    #   IndentationError, and that message does not say "why it failed".
     _refuse_if_empty_block(new)
     try:
         ast.parse(new)
     except SyntaxError as e:
-        raise AblateError(f"지운 뒤 문법이 깨진다: {e}") from None
+        raise AblateError(f"the syntax breaks after removal: {e}") from None
     return new
 
 
 def _refuse_if_empty_block(code: str) -> None:
-    """`if …:` 뒤에 들여쓴 줄이 안 남았으면 그 항이 유일했던 것이다."""
+    """No indented line left after `if …:` means that term was the only
+    one."""
     lines = [ln for ln in code.split("\n") if ln.strip()]
     for k, ln in enumerate(lines[:-1]):
         if not ln.rstrip().endswith(":"):
@@ -91,16 +95,19 @@ def _refuse_if_empty_block(code: str) -> None:
         indent = len(ln) - len(ln.lstrip())
         nxt = lines[k + 1]
         if len(nxt) - len(nxt.lstrip()) <= indent:
-            raise AblateError("분기 안이 비었다 — 그 항이 유일했다")
+            raise AblateError("the branch body is empty — that term was the "
+                              "only one")
     if lines and lines[-1].rstrip().endswith(":"):
-        raise AblateError("분기 안이 비었다 — 그 항이 유일했다")
+        raise AblateError("the branch body is empty — that term was the "
+                          "only one")
 
 
 def _fix_first_assignment(code: str) -> str:
-    """첫 `s` 대입이 `s = s + …` 이면 `s = …` 로 바꾼다.
+    """If the first `s` assignment is `s = s + …`, turn it into `s = …`.
 
-    항을 지우기 전의 첫 줄이 `s = <식> * w[0]` 이었고 그것을 지웠으면,
-    다음 줄이 `s = s + <식> * w[1]` 이라 **`s` 가 정의되기 전에 읽힌다.**
+    If the first line before removal was `s = <expr> * w[0]` and that is what
+    was removed, the next line is `s = s + <expr> * w[1]` — so **`s` is read
+    before it is defined.**
     """
     lines = code.split("\n")
     for k, ln in enumerate(lines):
@@ -113,8 +120,9 @@ def _fix_first_assignment(code: str) -> str:
             op, _, tail = rest.partition(" ")
             if op not in ("+", "-"):
                 raise AblateError(
-                    f"첫 항을 지웠는데 다음 줄이 `s = s {op} …` 다 — "
-                    "덧셈/뺄셈이 아니라 되살릴 수 없다")
+                    f"the first term was removed and the next line is "
+                    f"`s = s {op} …` — not an addition or subtraction, so it "
+                    "cannot be repaired")
             if op == "-":
                 tail = f"-({tail})"
             lines[k] = f"{indent}s = {tail}"
@@ -126,10 +134,11 @@ _TERM = re.compile(r"^(\s*)s = (?:s \+ )?(.*?)\s*\*\s*w\[(\d+)\]\s*$")
 
 
 def term_exprs(code: str) -> dict[int, str]:
-    """`w[i]` -> 그 항의 식. **한 줄에 항 하나**인 규칙만 받는다.
+    """`w[i]` -> that term's expression. Accepts only rules with **one term
+    per line**.
 
-    형태가 다르면 `AblateError` 다 — 조용히 일부만 읽으면 순서를 섞었을 때
-    항이 사라진다 (§26.4).
+    A different shape is an `AblateError` — silently reading only part of it
+    would make terms vanish when the order is shuffled (§26.4).
     """
     out: dict[int, str] = {}
     for ln in code.split("\n"):
@@ -137,29 +146,31 @@ def term_exprs(code: str) -> dict[int, str]:
             continue
         m = _TERM.match(ln)
         if m is None:
-            raise AblateError(f"이 줄은 `s = <식> * w[i]` 형태가 아니다: "
+            raise AblateError("this line is not of the form "
+                              "`s = <expr> * w[i]`: "
                               f"{ln.strip()[:60]}")
         out[int(m.group(3))] = m.group(2)
     if not out:
-        raise AblateError("항을 하나도 못 읽었다")
+        raise AblateError("no term could be read")
     return out
 
 
 def reorder_terms(code: str, order: list[int]) -> str:
-    """항 **순서를 바꾸고** `w` 인덱스를 새 순서로 다시 매긴다 (D-86).
+    """**Reorder** the terms and renumber the `w` indices to match (D-86).
 
-    Critic 이 "마지막 항" 을 지목하는 것이 위치 편향인지 보려면, 같은
-    식들을 다른 순서로 보여 줘야 한다. **인덱스도 다시 매긴다** — 안 하면
-    모델이 원래 순서를 그대로 읽는다.
+    To see whether the Critic pointing at "the last term" is a position bias,
+    the same expressions must be shown in a different order. **The indices are
+    renumbered too** — otherwise the model just reads the original order.
 
-    `order` 는 원래 인덱스를 새 순서로 늘어놓은 것이다.
+    `order` lists the original indices in their new order.
     """
     exprs = term_exprs(code)
     if sorted(order) != sorted(exprs):
-        raise AblateError(f"순서가 항 집합과 다르다: {order} vs {sorted(exprs)}")
+        raise AblateError(f"the order differs from the term set: {order} vs "
+                          f"{sorted(exprs)}")
     head = code.split("\n", maxsplit=1)[0]
     if not head.startswith("def score"):
-        raise AblateError("첫 줄이 `def score(...)` 가 아니다")
+        raise AblateError("the first line is not `def score(...)`")
     lines = [head]
     for k, old in enumerate(order):
         op = "s = " if k == 0 else "s = s + "

@@ -1,15 +1,18 @@
-"""2번 채점 — 조건 A(24개) vs B(24 + 새 축 10개).
+"""Scoring item 2 — condition A (the 24) vs B (the 24 + 10 new axes).
 
     python3 experiments/score_new_axes.py
 
-★ 표본내와 "쓰이는가" 로 먼저 판정하고, **구조 홀드아웃은 마지막에 한 번만**
-본다 (§12.3d). 그 숫자가 다음 수정의 근거가 되면 홀드아웃이 소진된다.
+★ The judgement is made first on the in-sample value and on "is it used", and
+**the structural holdout is looked at once, at the end** (§12.3d). If that
+number becomes the ground for the next fix, the holdout is used up.
 
-채점은 `core.canonical.canonical_score` 하나만 쓴다 — 루프의 `SplitSet` 을
-받아야 돌고 형상을 따로 뽑는 경로가 없다 (D-36).
+The scoring uses `core.canonical.canonical_score` alone — it runs only if
+given the loop's `SplitSet` and there is no path that picks the shapes
+separately (D-36).
 
-⚠️ 조건 B 의 규칙은 생성 피처를 참조하므로 **확장 레지스트리로 만든 행렬**
-로 채점해야 한다. 기본 레지스트리로 채점하면 `AttributeError` 가 난다.
+⚠️ Condition B's rules refer to generated features, so they have to be scored
+with **a matrix built from the extended registry**. Scoring with the base
+registry raises `AttributeError`.
 """
 
 from __future__ import annotations
@@ -35,8 +38,8 @@ VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
 
 
 def main() -> None:
-    # ★ 스크립트로 직접 돌면 `experiments` 가 패키지로 안 잡힌다.
-    #   `__init__.py` 를 두고 저장소 뿌리를 경로에 넣는다.
+    # ★ Run as a script directly, `experiments` is not seen as a package.
+    #   An `__init__.py` is kept and the repository root is put on the path.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from experiments.new_axes import novel_axes, used_features
 
@@ -61,13 +64,13 @@ def main() -> None:
 
     v = evaluate(vendor_order_fn(table, load_vendor(VENDOR),
                                  mapping="nearest"),
-                 table, list(splits.val.shapes), ks=(1,), label="벤더")
+                 table, list(splits.val.shapes), ks=(1,), label="vendor")
 
     print("=" * 78)
-    print("2번 — 새 축의 쓸모")
+    print("item 2 — the usefulness of a new axis")
     print("=" * 78)
-    print(f"  {'조건':14s} {'시드':>4} {'표본내':>9} {'★구조HO':>9} "
-          f"{'새 축 사용':>10}")
+    print(f"  {'condition':14s} {'seed':>5} {'in-sample':>10} "
+          f"{'★struct HO':>11} {'new axes used':>14}")
     rows: dict[str, list] = {}
     for cond in ("A-base", "B-extended"):
         for s in range(3):
@@ -81,39 +84,42 @@ def main() -> None:
                 r = canonical_score(best["code"], best["w"], table=table,
                                     matrix=mats[cond], splits=splits)
             except Exception as exc:                        # noqa: BLE001
-                print(f"  {cond:14s} {s:4d}  실패 {type(exc).__name__}: "
+                print(f"  {cond:14s} {s:5d}  failed {type(exc).__name__}: "
                       f"{str(exc)[:50]}")
                 continue
             rows.setdefault(cond, []).append(r)
             used = sorted(used_features(best["code"]) & new_names)
-            print(f"  {cond:14s} {s:4d} {r.in_sample:9.4f} {r.holdout:9.4f} "
-                  f"{len(used):10d}  {used if used else ''}")
+            print(f"  {cond:14s} {s:5d} {r.in_sample:10.4f} "
+                  f"{r.holdout:11.4f} "
+                  f"{len(used):14d}  {used if used else ''}")
 
-    print(f"\n  {'조건':14s} {'표본내 중앙':>11} {'최악':>8} "
-          f"{'★구조HO 중앙':>13} {'최악':>8}")
+    print(f"\n  {'condition':14s} {'in-sample median':>17} {'worst':>8} "
+          f"{'★struct HO median':>19} {'worst':>8}")
     for cond, rs in rows.items():
         ins = sorted(x.in_sample for x in rs)
         hos = sorted(x.holdout for x in rs)
-        print(f"  {cond:14s} {ins[len(ins) // 2]:11.4f} {ins[-1]:8.4f} "
-              f"{hos[len(hos) // 2]:13.4f} {hos[-1]:8.4f}")
-    print(f"  {'벤더 ★통과 조건':14s} {'':11s} {'':8s} {v.at(1):13.4f}")
+        print(f"  {cond:14s} {ins[len(ins) // 2]:17.4f} {ins[-1]:8.4f} "
+              f"{hos[len(hos) // 2]:19.4f} {hos[-1]:8.4f}")
+    print(f"  {'vendor ★pass cond':18s} {'':13s} {'':8s} {v.at(1):19.4f}")
     ps = canonical_score(PS, PS_W0, table=table, matrix=mats["A-base"],
                          splits=splits)
-    print(f"  {'human_guided':14s} {ps.in_sample:11.4f} {'':8s} "
-          f"{ps.holdout:13.4f}")
+    print(f"  {'human_guided':14s} {ps.in_sample:17.4f} {'':8s} "
+          f"{ps.holdout:19.4f}")
 
     print(f"\n{'=' * 78}")
-    print("유의성 — 구조 홀드아웃, 조건별 중앙 시드")
+    print("significance — the structural holdout, the median seed per "
+          "condition")
     print("=" * 78)
     for cond, rs in rows.items():
         mid = sorted(rs, key=lambda x: x.holdout)[len(rs) // 2]
-        c = compare(mid.evaluation, v, table, name_a="A", name_b="벤더")
+        c = compare(mid.evaluation, v, table, name_a="A", name_b="vendor")
         print(f"  {cond:14s} {c.geo_a:.4f} vs {c.geo_b:.4f}   "
-              f"이김 {int(c.a_wins.sum()):2d} / 짐 {int(c.a_loses.sum()):2d}"
-              f" / 구분불가 {int(c.tied.sum()):2d}")
+              f"wins {int(c.a_wins.sum()):2d} / "
+              f"losses {int(c.a_loses.sum()):2d}"
+              f" / indistinguishable {int(c.tied.sum()):2d}")
 
     print(f"\n{'=' * 78}")
-    print(f"새 축 {len(new_names)}개가 아카이브에서 얼마나 쓰였나")
+    print(f"how much the {len(new_names)} new axes were used in the archive")
     print("=" * 78)
     tally: dict[str, int] = dict.fromkeys(sorted(new_names), 0)
     total = 0
@@ -131,8 +137,8 @@ def main() -> None:
     for n, c in sorted(tally.items(), key=lambda kv: -kv[1]):
         bar = "█" * int(20 * c / max(total, 1))
         print(f"  {n:30s} {c:3d}/{total:3d}  {bar}")
-    print(f"\n  한 번도 안 쓰인 축: "
-          f"{[n for n, c in tally.items() if c == 0] or '없음'}")
+    print(f"\n  axes never used once: "
+          f"{[n for n, c in tally.items() if c == 0] or 'none'}")
 
 
 if __name__ == "__main__":

@@ -1,26 +1,26 @@
-"""★ 실행 트레이스 — **한 파일에 시간순으로** (D-133).
+"""★ Execution trace — **one file, in time order** (D-133).
 
-지금 기록이 여섯 군데에 흩어져 있다 (`llm_calls/` · `rounds.jsonl` ·
-`archive.jsonl` · `bests.jsonl` · `failures.jsonl` · `hypotheses.jsonl`).
-각자 맞으나 **"무엇 다음에 무엇이 왜"** 가 사후에 시각·id 로 맞춰야만
-보인다.
+The record is currently scattered across six places (`llm_calls/` ·
+`rounds.jsonl` · `archive.jsonl` · `bests.jsonl` · `failures.jsonl` ·
+`hypotheses.jsonl`). Each is correct, but **"what followed what, and why"**
+only becomes visible by matching timestamps and ids after the fact.
 
-`trace.jsonl` 은 한 줄이 한 사건이고 **덧붙이기만** 한다.
+In `trace.jsonl` one line is one event, and it is **append-only**.
 
-## ★ 부수 효과가 없어야 한다
+## ★ It must have no side effects
 
 ```
-꺼져 있으면    아무것도 안 한다 (`ev` 가 즉시 돌아온다)
-켜져 있으면    파일에 한 줄 쓰고 flush 한다. **계산 경로를 안 건드린다**
-★ 확인        MockLLM 으로 켜고/끄고 돌려 산출물이 **같은지** 본다
-              (`tests/test_trace.py`)
+disabled   does nothing (`ev` returns immediately)
+enabled    writes one line and flushes. **It does not touch the compute path**
+★ checked  run with MockLLM on and off and see that the outputs are
+           **identical** (`tests/test_trace.py`)
 ```
 
-## 왜 flush 하나
+## Why flush
 
-중간에 죽어도 **거기까지는 남아야** 한다 — D-33 이 78분 1400호출을
-잃은 자리다. 한 줄이 수 KB 이고 라운드당 수십 줄이라 비용이 무시할
-만하다.
+Even if it dies midway, **what got that far must survive** — D-33 is where
+78 minutes and 1,400 calls were lost. A line is a few KB and there are tens
+per round, so the cost is negligible.
 """
 
 from __future__ import annotations
@@ -33,14 +33,16 @@ __all__ = ["Tracer"]
 
 
 class Tracer:
-    """`trace.jsonl` 에 사건을 덧붙인다. `path=None` 이면 **아무것도 안 한다**."""
+    """Appends events to `trace.jsonl`. With `path=None` it **does
+    nothing**."""
 
     __slots__ = ("_f", "n", "_seen_calls")
 
     def __init__(self, path: str | Path | None = None) -> None:
         self._f = None
         self.n = 0
-        #: 이미 트레이스에 넣은 LLM 호출 수 (`llm.calls` 의 앞에서부터).
+        #: How many LLM calls are already traced (from the front of
+        #: `llm.calls`).
         self._seen_calls = 0
         if path is not None:
             p = Path(path)
@@ -52,7 +54,8 @@ class Tracer:
         return self._f is not None
 
     def ev(self, ev: str, **kw) -> None:
-        """사건 하나. ★ 꺼져 있으면 인자를 만지지도 않는다."""
+        """One event. ★ When disabled it does not even touch the
+        arguments."""
         if self._f is None:
             return
         rec = {"ev": ev, "t": round(time.time(), 3)}
@@ -62,10 +65,11 @@ class Tracer:
         self.n += 1
 
     def llm_calls(self, llm, **kw) -> None:
-        """`llm.calls` 에 새로 쌓인 것을 전문으로 옮긴다.
+        """Copy whatever accumulated in `llm.calls`, in full.
 
-        ★ LLM 쪽 코드를 **안 건드린다** — 이미 있는 목록을 읽기만 한다.
-        프롬프트·응답 전문을 담는다 (24라운드 실행이 2.7 MB 다 — 실측).
+        ★ It **does not touch** the LLM-side code — it only reads a list that
+        already exists. Prompts and responses are stored in full (a 24-round
+        run measures 2.7 MB).
         """
         if self._f is None:
             return

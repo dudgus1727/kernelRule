@@ -1,8 +1,10 @@
-"""★ §3 보고서의 형태 계수기 — **제곱과 교차곱을 따로** 센다 (D-110·D-123).
+"""★ The form counters of the §3 report — squares and cross products are
+counted **separately** (D-110·D-123).
 
-D-110 에서 두 쪽을 합집합으로 접었더니 `f.a * f.a` 와 `f.a * f.b` 가 같은
-"쌍" 이 되고, 최빈 쌍이 실은 `reg_pressure^3` 였다. 계수기는 **되돌려서**
-확인한다 (원칙 38) — 세야 할 것과 세면 안 될 것을 둘 다 넣는다.
+In D-110 the two sides were folded into a union, so `f.a * f.a` and
+`f.a * f.b` became the same "pair" and the most frequent pair was in fact
+`reg_pressure^3`. The counters are checked **by turning them back**
+(principle 38) — both what should be counted and what should not are put in.
 """
 from __future__ import annotations
 
@@ -21,13 +23,14 @@ def _f(body: str) -> str:
 
 
 @pytest.mark.parametrize(("body", "sq", "cr"), [
-    ("f.a * f.a * w[0]", 1, 0),                 # 제곱
-    ("(f.a * f.b) * w[0]", 0, 1),               # 교차곱
-    ("np.square(f.a) * w[0]", 1, 0),            # np.square 도 제곱이다
+    ("f.a * f.a * w[0]", 1, 0),                 # a square
+    ("(f.a * f.b) * w[0]", 0, 1),               # a cross product
+    ("np.square(f.a) * w[0]", 1, 0),            # np.square is a square too
     ("np.square(f.a) * w[0] + (f.a * f.b) * w[1]", 1, 1),
-    ("f.a * w[0] + f.b * w[1]", 0, 0),          # ★ 곱이 아니다
-    ("f.a * w[0] * f.b", 0, 0),                 # ★ 가중치가 낀 곱은 빼다
-    ("np.power(f.a, w[0])", 0, 0),              # 지수는 곱이 아니다
+    ("f.a * w[0] + f.b * w[1]", 0, 0),          # ★ not a product
+    ("f.a * w[0] * f.b", 0, 0),                 # ★ a product with a weight in
+                                                #   it is left out
+    ("np.power(f.a, w[0])", 0, 0),              # an exponent is not a product
 ])
 def test_squares_and_crosses(body, sq, cr):
     assert _squares_and_crosses(_f(body)) == (sq, cr)
@@ -37,14 +40,17 @@ def test_squares_and_crosses(body, sq, cr):
     ("np.power(f.a, w[0])", 1),
     ("f.a ** w[0]", 1),
     ("f.a ** w[0] + np.power(f.b, w[1]) * w[2]", 2),
-    ("np.power(f.a, 2.0) * w[0]", 0),           # ★ 상수 지수는 자유도가 아니다
+    ("np.power(f.a, 2.0) * w[0]", 0),           # ★ a constant exponent is not
+                                                #   a degree of freedom
     ("np.square(f.a) * w[0]", 0),
     ("f.a * w[0]", 0),
 ])
 def test_n_power_counts_only_weights_in_the_exponent(body, n):
-    """★ 지수 **자리에 가중치**가 든 항만 센다 (D-112 가 준 자유도다).
+    """★ Only terms with **a weight in the exponent slot** are counted (that
+    is the degree of freedom D-112 gave).
 
-    `np.power(f.a, 2.0)` 은 상수 지수라 적합기가 맞출 것이 없다 — 세면
-    "지수 자리를 썼다" 가 거짓이 된다.
+    `np.power(f.a, 2.0)` has a constant exponent, so there is nothing for the
+    fitter to fit — counting it would make "the exponent slot was used"
+    false.
     """
     assert _n_power(_f(body)) == n

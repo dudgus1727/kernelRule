@@ -1,17 +1,20 @@
-"""★ 세 쌍 **여섯 방향** — 무엇이 전이를 어렵게 하나. LLM 0회.
+"""★ Three pairs, **six directions** — what makes the transfer hard? 0 LLM
+calls.
 
     python3 experiments/transfer_six.py
 
-`transfer_29_5.py` 가 방향마다 낸 json 을 모아 한 장으로 만든다.
-**여기서 새로 적합하지 않는다** — 절차가 달라지면 안 된다 (원칙 2).
+It gathers the json `transfer_29_5.py` produced per direction into one sheet.
+**Nothing is refitted here** — the procedure must not change (principle 2).
 
-실험 계획서 `docs/artifacts/transfer-4090-prereg.md` §5 의 세 질문:
+The three questions in `docs/artifacts/transfer-4090-prereg.md` §5:
 
 ```
-1  A6000<->4090 (바운드 뒤집힘 0) 에서 (a) 가 되나
-2  그 쌍에서 (b) ≈ (c) 가 유지되나
-3  세 쌍에서 (a) 의 손해가 ridge 차이와 상관이 있나
-   ★ 쌍이 셋뿐이라 기술 통계다 — 상관계수를 내지 않는다 (원칙 27)
+1  does (a) work on A6000<->4090 (0 bound flips)
+2  does (b) ≈ (c) hold on that pair
+3  across the three pairs, does (a)'s loss correlate with the ridge
+   difference
+   ★ there are only three pairs, so it is descriptive — no correlation
+     coefficient is given (principle 27)
 ```
 """
 
@@ -23,17 +26,20 @@ from pathlib import Path
 
 import numpy as np
 
-#: 여섯 방향. (출처, 대상)
+#: The six directions. (source, destination)
 DIRS = [("a6000", "4090"), ("4090", "a6000"),
         ("a6000", "5090"), ("5090", "a6000"),
         ("4090", "5090"), ("5090", "4090")]
-#: 쌍 이름 -> 바운드 뒤집힘 수 (`transfer_check` 실측, 실험 계획서 §1).
-#: ★ 키는 **정렬한 순서**다 — `_pair` 가 그렇게 만든다 (방향이 둘이라
-#: 한쪽만 넣으면 반대 방향에서 KeyError 가 난다. 실제로 났다).
+#: pair name -> the number of bound flips (measured by `transfer_check`,
+#: pre-registration §1).
+#: ★ The key is **the sorted order** — that is how `_pair` builds it (there
+#: are two directions, so putting only one in raises a KeyError on the other.
+#: It really did).
 FLIP = {tuple(sorted(k)): v for k, v in
         {("a6000", "4090"): 0, ("a6000", "5090"): 4,
          ("4090", "5090"): 3}.items()}
-#: 판정선. 실험 계획서 §4 — 여기서 새로 정하지 않는다 (원칙 7).
+#: The decision line. Pre-registration §4 — it is not set anew here
+#: (principle 7).
 DELTA = 0.0516
 
 
@@ -58,20 +64,22 @@ def main() -> None:
     got = {(s, d): _load(s, d) for s, d in DIRS}
     missing = [f"{s}->{d}" for (s, d), v in got.items() if v is None]
     if missing:
-        print(f"  ⚠️ 아직 없는 방향: {missing}")
-        print("     ★ 없는 것을 빼고 결론 내지 않는다 — 다 돌고 다시 부른다")
+        print(f"  ⚠️ directions not there yet: {missing}")
+        print("     ★ no conclusion is drawn with the missing ones left out "
+              "— run them all and call this again")
 
     print("=" * 96)
-    print("세 쌍 여섯 방향 — 홀드아웃 20형상 (뒤집힘 포함) / 괄호는 뒤집힘 제외")
+    print("three pairs, six directions — the holdout of 20 shapes (flips "
+          "included) / the parenthesis excludes the flips")
     print("=" * 96)
-    print(f"  {'방향':16s} {'ridge비':>8} {'뒤집힘':>6} "
-          f"{'(a) 완전이식':>22} {'(b) 재적합':>22} {'(c) 재생성':>22}")
+    print(f"  {'direction':16s} {'ridge x':>8} {'flips':>6} "
+          f"{'(a) transplant':>22} {'(b) refit':>22} {'(c) regrow':>22}")
     rows: dict = {}
     for s, d in DIRS:
         v = got[(s, d)]
         if v is None:
             print(f"  {s + ' -> ' + d:16s} {'—':>8} {'—':>6} "
-                  f"{'(아직 안 돌았다)':>22}")
+                  f"{'(not run yet)':>22}")
             continue
         r = v["ridge"][1] / v["ridge"][0]
         f = FLIP[_pair(s, d)]
@@ -90,12 +98,12 @@ def main() -> None:
             "c_range": [min(v["c"]), max(v["c"])],
             "baseline": v["baseline"], "n": [len(v["a"]), len(v["c"])]}
 
-    # ------------------------------------------------------------ 질문 1·2
+    # ------------------------------------------------------ questions 1·2
     print("\n" + "=" * 96)
-    print("질문 1·2 — 방향마다 (a) 와 (b) 가 (c) 에서 얼마나 떨어져 있나")
+    print("questions 1·2 — per direction, how far (a) and (b) are from (c)")
     print("=" * 96)
-    print(f"  {'방향':16s} {'뒤집힘':>6} {'(a)-(c)':>10} {'(b)-(c)':>10}"
-          f"   {'뒤집힘 제외 (a)-(c)':>20} {'(b)-(c)':>10}")
+    print(f"  {'direction':16s} {'flips':>6} {'(a)-(c)':>10} {'(b)-(c)':>10}"
+          f"   {'flips excl. (a)-(c)':>22} {'(b)-(c)':>10}")
     for s, d in DIRS:
         k = f"{s}->{d}"
         if k not in rows:
@@ -106,18 +114,19 @@ def main() -> None:
         w["a_minus_c"], w["b_minus_c"] = da, db
         w["a_minus_c_nf"], w["b_minus_c_nf"] = dan, dbn
         print(f"  {k:16s} {w['flipped']:6d} {da:+10.4f} {db:+10.4f}   "
-              f"{dan:+20.4f} {dbn:+10.4f}")
-    print(f"\n  판정선 delta = {DELTA} (실험 계획서 §4).  "
-          "양수 = (c) 보다 나쁘다")
-    print("  ★ (b)-(c) 가 delta 안이면 '구조는 옮겨지고 가중치만 다시 맞추면"
-          " 된다' 가 그 방향에서 선다")
+              f"{dan:+22.4f} {dbn:+10.4f}")
+    print(f"\n  the decision line delta = {DELTA} (pre-registration §4).  "
+          "positive = worse than (c)")
+    print("  ★ if (b)-(c) is within delta, 'the structure moves over and only "
+          "the weights need refitting' holds in that direction")
 
-    # -------------------------------------------------------------- 질문 3
+    # -------------------------------------------------------- question 3
     print("\n" + "=" * 96)
-    print("질문 3 — (a) 의 손해가 ridge 차이와 같이 가나  ★ 쌍 3개, 기술 통계")
+    print("question 3 — does (a)'s loss go with the ridge difference  "
+          "★ 3 pairs, descriptive")
     print("=" * 96)
-    print(f"  {'쌍':16s} {'ridge비':>8} {'뒤집힘':>6} "
-          f"{'(a)-(c) 두 방향 평균':>20} {'뒤집힘 제외':>12}")
+    print(f"  {'pair':16s} {'ridge x':>8} {'flips':>6} "
+          f"{'(a)-(c) mean of both dirs':>28} {'flips excl.':>14}")
     per_pair: dict = {}
     for p in sorted({_pair(s, d) for s, d in DIRS}):
         ks = [f"{s}->{d}" for s, d in DIRS if _pair(s, d) == p and
@@ -127,24 +136,27 @@ def main() -> None:
         m = float(np.mean([rows[k]["a_minus_c"] for k in ks]))
         mn = float(np.mean([rows[k]["a_minus_c_nf"] for k in ks]))
         rr = float(np.mean([rows[k]["ridge_ratio"] for k in ks]))
-        # ★ 비율은 방향마다 역수라 평균이 1 근처로 쏠린다. **차이의 절대값**
-        #   으로 읽는다 — 같은 쌍의 두 방향이 같은 값을 갖는다.
+        # ★ The ratio is the reciprocal in each direction, so a mean collapses
+        #   towards 1. It is read as **the absolute value of the difference**
+        #   — both directions of the same pair then share a value.
         far = abs(np.log(rows[ks[0]]["ridge_ratio"]))
         per_pair["+".join(p)] = {"ridge_log_dist": far, "flipped": FLIP[p],
                                  "a_minus_c_mean": m, "a_minus_c_nf_mean": mn,
                                  "dirs": ks, "ridge_ratio_mean": rr}
         print(f"  {'+'.join(p):16s} {far:8.3f} {FLIP[p]:6d} "
-              f"{m:20.4f} {mn:12.4f}")
-    print("\n  ridge비 열은 **|log(비율)|** 이다 — 방향마다 역수라 그냥 "
-          "평균하면 1 근처로 뭉갠다")
-    print("  ★ 상관계수를 내지 않는다. 쌍이 셋이다 (원칙 27)")
+              f"{m:28.4f} {mn:14.4f}")
+    print("\n  the ridge column is **|log(ratio)|** — it is the reciprocal in "
+          "each direction, so a plain mean would flatten it to about 1")
+    print("  ★ no correlation coefficient is given. There are three pairs "
+          "(principle 27)")
 
-    # ------------------------------------------------- ★ 사후 관측 (대상별)
+    # ------------------------------- ★ a post-hoc observation (per target)
     print("\n" + "=" * 96)
-    print("★ 사후 관측 — 손해가 **대상 표**로 달라진다  ⚠️ 실험 계획서에 없다")
+    print("★ a post-hoc observation — the loss changes with **the target "
+          "table**  ⚠️ not in the pre-registration")
     print("=" * 96)
-    print(f"  {'대상 표':10s} {'(c) 원주민':>10s} {'기준선 physics':>14s} "
-          f"{'(a)-(c) 출처별':>26s} {'(b)-(c) 출처별':>26s}")
+    print(f"  {'target':10s} {'(c) native':>12s} {'baseline physics':>18s} "
+          f"{'(a)-(c) per source':>28s} {'(b)-(c) per source':>28s}")
     by_dst: dict = {}
     for s_, d_ in DIRS:
         k = f"{s_}->{d_}"
@@ -155,14 +167,16 @@ def main() -> None:
         base = items[0][1]["baseline"]
         aa = "  ".join(f"{s_}:{w['a_minus_c']:+.4f}" for s_, w in items)
         bb = "  ".join(f"{s_}:{w['b_minus_c']:+.4f}" for s_, w in items)
-        print(f"  {d_:10s} {c:10.4f} {base:14.4f} {aa:>26s} {bb:>26s}")
+        print(f"  {d_:10s} {c:12.4f} {base:18.4f} {aa:>28s} {bb:>28s}")
         per_pair[f"dst:{d_}"] = {
             "c": c, "baseline": base,
             "a_minus_c": {s_: w["a_minus_c"] for s_, w in items},
             "b_minus_c": {s_: w["b_minus_c"] for s_, w in items}}
-    print("\n  ★ 두 출처가 같은 대상에서 **거의 같은 손해**를 낸다 —")
-    print("     손해는 출처가 아니라 대상의 성질로 보인다")
-    print("  ⚠️ 대상 셋 x 출처 둘이다. 실험 계획서에 없던 자름이라 **관측**이다")
+    print("\n  ★ the two sources give **almost the same loss** on the same "
+          "target —")
+    print("     the loss looks like a property of the target, not the source")
+    print("  ⚠️ it is three targets x two sources. It is a cut that was not "
+          "in the pre-registration, so it is **an observation**")
 
     Path(a.out).write_text(json.dumps(
         {"delta": DELTA, "dirs": rows, "pairs": per_pair,

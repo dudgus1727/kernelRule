@@ -1,8 +1,9 @@
-"""★ 순위 손실 진화 결과 — 실험 계획서 `rank-evo-prereg.md` 의 지표. LLM 0회.
+"""★ The rank-loss evolution result — the metrics of the pre-registration
+`rank-evo-prereg.md`. 0 LLM calls.
 
     python3 experiments/rank_evo_report.py
 
-주 지표는 **tau** 다. `regret` 은 기록만 한다 (실험 계획서 §4).
+The main metric is **tau**. `regret` is only recorded (pre-registration §4).
 """
 
 from __future__ import annotations
@@ -28,7 +29,8 @@ from kernelrule.features import REGISTRY
 A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
 TOP_N = 100
 TAU_SAMPLE, TAU_SEED = 4000, 12345
-#: 상한 측정에서 상위 100 안에서 크게 변하던 것들 (ranking-ceiling.md §3)
+#: The ones that moved a lot inside the top 100 in the ceiling measurement
+#: (ranking-ceiling.md §3)
 WATCH = ("split_k_cost", "sm_idle_cost", "pipeline_warmup_frac",
          "tail_waste", "waves")
 
@@ -82,16 +84,17 @@ def main() -> None:
     shapes = list(sp.train.shapes)
 
     print("=" * 78)
-    print("순위 손실 진화 — 실험 계획서 지표   ★ 주 지표는 tau, regret 은 기록만")
+    print("rank-loss evolution — the pre-registration metrics   ★ the main "
+          "metric is tau, regret is only recorded")
     print("=" * 78)
 
     seed = json.loads(Path("runs/F3rw-p8/stage2-rule-writer"
                            "/chosen.json").read_text())
     st, sa = _taus(seed["code"], seed["w0"], T, M, shapes)
-    print(f"  씨앗 (공통)          상위100 tau {st:6.3f}   전구간 {sa:6.3f}\n")
+    print(f"  the seed (shared)    top-100 tau {st:6.3f}   all {sa:6.3f}\n")
 
-    print(f"  {'실행':10s} {'rank':>7} {'regret':>8} {'상위100 tau':>12} "
-          f"{'전구간':>8} {'셀':>4} {'항':>3} {'config종류':>9}")
+    print(f"  {'run':10s} {'rank':>7} {'regret':>8} {'top-100 tau':>13} "
+          f"{'all':>8} {'cells':>6} {'trm':>4} {'config kinds':>13}")
     rows = []
     for run in a.runs:
         d = Path("runs") / run
@@ -102,7 +105,7 @@ def main() -> None:
         t100, tall = _taus(best["code"], best["w"], T, M, shapes)
         rd = [json.loads(x) for x in
               (d / "rounds.jsonl").read_text().splitlines() if x.strip()]
-        # config 다양성
+        # config diversity
         fn = compile_rule(best["code"])
         w = np.asarray(best["w"], dtype=np.float64)
         picks = []
@@ -118,37 +121,41 @@ def main() -> None:
                "n_config_kinds": len(Counter(picks)),
                "feats": sorted(_feats(best["code"]))}
         rows.append(row)
-        print(f"  {run.split('-')[-1]:10s} {best.get('rank_loss', float('nan')):7.4f} "
-              f"{best['regret']:8.4f} {t100:12.3f} {tall:8.3f} "
-              f"{rd[-1]['n_cells']:4d} {len(best['w']):3d} "
-              f"{row['n_config_kinds']:9d}")
+        print(f"  {run.split('-')[-1]:10s} "
+              f"{best.get('rank_loss', float('nan')):7.4f} "
+              f"{best['regret']:8.4f} {t100:13.3f} {tall:8.3f} "
+              f"{rd[-1]['n_cells']:6d} {len(best['w']):4d} "
+              f"{row['n_config_kinds']:13d}")
 
     t1 = np.array([r["tau_top100"] for r in rows])
     ta = np.array([r["tau_all"] for r in rows])
-    print(f"\n  {'중앙':10s} {'':7s} {np.median([r['regret'] for r in rows]):8.4f} "
-          f"{np.median(t1):12.3f} {np.median(ta):8.3f}")
-    print(f"  {'범위':10s} {'':7s} {'':8s} "
+    print(f"\n  {'median':10s} {'':7s} "
+          f"{np.median([r['regret'] for r in rows]):8.4f} "
+          f"{np.median(t1):13.3f} {np.median(ta):8.3f}")
+    print(f"  {'range':10s} {'':7s} {'':8s} "
           f"{t1.min():.3f}~{t1.max():.3f}  {ta.min():.3f}~{ta.max():.3f}")
 
     print("\n" + "=" * 78)
-    print("판정 — 실험 계획서에 박은 선")
+    print("the verdict — the line nailed down in the pre-registration")
     print("=" * 78)
     m1, ma = float(np.median(t1)), float(np.median(ta))
-    print(f"  상위100 tau 중앙 {m1:.3f}  -> " + (
-        "★ 성공 (>=0.30)" if m1 >= 0.30
-        else "실패 (<=0.15)" if m1 <= 0.15 else "구분 불가 (0.15~0.30)"))
-    print(f"  전구간 tau 중앙  {ma:.3f}  -> " + (
-        "유지 (>=0.30)" if ma >= 0.30
-        else "★ trade-off (<=0.15)" if ma <= 0.15 else "가운데"))
-    print("  ⚠️ 3시드는 유의성을 못 낸다 — 범위 분리로 읽는다")
+    print(f"  top-100 tau median {m1:.3f}  -> " + (
+        "★ success (>=0.30)" if m1 >= 0.30
+        else "failure (<=0.15)" if m1 <= 0.15
+        else "indistinguishable (0.15~0.30)"))
+    print(f"  all-range tau median  {ma:.3f}  -> " + (
+        "kept (>=0.30)" if ma >= 0.30
+        else "★ a trade-off (<=0.15)" if ma <= 0.15 else "in between"))
+    print("  ⚠️ 3 seeds cannot give significance — it is read by range "
+          "separation")
 
-    print("\n  ★ 상한 측정이 지목한 다섯 축이 쓰이는가 "
-          "(상위 100 안에서 크게 변하던 것)")
+    print("\n  ★ are the five axes the ceiling measurement named used "
+          "(the ones that moved a lot inside the top 100)")
     for name in WATCH:
         n = sum(1 for r in rows if name in r["feats"])
-        print(f"    {name:22s} {n}/{len(rows)} 실행")
+        print(f"    {name:22s} {n}/{len(rows)} runs")
     allf = Counter(x for r in rows for x in r["feats"])
-    print(f"\n  쓴 축 합집합 {len(allf)}개: "
+    print(f"\n  the union of the axes used, {len(allf)}: "
           f"{', '.join(sorted(allf))}")
     Path(a.out).write_text(json.dumps(
         {"seed_tau": [st, sa], "rows": rows}, ensure_ascii=False, indent=1))

@@ -1,22 +1,23 @@
-"""실제 LLM 클라이언트 — Pydantic AI + OpenAI (§4-0).
+"""The real LLM client — Pydantic AI + OpenAI (§4-0).
 
-## `LLMClient` Protocol 뒤에 둔다
+## It sits behind the `LLMClient` Protocol
 
-`MockLLM` 과 **교체 가능**해야 ablation 과 `replay` 가 성립한다.
-`pydantic_ai.Agent` 를 호출부에 노출하지 않는다 — 루프는 `complete(role,
-prompt, **kw)` 만 안다.
+It must be **interchangeable** with `MockLLM` for the ablations and `replay`
+to hold. `pydantic_ai.Agent` is not exposed to the call sites — the loop
+knows only `complete(role, prompt, **kw)`.
 
-## 스키마 위반은 재시도 후 **폐기**다
+## A schema violation is a retry, then a **discard**
 
-Pydantic AI 가 validator 실패를 모델에 되먹여 재시도한다. 상한(`retries`)
-을 넘으면 그 후보를 버린다. **부분 수용하지 않는다** (§26.4) — 반쯤 맞는
-규칙을 고쳐서 쓰면 그 규칙이 무엇을 시험한 것인지 알 수 없어진다.
+Pydantic AI feeds a validator failure back to the model and retries. Beyond
+the cap (`retries`) the candidate is thrown away. **There is no partial
+acceptance** (§26.4) — patching up a half-right rule makes it impossible to
+say what that rule tested.
 
-## 키
+## The key
 
-`OPENAI_API_KEY` 환경변수에서만 읽는다. **코드에 넣지 않고, 저장하지도
-않는다.** 없으면 명확한 에러로 중단한다 — `MockLLM` 으로 조용히
-폴백하지 않는다 (§26.4).
+It is read only from the `OPENAI_API_KEY` environment variable. **It is not
+put in the code and not stored.** Without it, it stops with a clear error —
+it does not silently fall back to `MockLLM` (§26.4).
 """
 
 from __future__ import annotations
@@ -38,34 +39,51 @@ __all__ = ["OpenAILLM", "LLMConfig", "Budget", "BudgetExceeded",
 
 _PROMPTS = Path(__file__).parent / "prompts"
 
-#: ★ 모델의 **유일한 출처**. 실험 스크립트가 각자 상수를 들고 있다가
-#: 서로 다른 모델로 도는 일이 있었다 — 그러면 결과를 나란히 놓을 수 없다
-#: (D-31). 바꿀 때는 여기 하나만 고치고, **사용자가 지시했을 때만** 바꾼다.
+#: ★ The **single source** for the model. Experiment scripts used to hold
+#: their own constants and ran on different models — and then the results
+#: cannot be placed side by side (D-31). To change it, change this one place,
+#: and **only when the user says so**.
 DEFAULT_MODEL = "gpt-5.6-luna"
 
 
 class MissingAPIKey(RuntimeError):
-    """API 키가 없다. **`MockLLM` 으로 폴백하지 않는다** (§26.4)."""
+    """There is no API key. **It does not fall back to `MockLLM`**
+    (§26.4)."""
 
 
 class BudgetExceeded(RuntimeError):
-    """예산 상한을 넘었다. 실행을 멈춘다."""
+    """The budget cap was exceeded. The run stops."""
 
 
-#: validator 메시지 -> 짧은 사유 코드. `llm 132건` 으로 뭉뚱그리면
-#: 무엇이 걸렸는지 모르고, 프롬프트를 어디를 고쳐야 할지도 모른다.
+#: validator message -> a short reason code. Lumped together as
+#: `llm 132 cases`, there is no way to know what was caught, nor where to fix
+#: the prompt.
+#:
+#: ⚠️ 2026-09-08 (D-146): the validator messages became English. **The old
+#:    Korean patterns are kept** — old `llm_calls/` logs have to stay
+#:    classifiable (the correction-history rule).
 _VIOLATION_PATTERNS: tuple[tuple[str, str], ...] = (
-    # ⚠️ 패턴은 **실제 validator 메시지**와 맞춰야 한다.
-    #    "가중치 8개" 로 뒀다가 "가중치 9개..." 를 못 잡아 other 로 샜다.
+    # ⚠️ The patterns must match the **actual validator messages**. It once
+    #    said "8 weights" and failed to catch "9 weights...", which leaked
+    #    into other.
+    ("the budget is", "w0_too_long"),
+    ("numeric literals +", "w0_too_long"),
     ("리터럴 예산이", "w0_too_long"),
     ("최대 8개", "w0_too_long"),
+    ("reused across terms", "weight_reuse"),
     ("재사용", "weight_reuse"),
+    ("largest referenced index", "w0_length_mismatch"),
     ("최대 인덱스", "w0_length_mismatch"),
+    ("w0 is empty", "w0_empty"),
     ("w0 가 비었다", "w0_empty"),
+    ("abnormally large", "w0_huge"),
     ("비정상적으로 크다", "w0_huge"),
+    ("banned reference", "banned_substring"),
     ("금지된 참조", "banned_substring"),
     ("def score", "no_def_score"),
+    ("code in a hypothesis", "hypothesis_has_code"),
     ("가설에 코드", "hypothesis_has_code"),
+    ("hypotheses", "hypothesis_count"),
     ("가설이", "hypothesis_count"),
     ("Exceeded maximum", "retries_exhausted"),
     ("event loop", "event_loop_bug"),
@@ -74,43 +92,50 @@ _VIOLATION_PATTERNS: tuple[tuple[str, str], ...] = (
 
 
 def classify_violation(msg: str) -> str:
-    """예외/validator 메시지를 사유 코드로 분류한다."""
+    """Classifies an exception or validator message into a reason code."""
     for pat, code in _VIOLATION_PATTERNS:
         if pat.lower() in msg.lower():
             return code
     return "other"
 
 
-#: 피처 조건 셋 (D-128). `F2` 는 **공개 지식 다섯**으로 시작한다
-#: (§30.17). 옛 이름 `F0`(피처 없음)·옛 `F2`(원시 5개)는 실행이 0회라
-#: 삭제했고, 옛 `F1-K` 가 지금의 `F2` 다 (D-128). **alias 는 없다.**
+#: The three feature conditions (D-128). `F2` starts from the **five
+#: public facts** (§30.17). The old names `F0` (no features) and the old
+#: `F2` (5 raw values) had 0 runs and were deleted, and the old
+#: `F1-K` is today's `F2` (D-128). **There are no aliases.**
 _CONDITIONS = frozenset({"F1", "F2", "F3"})
 
-#: 조건 -> **피처** 예시 파일. 답을 건네지 않아야 하는 조건은 무관 도메인.
-#: ★ 조건이 프롬프트 **예시**를 고른다 — 잘못 옮기면 모델이 다른 예시를
-#: 받고 그것이 조건 변경이다 (D-128 의 개명에서 가장 조심한 자리).
+#: Condition -> the **feature** example file. A condition that must not be
+#: handed the answer gets an unrelated domain.
+#: ★ The condition selects the prompt **example** — moving it wrongly gives
+#: the model a different example, and that is a change of condition (the
+#: spot most carefully watched during the D-128 rename).
 _EXAMPLES = {"F1": "other_domain", "F2": "known5", "F3": "known5"}
 
-#: `examples/rule_known.md` 가 **이름으로 부르는** 피처들.
-#: 이 넷이 레지스트리에 다 있어야 그 예시를 쓸 수 있다 (§30.20).
+#: The features `examples/rule_known.md` **calls by name**.
+#: All four must be in the registry for that example to be usable (§30.20).
 _RULE_EXAMPLE_NEEDS = ("tail_waste", "has_spill", "occupancy_deficit",
                        "roofline_ratio")
 
 
 def _rule_example_for(registry, *, parameters: int | None = None) -> str:
-    """규칙 예시를 **레지스트리를 보고** 고른다 (§30.20).
+    """Selects the rule example **by looking at the registry** (§30.20).
 
-    RuleWriter 의 `condition` 은 A/B(표 관측 유무)라 피처 조건과 축이
-    다르다. 그래서 조건이 아니라 **예시가 쓰는 이름이 레지스트리에
-    있는가**로 정한다.
+    RuleWriter's `condition` is A/B (with or without table observations), a
+    different axis from the feature conditions. So it is decided not by the
+    condition but by **whether the names the example uses are in the
+    registry**.
 
     ```
-    다 있다   실제 이름을 써도 추가 누출이 아니다 — 이미 목록에 있다
-    없다      ★ 무관 도메인. 없는 이름을 예시로 주면 물리를 지목한다 (D-35)
+    all present   using the real names is no extra leak — they are already
+                  in the list
+    absent        ★ an unrelated domain. Giving names that do not exist as
+                  an example points at the physics (D-35)
     ```
 
-    조건 이름을 키로 쓰면 새 조건이 생길 때마다 표를 고쳐야 하고,
-    빠뜨리면 조용히 누출된다. **레지스트리를 보면 빠뜨릴 수 없다.**
+    Keying on the condition name means the table has to be edited whenever a
+    condition is added, and a missed entry leaks silently. **Looking at the
+    registry cannot be missed.**
     """
     names = set(getattr(registry, "_items", {}) or {})
     ok = names.issuperset(_RULE_EXAMPLE_NEEDS)
@@ -118,25 +143,31 @@ def _rule_example_for(registry, *, parameters: int | None = None) -> str:
         f"examples/{'rule_known' if ok else 'rule_other_domain'}.md",
         parameters=parameters)
 
-#: 하드웨어 사실(`hw/*.md`)을 받는 역할. **RuleWriter 뿐이다.**
+#: The roles that receive the hardware facts (`hw/*.md`). **RuleWriter
+#: only.**
 #:
-#:   RuleEditor / FeatureWriter   피처가 hw 를 이미 흡수했다. 안 보면 그
-#:                               프롬프트는 GPU 무관해진다 (§16.2)
-#:   Analyst                     ★ 진단 리포트 **블록 1 이 같은 사실**이다.
-#:                               리포트는 표에서 매번 생성되고 `hw/*.md` 는
-#:                               고정이라, 번들이 바뀌면 둘이 달라져 모순된
-#:                               사실을 받는다. 살아 있는 쪽을 남긴다 (원칙 2)
-#:   RuleWriter                   리포트를 안 받으므로 여기서 받아야 한다
-#: ★ 목표 정의 (D-101). **RuleEditor 만** 받는다 — RuleWriter 는 "점수
-#: 없음" 이므로 이 절 자체를 안 본다 (§30.10). 그래서 목적함수를 바꿔도
-#: RuleWriter 의 조건은 안 바뀐다.
+#:   RuleEditor / FeatureWriter   the features have already absorbed hw.
+#:                                Not seeing it makes that prompt
+#:                                GPU-independent (§16.2)
+#:   Analyst                      ★ **block 1 of the diagnostic report is
+#:                                the same facts.** The report is generated
+#:                                from the table every time and `hw/*.md` is
+#:                                fixed, so when the bundle changes the two
+#:                                diverge and it receives contradictory
+#:                                facts. The live one is kept (principle 2)
+#:   RuleWriter                   it receives no report, so it must get them
+#:                                here
+#: ★ The goal definition (D-101). **RuleEditor alone** receives it —
+#: RuleWriter has "no score", so it never sees this section (§30.10). That
+#: is why changing the objective does not change RuleWriter's condition.
 _OBJECTIVE_BLOCKS = {
     "regret": """`regret` = (time of the config the rule ranked first) /
 (the exhaustively measured best time for that shape).
 1.0 is perfect. Lower is better.""",
-    #: ★ `rank` 는 함수다 — `k` 와 `lambda` 가 실행마다 다르다. 문장에
-    #: 100 을 상수로 박아 두었더니 `--rank-top-k 10` 을 줘도 프롬프트는
-    #: "100개" 라고 말했다 (D-105/D-107 과 같은 자리, 다섯 번째 면).
+    #: ★ `rank` is a function — `k` and `lambda` differ per run. With 100
+    #: nailed into the sentence as a constant, giving `--rank-top-k 10`
+    #: still made the prompt say "100" (the same spot as D-105/D-107, the
+    #: fifth surface).
     "rank": None,
 }
 
@@ -161,12 +192,14 @@ pair with a large gap costs a lot.
 **Do not chase tiny differences; use the physics that creates the order.**{extra}"""
 
 
-#: ★ 실험 B (D-110) — **항 안에서 피처 둘을 곱해도 된다**는 것을 명시한다.
-#: 정적 검사는 원래부터 곱을 막지 않았다 (규칙 531개 중 312개가 이미
-#: 쓰고 있다). 그래서 이것은 "제약을 푸는 것" 이 아니라 **말해 주는
-#: 것**이다 — D-107 에서 배운 대로, 안 실리면 시도가 안 는다.
+#: ★ Experiment B (D-110) — it states that **two features may be
+#: multiplied within one term**. The static checks never blocked products
+#: (312 of 531 rules already use them). So this is not "loosening a
+#: constraint" but **saying so** — as learned in D-107, what is not said
+#: does not get tried.
 #:
-#: ⚠️ 끄면 **빈 문자열**이라 프롬프트가 이전과 바이트까지 같다.
+#: ⚠️ Switched off it is the **empty string**, so the prompt is
+#: byte-identical to before.
 _PRODUCT_BLOCK = """
 
 ## ★ Term shape — you may multiply features
@@ -188,11 +221,13 @@ _PRODUCT_NOTE = """
 """
 
 
-#: * 실험 (b) (D-112) — **가중치를 지수 자리에** 둘 수 있다.
-#: 이것만이 아직 안 건드린 형태다: 지금까지 넓힌 것은 항 수 / 노드 수 /
-#: 곱이고, **가중치가 선형 자리에만 있다**는 것은 그대로였다.
+#: * Experiment (b) (D-112) — a weight may sit **in the exponent slot**.
+#: This is the only form not yet touched: what has been widened so far is
+#: the term count / the node count / products, and **that weights sit only
+#: in linear positions** stayed as it was.
 #:
-#: 끄면 **빈 문자열**이라 프롬프트가 이전과 바이트까지 같다.
+#: Switched off it is the **empty string**, so the prompt is byte-identical
+#: to before.
 _POWER_BLOCK = """
 
 ## ★ Term shape — a weight may sit in the exponent
@@ -244,15 +279,17 @@ def power_note(on: bool) -> str:
     return _POWER_NOTE if on else ""
 
 
-#: ★ RuleEditor 에게 보낼 가설 필드 — **허용 목록**이다 (D-117).
+#: ★ The hypothesis fields sent to the RuleEditor — an **allow list**
+#: (D-117).
 #:
-#: 처음에는 거부 목록(`evidence_cases` 만 뺀다)이었다. 그러면 Analyst
-#: 스키마에 필드가 하나 늘 때마다 **자동으로 새어 나간다.** 그리고
-#: 형상 크기 validator 는 `claim` 에만 걸려 있어서 `risk` /
-#: `affected_regime` 는 안 거친다.
+#: It was first a deny list (drop `evidence_cases` only). Then every field
+#: added to the Analyst schema **leaks automatically.** And the shape-size
+#: validator is attached to `claim` alone, so `risk` / `affected_regime` do
+#: not go through it.
 #:
-#: 나머지(`evidence_cases` `risk` `affected_regime` `id`)는 Analyst
-#: 기록용이고 `hypotheses.jsonl` 에 그대로 남는다 — 버리는 것이 아니다.
+#: The rest (`evidence_cases`, `risk`, `affected_regime`, `id`) are for the
+#: Analyst record and stay in `hypotheses.jsonl` as they are — they are not
+#: discarded.
 _EDITOR_KEEPS = ("claim", "measurable_with", "proposed_direction")
 
 
@@ -270,9 +307,10 @@ def product_note(on: bool) -> str:
 
 def objective_block(objective: str, *, rank_top_k: int = 100,
                     rank_lambda: float = 0.0) -> str:
-    """★ 목표 정의 한 곳 (원칙 2). `k` 와 `lambda` 를 **문장에 넣는다.**"""
+    """★ The goal definition, in one place (principle 2). `k` and `lambda`
+    are **put into the sentence.**"""
     if objective not in _OBJECTIVE_BLOCKS:
-        raise ValueError(f"알 수 없는 목적함수: {objective!r}")
+        raise ValueError(f"unknown objective: {objective!r}")
     if objective == "rank":
         return _rank_block(rank_top_k, rank_lambda)
     return _OBJECTIVE_BLOCKS[objective]
@@ -285,23 +323,28 @@ def assemble_instructions(role: str, *, objective: str = "rank",
                           rank_lambda: float = 0.0,
                           product_hint: bool = False,
                           power_hint: bool = False) -> str:
-    """★ 시스템 프롬프트 조립. **한 곳에서만 한다** (원칙 2).
+    """★ Assembling the system prompt. **Done in one place only**
+    (principle 2).
 
-    전에는 `_agent()` 와 `tests/test_prompt_layout.py` 가 각자 조립했다.
-    `{objective_block}` 을 넣자 **시험 쪽만 안 채워져서** 달라졌다 —
-    "같은 판정이 여러 곳에 있으면 달라진다" 의 여덟 번째다.
+    `_agent()` and `tests/test_prompt_layout.py` used to assemble it
+    separately. Adding `{objective_block}` made them diverge because **only
+    the test side left it unfilled** — the eighth instance of "the same
+    judgement in several places diverges".
     """
     if objective not in _OBJECTIVE_BLOCKS:
-        raise ValueError(f"알 수 없는 목적함수: {objective!r}")
+        raise ValueError(f"unknown objective: {objective!r}")
     parts = [load_prompt("_base.md", parameters=parameters)]
     if role in _NEEDS_HW:
-        # ★ 조용한 기본값을 두지 않는다 (D-113). 없으면 실패다 (§26.4).
+        # ★ There is no silent default (D-113). Missing means failure
+        #   (§26.4).
         if hw_text is None and hw_file is None:
             raise ValueError(
-                f"역할 {role!r} 은 하드웨어 사실을 받아야 하는데 "
-                "`hw_text` 도 `hw_file` 도 없다. 번들에서 생성해 넘겨라 "
+                f"role {role!r} must be given the hardware facts, but "
+                "neither `hw_text` nor `hw_file` is set. Generate it from "
+                "the bundle and pass it in "
                 "(`kernelrule.agents.hwprompt.hw_prompt_from_bundle`). "
-                "기본값으로 떨어지면 다른 GPU 의 사실이 간다 (D-113).")
+                "Falling back to a default sends another GPU's facts "
+                "(D-113).")
         parts.append(hw_text if hw_text is not None
                      else load_prompt(hw_file, parameters=parameters))
     if role in _WRITES_RULES:
@@ -321,42 +364,49 @@ def assemble_instructions(role: str, *, objective: str = "rank",
 
 _NEEDS_HW = frozenset({"rule_writer"})
 
-#: 규칙 **함수**를 쓰는 역할 — 형태·예산·벡터화 제약을 공유한다.
+#: The roles that write the rule **function** — they share the shape,
+#: budget and vectorisation constraints.
 _WRITES_RULES = frozenset({"rule_editor", "rule_writer"})
 
-#: 부모 규칙을 **고치는** 역할. regret 정의와 거부 사례 갤러리를 받는다.
-#: ★ RuleWriter 는 안 받는다 — 백지에서 쓰므로 교체할 항도 이전 점수도
-#: 없고, 주면 자기 역할 파일의 "점수 없음" 과 정면으로 모순된다.
+#: The role that **edits** a parent rule. It receives the regret definition
+#: and the gallery of refused cases.
+#: ★ RuleWriter does not — it writes from a blank page, so there is no term
+#: to replace and no previous score, and giving it would contradict its own
+#: role file's "no score" head on.
 _EDITS_RULES = frozenset({"rule_editor"})
 
 
-#: 프롬프트 파일의 **내부 메모**. 사람이 읽으라고 쓴 것이고 모델에 보내지
-#: 않는다 — `§30.18`, `D-45` 같은 내부 참조가 그대로 나가고 있었다.
+#: **Internal notes** in the prompt files. They are written for humans and
+#: are not sent to the model — internal references such as `§30.18` and
+#: `D-45` were going out as they were.
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
 def load_prompt(name: str, *, parameters: int | None = None) -> str:
-    """프롬프트를 읽는다. **HTML 주석은 걷어내고 `{parameters}` 를 채운다.**
+    """Reads a prompt. **It strips HTML comments and fills in
+    `{parameters}`.**
 
-    `<!-- ... -->` 는 "왜 이렇게 썼나" 를 남기는 자리다. 그것이 모델에
-    가면 (1) 토큰을 쓰고 (2) 내부 결정 번호가 새고 (3) 조건에 따라서는
-    답을 건네줄 수도 있다.
+    `<!-- ... -->` is where "why it was written this way" is recorded. If
+    that goes to the model it (1) costs tokens, (2) leaks internal decision
+    numbers and (3) under some conditions could hand over the answer.
 
-    ★ 파라미터 수는 **프롬프트에 직접 쓰지 않는다.** `{parameters}` 로 쓰면
-    여기서 `checks.PARAMETERS` 로 채워진다. 프롬프트 다섯 파일과 스키마와
-    검사기가 각자 숫자를 적고 있었고, 그러면 바꿀 때 하나를 빠뜨린다
-    (`is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
-    `load_generated` 에 이은 여섯 번째가 된다).
+    ★ The parameter count is **not written into the prompt directly.**
+    Written as `{parameters}`, it is filled in here from
+    `checks.PARAMETERS`. Five prompt files, the schema and the checker each
+    wrote their own number, and then a change misses one (it would be the
+    sixth after `is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
+    `load_generated`).
     """
     from kernelrule.rules.checks import PARAMETERS, limits_for
 
     p = _PROMPTS / name
     if not p.exists():
-        raise FileNotFoundError(f"프롬프트가 없다: {p}")
+        raise FileNotFoundError(f"no such prompt: {p}")
     txt = _HTML_COMMENT.sub("", p.read_text()).strip() + "\n"
-    # ★ 파라미터 수에 딸린 상한들도 **같이** 채운다 (D-106). `ast_nodes` 를
-    #   상수로 적어 두면 파라미터 16 에서 "400 이 상한" 이라고 말하면서
-    #   검사기는 800 을 쓴다 — 프롬프트와 검사기가 달라진다.
+    # ★ The caps attached to the parameter count are filled in **too**
+    #   (D-106). With `ast_nodes` written as a constant, at 16 parameters
+    #   the prompt says "the cap is 400" while the checker uses 800 — the
+    #   prompt and the checker diverge.
     lim = limits_for(parameters if parameters is not None else PARAMETERS)
     for k, v in lim.items():
         txt = txt.replace("{" + k + "}", str(v))
@@ -365,105 +415,126 @@ def load_prompt(name: str, *, parameters: int | None = None) -> str:
 
 @dataclass
 class LLMConfig:
-    """`config.json` 에 그대로 기록된다 (§15.4 재현성)."""
+    """Recorded into `config.json` as is (§15.4 reproducibility)."""
 
     model: str = DEFAULT_MODEL
-    #: ★ 목표 정의를 정한다 (D-101). `config.json` 에 남아야 조건이 기록된다.
-    #: RuleEditor 의 "채점 방식" 절만 바뀐다 — RuleWriter 는 안 받는다.
+    #: ★ It sets the goal definition (D-101). It has to stay in
+    #: `config.json` for the condition to be recorded. Only the RuleEditor's
+    #: "how it is scored" section changes — RuleWriter does not receive it.
     objective: str = "regret"
-    #: ★ 파라미터 상한 (D-104). `None` 이면 `checks.PARAMETERS`(8). 프롬프트의
-    #: `{parameters}` 가 이 값으로 채워진다 — 검사기와 달라지면 안 되므로
-    #: 루프가 같은 값을 `check_rule(limits=...)` 에도 넘긴다.
+    #: ★ The parameter cap (D-104). With `None` it is
+    #: `checks.PARAMETERS` (8). The prompt's `{parameters}` is filled from
+    #: this value — it must not diverge from the checker, so the loop passes
+    #: the same value to `check_rule(limits=...)` too.
     parameters: int | None = None
-    #: ★ 목표 정의의 **숫자**. 프롬프트가 실행 조건과 같은 말을 해야 한다
-    #: (D-105/D-107). `rank` 목적함수에서만 쓰인다.
+    #: ★ The **numbers** of the goal definition. The prompt must say the
+    #: same thing as the run conditions (D-105/D-107). Used only under the
+    #: `rank` objective.
     rank_top_k: int = 100
     rank_lambda: float = 0.0
-    #: ★ 실험 B (D-110). 곱 항을 **명시**한다. 검사기는 원래 안 막았다.
+    #: ★ Experiment B (D-110). It **states** the product term. The checker
+    #: never blocked it.
     product_hint: bool = False
-    #: * 실험 (b) (D-112). 가중치를 지수 자리에 둘 수 있다고 명시한다.
+    #: * Experiment (b) (D-112). It states that a weight may sit in the
+    #: exponent slot.
     power_hint: bool = False
     # ------------------------------------------------------------------
-    # ★ temperature / seed — 둘 다 `None` 이다. 통제할 수 없다 (D-47)
+    # ★ temperature / seed — both are `None`. They cannot be controlled
+    # (D-47)
     # ------------------------------------------------------------------
-    # 전에는 0.7 / 20260821 로 두고 "다양성을 통제하고 재현성을 확보한다" 고
-    # 적었다. **둘 다 모델에 전달되지 않고 있었다.** `config.json` 에는
-    # 값이 적히는데 실제로는 모델 기본값으로 돌았다 (§30.8).
+    # They used to be 0.7 / 20260821 with "diversity is controlled and
+    # reproducibility secured" written next to them. **Neither was being
+    # passed to the model.** The values were written into `config.json`
+    # while it actually ran on the model defaults (§30.8).
     #
-    # 실측으로 층을 갈랐다 (3모델 x 2엔드포인트):
+    # Measurement separated the layers (3 models x 2 endpoints):
     #
-    #   seed         Responses 엔드포인트에 **파라미터 자체가 없다.**
-    #                SDK 가 `TypeError` 를 낸다 — 요청이 나가지도 않는다.
-    #                모델과 무관하다 (gpt-4.1-mini 도 마찬가지).
-    #   temperature  **추론 모델이 거부한다.** gpt-5.6-luna 는 두 엔드포인트
-    #                모두 400 이고, gpt-5.4-mini / gpt-4.1-mini 는 둘 다 된다.
-    #                엔드포인트와 무관하다.
-    #                (추론 모델은 내부적으로 여러 차례 추론·검증·선택을
-    #                 거치므로 샘플링을 막는다. 대신 reasoning_effort 를 준다.)
+    #   seed         **the parameter does not exist** on the Responses
+    #                endpoint. The SDK raises a `TypeError` — the request
+    #                never goes out. It is independent of the model
+    #                (gpt-4.1-mini too).
+    #   temperature  **reasoning models refuse it.** gpt-5.6-luna gives 400
+    #                on both endpoints, while gpt-5.4-mini / gpt-4.1-mini
+    #                accept it on both. It is independent of the endpoint.
+    #                (A reasoning model goes through several internal rounds
+    #                 of reasoning, verification and selection, so it blocks
+    #                 sampling. It offers reasoning_effort instead.)
     #
-    # pydantic-ai 는 둘 다 **조용히 버린다** — 그래서 몰랐다. 원인이 아니라
-    # 증상을 감춘 쪽이다.
+    # pydantic-ai **silently drops** both — which is why nobody knew. It hid
+    # the symptom, not the cause.
     #
-    # 따라서 기본을 `None` 으로 둔다. 값을 넣으면 보내되, **보낼 수 없는
-    # 조합이면 예외를 낸다** — 조용히 버려지느니 멈추는 편이 낫다 (§26.4).
+    # So the defaults are `None`. A value given is sent, but **an
+    # unsendable combination raises** — stopping is better than being
+    # silently dropped (§26.4).
     temperature: float | None = None
     seed: int | None = None
-    #: 스키마 위반 시 재시도 상한. 2 -> 3 (임시).
-    #: 지시 모순이 해소되면 필요 없지만, 거부율이 여전히 높을 때
-    #: "모델이 배우는 중" 과 "구조적으로 불가능" 을 구분해 준다.
+    #: The retry cap on a schema violation. 2 -> 3 (temporary).
+    #: It is unnecessary once the contradictory instructions are resolved,
+    #: but while the refusal rate is still high it separates "the model is
+    #: learning" from "structurally impossible".
     max_retries: int = 3
-    #: 동시 호출 상한. rate limit 에 걸리면 줄이되 **로그에 남긴다.**
+    #: The concurrency cap. Lower it when hitting a rate limit, but
+    #: **record that in the log.**
     concurrency: int = 6
-    #: ★ 하드웨어 사실. **기본값을 두지 않는다** (D-113). 기본값이
-    #: `"hw/sm_86.md"` 로 고정돼 있어서 5090 실행이 A6000 사실을 받았다.
-    #: 둘 중 하나는 있어야 하고, RuleWriter 를 부를 때 없으면 **실패**다.
-    #:   `hw_text`     번들에서 생성한 본문 (권장 — `hwprompt` 모듈)
-    #:   `arch_prompt` 파일 경로. 옛 실행을 되짚을 때만 쓴다
+    #: ★ The hardware facts. **There is no default** (D-113). The default
+    #: was pinned to `"hw/sm_86.md"`, so a 5090 run received A6000 facts.
+    #: One of the two must be present, and calling RuleWriter without it is
+    #: a **failure**.
+    #:   `hw_text`     the body generated from the bundle (recommended — the
+    #:                 `hwprompt` module)
+    #:   `arch_prompt` a file path. Used only when retracing an old run
     arch_prompt: str | None = None
     hw_text: str | None = None
-    #: ★ OpenAI 엔드포인트. **`config.json` 에 남는다** — 섞이면 비교가
-    #: 깨지므로 나중에 확인할 수 있어야 한다 (D-31, D-44).
+    #: ★ The OpenAI endpoint. **It stays in `config.json`** — mixing them
+    #: breaks comparison, so it must be checkable later (D-31, D-44).
     #:
-    #:   "responses"  /v1/responses.  구조화 출력 + 추론을 함께 쓸 수 있다
-    #:   "chat"       /v1/chat/completions.  전통적 형식
+    #:   "responses"  /v1/responses.  structured output + reasoning together
+    #:   "chat"       /v1/chat/completions.  the traditional form
     #:
-    #: gpt-5.6 계열은 chat 에서 **함수 도구 + reasoning_effort** 조합을
-    #: 400 으로 막는다. 구조화 출력(`output_type`)이 함수 도구로 구현되므로
-    #: 그대로 걸린다. 우회는 `reasoning_effort='none'` 인데 그러면 추론이
-    #: 꺼져 물리 유도 능력을 잃는다 — 그래서 엔드포인트를 옮겼다.
-    #: gpt-5.4 / 5.4-mini 도 responses 를 지원하므로 통일이 가능하다.
+    #: The gpt-5.6 family blocks the **function tools + reasoning_effort**
+    #: combination on chat with a 400. Structured output (`output_type`) is
+    #: implemented as function tools, so it is caught. The workaround is
+    #: `reasoning_effort='none'`, but that switches reasoning off and loses
+    #: the ability to derive physics — so the endpoint was moved instead.
+    #: gpt-5.4 / 5.4-mini support responses too, so this can be uniform.
     endpoint: str = "responses"
-    #: ★ 추론 강도. **명시한다** — 안 하면 모델 기본값이 적용되고, 그 기본이
-    #: 바뀌면 우리 결과가 조용히 달라진다 (§15.4 재현성).
+    #: ★ The reasoning effort. **It is stated** — otherwise the model
+    #: default applies, and if that default changes our results silently
+    #: change with it (§15.4 reproducibility).
     #:
-    #: 실측 (gpt-5.6-luna, Responses API):
-    #:   none    추론 0 토큰
+    #: Measured (gpt-5.6-luna, Responses API):
+    #:   none    0 reasoning tokens
     #:   low     ~150
-    #:   medium  ~130   ← 채택
+    #:   medium  ~130   <- adopted
     #:   high    ~520
-    #: 우리 실제 프롬프트(7,177토큰)에서는 기본값이 1,756 추론토큰을 썼다 —
-    #: 과제가 무거우면 그만큼 더 쓴다.
+    #: On our real prompt (7,177 tokens) the default spent 1,756 reasoning
+    #: tokens — a heavier task spends proportionally more.
     #:
-    #: `None` 이면 보내지 않는다(모델 기본값). 그 경우도 **의도한 것임을
-    #: 기록으로 남기려면** 명시적으로 None 을 적어야 한다.
+    #: With `None` nothing is sent (the model default). Even then, **to
+    #: record that it was intended**, None has to be written explicitly.
     reasoning_effort: str | None = "medium"
-    #: ★ 피처를 어떻게 보여주는가. **실험 조건이므로 기록한다** (D-31).
+    #: ★ How the features are shown. **An experimental condition, so it is
+    #: recorded** (D-31).
     #:
-    #:   "full"   이름 + 범위 + 물리적 의미 + 왜 중요한가  (지금 기본)
-    #:   "names"  이름만 — 2026-08-22 이전 상태
+    #:   "full"   name + range + physical meaning + why it matters (today's
+    #:            default)
+    #:   "names"  names only — the state before 2026-08-22
     #:
-    #: 이 둘의 차이가 이 저장소에서 시드 폭을 넘은 유일한 효과였는데,
-    #: 그 측정이 **임의로 바꾼 모델**에서 나온 것이라 다시 잰다 (D-52).
-    #: 플래그로 둔 이유는 코드를 되돌렸다 돌렸다 하면 어느 실행이 어느
-    #: 조건이었는지 알 수 없게 되기 때문이다.
+    #: The difference between these two was the only effect in this
+    #: repository that exceeded the seed spread, and that measurement came
+    #: from **a model that had been changed arbitrarily**, so it is being
+    #: remeasured (D-52). It is a flag because reverting the code back and
+    #: forth makes it impossible to tell which run was under which
+    #: condition.
     feature_detail: str = "full"
 
     def to_dict(self) -> dict:
-        """`config.json` 에 기록될 형태.
+        """The form recorded into `config.json`.
 
-        ★ `hw_text` 는 본문 전체가 아니라 **해시와 첫 줄**로 남긴다.
-        조건을 되짚기에는 충분하고, 본문은 `llm_calls/_system-*.md` 에
-        이미 그대로 있다 (pending_fixes 10 에서 넣었다).
+        ★ `hw_text` is kept as **a hash and the first line**, not the whole
+        body. That is enough to retrace the condition, and the body is
+        already there verbatim in `llm_calls/_system-*.md` (added in
+        pending_fixes 10).
         """
         import hashlib
 
@@ -480,7 +551,8 @@ class LLMConfig:
 
 @dataclass
 class Budget:
-    """호출 수와 토큰 상한. **넘으면 멈춘다** (§4-1)."""
+    """The call and token caps. **Exceeding them stops the run**
+    (§4-1)."""
 
     max_calls: int = 400
     max_input_tokens: int = 3_000_000
@@ -489,7 +561,8 @@ class Budget:
     input_tokens: int = 0
     output_tokens: int = 0
     cached_hits: int = 0
-    #: ★ 실패한 호출도 토큰을 쓴다. 안 세면 예산 감시에 구멍이 생긴다.
+    #: ★ A failed call spends tokens too. Not counting them leaves a hole
+    #: in the budget watchdog.
     failed_calls: int = 0
 
     def charge(self, n_in: int, n_out: int) -> None:
@@ -498,52 +571,57 @@ class Budget:
         self.output_tokens += n_out
         if self.calls > self.max_calls:
             raise BudgetExceeded(
-                f"호출 {self.calls} > 상한 {self.max_calls}")
+                f"calls {self.calls} > cap {self.max_calls}")
         if self.input_tokens > self.max_input_tokens:
             raise BudgetExceeded(
-                f"입력 토큰 {self.input_tokens:,} > 상한 "
+                f"input tokens {self.input_tokens:,} > cap "
                 f"{self.max_input_tokens:,}")
         if self.output_tokens > self.max_output_tokens:
             raise BudgetExceeded(
-                f"출력 토큰 {self.output_tokens:,} > 상한 "
+                f"output tokens {self.output_tokens:,} > cap "
                 f"{self.max_output_tokens:,}")
 
     def line(self) -> str:
-        return (f"호출 {self.calls}+{self.failed_calls}실패 "
-                f"(캐시 {self.cached_hits})  "
-                f"입력 {self.input_tokens:,}  출력 {self.output_tokens:,}")
+        return (f"calls {self.calls}+{self.failed_calls} failed "
+                f"(cached {self.cached_hits})  "
+                f"in {self.input_tokens:,}  out {self.output_tokens:,}")
 
 
 class OpenAILLM:
-    """`MockLLM` 과 같은 인터페이스. 루프는 둘을 구분하지 않는다."""
+    """The same interface as `MockLLM`. The loop does not distinguish
+    between them."""
 
     def __init__(self, cfg: LLMConfig, *, feature_names, shape_values,
                  registry, budget: Budget | None = None,
                  cache: bool = True) -> None:
         if not os.environ.get("OPENAI_API_KEY"):
             raise MissingAPIKey(
-                "OPENAI_API_KEY 가 없다. 실제 LLM 실행을 중단한다.\n"
-                "  MockLLM 으로 조용히 폴백하지 않는다 — 그러면 'LLM 이 "
-                "규칙을 만들었다' 를 거짓으로 믿게 된다 (§26.4).")
+                "there is no OPENAI_API_KEY. The real LLM run stops.\n"
+                "  It does not silently fall back to MockLLM — that would "
+                "make us falsely believe 'the LLM wrote the rules' "
+                "(§26.4).")
         self.cfg = cfg
         self.features = list(feature_names)
         self.shape_values = list(shape_values)
-        # ★ RuleWriter 는 이름 목록이 아니라 **물리적 정의**를 넣어야 한다.
-        #   `feature_names` 로는 physical_meaning 을 못 읽는다.
-        #   기본값 없음 — 어느 레지스트리가 프롬프트에 들어가는지가 실험
-        #   조건이고, `None` 이면 `render_features` 가 사람 24개로 떨어졌다
-        #   (§30.9). 이제는 호출부가 반드시 명시한다.
+        # ★ RuleWriter must be given the **physical definitions**, not a
+        #   list of names. `feature_names` cannot read physical_meaning.
+        #   There is no default — which registry goes into the prompt is an
+        #   experimental condition, and with `None`, `render_features` fell
+        #   back to the human 24 (§30.9). The call site must now state it.
         if registry is None:
             raise ValueError(
-                "OpenAILLM(registry=...) 는 필수다. F1~F3 조건에서 어느 "
-                "피처 목록이 프롬프트에 들어가는지가 실험 자체다 (§26.4).")
-        # ★ 같은 판정이 두 곳에 있으면 달라진다 (원칙 2). `feature_names` 는
-        #   정적 검사가 쓰고 `registry` 는 프롬프트가 쓴다 — 어긋나면 LLM 이
-        #   본 적 없는 이름으로 검사받거나, 검사에 없는 이름을 프롬프트가
-        #   권한다. 둘 다 비어 있지 않으면 포함 관계를 강제한다.
-        # ★ `M/N/K/n_candidates` 는 레지스트리와 무관하게 항상 있다 —
-        #   문제 자체의 성질이지 피처가 아니다. 처음에 이걸 빼먹어서 검증
-        #   실행이 시작도 못 하고 죽었다 (LLM 호출 전이라 손해는 없었다).
+                "OpenAILLM(registry=...) is mandatory. Which feature list "
+                "goes into the prompt under conditions F1~F3 is the "
+                "experiment itself (§26.4).")
+        # ★ The same judgement in two places diverges (principle 2).
+        #   `feature_names` is used by the static checks and `registry` by
+        #   the prompt — diverged, the LLM is either checked against names
+        #   it has never seen, or the prompt recommends names the checks do
+        #   not have. When neither is empty, containment is enforced.
+        # ★ `M/N/K/n_candidates` are always present, independent of the
+        #   registry — they are properties of the problem, not features.
+        #   Leaving them out at first killed a validation run before it even
+        #   started (before any LLM call, so nothing was lost).
         from kernelrule.core.matrix import INTRINSIC_SHAPE_FIELDS
 
         known = set(registry._items) | set(INTRINSIC_SHAPE_FIELDS)
@@ -552,26 +630,30 @@ class OpenAILLM:
                            - known)
             if stray:
                 raise ValueError(
-                    f"feature_names/shape_values 에 레지스트리 "
-                    f"{registry.name!r} 에 없는 이름이 있다: {stray}. "
-                    "정적 검사와 프롬프트가 서로 다른 목록을 보게 된다 "
-                    "(원칙 2).")
+                    f"feature_names/shape_values contain names absent from "
+                    f"registry {registry.name!r}: {stray}. The static checks "
+                    f"and the prompt would see different lists "
+                    f"(principle 2).")
         self.registry = registry
         self.budget = budget or Budget()
         self.calls: list[LLMCall] = []
         self._seq = 0
-        #: 프롬프트 해시 -> 응답. 초반에 같은 프롬프트가 자주 반복된다 (§15.4)
+        #: Prompt hash -> response. Early on the same prompt repeats often
+        #: (§15.4)
         self._cache: dict[str, object] = {} if cache else None
         self._agents: dict[str, object] = {}
-        #: ★ 루프 밖 역할 (D-92). 실험 스크립트가 **자기 프롬프트와 자기
-        #: 스키마**를 들고 등록한다. `kernelrule/agents/` 는 루프가 부르는
-        #: 넷(analyze / rule_writer / rule_editor / feature + categorize)만
-        #: 안다 — 루프에 없는 역할이 여기 남으면 "언젠가 켤 것" 으로 읽힌다.
+        #: ★ Roles outside the loop (D-92). An experiment script registers
+        #: one carrying **its own prompt and its own schema**.
+        #: `kernelrule/agents/` knows only the four the loop calls (analyze /
+        #: rule_writer / rule_editor / feature + categorize) — a role that
+        #: is not in the loop, left here, reads as "to be switched on some
+        #: day".
         self._extra: dict[str, tuple] = {}
-        # ★ 유효 항 예산. **여기서 한 번 정하고 모든 자리에 넘긴다**
-        #   (원칙 2). 전에는 `load_prompt` 의 기본값과 `checks.PARAMETERS`
-        #   직접 import 가 각자 정했고, `parameters=16` 을 줘도
-        #   **사용자 프롬프트와 역할 파일은 8 로 렌더링됐다** (D-105).
+        # ★ The effective term budget. **Decided once here and passed to
+        #   every place** (principle 2). It used to be decided separately by
+        #   `load_prompt`'s default and a direct import of
+        #   `checks.PARAMETERS`, so even with `parameters=16` **the user
+        #   prompt and the role files rendered 8** (D-105).
         from kernelrule.rules.checks import PARAMETERS as _CHECK_PARAMETERS
         self._parameters = int(cfg.parameters if cfg.parameters is not None
                            else _CHECK_PARAMETERS)
@@ -580,33 +662,38 @@ class OpenAILLM:
         self._product = bool(getattr(cfg, "product_hint", False))
         self._power = bool(getattr(cfg, "power_hint", False))
         self._base = load_prompt("_base.md", parameters=self._parameters)
-        # ★ 하드웨어 사실은 **없어도 여기서 안 죽는다** — RuleWriter 를
-        #   부를 때 죽는다. Analyst/RuleEditor/FeatureWriter 는 안 받으므로
-        #   (§16.2) 표 없이 만드는 호출을 막을 이유가 없다.
+        # ★ Missing hardware facts **do not kill it here** — it dies when
+        #   RuleWriter is called. Analyst/RuleEditor/FeatureWriter do not
+        #   receive them (§16.2), so there is no reason to block calls
+        #   constructed without a table.
         self._hw = (cfg.hw_text if cfg.hw_text is not None
                     else (load_prompt(cfg.arch_prompt, parameters=self._parameters)
                           if cfg.arch_prompt else None))
-        #: ★ 목적함수. 프롬프트의 "채점 방식" 절을 정한다 (D-101).
+        #: ★ The objective. It sets the prompt's "how it is scored"
+        #: section (D-101).
         self.objective = getattr(cfg, "objective", "regret")
         if self.objective not in _OBJECTIVE_BLOCKS:
-            raise ValueError(f"알 수 없는 목적함수: {self.objective!r}")
+            raise ValueError(f"unknown objective: {self.objective!r}")
         self._rules = load_prompt("role/_rules_common.md",
                                   parameters=self._parameters)
-        # ★ 조립은 `assemble_instructions` 한 곳에서 한다 (원칙 2).
-        #   아래 넷은 **프롬프트 존재 확인용**으로만 읽는다 — 파일이
-        #   없으면 첫 호출이 아니라 여기서 죽어야 한다.
+        # ★ Assembly happens in `assemble_instructions` alone
+        #   (principle 2). The four below are read **only to confirm the
+        #   prompts exist** — a missing file must kill it here, not on the
+        #   first call.
         self._edit = load_prompt("role/_rules_edit.md",
                                  parameters=self._parameters)
-        # ⚠️ `asyncio.Semaphore` 를 여기서 만들면 **첫 이벤트 루프에
-        #    바인딩된다.** 루프는 라운드마다 `asyncio.run()` 을 새로 부르므로
-        #    두 번째 라운드부터 "bound to a different event loop" 로 죽는다.
-        #    실제로 밟았고, 그 예외가 후보 폐기로 처리돼 **조용히 호출을
-        #    잃었다.** 루프마다 새로 만든다.
+        # ⚠️ Creating the `asyncio.Semaphore` here **binds it to the first
+        #    event loop.** The loop calls `asyncio.run()` afresh every round,
+        #    so from the second round it dies with "bound to a different
+        #    event loop". We stepped on this, and the exception was handled
+        #    as a discarded candidate, so **calls were silently lost.** One
+        #    is created per loop.
         self._sems: dict[int, asyncio.Semaphore] = {}
         self.rate_limit_events = 0
-        #: (라운드, 시도 회차, 사유 코드, 메시지). 되먹임이 작동하는지 본다 —
-        #: 1회차에 걸린 것이 2회차에도 **같은 이유**로 걸리면 재시도 상한을
-        #: 올릴 것이 아니라 프롬프트를 고쳐야 한다.
+        #: (round, attempt number, reason code, message). It shows whether
+        #: the feedback works — if what was caught on attempt 1 is caught on
+        #: attempt 2 **for the same reason**, the fix is the prompt, not a
+        #: higher retry cap.
         self.violations: list[dict] = []
         self.round = -1
 
@@ -618,7 +705,7 @@ class OpenAILLM:
                 self.cfg.concurrency)
         return sem
 
-    # -- Agent 구성 (§11.2 — 고정 역할 + 주입 도메인 사실) ------------------
+    # -- Agent construction (§11.2 — fixed roles + injected domain facts) -
     def _agent(self, role: str):
         if role in self._agents:
             return self._agents[role]
@@ -632,15 +719,16 @@ class OpenAILLM:
             rule_output_for,
         )
 
-        # ★ 루프 밖 역할은 `register_role` 로 실험 스크립트가 직접 등록한다
-        #   (D-92). `kernelrule/agents/` 는 **루프가 부르는 넷**만 안다.
+        # ★ Roles outside the loop are registered by experiment scripts
+        #   themselves through `register_role` (D-92).
+        #   `kernelrule/agents/` knows only **the four the loop calls**.
         if role in self._extra:
             out, body = self._extra[role]
         else:
-            # ★ 규칙 역할은 **예산이 든** 출력 타입을 쓴다 (D-107).
-            #   필드 설명이 도구 스키마로 모델에 그대로 간다 — 거기에
-            #   "최대 8개" 가 굳어 있으면 프롬프트가 16 이라고 해도
-            #   모델은 8 을 낸다.
+            # ★ The rule roles use an output type **carrying the budget**
+            #   (D-107). The field descriptions go to the model as the tool
+            #   schema — with "at most 8" frozen in there, the model
+            #   produces 8 even when the prompt says 16.
             _rule_out = rule_output_for(self._parameters,
                                         product_hint=self._product,
                                         power_hint=self._power)
@@ -650,21 +738,24 @@ class OpenAILLM:
             body = load_prompt(f"role/{role}.md", parameters=self._parameters) \
                 .replace("{product_note}", product_note(self._product)) \
                 .replace("{power_note}", power_note(self._power))
-        # ★ **두 축**으로 나뉜다 (§30.10). 한 축(하드웨어 무관/의존)만으로
-        #   나눴더니 역할별로 필요 없는 것이 공용에 쌓였다 — FeatureWriter 가
-        #   regret 정의와 가중치 예산을 매번 받고 있었다.
+        # ★ It splits along **two axes** (§30.10). Split along one axis
+        #   only (hardware-independent / dependent), things no role needed
+        #   piled up in the common part — FeatureWriter was receiving the
+        #   regret definition and the weight budget every time.
         #
-        #                 하드웨어 무관        하드웨어 의존
-        #     역할 무관   _base.md            hw/sm_86.md
-        #     역할 의존   role/*.md           (없음)
+        #                      hardware-independent   hardware-dependent
+        #     role-independent  _base.md              hw/sm_86.md
+        #     role-dependent    role/*.md             (none)
         #
-        #   `hw` 는 Analyst / RuleWriter 만 받는다. RuleEditor 와
-        #   FeatureWriter 가 안 보면 그 프롬프트는 **GPU 무관**해져서 새
-        #   GPU 에 그대로 쓸 수 있다 (§16.2).
-        #   규칙 블록은 다시 둘로 쪼갠다 — `_rules_common.md`(함수 형태·
-        #   예산·벡터화)는 RuleEditor + RuleWriter, `_rules_edit.md`(regret
-        #   정의·거부 사례 갤러리)는 **RuleEditor 만**. RuleWriter 는 백지
-        #   에서 쓰므로 교체할 항도 이전 점수도 없다 (§30.10).
+        #   `hw` goes to Analyst / RuleWriter only. Not seeing it makes the
+        #   RuleEditor and FeatureWriter prompts **GPU-independent**, usable
+        #   as they are on a new GPU (§16.2).
+        #   The rule block splits in two again — `_rules_common.md` (function
+        #   shape, budget, vectorisation) for RuleEditor + RuleWriter, and
+        #   `_rules_edit.md` (the regret definition, the gallery of refused
+        #   cases) for **RuleEditor only**. RuleWriter writes from a blank
+        #   page, so there is no term to replace and no previous score
+        #   (§30.10).
         instructions = assemble_instructions(
             role, objective=self.objective, hw_file=self.cfg.arch_prompt,
             hw_text=self.cfg.hw_text,
@@ -673,67 +764,71 @@ class OpenAILLM:
             product_hint=self._product, power_hint=self._power)
         if self.cfg.endpoint not in ("responses", "chat"):
             raise ValueError(
-                f"알 수 없는 엔드포인트: {self.cfg.endpoint!r}. "
-                "'responses' 또는 'chat'")
+                f"unknown endpoint: {self.cfg.endpoint!r}. "
+                f"'responses' or 'chat'")
         model = (OpenAIResponsesModel(self.cfg.model)
                  if self.cfg.endpoint == "responses"
                  else OpenAIChatModel(self.cfg.model))
-        # ★ 보낼 수 없는 조합은 **여기서 멈춘다** (D-47). pydantic-ai 에
-        #   넘기면 조용히 버려지고, config.json 에는 값이 남아 기록과 실제가
-        #   어긋난다.
+        # ★ An unsendable combination **stops here** (D-47). Handed to
+        #   pydantic-ai it is silently dropped, while the value stays in
+        #   config.json, so the record and reality diverge.
         if self.cfg.seed is not None and self.cfg.endpoint == "responses":
             raise ValueError(
-                "seed 는 Responses 엔드포인트에 **파라미터가 없다** (SDK 가 "
-                "TypeError 를 낸다). pydantic-ai 는 조용히 버리므로 "
-                "config.json 에만 남는다. `seed=None` 으로 두거나 "
-                "`endpoint='chat'` 을 써라 (D-47).")
+                "seed **is not a parameter** on the Responses endpoint "
+                "(the SDK raises a TypeError). pydantic-ai drops it "
+                "silently, so it survives only in config.json. Leave "
+                "`seed=None` or use `endpoint='chat'` (D-47).")
         settings: dict = {}
         if self.cfg.temperature is not None:
             settings["temperature"] = self.cfg.temperature
         if self.cfg.seed is not None:
             settings["seed"] = self.cfg.seed
         if self.cfg.reasoning_effort is not None:
-            # pydantic-ai 는 공급자 접두사를 붙인 키로 전달한다.
+            # pydantic-ai passes it under a provider-prefixed key.
             settings["openai_reasoning_effort"] = self.cfg.reasoning_effort
         a = Agent(model, output_type=out, instructions=instructions,
                   retries=self.cfg.max_retries, model_settings=settings)
         self._agents[role] = a
         return a
 
-    # -- 프롬프트 조립 ----------------------------------------------------
+    # -- Prompt assembly --------------------------------------------------
     def _feature_block(self) -> str:
-        """★ **모든 역할이 같은 렌더러를 쓴다** (§11.2 / D-34).
+        """★ **Every role uses the same renderer** (§11.2 / D-34).
 
-        전에는 RuleWriter 만 `render_features()` 로 범위와 물리적 정의를 받고,
-        RuleEditor 와 Analyst 는 **이름 목록**만 받았다. 진화 루프의 LLM 이
-        `has_spill` 이 무엇을 재는지 모르는 채로 항을 골랐고, 그래서 비용
-        없는 가지치기를 놓쳤다 (`artifacts/spill-term.md`).
+        Only RuleWriter used to receive the ranges and physical definitions
+        through `render_features()`, while RuleEditor and Analyst got **a
+        list of names**. The evolution loop's LLM picked terms without
+        knowing what `has_spill` measures, and so missed a free pruning
+        (`artifacts/spill-term.md`).
 
-        두 경로를 남겨두면 다시 달라진다. `_feature_block` 을 이쪽으로 흡수해
-        **출처를 하나로** 만든다.
+        Leaving two paths lets them diverge again. `_feature_block` is
+        absorbed into this one so that there is **a single source**.
 
-        ⚠️ 하드웨어 상수(SM 84, smem 99KB, ridge)는 주지 않는다. 피처가 이미
-        흡수했고, 안 보면 이 프롬프트가 **GPU 무관**해져 새 GPU 에 그대로
-        쓸 수 있다 (§16.2).
+        ⚠️ The hardware constants (SM 84, smem 99KB, ridge) are not given.
+        The features have already absorbed them, and not seeing them makes
+        this prompt **GPU-independent**, usable as it is on a new GPU
+        (§16.2).
         """
         from kernelrule.features import render_features
 
         if self.cfg.feature_detail not in ("full", "names"):
             raise ValueError(
-                f"알 수 없는 feature_detail: {self.cfg.feature_detail!r}. "
-                "'full' 또는 'names'")
+                f"unknown feature_detail: {self.cfg.feature_detail!r}. "
+                f"'full' or 'names'")
         if self.cfg.feature_detail == "names":
-            # ★ 2026-08-22 이전 상태를 그대로 재현한다 — 이름 목록만.
-            return ("## config 수준 (`f.<이름>`)\n\n"
+            # ★ It reproduces the state before 2026-08-22 exactly — a list
+            #   of names only.
+            return ("## Config level (`f.<name>`)\n\n"
                     + "\n".join(f"- `{n}`" for n in self.features)
-                    + "\n\n## 형상 수준 (`p.<이름>`)\n\n"
+                    + "\n\n## Shape level (`p.<name>`)\n\n"
                     + "\n".join(f"- `{n}`" for n in self.shape_values))
         if self.registry is None:
-            # 레지스트리가 없으면 이름만 — 그리고 **그 사실을 말한다** (§26.4)
+            # Without a registry, names only — and **it says so** (§26.4)
             names = "\n".join(f"- `{n}`" for n in self.features)
             svals = "\n".join(f"- `{n}`" for n in self.shape_values)
-            return ("⚠️ 피처의 물리적 정의를 불러오지 못했다 (registry 없음). "
-                    f"이름만 있다.\n\n{names}\n\n{svals}")
+            return ("⚠️ The physical definitions of the features could not be "
+                    f"loaded (no registry). Only the names are "
+                    f"here.\n\n{names}\n\n{svals}")
         return render_features(self.registry, include_observed=False)
 
     def _user_prompt(self, role: str, prompt: str, **kw) -> str:
@@ -745,22 +840,26 @@ class OpenAILLM:
         if role == "feature":
             return self._feature_prompt(**kw)
         if role in self._extra:
-            # 등록 역할은 사용자 프롬프트도 호출자가 만든다.
+            # For a registered role the caller builds the user prompt too.
             return prompt
         if role == "analyze":
-            return prompt + "\n\n---\n\n## 등록된 피처\n\n" + fl + "\n"
+            return (prompt + "\n\n---\n\n## Registered features\n\n"
+                    + fl + "\n")
         parent = kw.get("parent")
         hyp = kw.get("hypothesis") or {}
         applied = kw.get("hypotheses_applied") or []
-        # ★ 부모의 현재 항 수를 주입하고, 포화 시 **교체를 지시**한다.
-        #   "버려도 된다" 는 선택지이고 "버리고 넣어라" 는 지시다.
-        #   예산이 `role/_rules.md`(시스템)에만 있으면 긴 컨텍스트에서 희석된다.
+        # ★ The parent's current term count is injected, and at saturation
+        #   it **instructs a replacement**. "You may drop one" is an option;
+        #   "drop one and put it in" is an instruction. With the budget only
+        #   in `role/_rules.md` (the system prompt) it is diluted in a long
+        #   context.
         n_terms = int(kw.get("parent_n_terms") or 0)
-        # ★ 예산은 **경로별**이다 (D-144). 남은 자리는 가장 무거운 경로로 센다.
+        # ★ The budget is **per path** (D-144). The room left is counted on
+        #   the heaviest path.
         n_path = int(kw.get("parent_path_params") or 0)
         n_w = len(parent.w0) if parent else 0
-        # ★ `checks.PARAMETERS` 을 직접 읽으면 `parameters` 을 무시한다
-        #   (D-105). 유효 예산은 `self._parameters` 하나뿐이다.
+        # ★ Reading `checks.PARAMETERS` directly ignores `parameters`
+        #   (D-105). The effective budget is `self._parameters` alone.
         if n_path >= self._parameters:
             note = ("\n★ The **heaviest path** is at the cap "
                     f"({n_path}/{self._parameters}).\n"
@@ -773,13 +872,15 @@ class OpenAILLM:
         else:
             note = (f"Room left on the heaviest path: "
                     f"{self._parameters - n_path} ({n_terms} terms in total)")
-        # ★ Analyst 가 꺼져 있으면 **가설 절 자체를 안 만든다** (§16.1, D-89).
-        #   "## 이번 가설\n\n(가설 없음)" 처럼 빈 자리를 남기면 모델이
-        #   "가설이 있는데 비어 있다" 로 읽어 다른 조건이 된다. 진단
-        #   리포트를 만들지도 않는 것과 같은 원칙이다.
-        # ★ Analyst 를 끈 프롬프트는 켠 것에서 **문장을 지운 것**이어야 한다
-        #   (§16.1, D-89). 새 문구를 쓰면 "Analyst 만 다르다" 가 깨진다 —
-        #   `test_optimize_prompt_without_analyst_is_a_deletion` 이 고정한다.
+        # ★ With the Analyst off, **the hypothesis section is not built at
+        #   all** (§16.1, D-89). Leaving an empty slot such as
+        #   "## This round's hypothesis\n\n(none)" makes the model read "there
+        #   is a hypothesis and it is empty", a different condition. It is
+        #   the same principle as not building the diagnostic report either.
+        # ★ The prompt with the Analyst off must be **the one with it on,
+        #   with sentences deleted** (§16.1, D-89). Writing new wording
+        #   breaks "only the Analyst differs" —
+        #   `test_optimize_prompt_without_analyst_is_a_deletion` pins it.
         if kw.get("analyst", True):
             hyp_block = (
                 "## Hypotheses already reflected in the current rule\n\n"
@@ -800,10 +901,11 @@ class OpenAILLM:
                 "that reason.\n")
         else:
             hyp_block = inputs_hyp = one_change = applied_warn = ""
-        # ★ 두 번째 부모는 `cross` 일 때만 있다 (D-96). 없으면 **절 자체를
-        #   안 만든다** — "(부모 없음)" 같은 빈 자리를 남기면 모델이 "둘째가
-        #   있는데 비어 있다" 로 읽고, 그러면 exploit/explore 의 조건이
-        #   달라진다 (D-89 에서 밟았다).
+        # ★ There is a second parent only under `cross` (D-96). Without
+        #   one **the section is not built at all** — leaving an empty slot
+        #   such as "(no parent)" makes the model read "there is a second and
+        #   it is empty", which changes the conditions of exploit/explore
+        #   (we stepped on this in D-89).
         p2 = kw.get("parent2")
         if p2 is None:
             second = ""
@@ -831,35 +933,41 @@ class OpenAILLM:
             parent_w=(list(parent.w0) if parent else "-"))
 
 
-    # -- RuleWriter (§11.8) — 부모도 사례도 점수도 받지 않는다 ---------------
+    # -- RuleWriter (§11.8) — it receives no parent, no cases, no score ---
     def _rule_writer_prompt(self, *, condition: str = "A",
                           table_facts=None, registry=None, **_kw) -> str:
-        """★ 조건 A 는 **표에서 나온 문장이 하나도 없다.**
+        """★ Condition A has **not one sentence that came from the
+        table.**
 
-        전이 시나리오와의 정합성이 이 조건의 존재 이유다:
+        Consistency with the transfer scenarios is why this condition
+        exists:
 
-            완전 이식 §29.5(a)   표 0      구조+가중치 그대로
-            재적합   §29.5(b)   표본 5%   구조 고정, 가중치만
-            재생성   §29.5(c)   전수      구조부터 새로
+            full port    §29.5(a)   0 table      structure + weights as they are
+            refit        §29.5(b)   5% sample    structure fixed, weights only
+            regenerate   §29.5(c)   exhaustive   from the structure up
 
-        표를 봐야 **구조**가 나오면 그것은 (c) 다. 그런데 전수를 잴 거면
-        표를 직접 쓰면 되므로 이 시스템을 쓸 이유가 없다. 그래서 A 가
-        통과 조건이고, B 와의 격차가 곧 "표의 값어치" 다.
+        If the **structure** needs the table, that is (c). But if you are
+        going to measure exhaustively you can use the table directly, so
+        there is no reason to use this system. So A is the gate condition,
+        and the gap against B is exactly "what the table is worth".
 
-        조립을 손으로 하지 않는다 — `render_features` 를 통과시킨다 (D-28).
+        The assembly is not done by hand — it goes through
+        `render_features` (D-28).
         """
         from kernelrule.features import render_features
 
         if condition not in ("A", "B"):
-            raise ValueError(f"알 수 없는 RuleWriter 조건: {condition!r}. "
-                             "A(물리만) 또는 B(물리+학습분할 집계)")
+            raise ValueError(f"unknown RuleWriter condition: {condition!r}. "
+                             f"A (physics only) or B (physics + training-split "
+                             f"aggregates)")
         if condition == "B" and table_facts is None:
             raise ValueError(
-                "조건 B 는 학습 분할 집계가 필요하다. "
-                "TableFacts.compute(table, splits.train) 을 넘겨라 (§12.3).")
+                "condition B needs the training-split aggregates. Pass "
+                "TableFacts.compute(table, splits.train) (§12.3).")
 
-        # ★ 넘겨받은 레지스트리를 쓴다. 전에는 `self.registry` 고정이라
-        #   F1/F2 처럼 다른 라이브러리로 부를 때 어긋날 수 있었다 (§30.9).
+        # ★ It uses the registry it was given. It used to be pinned to
+        #   `self.registry`, which could diverge when called with another
+        #   library such as F1/F2 (§30.9).
         reg = registry if registry is not None else self.registry
         extra = getattr(table_facts, "by_feature", None) if table_facts else None
         block = render_features(reg, include_observed=condition == "B",
@@ -876,10 +984,11 @@ class OpenAILLM:
                    "These are patterns over the whole split, not answers for "
                    "individual shapes. **Nothing here identifies a shape.**"
                    f"\n\n```\n{lines}\n```")
-        # ★ 규칙 예시도 **조건마다 다르다** (§30.20). RuleWriter 는
-        #   `condition` 이 A/B(표 관측 유무)라 피처 조건과 축이 다르다 —
-        #   레지스트리가 사람 24개면 실제 이름을 써도 되고, F0/F1
-        #   레지스트리면 무관 도메인을 써야 한다.
+        # ★ The rule example **differs per condition** too (§30.20).
+        #   RuleWriter's `condition` is A/B (with or without table
+        #   observations), a different axis from the feature conditions — if
+        #   the registry is the human 24 the real names may be used, and with
+        #   an F0/F1 registry an unrelated domain must be.
         rule_ex = _rule_example_for(reg, parameters=self._parameters)
         return load_prompt("role/rule_writer.md",
                            parameters=self._parameters).format(
@@ -887,14 +996,15 @@ class OpenAILLM:
             table_note=note, feature_block=block, aggregate_block=agg)
 
 
-    # -- FeatureWriter (§11.4) — 없는 축을 만든다 ---------------------------
+    # -- FeatureWriter (§11.4) — it builds axes that do not exist ---------
     def _categorize_prompt(self, *, n_min: int = 5, n_max: int = 8,
                            **_kw) -> str:
-        """★ 영역을 **LLM 이** 나눈다 (§30.10).
+        """★ **The LLM** partitions the areas (§30.10).
 
-        사람이 카테고리를 주면 사전 지식을 건네는 것이다 — "메모리
-        트래픽이 중요하다" 를 알려주는 셈이다. 그리고 나눈 결과 자체가
-        관찰 대상이다: LLM 이 GEMM 성능의 물리를 어떻게 구조화하는가.
+        Handing over human-written categories hands over prior knowledge —
+        it amounts to saying "memory traffic matters". And the partition
+        itself is an object of observation: how does the LLM structure the
+        physics of GEMM performance?
         """
         from kernelrule.features.generated import field_block
 
@@ -904,22 +1014,25 @@ class OpenAILLM:
 
     def _feature_prompt(self, *, condition: str = "F1", task: str = "",
                         registry=None, **_kw) -> str:
-        """F1~F3 — **피처를 얼마나 주느냐**가 조건이다. 0 -> 5 -> 24 다.
+        """F1~F3 — the condition is **how many features are given**.
+        0 -> 5 -> 24.
 
-            F1  0개에서 시작   파생 물리량을 만들 수 있나   ★ 근본 질문
-            F2  공개 지식 5개  그 위에 쌓을 수 있나  (D-128 개명 전 `F1-K`)
-            F3  사람 24개     조합만 (= 지금까지의 모든 실행)
+            F1  start from 0    can it build derived quantities  ★ the
+                                fundamental question
+            F2  5 public facts  can it build on top of them
+                                (`F1-K` before the D-128 rename)
+            F3  the human 24    combination only (= every run so far)
 
-        ⚠️ 형태 예시는 **이 문제와 무관한 것**을 쓴다. `optimize.md` 의
-        출력 예시가 `human_guided` 축약판이라 "씨앗 없음" 조건에 씨앗이
-        들어간 일이 있다 (D-35).
+        ⚠️ The shape example is **something unrelated to this problem**. The
+        output example in `optimize.md` was an abridged `human_guided`, and a
+        seed once entered the "no seed" condition that way (D-35).
         """
         from kernelrule.features import render_features
         from kernelrule.features.generated import field_block
 
         if condition not in _CONDITIONS:
             raise ValueError(
-                f"알 수 없는 조건: {condition!r}. {sorted(_CONDITIONS)}")
+                f"unknown condition: {condition!r}. {sorted(_CONDITIONS)}")
         reg = registry if registry is not None else self.registry
         if condition == "F1":
             block = ("## Existing features\n\n**None.** Derive the "
@@ -928,14 +1041,16 @@ class OpenAILLM:
                      "build derived quantities yourself.")
         else:
             if reg is None:
-                raise ValueError(f"조건 {condition} 은 레지스트리가 필요하다")
+                raise ValueError(
+                    f"condition {condition} needs a registry")
             block = ("## Existing features — **duplicates are discarded**"
                      "\n\n"
                      + render_features(reg, include_observed=False))
-        # ★ 예시는 **조건마다 다르다** (§30.17). F1 은 답을 건네지
-        #   않으려 무관 도메인을 쓰고, 공개 지식을 주는 조건(F2/F3)은
-        #   실제 피처를 코드까지 보여준다 — 그것이 조건의 정의이므로
-        #   D-35 의 조심이 여기서는 불필요하다.
+        # ★ The example **differs per condition** (§30.17). F1 uses an
+        #   unrelated domain so as not to hand over the answer, and the
+        #   conditions that do give public knowledge (F2/F3) show the real
+        #   features down to the code — that is the definition of the
+        #   condition, so D-35's caution does not apply here.
         example = load_prompt(f"examples/{_EXAMPLES[condition]}.md",
                               parameters=self._parameters)
         return load_prompt("role/feature.md", parameters=self._parameters).format(
@@ -945,25 +1060,28 @@ class OpenAILLM:
             task_block=task or ("## What to build now\n\nPropose one "
                                 "feature."))
 
-    # -- 루프 밖 역할 등록 (D-92) -----------------------------------------
+    # -- Registering roles outside the loop (D-92) ------------------------
     def register_role(self, name: str, *, instructions: str,
                       output_type) -> None:
-        """루프에 없는 역할을 **호출자가** 등록한다.
+        """**The caller** registers a role the loop does not have.
 
-        ★ 루프가 부르지 않는 역할을 `kernelrule/agents/` 에 남겨 두면
-        "언젠가 켤 것" 으로 읽히고, 조건 목록과 ablation 표에 계속 끌려
-        다닌다 (D-92). 프롬프트와 스키마를 **쓰는 쪽이 들고 온다.**
+        ★ A role the loop never calls, left in `kernelrule/agents/`, reads
+        as "to be switched on some day" and keeps being dragged through the
+        condition lists and the ablation table (D-92). **The side that uses
+        it brings** the prompt and the schema.
 
-        예산·재시도·추적·`dump()` 는 그대로 쓴다 — LLM 호출은 다시 만들
-        수 없으므로 남기는 경로가 하나여야 한다 (D-33).
+        The budget, retries, tracing and `dump()` are used as they are —
+        an LLM call cannot be remade, so there must be exactly one path that
+        records it (D-33).
         """
         if name in ("analyze", "rule_writer", "rule_editor", "feature",
                     "categorize"):
             raise ValueError(
-                f"{name!r} 은 루프 역할이다. 덮어쓰면 조용히 다른 것이 돈다.")
+                f"{name!r} is a loop role. Overwriting it silently runs "
+                f"something else.")
         self._extra[name] = (output_type, instructions)
 
-    # -- 진입점 -----------------------------------------------------------
+    # -- Entry points -----------------------------------------------------
     def complete(self, role: str, prompt: str, **kw):
         return asyncio.run(self.acomplete(role, prompt, **kw))
 
@@ -985,24 +1103,27 @@ class OpenAILLM:
                 name = type(e).__name__
                 if "RateLimit" in name or "429" in str(e):
                     self.rate_limit_events += 1
-                    # ★ 조용히 줄이지 않는다. 로그에 남기고 한 번 물러선다.
+                    # ★ It is not quietly reduced. It is logged and it
+                    #   backs off once.
                     await asyncio.sleep(20.0)
                     res = await agent.run(user)
                 else:
-                    # ★ 실패해도 토큰은 이미 소모됐다. 호출 수만이라도 센다 —
-                    #   안 세면 재시도가 폭주해도 예산 감시가 안 걸린다.
+                    # ★ Even on failure the tokens are already spent. At
+                    #   least the call count is counted — without it, a
+                    #   runaway retry loop never trips the budget watchdog.
                     self.budget.failed_calls += 1
                     if (self.budget.calls + self.budget.failed_calls
                             > self.budget.max_calls):
                         raise BudgetExceeded(
-                            f"호출 {self.budget.calls}+"
-                            f"{self.budget.failed_calls}실패 > 상한 "
+                            f"calls {self.budget.calls}+"
+                            f"{self.budget.failed_calls} failed > cap "
                             f"{self.budget.max_calls}") from e
                     raise
             dt = time.perf_counter() - t0
 
-        # pydantic-ai 2.x 는 속성, 1.x 는 메서드다. 조용히 0 으로 떨어지면
-        # 예산 감시가 무력해지므로 **둘 다 시도하고 실패하면 에러**다.
+        # In pydantic-ai 2.x it is an attribute, in 1.x a method. Falling
+        # silently to 0 would disarm the budget watchdog, so **both are
+        # tried and failure is an error**.
         u = res.usage
         if callable(u):
             u = u()
@@ -1012,15 +1133,15 @@ class OpenAILLM:
                  or getattr(u, "response_tokens", None))
         if n_in is None or n_out is None:
             raise RuntimeError(
-                f"토큰 사용량을 읽을 수 없다: {type(u).__name__} "
+                f"the token usage cannot be read: {type(u).__name__} "
                 f"{[a for a in dir(u) if 'token' in a]}. "
-                "0 으로 떨어지면 예산 감시가 무력해진다 (§26.4).")
+                f"Falling to 0 would disarm the budget watchdog (§26.4).")
         self.budget.charge(n_in, n_out)
         out = res.output
         payload = out.model_dump() if hasattr(out, "model_dump") else out
         self.calls.append(LLMCall(role=role, prompt_hash=h, response=payload,
                                   seq=seq, mode=self.cfg.model))
-        # 원본을 남긴다. ★ 키나 인증 헤더는 저장하지 않는다.
+        # The original is kept. ★ No keys or auth headers are stored.
         self._last = {"prompt": user, "seconds": dt,
                       "input_tokens": n_in, "output_tokens": n_out}
         self.calls[-1].__dict__["_meta"] = self._last
@@ -1029,24 +1150,28 @@ class OpenAILLM:
         return payload
 
     async def _run_traced(self, agent, user: str, role: str, seq: int):
-        """Pydantic AI 재시도의 **회차별 위반**을 기록한다.
+        """Records the **per-attempt violations** of Pydantic AI's
+        retries.
 
-        프레임워크가 validator 실패를 모델에 되먹여 재시도하는데, 그 내역이
-        밖에서 안 보인다. 결과 메시지에서 되짚어 회차별로 남긴다.
+        The framework feeds a validator failure back to the model and
+        retries, and that history is invisible from outside. It is recovered
+        from the result messages and recorded per attempt.
         """
-        # ★ `capture_run_messages` 로 감싼다. 그러지 않으면 **실패했을 때**
-        #   회차별 메시지를 볼 수 없다 — 예외만 남고 `res` 가 없다.
-        #   RuleWriter A 조건에서 10회 중 8회가 재시도 소진으로 죽었는데
-        #   무엇이 걸렸는지 알 수 없었다. 그러면 프롬프트를 어디를 고칠지
-        #   모른다 (§26.4 — 실패가 정보를 남겨야 한다).
+        # ★ It is wrapped in `capture_run_messages`. Without it the
+        #   per-attempt messages are invisible **when it fails** — only the
+        #   exception remains and there is no `res`. Under RuleWriter
+        #   condition A, 8 of 10 died on exhausted retries and there was no
+        #   way to know what was caught. Then there is no way to know where
+        #   to fix the prompt (§26.4 — a failure must leave information).
         from pydantic_ai import capture_run_messages
 
         def _harvest(msgs, seq_: int) -> None:
             for i, m in enumerate(msgs or []):
                 for part in getattr(m, "parts", []):
-                    # ★ `RetryPromptPart.content` 는 **dict 리스트**다.
-                    #   str 만 보면 되먹임 내역이 통째로 안 잡힌다 —
-                    #   실제로 재시도 소진의 이유를 못 읽고 있었다.
+                    # ★ `RetryPromptPart.content` is **a list of dicts**.
+                    #   Looking only at str misses the whole feedback
+                    #   history — the reason for exhausted retries really was
+                    #   unreadable.
                     raw = getattr(part, "content", "")
                     content = raw if isinstance(raw, str) else str(raw)
                     if ("validation error" in content.lower()
@@ -1071,12 +1196,13 @@ class OpenAILLM:
         return res
 
     def violation_report(self) -> dict:
-        """사유 코드 x 회차 분포. 되먹임이 작동하는지 본다."""
+        """The reason code x attempt distribution. It shows whether the
+        feedback works."""
         from collections import Counter
 
         by_code = Counter(v["code"] for v in self.violations)
         by_attempt = Counter(v["attempt"] for v in self.violations)
-        # 같은 호출(seq)에서 같은 코드가 두 번 이상 나왔는가
+        # Did the same code appear more than once within one call (seq)
         seen: dict[int, list[str]] = {}
         for v in self.violations:
             seen.setdefault(v["seq"], []).append(v["code"])
@@ -1088,12 +1214,12 @@ class OpenAILLM:
                 "n_calls_with_violation": len(seen)}
 
     async def many(self, role: str, items: list[dict]):
-        """규칙 12개를 **병렬로** 부른다 (§4-0)."""
+        """Calls for 12 rules **in parallel** (§4-0)."""
         return await asyncio.gather(
             *(self.acomplete(role, it.pop("prompt", ""), **it)
               for it in items), return_exceptions=True)
 
-    # -- 기록 -------------------------------------------------------------
+    # -- Recording --------------------------------------------------------
     def dump(self, out: str | Path) -> None:
         out = Path(out)
         out.mkdir(parents=True, exist_ok=True)
@@ -1107,10 +1233,11 @@ class OpenAILLM:
                  "output_tokens": meta.get("output_tokens"),
                  "seconds": meta.get("seconds")},
                 ensure_ascii=False, indent=1))
-        # ★ **조건**을 남긴다 (pending_fixes 10). 사용자 프롬프트만
-        #   남기면 시스템 프롬프트와 출력 스키마 안의 모순을 산출물로는
-        #   못 찾는다 — D-105 는 시스템 프롬프트 안에, D-107 은 출력
-        #   스키마 안에 있었고 둘 다 로그에 안 남았다.
+        # ★ **The conditions** are recorded (pending_fixes 10). Recording
+        #   the user prompt alone makes contradictions inside the system
+        #   prompt and the output schema unfindable from the artefacts —
+        #   D-105 was inside the system prompt and D-107 inside the output
+        #   schema, and neither was in the logs.
         for role in sorted({c.role for c in self.calls}):
             try:
                 sysp, sch = self._condition_of(role)
@@ -1123,7 +1250,8 @@ class OpenAILLM:
                     json.dumps(sch, ensure_ascii=False, indent=1))
 
     def _condition_of(self, role: str) -> tuple[str, dict | None]:
-        """그 역할이 **실제로 받은** 시스템 프롬프트와 출력 스키마."""
+        """The system prompt and output schema that role **actually
+        received**."""
         from kernelrule.agents.schemas import rule_output_for
 
         if role in self._extra:
@@ -1145,7 +1273,8 @@ class OpenAILLM:
 
 def estimate_and_confirm(*, n_rounds: int, n_rules: int, report_chars: int,
                          cfg: LLMConfig, yes: bool = False) -> dict:
-    """예상 호출 수와 토큰을 출력하고 확인을 요구한다 (§4-1)."""
+    """Prints the expected call and token counts and asks for confirmation
+    (§4-1)."""
     per_round = 1 + n_rules
     calls = per_round * n_rounds
     tok_in = int(report_chars / 3) * n_rounds + int(report_chars / 6) * \
@@ -1153,11 +1282,14 @@ def estimate_and_confirm(*, n_rounds: int, n_rules: int, report_chars: int,
     est = {"model": cfg.model, "calls": calls,
            "est_input_tokens": tok_in, "per_round": per_round}
     print("=" * 62)
-    print(f"실제 LLM 실행 예상  모델 {cfg.model}  온도 {cfg.temperature}")
-    print(f"  라운드 {n_rounds} x (진단 1 + 규칙 {n_rules}) = 호출 {calls}")
-    print(f"  입력 토큰 대략 {tok_in:,}")
+    print(f"real LLM run estimate  model {cfg.model}  "
+          f"temperature {cfg.temperature}")
+    print(f"  {n_rounds} rounds x (1 diagnosis + {n_rules} rules) = "
+          f"{calls} calls")
+    print(f"  input tokens roughly {tok_in:,}")
     print("=" * 62)
     if not yes:
         raise BudgetExceeded(
-            "확인이 필요하다. `--yes` 로 진행하거나 예산을 조정하라.")
+            "confirmation is needed. Proceed with `--yes` or adjust the "
+            "budget.")
     return est

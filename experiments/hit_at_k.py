@@ -1,34 +1,41 @@
-"""★ (a) 완전 이식 규칙의 상위 k% 안에 정답이 드는가. LLM 0회.
+"""★ Does the answer fall in the top k% of the (a) full-transplant rule? 0 LLM
+calls.
 
     python3 experiments/hit_at_k.py
 
-## 왜
+## Why
 
-**config 축 샘플링이 가능한지의 상한이다.** 지금까지 형상 축만 줄여
-봤는데(`refit_sample.py`), config 축을 줄이는 쪽이 훨씬 싸다.
-
-```
-형상 12 x config 전부   23만 작업
-형상 41 x config 5%     3.9만 작업   ★ 그리고 형상 다양성이 3.4배
-```
-
-## 재는 것 — 두 가지. **두 번째가 더 중요하다**
+**It is the upper bound on whether config-axis sampling is possible.** So far
+only the shape axis has been shrunk (`refit_sample.py`), and shrinking the
+config axis is far cheaper.
 
 ```
-상위 k% 안에 **진짜 최적**이 든 형상 비율
-상위 k% 안에 **정답 집합**(노이즈 바닥 2σ 이내) 원소가 하나라도 든 비율
+12 shapes x all configs     230k jobs
+41 shapes x 5% of configs   39k jobs   ★ and 3.4x the shape diversity
 ```
 
-정답 집합에 하나라도 들면 그 형상에서 최선을 고를 수 있다. 그리고 이
-표는 동률이 많다 (5090 정답 집합 중앙 9개, 최대 724개).
-
-## 비교 대상
+## What is measured — two things. **The second matters more**
 
 ```
-(a) 규칙 6개   A6000 구조 + A6000 가중치. ★ hw 상수만 5090 것
-정적 top-k    ★ A6000 표에서 고른 고정 축 좌표 — 새 GPU 에서 바로 쓸 수 있다
-무작위        바닥
-벤더          ⛔ nvMatmulHeuristics 가 이 환경에 없다. 아래 주석 참고
+the fraction of shapes whose **true optimum** is in the top k%
+the fraction where at least one member of the **answer set** (within 2σ of
+the noise floor) is in the top k%
+```
+
+If even one answer-set member is in, the best can be chosen for that shape.
+And this table has many ties (the 5090's answer set is 9 at the median and up
+to 724).
+
+## What it is compared against
+
+```
+(a) the 6 rules   the A6000 structure + the A6000 weights. ★ only the hw
+                  constants are the 5090's
+static top-k      ★ fixed axis coordinates chosen on the A6000 table — usable
+                  straight away on a new GPU
+random            the floor
+vendor            ⛔ nvMatmulHeuristics is not in this environment. See the
+                  comment below
 ```
 """
 
@@ -72,15 +79,17 @@ def _splits(table: PerfTable):
 
 
 def _axis_keys(table: PerfTable, p) -> list[tuple]:
-    """★ 리스트로 돌려준다. `np.array(..., dtype=object)` 로 만들면
-    튜플이 2차원 배열로 펴져서 **해시가 안 된다** — 실제로 걸렸다."""
+    """★ It returns a list. Building it with `np.array(..., dtype=object)`
+    flattens the tuples into a 2-D array and **they stop being hashable** —
+    that really happened."""
     df = table.frame_for(p)
     cols = [df[f].to_numpy() for f in AXIS_FIELDS]
     return [tuple(c[i] for c in cols) for i in range(len(df))]
 
 
 def _hits(order: np.ndarray, table: PerfTable, p, pcts) -> dict:
-    """`order` 는 좋다고 본 순서(인덱스). 상위 k% 안의 적중을 센다."""
+    """`order` is the order it judged good (indices). It counts the hits
+    within the top k%."""
     t = table.times_of(p)
     best = int(np.argmin(t))
     ans = np.flatnonzero(table.answer_mask(p))
@@ -97,8 +106,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="docs/artifacts/hit-at-k.json")
     ap.add_argument("--weights", choices=("a6000", "refit"), default="a6000",
-                    help="a6000 = (a) 완전 이식 / refit = ★ (b) 5090 재적합. "
-                         "둘을 견주면 '순위 능력이 전이되나' 를 가른다")
+                    help="a6000 = (a) the full transplant / refit = ★ (b) the "
+                         "5090 refit. Comparing the two separates 'does the "
+                         "ranking ability transfer'")
     a = ap.parse_args()
     warnings.simplefilter("ignore")
 
@@ -106,18 +116,21 @@ def main() -> None:
     B = PerfTable.from_bundle(G5090[0], env_hash=G5090[1], ok_only=False)
     mA, mB = FeatureMatrix(A, REGISTRY), FeatureMatrix(B, REGISTRY)
     spA, spB = _splits(A), _splits(B)
-    shapes = list(spB.val.shapes)          # ★ 홀드아웃에서 잰다
+    shapes = list(spB.val.shapes)      # ★ it is measured on the holdout
 
     print("=" * 78)
-    print("(a) 완전 이식 규칙의 hit@k%  —  config 샘플링의 상한")
+    print("hit@k% of the (a) full-transplant rule  —  the upper bound of "
+          "config sampling")
     print("=" * 78)
     n_c = [len(B.times_of(p)) for p in shapes]
-    print(f"  5090 홀드아웃 {len(shapes)}형상   후보 중앙 {int(np.median(n_c))}개")
-    print(f"  정답 집합 크기 중앙 "
-          f"{int(np.median([int(B.answer_mask(p).sum()) for p in shapes]))}개")
-    print("  ⛔ 벤더: nvMatmulHeuristics 가 이 환경에 없다 (import 실패).")
-    print("     5090 벤더 추천을 만들 수 없어 이 표에서 뺀다 — "
-          "'없다' 를 '나쁘다' 로 적지 않는다\n")
+    print(f"  5090 holdout {len(shapes)} shapes   candidates, median "
+          f"{int(np.median(n_c))}")
+    print(f"  answer-set size, median "
+          f"{int(np.median([int(B.answer_mask(p).sum()) for p in shapes]))}")
+    print("  ⛔ vendor: nvMatmulHeuristics is not in this environment (the "
+          "import fails).")
+    print("     A 5090 vendor recommendation cannot be made, so it is left "
+          "out of this table — 'absent' is not written down as 'bad'\n")
 
     res: dict = {"pcts": list(PCTS), "arms": {}}
 
@@ -135,8 +148,9 @@ def main() -> None:
             f"{q}%: {rows[q][1]}/{len(shapes)}={rows[q][1] / len(shapes):.0%}"
             for q in PCTS))
 
-    # -- (a) 완전 이식 규칙 6개 --------------------------------------------
-    print("  ★ 정답 집합 원소가 상위 k% 에 하나라도 드는 형상 비율")
+    # -- (a) the 6 full-transplant rules -----------------------------------
+    print("  ★ the fraction of shapes with at least one answer-set member in "
+          "the top k%")
     print("  " + "-" * 74)
     for run in SRC_RUNS:
         f = Path("runs") / run / "archive.jsonl"
@@ -145,12 +159,12 @@ def main() -> None:
         fn = compile_rule(e["code"])
         ws = {}
         for nm in ("short", "long"):
-            if a.weights == "a6000":     # (a) — A6000 에서 맞춘 가중치
+            if a.weights == "a6000":   # (a) — the weights fitted on the A6000
                 g = [q for q in spA.train.shapes if regime_of(q, A.hw) == nm]
                 ws[nm] = fit_weights(fn, mA, A, Split("train", tuple(g)),
                                      e["w"], max_evals=300,
                           objective="regret").w
-            else:                        # ★ (b) — 5090 학습 분할로 재적합
+            else:                      # ★ (b) — refitted on the 5090 training
                 g = [q for q in spB.train.shapes if regime_of(q, B.hw) == nm]
                 ws[nm] = fit_weights(fn, mB, B, Split("train", tuple(g)),
                                      e["w"], max_evals=300,
@@ -164,8 +178,9 @@ def main() -> None:
         tag = "(a)" if a.weights == "a6000" else "(b)"
         record(f"{tag} {run.split('-')[-1]}", orders)
 
-    # -- 정적 top-k: A6000 표에서 고른 고정 축 좌표 ------------------------
-    # ★ 축 좌표로 조인한다. kernel_id 는 아키텍처마다 다르게 컴파일된다
+    # -- static top-k: fixed axis coordinates chosen on the A6000 table -----
+    # ★ It joins on the axis coordinates. kernel_id is compiled differently
+    #   per architecture
     rank_a: dict = {}
     for p in spA.train.shapes:
         t = A.times_of(p)
@@ -176,18 +191,20 @@ def main() -> None:
     orders = {}
     for p in shapes:
         keys = _axis_keys(B, p)
-        # A6000 에 없던 좌표는 맨 뒤로 (조용히 빼지 않는다)
+        # Coordinates absent from the A6000 go to the very back (they are not
+        # silently dropped)
         s = np.array([score_a.get(k, 1e9) for k in keys], dtype=float)
         orders[p.key] = np.argsort(s, kind="stable")
-    record("정적 (A6000 고정 config)", orders)
+    record("static (A6000 fixed config)", orders)
 
-    # -- 무작위 바닥 --------------------------------------------------------
+    # -- the random floor ---------------------------------------------------
     rng = np.random.default_rng(0)
     orders = {p.key: rng.permutation(len(B.times_of(p))) for p in shapes}
-    record("무작위", orders)
+    record("random", orders)
 
-    # -- 진짜 최적이 드는 비율 (엄격) ---------------------------------------
-    print("\n  ★ **진짜 최적**이 상위 k% 에 드는 형상 비율 (엄격)")
+    # -- the fraction where the true optimum lands (strict) -----------------
+    print("\n  ★ the fraction of shapes with the **true optimum** in the "
+          "top k% (strict)")
     print("  " + "-" * 74)
     for name, d in res["arms"].items():
         print(f"  {name:28s} " + "  ".join(

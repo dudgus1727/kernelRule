@@ -1,19 +1,22 @@
-"""★ 옛 산출물의 역할 이름을 한 번에 옮긴다 (D-93). LLM 0회.
+"""★ It moves the role names of the old artefacts in one go (D-93). 0 LLM
+calls.
 
-    python3 experiments/rename_roles.py --check     # 세기만
-    python3 experiments/rename_roles.py --apply     # 옮긴다
+    python3 experiments/rename_roles.py --check     # count only
+    python3 experiments/rename_roles.py --apply     # move them
 
-## 왜 alias 를 안 두나
+## Why no alias is kept
 
-옛 이름을 읽는 호환 경로를 만들면 **두 이름이 공존하고 그것이 달라진다.**
-`is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
-`load_generated` / `approx_equal` / 예산 상수에 이은 여덟 번째가 된다
-(원칙 2). 그래서 **읽는 쪽을 고치지 않고 자료를 옮긴다.**
+Making a compatibility path that reads the old name means **two names coexist
+and they diverge.** It would be the eighth after `is_reference` / `top_k` /
+`DEFAULT_MODEL` / `REGISTRY` / `load_generated` / `approx_equal` / the budget
+constants (principle 2). So **the data is moved instead of patching the
+reading side.**
 
-## ★ 옮긴 뒤 집계를 대조한다
+## ★ The tallies are checked after the move
 
-역할별 호출 수의 **합**은 이름을 바꿔도 안 변한다. 안 맞으면 못 옮긴
-자리가 있다는 뜻이다 — 조용히 지나가면 `cost.md` 가 틀린다.
+The **sum** of the calls per role does not change when a name changes. If it
+does not match, there is a place that was not moved — and passing over that
+silently makes `cost.md` wrong.
 """
 
 from __future__ import annotations
@@ -23,16 +26,17 @@ import json
 from collections import Counter
 from pathlib import Path
 
-#: 옛 이름 -> 새 이름. **한 곳에서만 적는다.**
-#: ⚠️ 이 표는 **옛 이름 -> 새 이름**이다. 한 번 이 파일이 자기 자신의
-#: 일괄 치환에 걸려 항등 사상이 된 적이 있다 (`{"rule_writer":
-#: "rule_writer"}`). 그러면 "남은 옛 이름 0" 이 거짓이 된다 —
-#: `test_rename_map_is_not_identity` 가 그것을 고정한다.
+#: old name -> new name. **Written in one place only.**
+#: ⚠️ This table is **old name -> new name**. Once, this file got caught in its
+#: own bulk substitution and became the identity map (`{"rule_writer":
+#: "rule_writer"}`). Then "0 old names left" becomes false —
+#: `test_rename_map_is_not_identity` pins that down.
 RENAME = {"architect": "rule_writer", "optimize": "rule_editor"}
 
 
 def _role_counts(root: Path) -> Counter:
-    """`llm_calls/*.json` 의 역할별 호출 수. 이름을 정규화해서 센다."""
+    """The number of calls per role in `llm_calls/*.json`. The names are
+    normalised before counting."""
     c: Counter = Counter()
     for f in root.glob("*/llm_calls/*.json"):
         try:
@@ -44,8 +48,9 @@ def _role_counts(root: Path) -> Counter:
     return c
 
 
-#: 산출물 디렉토리 이름. 역할 이름이 경로에 박혀 있어 새 실행도 옛 이름을
-#: 쓰게 된다 — 그것이 바로 "두 이름 공존" 이다.
+#: The artefact directory names. The role name is baked into the path, so a
+#: new run would use the old name too — and that is exactly "two names
+#: coexisting".
 DIR_RENAME = {"stage2-architect": "stage2-rule-writer"}
 
 
@@ -77,9 +82,10 @@ def main() -> None:
 
     before = _role_counts(root)
     print("=" * 68)
-    print(f"역할 이름 이전  {root}   {'(세기만)' if a.check else '(적용)'}")
+    print(f"moving the role names  {root}   "
+          f"{'(count only)' if a.check else '(apply)'}")
     print("=" * 68)
-    print(f"  이전 집계(정규화): {dict(before)}")
+    print(f"  the tally before (normalised): {dict(before)}")
 
     n_files = 0
     hits: Counter = Counter()
@@ -95,24 +101,27 @@ def main() -> None:
             for old, new in RENAME.items():
                 txt = txt.replace(f'"{old}"', f'"{new}"')
             f.write_text(txt)
-    print(f"  옛 이름이 든 파일 {n_files}개   {dict(hits)}")
+    print(f"  files containing an old name: {n_files}   {dict(hits)}")
     n_dirs = _move_dirs(root, a.apply)
-    print(f"  옛 이름 디렉토리 {n_dirs}개 {DIR_RENAME}")
+    print(f"  directories with an old name: {n_dirs} {DIR_RENAME}")
 
     if a.apply:
         after = _role_counts(root)
-        # ★ 집계 대조. 이름만 바뀌었으므로 **합이 같아야 한다.**
+        # ★ The tally check. Only the name changed, so **the sums must match.**
         ok = before == after
-        print(f"  이후 집계:         {dict(after)}")
-        print("  ★ 집계 대조: " + ("일치" if ok else "★불일치 — 못 옮긴 자리가 있다"))
+        print(f"  the tally after:   {dict(after)}")
+        print("  ★ the tally check: "
+              + ("matches" if ok else
+                 "★ mismatch — there is a place that was not moved"))
         if not ok:
             raise SystemExit(1)
         left = sum(1 for f in _walk(root)
                    for k in RENAME if f'"{k}"' in f.read_text())
-        print(f"  남은 옛 이름: {left}")
+        print(f"  old names left: {left}")
         if left:
             raise SystemExit(1)
-    print("\n  ★ alias 를 두지 않는다 — 두 이름이 공존하면 달라진다 (원칙 2)")
+    print("\n  ★ no alias is kept — two coexisting names diverge "
+          "(principle 2)")
 
 
 if __name__ == "__main__":

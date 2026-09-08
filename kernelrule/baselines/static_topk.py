@@ -1,34 +1,38 @@
-"""정적 top-k — 형상과 **무관하게** 고정된 config k개를 쓸 때의 regret.
+"""Static top-k — the regret of using k fixed configs, **independent of the
+shape**.
 
-## ★ 절차가 답을 바꾼다 (§30.5b)
+## ★ The procedure changes the answer (§30.5b)
 
-`status` 필터와 덮개 정의를 어떻게 잡느냐로 답이 세 갈래로 달라진다. 실측:
+How you set the `status` filter and the cover definition splits the answer
+three ways. Measured:
 
-    ok 만 + 개별 전덮개      k=1 1.394   k=3 1.383   k=8 1.383   ← 포화
-    ok 만 + 합집합 덮개      k=1 1.394   k=3 1.060   k=8 1.009
-    전체 + 합집합 덮개 (대표값) k=1 1.115   k=3 1.031   k=8 1.006
+    ok only + individual full cover      k=1 1.394   k=3 1.383   k=8 1.383  <- saturates
+    ok only + union cover                k=1 1.394   k=3 1.060   k=8 1.009
+    all + union cover (representative)   k=1 1.115   k=3 1.031   k=8 1.006
 
-**세 절차를 전부 계산해 병기하고 대표값을 명시한다. 단일 숫자로 보고하지 마라.**
+**Compute all three and report them side by side, naming the representative
+one. Do not report a single number.**
 
-### (1) `status` 필터
+### (1) The `status` filter
 
-`high_outlier_frac` 은 그 **측정 한 건**의 속성이지 config 의 성질이 아니다.
-반복 수가 많을수록 IQR 밖 하나가 걸릴 확률이 커질 뿐이고 시간 중앙값은
-유효하다. `ok` 만 남기면 "모든 형상에서 우연히 깨끗한 측정이 나온 config" 를
-요구하게 되어 61형상 전부에서 ok 인 config 가 17,325개 중 **3개**만 남는다.
+`high_outlier_frac` is a property of **that one measurement**, not of the
+config. More repetitions only raise the chance that one sample lands outside
+the IQR, and the median time stays valid. Keeping only `ok` demands "a config
+whose measurement happened to be clean on every shape", which leaves **3** of
+17,325 configs ok across all 61 shapes.
 
-### (2) 덮개 정의
+### (2) The cover definition
 
-개별 config 가 61형상 전부에서 유효할 것을 요구하면 `split_k>1` 이 사실상
-배제된다 — `split_k=3` 은 K 가 3의 배수인 형상에서만 유효하다. 실제
-라이브러리는 그런 config 를 당연히 포함하고 형상마다 그중 유효한 것을 쓴다.
-**k개의 합집합이 덮으면 된다.**
+Requiring each individual config to be valid on all 61 shapes effectively
+excludes `split_k>1` — `split_k=3` is valid only where K is a multiple of 3.
+A real library of course includes such configs and uses whichever is valid
+per shape. **It is enough that the union of the k covers.**
 
-### (3) 완화하면 반대로 무너진다
+### (3) Relaxing it collapses the other way
 
-"덮은 형상에서만 재고 덮개율을 병기" (§9.1) 를 그대로 쓰면 그리디가 덮개
-23% 로 도망가 1.074 가 나온다. 그래서 **합집합이 전 형상을 덮을 것을
-요구**하고, 못 덮으면 그 자체를 실패로 보고한다.
+Using "score only on covered shapes and report the cover rate" (§9.1) as is
+lets the greedy escape to 23% cover and report 1.074. So we **require the
+union to cover every shape**, and report failure to do so as a failure.
 """
 
 from __future__ import annotations
@@ -42,18 +46,19 @@ from kernelrule.core.table import PerfTable
 
 __all__ = ["StaticTopK", "TopKResult", "PROCEDURES", "run_all_procedures"]
 
-#: 덮이지 않은 형상에 매기는 벌점 배수. 그리디가 **덮개를 먼저** 확보하게 한다.
-#: 완화(덮은 형상에서만 채점)하면 23% 덮개로 도망간다.
+#: Penalty multiplier for an uncovered shape. It makes the greedy secure
+#: **cover first**. Relaxing it (scoring only covered shapes) lets it escape
+#: to 23% cover.
 _UNCOVERED_PENALTY = 1e3
 
-#: 병기할 절차 세 개. 마지막이 대표값이다.
+#: The three procedures reported side by side. The last is representative.
 PROCEDURES = (
     ("ok_individual", dict(ok_only=True, coverage="individual"),
-     "ok 만 + 개별 전덮개"),
+     "ok only + individual full cover"),
     ("ok_union", dict(ok_only=True, coverage="union"),
-     "ok 만 + 합집합 덮개"),
+     "ok only + union cover"),
     ("canonical", dict(ok_only=False, coverage="union"),
-     "★ 전체 status + 합집합 덮개 (대표값)"),
+     "★ all statuses + union cover (representative)"),
 )
 
 
@@ -62,9 +67,9 @@ class TopKResult:
     procedure: str
     description: str
     ks: tuple[int, ...]
-    #: k -> 층별 regret dict
+    #: k -> per-stratum regret dict
     by_k: dict[int, dict[str, float]] = field(default_factory=dict)
-    #: k -> 덮개율
+    #: k -> cover rate
     coverage: dict[int, float] = field(default_factory=dict)
     n_shapes: int = 0
     n_configs_considered: int = 0
@@ -73,11 +78,11 @@ class TopKResult:
 
     def report(self) -> str:
         lines = [f"[{self.procedure}] {self.description}",
-                 (f"    형상 {self.n_shapes}, 후보 config "
+                 (f"    {self.n_shapes} shapes, candidate configs "
                  f"{self.n_configs_considered}/{self.n_configs_total} "
                  f"({100 * self.n_configs_considered / max(1, self.n_configs_total):.2f}%)"),
-                 (f"    {'k':>3} {'전체':>7} {'>=0.5ms':>8} {'<0.5ms':>8} "
-                 f"{'어려움':>7} {'쉬움':>7} {'덮개':>7}")]
+                 (f"    {'k':>3} {'all':>7} {'>=0.5ms':>8} {'<0.5ms':>8} "
+                 f"{'hard':>7} {'easy':>7} {'cover':>7}")]
         for k in self.ks:
             d = self.by_k[k]
             lines.append(
@@ -88,22 +93,23 @@ class TopKResult:
 
 
 class StaticTopK:
-    """facility-location greedy. submodular 이므로 (1-1/e) 보장이 있다."""
+    """Facility-location greedy. Submodular, so it has the (1-1/e)
+    guarantee."""
 
     def __init__(self, table: PerfTable, shapes=None, *,
                  coverage: str = "union") -> None:
         if coverage not in ("union", "individual"):
-            raise ValueError(f"알 수 없는 덮개 정의: {coverage!r}")
+            raise ValueError(f"unknown cover definition: {coverage!r}")
         self.table = table
         self.coverage = coverage
         self.shapes = tuple(shapes if shapes is not None else table.shapes())
         if not self.shapes:
-            raise ValueError("형상이 하나도 없다 (§26.4).")
+            raise ValueError("there are no shapes at all (§26.4).")
         self.strata = Strata.build(table, self.shapes)
         self._build()
 
     def _build(self) -> None:
-        """config x 형상 행렬. 미측정은 NaN."""
+        """config x shape matrix. Unmeasured entries are NaN."""
         keys: dict[tuple, int] = {}
         cols = []
         for p in self.shapes:
@@ -118,7 +124,8 @@ class StaticTopK:
                 j = keys.get(key)
                 if j is None:
                     j = keys[key] = len(keys)
-                # 같은 key 가 한 형상에 두 번 오면 안 되지만, 오면 빠른 쪽.
+                # The same key should not appear twice for one shape, but if
+                # it does, take the faster one.
                 if j not in col or rel[i] < col[j]:
                     col[j] = float(rel[i])
             cols.append(col)
@@ -135,8 +142,8 @@ class StaticTopK:
             keep = np.flatnonzero(~np.isnan(A).any(axis=1))
             if keep.size == 0:
                 raise ValueError(
-                    "모든 형상에서 측정된 config 가 하나도 없다. "
-                    "'individual' 덮개로는 정적 top-k 를 정의할 수 없다.")
+                    "no config was measured on every shape. Static top-k "
+                    "cannot be defined with the 'individual' cover.")
             self.rows = keep
         else:
             self.rows = np.arange(n_cfg)
@@ -154,7 +161,8 @@ class StaticTopK:
                          n_configs_total=self.n_configs_total)
         pen = np.log(_UNCOVERED_PENALTY)
         for k in range(1, max(ks) + 1):
-            # 각 후보를 넣었을 때의 목적함수. 미덮개는 벌점으로 채운다.
+            # The objective with each candidate added. Uncovered shapes are
+            # filled with the penalty.
             cand = np.fmin(np.broadcast_to(cur, self.logA.shape), self.logA)
             filled = np.where(np.isnan(cand), pen, cand)
             obj = filled.mean(axis=1)
@@ -183,7 +191,8 @@ class StaticTopK:
 
 def run_all_procedures(bundle_ref, env_hash: str, *, shapes_filter=None,
                        ks=(1, 2, 3, 5, 8, 10, 20)) -> list[TopKResult]:
-    """세 절차를 전부 돌린다. **대표값만 내지 않는다** (§30.5b)."""
+    """Run all three procedures. **Do not emit only the representative one**
+    (§30.5b)."""
     out = []
     for name, kw, desc in PROCEDURES:
         table = PerfTable.from_bundle(bundle_ref, env_hash=env_hash,
@@ -193,7 +202,7 @@ def run_all_procedures(bundle_ref, env_hash: str, *, shapes_filter=None,
         try:
             r = StaticTopK(table, shapes, coverage=kw["coverage"]).run(ks)
         except ValueError as e:
-            r = TopKResult(procedure=name, description=f"{desc} — 실패: {e}",
+            r = TopKResult(procedure=name, description=f"{desc} — failed: {e}",
                            ks=tuple(ks))
             out.append(r)
             continue

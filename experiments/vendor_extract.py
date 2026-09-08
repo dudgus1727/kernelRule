@@ -1,33 +1,36 @@
-"""★ 벤더(nvMatmulHeuristics) 추천을 번들 형상에 대해 뽑는다. GPU 0회.
+"""★ It extracts the vendor's (nvMatmulHeuristics) recommendations for the
+bundle's shapes. 0 GPU.
 
     python3 experiments/vendor_extract.py datasets/rtx-5090-sm_120-5bb6f403 \
         --env-hash 5bb6f403 --out datasets/baselines/vendor-5090-5bb6f403.json
 
-라이브러리는 **프리셋으로 계산만** 한다 — GPU 가 필요 없다.
+The library **only computes, from a preset** — it does not need a GPU.
 
-## ★ kernelTab 과 조건을 맞춘다
-
-```
-버전     0.1.0.27          다르면 추천이 달라진다
-target   ★ CUTLASS         CUTLASS3 를 쓰면 cluster(1,4) 가 나온다 —
-                           우리 표는 2.x 공간이다
-layout   TN_ROW_MAJOR      전 형상 공통
-precision HSS
-프리셋    hw 이름에서 유도  (RTX_A6000 / RTX_5090 ...)
-```
-
-출력 형식은 `datasets/baselines/vendor-a6000-c63710df.json` 과 같다 —
-`kernelrule.baselines.vendor.load_vendor` 가 그대로 읽는다.
-
-## ★ 뽑은 뒤 감시한다
+## ★ The conditions are matched to kernelTab
 
 ```
-cluster == (1,1)      2.x 공간인가
-instr   == (16,8,16)  f16 HMMA 인가
+version    0.1.0.27           a different one changes the recommendation
+target     ★ CUTLASS          CUTLASS3 gives cluster(1,4) — our table is the
+                              2.x space
+layout     TN_ROW_MAJOR       the same for every shape
+precision  HSS
+preset     derived from the hw name  (RTX_A6000 / RTX_5090 ...)
 ```
 
-둘 중 하나라도 다르면 **다른 커널 공간의 추천**이고, 우리 표와 조인이
-성립하지 않는다. 세어서 찍고, 있으면 종료 코드를 1로 낸다.
+The output format is the same as
+`datasets/baselines/vendor-a6000-c63710df.json` —
+`kernelrule.baselines.vendor.load_vendor` reads it as it is.
+
+## ★ It is watched after extraction
+
+```
+cluster == (1,1)      is it the 2.x space
+instr   == (16,8,16)  is it f16 HMMA
+```
+
+If either differs, it is **a recommendation from a different kernel space**
+and the join with our table does not hold. They are counted and printed, and
+if there are any, it exits with code 1.
 """
 
 from __future__ import annotations
@@ -37,7 +40,8 @@ import json
 import re
 from pathlib import Path
 
-#: GPU 이름 -> 프리셋. ★ kernelTab `scripts/baseline_vendor.py` 와 같은 표다.
+#: GPU name -> preset. ★ The same table as kernelTab's
+#: `scripts/baseline_vendor.py`.
 GPU_PRESETS = {
     "rtx a6000": "RTX_A6000", "rtx 4090": "RTX_4090", "rtx 3090": "RTX_3090",
     "rtx 5090": "RTX_5090", "rtx 6000 ada": "RTX_6000_ADA",
@@ -59,7 +63,7 @@ def preset_for(name: str) -> str:
         if k in low:
             return v
     raise SystemExit(
-        f"'{name}' 에 대응하는 프리셋을 모른다. GPU_PRESETS 에 추가하라.")
+        f"the preset for '{name}' is unknown. Add it to GPU_PRESETS.")
 
 
 def main() -> None:
@@ -74,16 +78,17 @@ def main() -> None:
 
     info = json.loads(Path(a.bundle, "BUNDLE.json").read_text())
     if not str(info["env_hash"]).startswith(a.env_hash):
-        raise SystemExit(f"env_hash 불일치: {str(info['env_hash'])[:16]}")
+        raise SystemExit(f"env_hash mismatch: {str(info['env_hash'])[:16]}")
     preset = preset_for(info["gpu_name"])
-    print(f"{info['gpu_name']}  ->  프리셋 {preset}   "
+    print(f"{info['gpu_name']}  ->  preset {preset}   "
           f"(target=CUTLASS, layout=TN_ROW_MAJOR, precision=HSS)")
 
-    # ★ 형상은 **번들에서** 읽는다. kernelTab 의 all_shapes 를 부르면
-    #   그쪽 env 를 읽게 되고 번들과 어긋날 수 있다.
+    # ★ The shapes are read **from the bundle**. Calling kernelTab's
+    #   all_shapes reads that side's env and can go out of step with the
+    #   bundle.
     shapes = sorted({tuple(s) for layer in
                      (info.get("shape_layers") or {}).values() for s in layer})
-    print(f"번들 형상 {len(shapes)}개")
+    print(f"{len(shapes)} bundle shapes")
 
     h = nv.NvMatmulHeuristicsInterface(nv.NvMatmulHeuristicsTarget.CUTLASS,
                                        precision="HSS")
@@ -133,13 +138,14 @@ def main() -> None:
 
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(json.dumps(out, indent=1))
-    print(f"  -> {a.out}   ({len(out) - 1} 형상 x {a.count})")
-    print(f"  ★ 감시: cluster != (1,1) {bad_cluster}건   "
-          f"instr != (16,8,16) {bad_instr}건   파싱 실패 {n_fail}건")
+    print(f"  -> {a.out}   ({len(out) - 1} shapes x {a.count})")
+    print(f"  ★ watch: cluster != (1,1) {bad_cluster}   "
+          f"instr != (16,8,16) {bad_instr}   parse failures {n_fail}")
     if bad_cluster or bad_instr:
         raise SystemExit(
-            "★ 다른 커널 공간의 추천이 섞였다. 우리 표(CUTLASS 2.x, f16 "
-            "HMMA)와 조인이 성립하지 않는다. target 을 확인하라.")
+            "★ recommendations from a different kernel space got mixed in. "
+            "The join with our table (CUTLASS 2.x, f16 HMMA) does not hold. "
+            "Check the target.")
 
 
 if __name__ == "__main__":

@@ -1,12 +1,15 @@
-"""★ 형상별 승패 — **어디서 이기고 어디서 지나**. LLM 0회.
+"""★ Wins and losses per shape — **where it wins and where it loses**. 0 LLM
+calls.
 
     python3 experiments/vendor_shapes.py
 
-`vendor_compare.py` 가 낸 형상별 값에 **표의 성질**을 붙인다.
-그림(정렬 막대)을 그릴 수 있게 `vendor-shapes.json` 으로 낸다.
+It attaches **the table's properties** to the per-shape values
+`vendor_compare.py` produced. It writes `vendor-shapes.json` so a figure (a
+sorted bar chart) can be drawn.
 
-⚠️ **사후 자름이다.** M 으로 가르는 것은 실험 계획서에 없었다 — 관측으로
-적는다. 다만 체제 분할(SOL 0.5ms)은 이미 있던 축이고 같은 얘기다.
+⚠️ **It is a post-hoc cut.** Splitting by M was not in the pre-registration —
+it is written down as an observation. The regime split (SOL 0.5ms) is an axis
+that already existed and says the same thing.
 """
 
 from __future__ import annotations
@@ -61,7 +64,7 @@ def main() -> None:
         d0 = T.frame_for(p)
         rows.append({
             "M": mnk[0], "N": mnk[1], "K": mnk[2],
-            # ★ 형상 수준 축이다 — 한 형상 안에서 값이 하나다 (확인함)
+            # ★ It is a shape-level axis — one value per shape (confirmed)
             "arith_intensity": float(d0["arith_intensity"].iloc[0]),
             "is_memory_bound": bool(d0["is_memory_bound"].iloc[0]),
             "ours": o, "vendor": vend[k], "delta": o - vend[k],
@@ -73,50 +76,58 @@ def main() -> None:
     rows.sort(key=lambda r: r["delta"])
 
     print("=" * 96)
-    print(f"형상별 승패 — {arm}   (음수 = 우리가 이김)")
+    print(f"wins and losses per shape — {arm}   (negative = we win)")
     print("=" * 96)
-    print(f"  {'M':>6s} {'N':>6s} {'K':>6s} {'우리':>8s} {'벤더':>8s} "
-          f"{'차':>9s} {'체제':>6s} {'정답집합':>7s} {'100등폭':>8s}")
+    print(f"  {'M':>6s} {'N':>6s} {'K':>6s} {'ours':>8s} {'vendor':>8s} "
+          f"{'diff':>9s} {'regime':>7s} {'answers':>8s} {'100th gap':>10s}")
     for r in rows:
         print(f"  {r['M']:6d} {r['N']:6d} {r['K']:6d} {r['ours']:8.4f} "
-              f"{r['vendor']:8.4f} {r['delta']:+9.4f} {r['regime']:>6s} "
-              f"{r['answer_set']:7d} {r['gap100']:8.1%}")
+              f"{r['vendor']:8.4f} {r['delta']:+9.4f} {r['regime']:>7s} "
+              f"{r['answer_set']:8d} {r['gap100']:10.1%}")
 
     def tally(sel, label):
         s = [r for r in rows if sel(r)]
         w = sum(1 for r in s if r["delta"] < -1e-9)
         l = sum(1 for r in s if r["delta"] > 1e-9)
-        print(f"  {label:24s} 이김 {w:2d} / 짐 {l:2d} / 무 {len(s)-w-l:2d}"
-              f"   부호검정 p = {_sign_p(w, l):.4f}")
+        print(f"  {label:26s} wins {w:2d} / losses {l:2d} / "
+              f"ties {len(s)-w-l:2d}"
+              f"   sign test p = {_sign_p(w, l):.4f}")
         return {"win": w, "loss": l, "tie": len(s) - w - l,
                 "p": _sign_p(w, l), "n": len(s)}
 
     print("\n" + "-" * 96)
     out = {"src": a.src, "arm": arm, "shapes": rows, "groups": {}}
-    out["groups"]["all"] = tally(lambda r: True, "전체")
-    # ★ 사후 자름이다. M<=32 는 결과를 보고 정한 경계가 아니라 **표의 M 축에서
-    #   가장 작은 셋**이다 — 그 사실을 적는다.
+    out["groups"]["all"] = tally(lambda r: True, "all")
+    # ★ It is a post-hoc cut. M<=32 is not a boundary chosen after seeing the
+    #   result but **the smallest three on the table's M axis** — that fact is
+    #   written down.
     out["groups"]["M<=32"] = tally(lambda r: r["M"] <= 32, "M <= 32")
     out["groups"]["M>=128"] = tally(lambda r: r["M"] >= 128, "M >= 128")
-    out["groups"]["fast"] = tally(lambda r: r["regime"] == "short", "빠른 체제")
-    out["groups"]["slow"] = tally(lambda r: r["regime"] == "long", "느린 체제")
-    # ★ 기존 축으로 다시 — `is_memory_bound` 는 표가 이미 갖고 있는 형상 수준
-    #   값이다 (AI < ridge). 사후 자름인 M 을 이것으로 대신할 수 있나 본다.
+    out["groups"]["fast"] = tally(lambda r: r["regime"] == "short",
+                                  "the fast regime")
+    out["groups"]["slow"] = tally(lambda r: r["regime"] == "long",
+                                  "the slow regime")
+    # ★ Again on an existing axis — `is_memory_bound` is a shape-level value
+    #   the table already has (AI < ridge). It looks at whether it can stand
+    #   in for the post-hoc M.
     out["groups"]["mem_bound"] = tally(lambda r: r["is_memory_bound"],
-                                       "메모리 바운드 (AI<ridge)")
+                                       "memory bound (AI<ridge)")
     out["groups"]["compute_bound"] = tally(lambda r: not r["is_memory_bound"],
-                                           "컴퓨트 바운드")
-    # ★ D-130/D-141 의 축 — 상위권 간격. 중앙에서 가른다 (형상 20개)
+                                           "compute bound")
+    # ★ The D-130/D-141 axis — the top-rank gap. It is split at the median
+    #   (20 shapes)
     med_gap = float(np.median([r["gap100"] for r in rows]))
     out["groups"]["tight_top"] = tally(lambda r: r["gap100"] < med_gap,
-                                       f"상위권 촘촘 (<{med_gap:.1%})")
+                                       f"tight top (<{med_gap:.1%})")
     out["groups"]["wide_top"] = tally(lambda r: r["gap100"] >= med_gap,
-                                      f"상위권 벌어짐 (>={med_gap:.1%})")
+                                      f"wide top (>={med_gap:.1%})")
 
-    print("\n  ⚠️ M 으로 가른 것은 **사후**다 (실험 계획서에 없다). 관측으로 읽어라.")
-    print("     체제 분할은 이미 있던 축이고 같은 얘기다.")
+    print("\n  ⚠️ splitting by M is **post-hoc** (it is not in the "
+          "pre-registration). Read it as an observation.")
+    print("     The regime split is an axis that already existed and says the "
+          "same thing.")
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
-    print(f"\n  -> {a.out}   (정렬 막대 그림용 자료)")
+    print(f"\n  -> {a.out}   (data for the sorted bar chart)")
 
 
 if __name__ == "__main__":

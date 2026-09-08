@@ -1,32 +1,40 @@
-"""★ §29.5 구조 전이 — (a) 완전 이식 / (b) 재적합 / (c) 재생성. LLM 0회.
+"""★ §29.5 structural transfer — (a) full transplant / (b) refit /
+(c) regrow. 0 LLM calls.
 
     python3 experiments/transfer_29_5.py --pair a6000 5090
-    python3 experiments/transfer_29_5.py --pair a6000 4090   # 표가 오면
+    python3 experiments/transfer_29_5.py --pair a6000 4090   # when the table
+                                                             # comes
 
-**실험 계획서** `docs/artifacts/transfer-prereg.md` + 부칙.
+The **pre-registration** is `docs/artifacts/transfer-prereg.md` + the
+addendum.
 
-## 세 팔
+## The three arms
 
 ```
-(a) 완전 이식   A6000 구조 + A6000 가중치 그대로 -> 5090 에서 채점
-(b) 재적합      구조 고정, 5090 학습 분할로 가중치만 다시
-(c) 재생성      5090 표에서 처음부터   <- 이미 돌았다 (5090sigma 3시드)
+(a) full transplant   the A6000 structure + the A6000 weights as they are
+                      -> scored on the 5090
+(b) refit             the structure fixed, only the weights done again on
+                      the 5090 training split
+(c) regrow            from scratch on the 5090 table   <- already run
+                      (5090sigma, 3 seeds)
 ```
 
-## ★ 규칙을 하나 고르지 않는다 (원칙 5)
+## ★ One rule is not picked (principle 5)
 
-"A6000 에서 진화한 규칙" 을 하나 고르면 그 선택이 낙관 편향이 된다.
-**A6000 F3 캠페인 6시드 전부**의 학습 최고 규칙을 옮기고 분포를 낸다.
+Picking one "rule evolved on the A6000" makes that choice an optimism bias.
+The training-best rule of **all 6 seeds of the A6000 F3 campaign** is moved
+over and the distribution is reported.
 
-## ★ 기준선 — 실험 계획서의 대체안을 쓴다
+## ★ The baseline — the pre-registration's fallback is used
 
-`nvMatmulHeuristics` 가 이 환경에 없다 (import 실패). 실험 계획서가
-미리 적어 둔 대로 **5090 에서 재적합한 `human_guided`** 를 쓴다.
-결과를 보고 고른 것이 아니다.
+`nvMatmulHeuristics` is not in this environment (the import fails). As the
+pre-registration wrote down in advance, **`human_guided` refitted on the
+5090** is used. It was not picked after seeing the results.
 
-## ★ 뒤집힌 형상을 포함/제외 양쪽으로
+## ★ The flipped shapes both included and excluded
 
-홀드아웃 20형상 중 2개가 바운드 뒤집힘이다. 한쪽만 내면 고른 것이 된다.
+2 of the 20 holdout shapes are bound flips. Reporting only one side would be
+a choice.
 """
 
 from __future__ import annotations
@@ -49,46 +57,56 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 
-#: ★ 표 등록부. **새 GPU 는 여기 한 줄이면 된다** (원칙 2).
-#:   `runs` 는 그 표에서 **처음부터** 돌린 캠페인 = (c) 재생성이고,
-#:   같은 목록이 다른 쌍에서 (a)(b) 의 **출처**로도 쓰인다.
-#: ★ (c) 는 GPU 당 한 번이고 (a)(b) 는 조합이 몇 개든 공짜다.
+#: ★ The table registry. **A new GPU only needs one line here**
+#: (principle 2).
+#:   `runs` is the campaign run **from scratch** on that table = (c) regrow,
+#:   and the same list is also used as the **source** of (a)(b) in another
+#:   pair.
+#: ★ (c) is once per GPU and (a)(b) are free however many combinations there
+#: are.
 TABLES: dict[str, dict] = {
     "a6000": {
         "bundle": "datasets/rtx-a6000-sm_86-c63710df",
         "env_hash": "c63710df",
-        # ★ 2026-09-06 (D-141): 대표값이 `F3rw-p8-nan` 으로 바뀌었고
-        #   라운드가 12 이므로 **r11 의 규칙**을 쓴다 (D-140).
-        #   ⚠️ 앞서 여기 `F3rw-p8-s{i}` 가 적혀 있었는데, 그 이름이 개명으로
-        #      다른 캠페인을 가리키게 됐다 — 옛 전이 수치가 **어느 캠페인의
-        #      것인지 산출물에 안 남아 있다**. 그래서 아래 `src_runs` 를
-        #      기록한다.
+        # ★ 2026-09-06 (D-141): the representative value changed to
+        #   `F3rw-p8-nan` and the rounds are 12, so **the rule at r11** is
+        #   used (D-140).
+        #   ⚠️ `F3rw-p8-s{i}` used to be written here, and the rename made
+        #      that name point at a different campaign — **the artefacts do
+        #      not record which campaign** the old transfer numbers came
+        #      from. That is why `src_runs` below is recorded.
         "runs": [f"F3rw-p8-nan-s{i}" for i in range(6)],
         "round": 11},
     "5090": {
         "bundle": "datasets/rtx-5090-sm_120-5bb6f403",
         "env_hash": "5bb6f403",
-        # ★ (c) 재생성 6실행. 앞 3개와 뒤 3개가 **같은 2단계 씨앗**을
-        #   쓴다 (`--seed-from`) — 안 그러면 씨앗 규칙이 달라져 조건이
-        #   달라진다 (D-84). 표본 단위는 실행이다 (원칙 28).
-        # ⚠️ 2026-09-03 정정 (D-119): 뒤 셋(`-b-`)은 `human_guided`
-        #    **손씨앗**이라 "5090 에서 처음부터" 가 아니다. (c) 에서 뺀다.
-        #    옛 값 1.0485 는 그 여섯의 중앙이고 `c-ladder.md` §0 에 남겼다.
-        # ★ 2026-09-04 정정 (D-126): 사다리의 **새 (c)** 로 바꿨다.
-        #    `5090sigma-s*` 는 hw 숫자·경고가 둘 다 A6000 이었다 (D-113·116).
-        #    `5090sigma-hw2-s*` 가 번들에서 생성한 5090 hw 를 받은 것이고,
-        #    4090 (c) 와 **같은 판**이다. 옛 값은 지우지 않는다 —
-        #    `transfer-29-5.md` 와 `c-ladder.md` 에 그대로 있다.
+        # ★ 6 (c) regrow runs. The first 3 and the last 3 use **the same
+        #   stage-2 seed** (`--seed-from`) — otherwise the seed rule differs
+        #   and so does the condition (D-84). The sample unit is the run
+        #   (principle 28).
+        # ⚠️ 2026-09-03 correction (D-119): the last three (`-b-`) are the
+        #    `human_guided` **hand seed**, so they are not "from scratch on
+        #    the 5090". They are taken out of (c). The old value 1.0485 is
+        #    the median of those six and it is kept in `c-ladder.md` §0.
+        # ★ 2026-09-04 correction (D-126): it was changed to **the ladder's
+        #    new (c)**. `5090sigma-s*` had both the hw numbers and the
+        #    warnings from the A6000 (D-113·116). `5090sigma-hw2-s*` is the
+        #    one that got the 5090 hw generated from the bundle, and it is
+        #    **the same version** as the 4090 (c). The old values are not
+        #    deleted — they are still in `transfer-29-5.md` and
+        #    `c-ladder.md`.
         "runs": [f"F3rw-p8-5090-s{i}" for i in range(3)]},
     "4090": {
         "bundle": "datasets/rtx-4090-sm_89-ad95d455",
         "env_hash": "ad95d455",
-        # ★ (c) 재생성 3시드. 5090 새 (c) 와 **명령이 같다** (표만 다르다).
+        # ★ 3 (c) regrow seeds. **The command is the same** as the 5090's new
+        #   (c) (only the table differs).
         "runs": [f"F3rw-p8-4090-s{i}" for i in range(3)]},
     "h100": {
         "bundle": "datasets/h100-nvl-sm_90-63684546",
         "env_hash": "63684546",
-        # ★ (c) 가 **없다**. 대상으로만 쓸 수 있다 — 출처로 쓰면 거절한다.
+        # ★ There is **no (c)**. It can be used only as a destination — as a
+        #   source it is refused.
         "runs": []},
 }
 
@@ -107,19 +125,22 @@ def _splits(table: PerfTable) -> SplitSet:
 
 
 def _best(run: str, rnd: int | None = None) -> dict:
-    """학습 점수로 하나. **홀드아웃을 안 본다** (§10.2).
+    """One by the training score. **It does not look at the holdout**
+    (§10.2).
 
-    `rnd` 가 있으면 **그 라운드의 최고**를 `bests.jsonl` 에서 읽는다.
-    `archive.jsonl` 은 마지막 상태라 중간 라운드를 못 준다 (D-139).
+    If `rnd` is given, **the best of that round** is read from
+    `bests.jsonl`. `archive.jsonl` is the final state, so it cannot give an
+    intermediate round (D-139).
     """
     if rnd is not None:
         f = Path("runs") / run / "bests.jsonl"
         if not f.exists():
-            raise SystemExit(f"{f} 가 없다 — 라운드 지정을 못 한다 (D-139)")
+            raise SystemExit(
+                f"{f} does not exist — the round cannot be specified (D-139)")
         at = [json.loads(x) for x in f.read_text().splitlines() if x.strip()]
         at = [e for e in at if e["round"] <= rnd]
         if not at:
-            raise SystemExit(f"{run} 에 r{rnd} 이하의 최고가 없다")
+            raise SystemExit(f"{run} has no best at or below r{rnd}")
         return max(at, key=lambda e: e["round"])
     f = Path("runs") / run / "archive.jsonl"
     arc = sorted((json.loads(x) for x in f.read_text().splitlines()
@@ -139,7 +160,8 @@ def _fit_per_regime(code, w0, table, matrix, train):
 
 
 def _score_on(fn, ws, table, matrix, shapes) -> float:
-    """체제별 가중치로 형상들을 채점. **체제 판정은 이 표의 하드웨어로.**"""
+    """Scores the shapes with the per-regime weights. **The regime is judged
+    with this table's hardware.**"""
     regs = []
     for p in shapes:
         reg = regime_of(p, table.hw)
@@ -153,8 +175,9 @@ def _score_on(fn, ws, table, matrix, shapes) -> float:
 
 def _row(label: str, xs: list[float]) -> str:
     a = np.array(xs)
-    return (f"  {label:34s} 중앙 {np.median(a):.4f}  "
-            f"범위 {a.min():.4f}~{a.max():.4f}  폭 {a.max() - a.min():.4f}"
+    return (f"  {label:34s} median {np.median(a):.4f}  "
+            f"range {a.min():.4f}~{a.max():.4f}  "
+            f"width {a.max() - a.min():.4f}"
             f"  (n={len(a)})")
 
 
@@ -162,9 +185,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pair", nargs=2, default=["a6000", "5090"],
                     metavar=("SRC", "DST"),
-                    help=f"표 이름 둘. 등록된 것: {sorted(TABLES)}")
+                    help=f"two table names. Registered: {sorted(TABLES)}")
     ap.add_argument("--out", default=None,
-                    help="기본은 docs/artifacts/transfer-<src>-<dst>.json")
+                    help="the default is "
+                         "docs/artifacts/transfer-<src>-<dst>.json")
     a = ap.parse_args()
     warnings.simplefilter("ignore")
 
@@ -172,29 +196,31 @@ def main() -> None:
     for n in (src, dst):
         if n not in TABLES:
             raise SystemExit(
-                f"등록되지 않은 표 {n!r}. TABLES 에 한 줄 넣어라. "
-                f"지금 있는 것: {sorted(TABLES)}")
+                f"the table {n!r} is not registered. Put one line in TABLES. "
+                f"What is there now: {sorted(TABLES)}")
     if src == dst:
-        raise SystemExit("같은 표끼리는 전이가 아니다.")
+        raise SystemExit("the same table to itself is not a transfer.")
     S, D = TABLES[src], TABLES[dst]
     SRC_RUNS, DST_RUNS = S["runs"], D["runs"]
     S_RND, D_RND = S.get("round"), D.get("round")
     if not SRC_RUNS:
         raise SystemExit(
-            f"{src} 는 (c) 재생성 실행이 없다 — **출처로 쓸 수 없다**. "
-            "구조가 거기서 나와야 한다.")
+            f"{src} has no (c) regrow run — **it cannot be used as a "
+            f"source**. The structure has to come from there.")
     if not DST_RUNS:
-        print(f"  ⚠️ {dst} 는 (c) 재생성이 **없다** — (a)(b) 만 낸다")
-    # ★ 묶음의 조건이 하나인지 **여기서** 본다 (D-120). 나중에 보면
-    #   "있었는데 안 봤다" 가 된다 (원칙 39).
-    assert_same_condition(SRC_RUNS, label=f"{a.pair[0]} (c) 재생성")
-    assert_same_condition(DST_RUNS, label=f"{a.pair[1]} (c) 재생성")
+        print(f"  ⚠️ {dst} has **no** (c) regrow — only (a)(b) are reported")
+    # ★ Whether the set has a single condition is looked at **here** (D-120).
+    #   Looking later turns it into "it was there and we did not look"
+    #   (principle 39).
+    assert_same_condition(SRC_RUNS, label=f"{a.pair[0]} (c) regrow")
+    assert_same_condition(DST_RUNS, label=f"{a.pair[1]} (c) regrow")
     missing = [r for r in SRC_RUNS + DST_RUNS
                if not (Path("runs") / r / "archive.jsonl").exists()]
     if missing:
         raise SystemExit(
-            "없는 실행: " + ", ".join(missing)
-            + "\n  ★ 조용히 건너뛰면 표본이 줄어든 줄 모르고 결론을 낸다.")
+            "runs that do not exist: " + ", ".join(missing)
+            + "\n  ★ skipping silently draws a conclusion without knowing "
+              "the sample shrank.")
     out = a.out or f"docs/artifacts/transfer-{src}-{dst}.json"
 
     A = PerfTable.from_bundle(S["bundle"], env_hash=S["env_hash"],
@@ -210,17 +236,18 @@ def main() -> None:
     hold_nf = [p for p in hold if (p.M, p.N, p.K) not in flip]
 
     print("=" * 78)
-    print(f"§29.5 구조 전이  {src} -> {dst}")
+    print(f"§29.5 structural transfer  {src} -> {dst}")
     print("=" * 78)
     print(f"  ridge {A.hw.ridge_point:.1f} -> {B.hw.ridge_point:.1f}  "
-          f"({B.hw.ridge_point / A.hw.ridge_point:.2f}배)   "
+          f"({B.hw.ridge_point / A.hw.ridge_point:.2f}x)   "
           f"SM {A.hw.sm_count} -> {B.hw.sm_count}")
-    # ★ 쌍마다 다르다. 하드코딩하면 다른 쌍에서 **거짓말을 한다**.
-    print(f"  홀드아웃 {len(hold)}형상 (공통 {len(common)} 안)   "
-          f"뒤집힘 제외 {len(hold_nf)}형상")
-    print(f"  {dst} 학습 {len(spB.train.shapes)}형상 — (b) 재적합에 쓴다")
-    print("  ★ 기준선: nvMatmulHeuristics 없음 -> 실험 계획서의 대체안"
-          f" ({dst} 재적합 human_guided)\n")
+    # ★ It differs per pair. Hardcoding it makes it **lie** on another pair.
+    print(f"  holdout {len(hold)} shapes (within the {len(common)} common)   "
+          f"flips excluded {len(hold_nf)} shapes")
+    print(f"  {dst} training {len(spB.train.shapes)} shapes — used for the "
+          f"(b) refit")
+    print("  ★ the baseline: no nvMatmulHeuristics -> the pre-registration's"
+          f" fallback ({dst}-refitted human_guided)\n")
 
     res: dict = {"a": [], "b": [], "c": [], "a_nf": [], "b_nf": [],
                  "c_nf": [], "src": []}
@@ -228,12 +255,12 @@ def main() -> None:
     for run in SRC_RUNS:
         e = _best(run, S_RND)
         fn = compile_rule(e["code"])
-        # (a) A6000 에서 맞춘 체제별 가중치를 **그대로**
+        # (a) the per-regime weights fitted on the A6000, **as they are**
         _, wsA = _fit_per_regime(e["code"], e["w"], A, mA,
                                  list(spA.train.shapes))
         va = _score_on(fn, wsA, B, mB, hold)
         va_nf = _score_on(fn, wsA, B, mB, hold_nf)
-        # (b) 5090 학습 분할로 가중치만 다시
+        # (b) only the weights done again on the 5090 training split
         _, wsB = _fit_per_regime(e["code"], e["w"], B, mB,
                                  list(spB.train.shapes))
         vb = _score_on(fn, wsB, B, mB, hold)
@@ -244,7 +271,7 @@ def main() -> None:
         res["b"].append(vb)
         res["b_nf"].append(vb_nf)
         print(f"  {run:26s} (a) {va:.4f}   (b) {vb:.4f}   "
-              f"[뒤집힘 제외 {va_nf:.4f} / {vb_nf:.4f}]", flush=True)
+              f"[flips excluded {va_nf:.4f} / {vb_nf:.4f}]", flush=True)
 
     print()
     for run in DST_RUNS:
@@ -256,7 +283,7 @@ def main() -> None:
         res["c"].append(vc)
         res["c_nf"].append(vc_nf)
         print(f"  {run:26s} (c) {vc:.4f}"
-              f"                 [뒤집힘 제외 {vc_nf:.4f}]", flush=True)
+              f"                 [flips excluded {vc_nf:.4f}]", flush=True)
 
     from kernelrule.rules.human_guided import CODE as PS_CODE
     from kernelrule.rules.human_guided import W0 as PS_W0
@@ -268,25 +295,28 @@ def main() -> None:
     res["baseline_nf"] = base_nf
 
     print("\n" + "=" * 78)
-    print(f"홀드아웃 {len(hold)}형상 (뒤집힘 포함)")
+    print(f"holdout {len(hold)} shapes (flips included)")
     print("=" * 78)
-    print(_row("(a) 완전 이식", res["a"]))
-    print(_row("(b) 재적합", res["b"]))
-    print(_row("(c) 재생성", res["c"]) if res["c"]
-          else "  (c) 재생성                        ★ 없다 — 이 표의 원주민 미측정")
-    # ★ 여기도 쌍마다 다르다 (위 두 자리와 같은 실수를 세 번째로 하지 않는다)
-    print(f"  {f'★ 기준선 human_guided({dst} 재적합)':34s} {base:.4f}")
-    print(f"\n홀드아웃 {len(hold_nf)}형상 (뒤집힘 제외)")
+    print(_row("(a) full transplant", res["a"]))
+    print(_row("(b) refit", res["b"]))
+    print(_row("(c) regrow", res["c"]) if res["c"]
+          else "  (c) regrow                        ★ none — this table's "
+               "native is unmeasured")
+    # ★ This differs per pair too (the same mistake as the two places above
+    #   is not made a third time)
+    print(f"  {f'★ baseline human_guided({dst}-refitted)':34s} {base:.4f}")
+    print(f"\nholdout {len(hold_nf)} shapes (flips excluded)")
     print("-" * 78)
-    print(_row("(a) 완전 이식", res["a_nf"]))
-    print(_row("(b) 재적합", res["b_nf"]))
-    print(_row("(c) 재생성", res["c_nf"]) if res["c_nf"]
-          else "  (c) 재생성                        ★ 없다")
-    print(f"  {'★ 기준선 human_guided':34s} {base_nf:.4f}")
+    print(_row("(a) full transplant", res["a_nf"]))
+    print(_row("(b) refit", res["b_nf"]))
+    print(_row("(c) regrow", res["c_nf"]) if res["c_nf"]
+          else "  (c) regrow                        ★ none")
+    print(f"  {'★ baseline human_guided':34s} {base_nf:.4f}")
 
     res["pair"] = [src, dst]
-    # ★ 어느 실행을 썼나 — 개명 때문에 옛 산출물이 어느 캠페인의 것인지
-    #   알 수 없게 됐다. 다시는 그러지 않는다 (원칙 2, D-141).
+    # ★ Which runs were used — the rename made it impossible to tell which
+    #   campaign an old artefact came from. That does not happen again
+    #   (principle 2, D-141).
     res["src_runs"] = list(SRC_RUNS)
     res["dst_runs"] = list(DST_RUNS)
     res["src_round"] = S_RND
@@ -295,8 +325,8 @@ def main() -> None:
     res["n_holdout"] = [len(hold), len(hold_nf)]
     Path(out).write_text(json.dumps(res, ensure_ascii=False, indent=1))
     print(f"\n  -> {out}")
-    print("  ⚠️ 유의성은 붙이지 않는다 — σ 신뢰구간이 넓다 "
-          "(sigma-5090.json)")
+    print("  ⚠️ no significance is attached — the σ confidence interval is "
+          "wide (sigma-5090.json)")
 
 
 if __name__ == "__main__":

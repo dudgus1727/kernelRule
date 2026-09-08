@@ -1,32 +1,33 @@
-"""라운드 루프 (§14) — 코드가 순서를 통제한다.
+"""The round loop (§14) — the code controls the order.
 
-**에이전트는 서로 대화하지 않는다** (§11.1). 진짜 멀티 에이전트로 만들면
-어느 단계에서 망가졌는지 추적이 불가능해진다.
+**The agents do not talk to each other** (§11.1). Making it a true
+multi-agent system would make it impossible to trace which stage broke.
 
-## 한 라운드 (§14.1, 부록 ★수정 1)
+## One round (§14.1, appendix ★fix 1)
 
-    1. 아카이브 최고 규칙 채점 -> 진단 리포트 생성           [코드]
-    2. 가설 3~5개                                          [LLM 1회]
-    3. 필요시 피처 생성 + 심사 + 자동 검증                   [LLM 0~4회]
-    4. 규칙 12개 생성 (부모/가설 조합)                       [LLM 12회]
-    5. 정적 검사 -> 샌드박스 -> ★ 가중치 최적화 -> 채점       [코드]
-    6. 아카이브 갱신
-    7. 가설 이력 / 실패 목록 기록
-    8. 종료 조건 확인
+    1. score the archive's best rule -> build the diagnostic report  [code]
+    2. 3~5 hypotheses                                               [1 LLM call]
+    3. generate features if needed + review + auto-validation        [0~4 calls]
+    4. generate 12 rules (parent/hypothesis combinations)            [12 calls]
+    5. static checks -> sandbox -> ★ weight optimisation -> scoring  [code]
+    6. update the archive
+    7. record the hypothesis history / the failure list
+    8. check the stopping condition
 
-**5번의 가중치 최적화가 채점 앞에 오는 것이 핵심이다** (§29.3). 안 하면
-좋은 구조가 나쁜 초기값 때문에 버려지고, 진화가 구조가 아니라 **가중치
-운**을 선택한다.
+**Step 5's weight optimisation coming before scoring is the crux** (§29.3).
+Without it a good structure is thrown away because of bad initial values, and
+evolution selects not structure but **luck in the weights**.
 
-## 종료 조건 (§14.3)
+## Stopping condition (§14.3)
 
-    10라운드 연속 개선이 노이즈 바닥 이하
+    10 consecutive rounds of improvement below the noise floor
       AND
-    아카이브에 새 셀이 채워지지 않음
+    no new cell filled in the archive
 
-점수가 멈춰도 다양성이 늘고 있으면 아직 탐색 중이다. **두 조건을 모두** 쓴다.
-조기 종료는 **검증 분할**로 판정한다 — 학습 regret 으로 하면 이미 과적합이
-시작된 뒤에도 계속 돈다 (§10.2).
+If the score has stalled but diversity is still growing, it is still
+exploring. **Both conditions** are used. Early stopping is judged on the
+**validation split** — judged on the training regret it keeps running long
+after overfitting has begun (§10.2).
 """
 
 from __future__ import annotations
@@ -61,108 +62,138 @@ __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 @dataclass
 class LoopConfig:
     run_id: str
-    #: ★ 2026-09-08 (D-144): 12 -> 6. `Archive.parents` 의 비율이
-    #: exploit 3 / explore 2 / cross 1 을 만든다.
+    #: ★ 2026-09-08 (D-144): 12 -> 6. `Archive.parents`'s ratio makes it
+    #: exploit 3 / explore 2 / cross 1.
     n_rules_per_round: int = 6
     max_rounds: int = 20
     max_evals: int = 200
-    #: ★ 실행 트레이스 (D-133). `trace.jsonl` 에 사건을 시간순으로 남긴다.
-    #: **조건이 아니다** — 로깅만 하고 계산 경로를 안 건드린다. 그래서
-    #: `runset.KEYS` 에 넣지 않는다 (`tests/test_trace.py` 가 확인한다).
+    #: ★ The execution trace (D-133). It records events into `trace.jsonl`
+    #: in time order.
+    #: **It is not a condition** — it only logs and does not touch the
+    #: compute path. That is why it is not in `runset.KEYS`
+    #: (`tests/test_trace.py` verifies it).
     trace: bool = True
-    #: ★ 조기 종료 **끔** (D-132). `0` 이면 라운드 상한까지 다 돈다.
+    #: ★ Early stopping is **off** (D-132). At `0` it runs to the round
+    #: cap.
     #:
-    #: 왜 껐나 — 문제가 값이 아니라 **판단 기준**이었다:
+    #: Why it was turned off — the problem was not the value but the
+    #: **criterion**:
     #: ```
-    #: 루프 내부 점수(best_val_regret)가 평평해도
-    #: ★ 최종 채점(체제별 재적합 -> 홀드아웃)은 계속 좋아진다
-    #: -> 내부 점수로 멈추면 원리적으로 최종 성능을 잃는다 (D-131: +0.0187)
-    #: patience 를 5 로 올려도 크기만 줄고 같은 문제다
+    #: even when the loop's internal score (best_val_regret) is flat,
+    #: ★ the final scoring (per-regime refit -> holdout) keeps improving
+    #: -> stopping on the internal score loses final performance in
+    #:    principle (D-131: +0.0187)
+    #: raising patience to 5 only shrinks the size; the problem is the same
     #: ```
-    #: 0 보다 크면 옛 규칙이 그대로 돈다 — 옛 실행 재현용으로 남긴다.
+    #: Above 0 the old rule runs unchanged — kept for reproducing old runs.
     patience: int = 0
     seed: int = 0
     sandbox_first_seen: bool = True
     out_dir: str = "runs"
-    #: ★ Analyst -> FeatureWriter 경로 (D-75). 라운드당 만들 수 있는 새 축의
-    #: 상한. **0 이면 경로가 없다** — 2026-08-28 이전의 동작이고 기본값이다.
+    #: ★ The Analyst -> FeatureWriter path (D-75). The cap on how many new
+    #: axes may be created per round. **At 0 the path does not exist** — the
+    #: behaviour before 2026-08-28, and the default.
     #:
-    #: 상한이 필요한 이유는 §21 이다: 피처 행렬이 새 축마다 전 형상을 다시
-    #: 계산하고, 캐시 키가 레지스트리 해시라 라운드마다 바뀌면 캐시가 안
-    #: 듣는다. 1~2 를 넘기지 마라.
+    #: The cap is needed because of §21: the feature matrix recomputes every
+    #: shape for each new axis, and the cache key is the registry hash, so
+    #: if it changes every round the cache never hits. Do not exceed 1~2.
     max_new_features_per_round: int = 0
-    #: FeatureWriter 조건 (F1/F2/F3). 루프 밖 1단계와 **같은 조건**을
-    #: 줘야 한다 — 다르면 라운드 안에서 조건이 바뀐다.
+    #: The FeatureWriter condition (F1/F2/F3). It must be given **the same
+    #: condition** as stage 1 outside the loop — otherwise the condition
+    #: changes inside a round.
     feature_condition: str = "F3"
-    #: ★ §16.1 대조군 C (D-91) — Analyst 를 끄되 **다른 실행·다른 라운드의
-    #: 가설**을 그 자리에 넣는다. `hypotheses.jsonl` 경로들.
+    #: ★ §16.1's control arm C (D-91) — the Analyst is off, but
+    #: **hypotheses from another run and another round** go in its place.
+    #: Paths to `hypotheses.jsonl` files.
     #:
-    #: 무엇을 가르나:
-    #:   B 에 가까우면  가설이 **현재 상태에 맞을 필요는 없다**
-    #:                  = 진단 리포트의 기여가 다양성 주입이다
-    #:   A 에 가까우면  ★ 이 라운드의 진단에 맞아야 한다 (§16.1 의 강한 형태)
+    #: What it separates:
+    #:   close to B  a hypothesis **need not fit the current state**
+    #:               = the diagnostic report's contribution is diversity
+    #:                 injection
+    #:   close to A  ★ it must fit this round's diagnosis (the strong form
+    #:               of §16.1)
     #:
-    #: Analyst 를 안 부르므로 **A 와 호출 수가 같다** — 비용 비교가 깨끗하다.
+    #: The Analyst is not called, so **the call count matches A** — the cost
+    #: comparison is clean.
     hypothesis_pool: tuple[str, ...] = ()
-    #: ★ 가중치 목적함수 (D-101). 기본 `"regret"` — **지금까지의 동작**이다.
-    #: `"rank"` 면 참 상위 `rank_top_k` 안의 가중 쌍 손실로 맞추고,
-    #: **아카이브 채택도 그것으로 한다** (셀 축은 안 바뀐다).
-    #: `regret` 은 그 경우에도 계속 계산해서 기록한다 (실험 계획서 §4 —
-    #: 판정에는 안 쓰고 두 진화를 나란히 놓을 때 쓴다).
-    #: ★ 2026-09-04 (D-128): 기본이 다시 `"regret"` 이고, **`"rank"` 는
-    #: 거부한다** — 순위 손실은 틀린 목적함수로 결론났다 (D-118·D-121).
-    #: 필드 자체는 남긴다: 옛 `config.json` 을 읽어야 한다.
-    #: 순위 손실·tau 는 **지표로는** 그대로 쓴다 (`weights.rank_loss` 등).
+    #: ★ The weight objective (D-101). Default `"regret"` — **the
+    #: behaviour so far**.
+    #: With `"rank"` it fits on the weighted pairwise loss within the true
+    #: top `rank_top_k`, and **archive acceptance uses that too** (the cell
+    #: axes do not change).
+    #: `regret` keeps being computed and recorded even then (experiment plan
+    #: §4 — not used for the verdict, used when placing two evolutions side
+    #: by side).
+    #: ★ 2026-09-04 (D-128): the default is `"regret"` again, and
+    #: **`"rank"` is refused** — the rank loss was concluded to be the wrong
+    #: objective (D-118 · D-121).
+    #: The field itself stays: old `config.json` files must still be read.
+    #: The rank loss and tau are still used **as metrics**
+    #: (`weights.rank_loss` and the like).
     objective: str = "regret"
     rank_top_k: int = 100
-    #: ★ 두 손실의 합 (D-109). `L = rank_loss(k) + lambda * rank_loss_top1(k)`
-    #: `rank_loss_top1` 은 **참 1등이 낀 쌍만** — `regret` 의 부드러운
-    #: 대리다. `regret` 을 직접 넣지 않는다 (계단이라 L-BFGS 를 못 쓴다).
+    #: ★ The sum of two losses (D-109).
+    #: `L = rank_loss(k) + lambda * rank_loss_top1(k)`
+    #: `rank_loss_top1` covers **only pairs involving the true first place**
+    #: — a smooth surrogate for `regret`. `regret` itself is not put in (it
+    #: is a step function, so L-BFGS cannot be used).
     rank_lambda: float = 0.0
-    #: ★ 적합기 (D-123). 기본 `"nelder-mead"` — **지금까지의 모든 실행**이다.
-    #: `"cma"` 는 §2 통과 조건이 고른 팔이다 (16차원 도달률 100%, `cma` 패키지 필요).
-    #: ★ 조건이므로 `config.json` 에 남기고 묶음 검사가 본다 (원칙 39).
+    #: ★ The fitter (D-123). Default `"nelder-mead"` — **every run so
+    #: far**.
+    #: `"cma"` is the arm §2's gate chose (100% reach rate in 16 dimensions,
+    #: needs the `cma` package).
+    #: ★ It is a condition, so it stays in `config.json` and the bundle
+    #: check looks at it (principle 39).
     fit_method: str = "nelder-mead"
-    #: 적합 재시작 수. CMA-ES 는 1 이다 — 예산을 넷으로 쪼개면 세대가
-    #: 여섯 번뿐이라 CMA 가 아니다 (`fitter-regret-prereg.md` §2).
+    #: The number of fit restarts. It is 1 for CMA-ES — splitting the
+    #: budget four ways leaves only six generations, which is not CMA
+    #: (`fitter-regret-prereg.md` §2).
     fit_restarts: int = 4
-    #: ★ 두 순서 실험 (D-104). `"rank->regret"` 또는 `"regret->rank"`.
-    #: `None` 이면 목적함수가 안 바뀐다 — 지금까지의 동작이다.
+    #: ★ The two-order experiment (D-104). `"rank->regret"` or
+    #: `"regret->rank"`.
+    #: With `None` the objective does not change — the behaviour so far.
     #:
-    #: **전환 시점은 하이퍼파라미터가 아니라 중단 조건이다** — 직전
-    #: `switch_window` 라운드의 개선이 `switch_min_improve` 미만이면
-    #: 바꾼다. 근거: s2 가 r5~r9 에서 0.2945 -> 0.2915 (1.0%) 로 평평했다.
-    #: ★ 파라미터 상한 (D-104). `None` 이면 `checks.PARAMETERS`(8) — 지금까지의 동작.
-    #: 검사기·프롬프트가 **같은 값**을 봐야 한다 (원칙 2).
+    #: **The switch point is not a hyperparameter but a stopping condition**
+    #: — it switches when the improvement over the last `switch_window`
+    #: rounds is below `switch_min_improve`. Rationale: s2 was flat from r5
+    #: to r9, 0.2945 -> 0.2915 (1.0%).
+    #: ★ The parameter cap (D-104). With `None` it is
+    #: `checks.PARAMETERS` (8) — the behaviour so far.
+    #: The checker and the prompt must see **the same value** (principle
+    #: 2).
     parameters: int | None = None
     objective_switch: str | None = None
     switch_min_improve: float = 0.01
     switch_window: int = 3
-    #: ★ 채점·적합 병렬화 (D-95). 0 이면 순차 — **지금까지의 동작**이다.
-    #: 결과는 같아야 한다 (`test_parallel_matches_sequential`).
+    #: ★ Parallel scoring and fitting (D-95). At 0 it is sequential — **the
+    #: behaviour so far**.
+    #: The results must be identical (`test_parallel_matches_sequential`).
     n_workers: int = 0
-    #: ★ §16.1 ablation — Analyst 를 끄면 진단 리포트도 가설도 없다.
-    #: RuleEditor 는 부모 규칙과 피처 목록만 보고 고친다.
-    #: **기본은 켬**이다 (지금까지의 모든 실행이 그렇다).
+    #: ★ The §16.1 ablation — with the Analyst off there is neither a
+    #: diagnostic report nor hypotheses. The RuleEditor edits from the
+    #: parent rule and the feature list alone.
+    #: **The default is on** (as in every run so far).
     use_analyst: bool = True
 
 
 class LLMUnreachable(RuntimeError):
-    """LLM 에 닿지 못했다. **모델의 실패가 아니라 우리 문제다** (D-43)."""
+    """The LLM could not be reached. **Our problem, not a failure of the
+    model** (D-43)."""
 
 
-#: LLM 에 닿지 못한 것을 알아보는 이름들. 크레딧·인증·네트워크 문제이지
-#: 모델의 실패가 아니다 (D-43).
+#: Names that identify a failure to reach the LLM. They are credit,
+#: authentication or network problems, not failures of the model (D-43).
 _TRANSPORT_HINTS = ("HTTPError", "APIError", "APIConnection", "APIStatus",
                     "Timeout", "RateLimit", "Authentication", "Permission",
                     "ConnectError", "ReadError", "ServiceUnavailable")
-#: 본문에 이것이 있으면 확실하다.
+#: Finding one of these in the body settles it.
 _TRANSPORT_BODY = ("no credits", "insufficient_quota", "invalid_api_key",
                    "401", "402", "403", "429", "500", "502", "503")
 
 
 def _is_transport_error(exc: BaseException) -> bool:
-    """LLM 에 **닿지 못한** 것인가, 모델이 스키마를 못 맞춘 것인가."""
+    """Was the LLM **unreachable**, or did the model fail to match the
+    schema?"""
     name = type(exc).__name__
     if any(h in name for h in _TRANSPORT_HINTS):
         return True
@@ -170,36 +201,42 @@ def _is_transport_error(exc: BaseException) -> bool:
     return any(h in text for h in _TRANSPORT_BODY)
 
 
-#: 한 라운드의 제안이 **전부** 전송 실패면 멈춘다. 크레딧이나 인증 문제는
-#: 저절로 낫지 않고, 남은 라운드를 태워도 빈 아카이브만 남는다.
-#: 실제로 12라운드 x 48초를 그렇게 썼다.
+#: If **every** proposal of a round is a transport failure, it stops. A
+#: credit or authentication problem does not heal by itself, and burning the
+#: remaining rounds leaves nothing but an empty archive.
+#: 12 rounds x 48 seconds really were spent that way.
 STOP_ON_TOTAL_LLM_FAILURE = True
 
 
-#: 검증 격차가 이보다 크면 **체제 전이 실패**로 본다.
-#: 과적합과 다르다 — 항이 3개뿐인 규칙도 이 값을 넘는다 (실측 +4.99).
+#: A validation gap larger than this counts as a **regime transfer
+#: failure**.
+#: It differs from overfitting — even a rule with only 3 terms exceeds this
+#: value (+4.99 measured).
 VAL_GAP_ALARM = 0.5
 
 
-#: ★ 워커가 보는 것 (D-95). `fork` 로 만들어진 자식이 **부모의 메모리를
-#: 그대로 물려받는다** — 표 + 피처 행렬이 4.2GB 라 워커마다 다시 로드하면
-#: 12개에 50GB 다. 복사-후-쓰기라 실제로는 거의 안 는다.
+#: ★ What a worker sees (D-95). A child created by `fork` **inherits the
+#: parent's memory as it is** — the table + feature matrix is 4.2GB, so
+#: reloading per worker would be 50GB across 12. With copy-on-write it
+#: barely grows in practice.
 #:
-#: ⚠️ 풀을 만들기 **전에** 채워야 한다. fork 시점의 스냅숏이 전부다.
+#: ⚠️ It must be filled **before** the pool is created. The snapshot at fork
+#: time is all there is.
 _WORKER: dict = {}
 
 
 def _fit_and_score(job: tuple) -> dict:
-    """★ 한 후보를 적합하고 채점한다. **워커에서 돈다** (D-95).
+    """★ Fits and scores one candidate. **It runs in a worker** (D-95).
 
-    라운드 벽시계의 96% 가 `fit_weights` 다 (후보당 5.4초 x 12).
-    GIL 때문에 스레드로는 안 되고 프로세스여야 한다.
+    96% of a round's wall clock is `fit_weights` (5.4 s x 12 candidates).
+    Because of the GIL it cannot be threads; it has to be processes.
 
-    ⚠️ **정적 검사·샌드박스는 부모가 한다.** 여기서 하면 워커가 또 프로세스를
-    띄우고(`run_isolated`), 중첩 spawn 이 된다. 그 둘은 합쳐도 3% 다.
+    ⚠️ **The static checks and the sandbox are done by the parent.** Doing
+    them here would have the worker start yet another process
+    (`run_isolated`), a nested spawn. Together those two are 3%.
 
-    돌려주는 것은 **순수 자료**다 — `Elite` 의 id 와 순서는 부모가 정한다
-    (결정론).
+    What comes back is **pure data** — the ids and order of the `Elite`s are
+    decided by the parent (determinism).
     """
     idx, code, w0 = job
     from kernelrule.core.sandbox import compile_rule
@@ -209,8 +246,9 @@ def _fit_and_score(job: tuple) -> dict:
     c = _WORKER
     try:
         fn = compile_rule(code)
-        # ★ 적합기는 **이 규칙의 len(W0)** 이 정한다 (D-144). 경로별 예산이
-        #   되면서 차원이 규칙마다 다르다 — 캠페인 하나로 못 정한다.
+        # ★ The fitter is decided by **this rule's len(W0)** (D-144). With
+        #   a per-path budget the dimension differs per rule — one campaign
+        #   setting cannot decide it.
         _ft = fitter_for(len(w0))
         fr = fit_weights(fn, c["matrix"], c["table"], c["train"], w0,
                          max_evals=_ft["max_evals"], val_split=c["val"],
@@ -236,10 +274,11 @@ def _fit_and_score(job: tuple) -> dict:
 
 
 def _rank_loss_of(fn, c: dict, w) -> float:
-    """★ 채택에 쓸 순위 손실. `objective="regret"` 이면 NaN 을 남긴다.
+    """★ The rank loss used for acceptance. Under `objective="regret"` it
+    leaves NaN.
 
-    `regret` 조건에서 억지로 계산하지 않는다 — 그러면 쌍을 만드는 비용이
-    모든 기존 실행에 붙는다.
+    It is not forced under the `regret` condition — that would add the cost
+    of building the pairs to every existing run.
     """
     import math
 
@@ -252,8 +291,9 @@ def _rank_loss_of(fn, c: dict, w) -> float:
     pr = _Problem(c["matrix"], c["table"], c["train"].shapes, 1)
     pr.build_pairs(c["table"], k)
     v = pr.rank_loss(fn, w)
-    # ★ 채택도 **적합과 같은 목적함수**로 해야 한다 (원칙 37). 람다를
-    #   빼고 고르면 최적화한 것과 다른 것으로 뽑는다.
+    # ★ Acceptance must use **the same objective as the fit** (principle
+    #   37). Selecting without lambda picks by something other than what was
+    #   optimised.
     if lam and math.isfinite(v):
         pr.build_top1_pairs(c["table"], k)
         v += lam * pr.rank_loss_top1(fn, w)
@@ -261,22 +301,26 @@ def _rank_loss_of(fn, c: dict, w) -> float:
 
 
 def _requirement_of(h: dict) -> str:
-    """가설이 요구한 물리량 문장. **두 이름을 다 읽는다.**
+    """The sentence naming the physical quantity a hypothesis asked for.
+    **Both names are read.**
 
-    필드는 `needs_new_feature` 다. 2026-08-28 에 잠깐 `physical_requirement`
-    로 바꿔 실행 3개를 돌렸다가 **되돌렸다** (D-81) — 기준선이 옛 이름으로
-    측정됐기 때문이다. 그 사이 실행들이 조용히 0건이 되면 안 되므로 둘 다
-    읽는다.
+    The field is `needs_new_feature`. On 2026-08-28 it was briefly renamed
+    to `physical_requirement`, three runs were made, and then it was
+    **reverted** (D-81) — because the baseline was measured under the old
+    name. The runs made in between must not silently become 0, so both are
+    read.
     """
     v = h.get("physical_requirement") or h.get("needs_new_feature")
     return str(v).strip() if v else ""
 
 
 def _feature_task(text: str) -> str:
-    """FeatureWriter 에게 가는 **전부**. ★ 진단 리포트는 안 간다 (D-75).
+    """**Everything** that goes to the FeatureWriter. ★ The diagnostic
+    report does not (D-75).
 
-    사례 번호도 점수도 형상 목록도 없다. 물리 요구 한 문장뿐이다 —
-    루프 안에서 만든 피처가 학습 형상에 맞춰지는 통로를 막는다.
+    No case numbers, no scores, no shape list. Only the one sentence of
+    physical requirement — it blocks the channel by which a feature built
+    inside the loop could be fitted to the training shapes.
     """
     return ("## What to build now\n\n"
             "Build one feature that measures the quantity below.\n\n"
@@ -292,66 +336,74 @@ class RoundResult:
     n_rejected_static: int = 0
     n_rejected_sandbox: int = 0
     n_rejected_schema: int = 0
-    #: ★ LLM 에 **닿지 못한** 횟수. 스키마 거부와 섞으면 안 된다 —
-    #: 크레딧 소진·인증 실패·네트워크 오류가 "모델이 나쁜 규칙을 냈다" 로
-    #: 보인다 (D-43). 실제로 429 를 12라운드 동안 "스키마 거부 144건" 으로
-    #: 읽었다.
+    #: ★ How many times the LLM was **unreachable**. It must not be mixed
+    #: with schema refusals — exhausted credit, failed authentication or a
+    #: network error would look like "the model produced bad rules" (D-43).
+    #: A 429 really was read as "144 schema refusals" across 12 rounds.
     n_llm_error: int = 0
     n_rejected_fit: int = 0
-    #: ★ 가중치 적합기가 실제로 움직인 후보 수 (D-54). 낮으면 그 라운드는
-    #: **초기값으로 채점된 것**이고, 진화가 구조가 아니라 가중치 운을
-    #: 고르게 된다 (§29.3). 화면에 뜨면 첫 라운드에서 눈치챈다.
+    #: ★ How many candidates the weight fitter actually moved (D-54). When
+    #: it is low that round was **scored on the initial values**, and
+    #: evolution selects luck in the weights rather than structure (§29.3).
+    #: On screen it is noticed in the first round.
     n_fit_moved: int = 0
     n_scored: int = 0
     n_accepted: int = 0
     best_regret: float = float("nan")
     best_val_regret: float = float("nan")
-    #: ★ 채택 기준이 `rank` 일 때 아카이브 최고의 순위 손실 (D-101).
-    #: `regret` 조건에서는 NaN 이다 — 억지로 계산하지 않는다.
+    #: ★ The archive best's rank loss when the acceptance criterion is
+    #: `rank` (D-101). Under the `regret` condition it is NaN — it is not
+    #: forced.
     best_rank_loss: float = float("nan")
     n_cells: int = 0
     val_gap: float = float("nan")
     n_val_blowups: int = 0
-    #: ★ 부모 종류별 (exploit / explore / cross) 제안·중복·채점 수 (D-94).
+    #: ★ Proposal / duplicate / scored counts per parent kind (exploit /
+    #: explore / cross) (D-94).
     #: `{"exploit": {"n": 6, "dup": 1, "scored": 5}, ...}`
     #:
-    #: 왜 여기 남기나: 부모 종류가 **프롬프트 문자열에만** 있어서
-    #: `llm_calls` 의 `prompt` 가 빈 실행에서는 못 읽었다 — "가설-부모
-    #: 불일치" 를 옛 자료로 재려다 실패했다.
+    #: Why it is recorded here: the parent kind lived **only in the prompt
+    #: string**, so it could not be read in runs where `llm_calls`'
+    #: `prompt` was empty — an attempt to measure "hypothesis-parent
+    #: mismatch" from old material failed.
     by_parent_kind: dict = field(default_factory=dict)
-    #: ★ 이 라운드에 Analyst 가 요구한 새 축 / 실제로 만들어진 축 (D-75).
+    #: ★ New axes the Analyst asked for this round / axes actually built
+    #: (D-75).
     n_feature_requests: int = 0
     n_features_made: int = 0
-    #: 라운드당 상한에 걸려 **만들지 않은** 요구. 조용히 버리지 않는다.
+    #: Requests **not built** because of the per-round cap. They are not
+    #: discarded silently.
     n_feature_over_cap: int = 0
     seconds: float = 0.0
     llm_calls: dict = field(default_factory=dict)
     rejections: list[tuple] = field(default_factory=list)
 
     def line(self) -> str:
-        err = f"★LLM오류 {self.n_llm_error} " if self.n_llm_error else ""
-        mv = f"적합이동 {self.n_fit_moved}/{self.n_scored} | " if self.n_scored else ""
+        err = f"★LLM err {self.n_llm_error} " if self.n_llm_error else ""
+        mv = (f"fit moved {self.n_fit_moved}/{self.n_scored} | "
+              if self.n_scored else "")
         gap = f"{self.val_gap:+.3f}"
         alarm = "!" if self.val_gap > VAL_GAP_ALARM else " "
-        over = f"(상한초과 {self.n_feature_over_cap}) " \
+        over = f"({self.n_feature_over_cap} over cap) " \
             if self.n_feature_over_cap else ""
-        feat = (f"새축 {self.n_features_made}/{self.n_feature_requests} "
+        feat = (f"new axes {self.n_features_made}/{self.n_feature_requests} "
                 f"{over}| " if self.n_feature_requests else "")
         return (
-            f"r{self.round:<3d} 제안 {self.n_proposed:2d} | {err}{feat}"
-            f"거부 스키마 {self.n_rejected_schema} 정적 "
-            f"{self.n_rejected_static} 샌드박스 {self.n_rejected_sandbox} "
-            f"적합 {self.n_rejected_fit} | 채점 {self.n_scored:2d} "
-            f"채택 {self.n_accepted:2d} | {mv}best {self.best_regret:.4f} "
+            f"r{self.round:<3d} proposed {self.n_proposed:2d} | {err}{feat}"
+            f"refused schema {self.n_rejected_schema} static "
+            f"{self.n_rejected_static} sandbox {self.n_rejected_sandbox} "
+            f"fit {self.n_rejected_fit} | scored {self.n_scored:2d} "
+            f"accepted {self.n_accepted:2d} | {mv}best {self.best_regret:.4f} "
             + (f"rank {self.best_rank_loss:.4f} "
                if self.best_rank_loss == self.best_rank_loss else "")
             + f"val {self.best_val_regret:.4f}({gap}{alarm})"
-            f"| 셀 {self.n_cells:2d} 폭발 {self.n_val_blowups} | "
+            f"| cells {self.n_cells:2d} blowups {self.n_val_blowups} | "
             f"{self.seconds:.1f}s")
 
 
 def _git_commit() -> str:
-    """지금 커밋. 트레이스 첫 줄이 자족하려면 코드 판이 있어야 한다."""
+    """The current commit. For the trace's first line to stand on its own
+    it needs the code version."""
     import subprocess
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"],
@@ -362,7 +414,8 @@ def _git_commit() -> str:
 
 
 def _sha(code: str) -> str:
-    """코드의 짧은 해시. 트레이스에서 같은 제안을 잇는 데 쓴다 (D-133)."""
+    """A short hash of the code. Used in the trace to link the same
+    proposal together (D-133)."""
     import hashlib
 
     return hashlib.sha256(code.encode()).hexdigest()[:12]
@@ -371,16 +424,20 @@ def _sha(code: str) -> str:
 class RoundLoop:
     def __init__(self, *, cfg: LoopConfig, table: PerfTable,
                  matrix: FeatureMatrix, splits: SplitSet, llm) -> None:
-        # ★ 진화 경로에서 순위 손실을 뺀다 (D-128). **맨 먼저** 본다 —
-        #   뒤에서 걸리면 표를 다 읽은 뒤에 죽는다 (원칙 1).
+        # ★ The rank loss is taken out of the evolution path (D-128). It
+        #   is checked **first** — caught later, it would die after the
+        #   whole table had been read (principle 1).
         if cfg.objective != "regret" or cfg.objective_switch is not None:
             raise ValueError(
-                f"진화 목적함수는 regret 뿐이다 (objective={cfg.objective!r}, "
-                f"objective_switch={cfg.objective_switch!r}). 순위 손실은 "
-                "틀린 목적함수로 결론났다 (D-118·D-121) — 지표로만 쓴다. "
-                "옛 실행을 재현하려면 그 커밋으로 돌아가라 (D-128).")
+                f"the evolution objective is only regret "
+                f"(objective={cfg.objective!r}, "
+                f"objective_switch={cfg.objective_switch!r}). The rank loss "
+                f"was concluded to be the wrong objective (D-118 · D-121) — "
+                f"it is used as a metric only. To reproduce an old run, go "
+                f"back to that commit (D-128).")
         self.cfg = cfg
-        # ★ 트레이스 (D-133). `dump()` 와 같은 곳에 쌓는다.
+        # ★ The trace (D-133). It accumulates in the same place as
+        # `dump()`.
         from kernelrule.core.trace import Tracer
         self.trace = Tracer(
             Path(cfg.out_dir) / cfg.run_id / "trace.jsonl"
@@ -389,76 +446,90 @@ class RoundLoop:
         self.matrix = matrix
         self.splits = splits
         self.llm = llm
-        # ★ 주입받지 않고 **여기서 학습 분할로부터 계산한다** (§12.3 / D-28).
-        #   호출자가 전수 표에서 계산한 문장을 넘길 수 있으면 리포트의 분할
-        #   검사가 아무 일도 하지 않는다 — 첫 실제 실행이 그렇게 오염됐다.
+        # ★ It is not injected but **computed here from the training
+        #   split** (§12.3 / D-28). If the caller could pass a sentence
+        #   computed on the full table, the report's split check would do
+        #   nothing — the first real run was contaminated exactly that way.
         from kernelrule.report.table_facts import TableFacts
         self.table_facts = TableFacts.compute(table, splits.train)
         self.rng = np.random.default_rng(cfg.seed)
-        # ★ 칸은 언제나 동적 3분위다 (D-144) — `cell_mode` 를 없앴다.
+        # ★ The cells are always dynamic tertiles (D-144) — `cell_mode`
+        # was removed.
         self.archive = Archive(
             noise_tol=0.0,
             select_by=("rank" if cfg.objective == "rank" else "regret"))
         self.rounds: list[RoundResult] = []
         self.failures: list[dict] = []
         self.hypotheses: list[dict] = []
-        #: ★ 라운드 안에서 만든 피처들 (D-75). 산출물에 그대로 남긴다.
+        #: ★ Features built inside a round (D-75). They stay in the
+        #: artefacts as they are.
         self.features_made: list[dict] = []
-        #: ★ cross 자식이 두 부모의 항을 섞었는가 (D-96 관찰 1).
-        #: 부모 코드는 남지 않으므로 그 자리에서 계산해 둔다.
+        #: ★ Did a cross child mix terms from both parents (D-96
+        #: observation 1)? The parent code does not survive, so it is
+        #: computed on the spot.
         self.cross_lineage: list[dict] = []
-        #: ★ 라운드별 아카이브 최고 (코드째). D-101 관찰용.
+        #: ★ The archive best per round (code included). For the D-101
+        #: observations.
         self.bests: list[dict] = []
-        #: ★ 목적함수 전환 상태 (D-104). `switch_round` 는 안 바뀌면 -1.
-        #: ★ 예산을 검사기에 흘린다. `None` 이면 기본(8) 그대로다.
+        #: ★ The objective-switch state (D-104). `switch_round` is -1 when
+        #: it never switches.
+        #: ★ The budget is fed to the checker. With `None` it stays at the
+        #: default (8).
         self._budget = (cfg.parameters if cfg.parameters is not None
                         else _PARAMETERS)
-        # ★ 예산만 올리면 **AST 노드 상한에서 막힌다** (D-106). 상한들을
-        #   한 곳에서 같이 움직인다.
+        # ★ Raising only the budget **runs into the AST node cap**
+        #   (D-106). The caps move together, from one place.
         self._limits = (limits_for(cfg.parameters)
                         if cfg.parameters is not None else None)
         self._objective = cfg.objective
         self._switched = False
         self.switch_round = -1
-        #: 가설 id 의 **유일한 출처**. 모델이 붙인 id 는 응답 안에서만
-        #: 유일해서 라운드/패스를 넘으면 겹친다.
+        #: The **single source** of hypothesis ids. The ids the model
+        #: attaches are unique only within a response, so they collide
+        #: across rounds and passes.
         self._hyp_seq = 0
-        #: 빌려온 가설 묶음 (대조군 C). 처음 쓸 때 한 번만 읽는다.
+        #: The borrowed hypothesis blocks (control arm C). Read once, on
+        #: first use.
         self._pool: list[list[dict]] | None = None
-        #: 병렬 채점용 프로세스 풀 (D-95). 라운드마다 새로 만들지 않는다.
+        #: The process pool for parallel scoring (D-95). It is not rebuilt
+        #: every round.
         self._pool_exec = None
         self._rule_seq = 0
-        self._seen_code: dict[str, float] = {}      # 캐시 (§15.4)
+        self._seen_code: dict[str, float] = {}      # the cache (§15.4)
         self._feats = matrix.feature_names()
-        #: ★ 지수 자리 가드용 (D-112). 축이 늘면 같이 갱신한다.
+        #: ★ For the exponent-slot guard (D-112). It is refreshed together
+        #: when axes are added.
         self._fmins = matrix.feature_mins()
         self._shape_vals = matrix.shape_value_names()
         self._short_mask, self._long_mask = self._regime_masks()
-        # ★ 풀은 **생성자에서** 만든다 (D-95). `fork` 는 스레드가 도는 중이면
-        #   위험하고(CPython 이 DeprecationWarning 을 낸다) asyncio LLM 호출이
-        #   스레드를 만든다 — 생성자가 이 객체가 통제할 수 있는 가장 이른
-        #   시점이다. 마스크가 `_WORKER` 에 들어가므로 그 뒤여야 한다.
-        #   ⚠️ 완전하지는 않다 — 같은 프로세스에서 앞 단계가 이미 LLM 을
-        #      불렀으면 스레드가 있을 수 있다. 그때는 `n_workers=0` 으로
-        #      떨어뜨려라 (기본값이다).
+        # ★ The pool is created **in the constructor** (D-95). `fork` is
+        #   dangerous while threads are running (CPython raises a
+        #   DeprecationWarning) and asyncio LLM calls create threads — the
+        #   constructor is the earliest point this object controls. The
+        #   masks go into `_WORKER`, so it must come after that.
+        #   ⚠️ It is not complete — if an earlier stage in the same process
+        #      already called the LLM, threads may exist. Fall back to
+        #      `n_workers=0` then (it is the default).
         self._pool_or_none()
 
-    # -- ★ 대조군 C — 남의 가설을 빌려 온다 (§16.1, D-91) ------------------
+    # -- ★ Control arm C — borrowing someone else's hypotheses (§16.1,
+    #    D-91) --------------------------------------------------------------
     def _pool_round(self, r: int) -> list[dict]:
-        """다른 실행의 **한 라운드 전체**를 통째로 빌린다.
+        """Borrows **a whole round** of another run, entire.
 
-        가설 하나씩 섞지 않고 (실행, 라운드) 단위로 가져오는 이유는 두
-        가지다.
+        There are two reasons for taking them per (run, round) rather than
+        mixing individual hypotheses.
 
         ```
-        1  Analyst 한 번의 출력은 서로를 보완하는 집합이다.
-           낱개로 섞으면 "맞지 않는 가설" 이 아니라 "앞뒤가 안 맞는 묶음" 이
-           되어 다른 것을 재게 된다
-        2  라운드당 개수 분포가 B 와 자동으로 같아진다 (평균 4.4개)
+        1  One Analyst output is a set that complements itself. Mixing them
+           individually gives not "a hypothesis that does not fit" but "a
+           self-contradictory block", which measures something else
+        2  The per-round count distribution automatically matches B's
+           (4.4 on average)
         ```
 
-        ⚠️ **같은 시드 번호의 실행은 뺀다** — `abl-B-s1` 의 가설을
-        `abl-C-s1` 에 주면 "다른 실행" 이 아니다.
+        ⚠️ **Runs with the same seed number are excluded** — giving
+        `abl-B-s1`'s hypotheses to `abl-C-s1` is not "another run".
         """
         if self._pool is None:
             import json as _json
@@ -468,7 +539,7 @@ class RoundLoop:
                 pp = Path(path)
                 src = pp.parent.name
                 if src.rsplit("-s", 1)[-1] == mine:
-                    continue                    # 같은 시드 번호는 뺀다
+                    continue        # the same seed number is excluded
                 for ln in pp.read_text().splitlines():
                     if not ln.strip():
                         continue
@@ -479,15 +550,17 @@ class RoundLoop:
             self._pool = [groups[k] for k in sorted(groups)]
             if not self._pool:
                 raise ValueError(
-                    "가설 풀이 비었다. 같은 시드 번호만 줬거나 경로가 "
-                    "틀렸다 — 조용히 가설 없이 돌지 않는다 (§26.4).")
+                    "the hypothesis pool is empty. Either only the same "
+                    "seed number was given or the paths are wrong — it does "
+                    "not silently run without hypotheses (§26.4).")
             self.rng.shuffle(self._pool)
         block = self._pool[r % len(self._pool)]
         out = []
         for h in block:
             g = dict(h)
-            # ★ 출처를 남긴다. 나중에 "이 가설이 어디서 왔나" 를 못 물으면
-            #   이 팔의 결과를 해석할 수 없다.
+            # ★ The provenance is recorded. Without being able to ask
+            #   later "where did this hypothesis come from", this arm's
+            #   result cannot be interpreted.
             g["borrowed_from"] = f"{h.get('id')}@r{h.get('round')}"
             g.pop("analyst_pass", None)
             out.append(g)
@@ -496,27 +569,33 @@ class RoundLoop:
     # -- ★ Analyst -> FeatureWriter (D-75) --------------------------------
     def _write_features(self, hyps: list[dict], r: int,
                         res: RoundResult) -> list[str]:
-        """가설이 요구한 물리량을 **피처로 만든다.** 만든 이름들을 돌려준다.
+        """**Builds features** for the physical quantities the hypotheses
+        asked for. Returns the names built.
 
-        ## 왜 있나
+        ## Why it exists
 
-        `needs_new_feature` 는 33실행에서 303번
-        채워졌고 **`loop.py` 에 그것을 읽는 코드가 없었다.** 다섯 번에 한
-        번꼴로 "이걸 재려면 새 축이 필요하다" 고 말한 것이 전부 버려졌다.
+        `needs_new_feature` was filled in 303 times across 33 runs, and
+        **there was no code in `loop.py` that read it.** Roughly one in five
+        said "measuring this needs a new axis", and all of it was thrown
+        away.
 
-        ## 조건 셋 — 이 함수가 지킨다
+        ## Three conditions — this function holds them
 
         ```
-        1  ★ FeatureWriter 에게 **진단 리포트를 주지 않는다.**
-           요구 문장 하나만 넘긴다. 루프 안에서 만든 피처가 학습 형상에
-           맞춰지는 통로를 막는다 — 그러면 F1 조건이 루프 안에서도 유지된다
-        2  라운드당 상한 (`cfg.max_new_features_per_round`)
-           §21 피처 행렬이 새 축마다 전 형상을 다시 계산한다
-        3  판정은 성능이 아니라 관찰로 — 빈도 / 사용률 / 요구 내용
+        1  ★ The FeatureWriter is **not given the diagnostic report.**
+           Only the one requirement sentence is passed. It blocks the
+           channel by which a feature built inside the loop could be fitted
+           to the training shapes — that keeps condition F1 intact inside
+           the loop too
+        2  The per-round cap (`cfg.max_new_features_per_round`)
+           §21: the feature matrix recomputes every shape for each new axis
+        3  The verdict is by observation, not performance — frequency /
+           usage rate / what was asked for
         ```
 
-        ⚠️ 검증(§8.3)에 걸린 것은 **조용히 버리지 않는다.** 거부 사유를
-        `features_made` 에 남긴다 — "무엇을 만들려다 실패했나" 가 관찰이다.
+        ⚠️ Anything caught by validation (§8.3) is **not thrown away
+        silently.** The refusal reason stays in `features_made` — "what did
+        it try to build and fail" is an observation.
         """
         from kernelrule.features.generated import (
             FeatureRejected,
@@ -533,15 +612,16 @@ class RoundLoop:
         made: list[str] = []
         reg = self.matrix.registry
         cap = self.cfg.max_new_features_per_round
-        # ★ 상한은 **코드에서** 건다. 프롬프트로 억제하면 재려는 것(요구
-        #   빈도)을 직접 눌러 버린다 — 기준선 17.9% 는 그 문구가 없는
-        #   조건에서 측정됐다. 넘친 요구는 **버리고 기록한다**: "몇 건이
-        #   상한에 걸렸나" 자체가 관찰이다.
+        # ★ The cap is applied **in code**. Suppressing it through the
+        #   prompt would directly press down the very thing being measured
+        #   (the request frequency) — the 17.9% baseline was measured
+        #   without such wording. Requests over the cap are **dropped and
+        #   recorded**: "how many hit the cap" is itself an observation.
         for hid, text in reqs[cap:]:
             self.features_made.append(
                 {"round": r, "hypothesis_id": hid, "requirement": text,
                  "accepted": False, "over_cap": True,
-                 "error": f"라운드당 상한 {cap}개를 넘겼다 — 만들지 않았다"})
+                 "error": f"over the per-round cap of {cap} — not built"})
         res.n_feature_over_cap = max(0, len(reqs) - cap)
         for hid, text in reqs[:cap]:
             row = {"round": r, "hypothesis_id": hid, "requirement": text}
@@ -554,14 +634,17 @@ class RoundLoop:
                 f = register_generated(out["code"], registry=reg, meta=out,
                                        table=self.table, matrix=self.matrix,
                                        hw_alt=alt_hw(self.table.hw))
-                # ★ 열을 지금 만든다. 안 하면 규칙이 이름을 써도 KeyError 다.
+                # ★ The column is built now. Without it, a rule using the
+                #   name gets a KeyError.
                 self.matrix.invalidate(f.name)
                 self._feats = self.matrix.feature_names()
                 self._fmins = self.matrix.feature_mins()
                 self._shape_vals = self.matrix.shape_value_names()
-                # ★ 워커는 fork 시점의 행렬을 들고 있다 — 새 열을 못 본다.
-                #   풀을 버리고 다시 만든다. 안 하면 **워커가 낡은 행렬로
-                #   채점하고** 그것이 조용히 다른 점수가 된다 (D-95).
+                # ★ The workers hold the matrix as of fork time — they
+                #   cannot see the new column. The pool is discarded and
+                #   rebuilt. Without that, **the workers score on a stale
+                #   matrix** and that silently becomes a different score
+                #   (D-95).
                 self._restart_pool()
                 row.update(accepted=True, shape_level=f.shape_level)
                 made.append(f.name)
@@ -574,46 +657,51 @@ class RoundLoop:
         res.n_features_made = len(made)
         return made
 
-    # -- 체제 마스크 (셀 축) — ★ 크기로 가른다 (§10.1, §30.5) -------------
+    # -- Regime masks (the cell axes) — ★ cut by size (§10.1, §30.5) ------
     def _regime_masks(self):
-        """학습 분할 안에서 짧은/긴 형상을 가른다.
+        """Separates short and long shapes within the training split.
 
-        ⚠️ 경계를 `best_ms`(정답)가 아니라 **roofline 하한**으로 잡는다.
-        ⚠️ **학습 분할 안에서만** 가른다 — 검증을 셀 축에 쓰면 홀드아웃이
-        오염된다 (§10.2).
+        ⚠️ The boundary is taken from the **roofline lower bound**, not from
+        `best_ms` (the answer).
+        ⚠️ It cuts **within the training split only** — using validation as
+        a cell axis contaminates the holdout (§10.2).
         """
-        # ★ `regime_of` 를 쓴다 — 같은 판정이 두 곳에 있으면 달라진다 (원칙 2).
-        #   전에는 여기서 `info.log_sol_ms < log2(0.5)` 를 직접 계산했는데,
-        #   그것은 **레지스트리에 `log_sol_ms` 가 있다는 가정**이었다.
-        #   F0/F1 레지스트리에는 없어서 루프가 통째로 죽는다 (§30.9).
-        #   체제는 (형상, 하드웨어)의 성질이지 피처 목록의 성질이 아니다.
+        # ★ It uses `regime_of` — the same verdict in two places diverges
+        #   (principle 2). This used to compute
+        #   `info.log_sol_ms < log2(0.5)` directly here, which **assumed
+        #   `log_sol_ms` was in the registry**. The F0/F1 registries do not
+        #   have it, so the whole loop dies (§30.9). A regime is a property
+        #   of (shape, hardware), not of the feature list.
         from kernelrule.core.splits import regime_of
 
-        # ★ 축이 크기(SOL 0.5ms)에서 **roofline** 으로 바뀌었다 (D-144).
+        # ★ The axis changed from size (SOL 0.5ms) to the **roofline**
+        #   (D-144).
         short = np.asarray([regime_of(p, self.table.hw, axis="roofline")
                             == "mem" for p in self.splits.train.shapes])
         if not short.any() or short.all():
             import warnings
             warnings.warn(
-                f"학습 분할이 한 roofline 구간만 담고 있다 "
+                f"the training split holds only one roofline band "
                 f"(memory {int(short.sum())} / compute "
                 f"{int((~short).sum())}). "
-                "셀 축이 무의미해지고, 진화가 다른 체제를 희생해도 안 보인다 "
-                "(§10.1).", stacklevel=3)
+                f"The cell axes become meaningless, and evolution "
+                f"sacrificing the other regime stays invisible (§10.1).",
+                stacklevel=3)
         return short, ~short
 
-    # -- 채점 -------------------------------------------------------------
-    # -- 병렬 채점 (D-95) --------------------------------------------------
+    # -- Scoring ----------------------------------------------------------
+    # -- Parallel scoring (D-95) ------------------------------------------
     def _pool_or_none(self):
-        """`fork` 로 만든 프로세스 풀. **표와 행렬을 복사하지 않는다.**
+        """A process pool made with `fork`. **It does not copy the table
+        and the matrix.**
 
-        표 + 피처 행렬이 4.2GB 다. 워커마다 다시 로드하면 12개에 50GB 이고
-        로드에만 3초씩 든다. `fork` 는 부모 메모리를 복사-후-쓰기로
-        물려주므로 둘 다 안 든다 — 대신 **풀을 만들기 전에 `_WORKER` 를
-        채워야 한다.**
+        The table + feature matrix is 4.2GB. Reloading per worker would be
+        50GB across 12 and 3 seconds each just to load. `fork` hands the
+        parent's memory over copy-on-write, so neither cost applies — but
+        **`_WORKER` has to be filled before the pool is created.**
 
-        ⚠️ `fork` 는 스레드가 도는 중이면 위험하다. 여기는 `_call_optimizers`
-        (asyncio)가 끝난 **뒤**에만 불린다.
+        ⚠️ `fork` is dangerous while threads are running. This is called
+        only **after** `_call_optimizers` (asyncio) has finished.
         """
         if self.cfg.n_workers <= 0:
             return None
@@ -635,20 +723,22 @@ class RoundLoop:
         return self._pool_exec
 
     def _restart_pool(self) -> None:
-        """풀을 버리고 다시 만든다. **행렬이 바뀌면 반드시** (D-95)."""
+        """Discards and rebuilds the pool. **Mandatory whenever the matrix
+        changes** (D-95)."""
         if self._pool_exec is not None:
             self._pool_exec.shutdown(wait=True)
             self._pool_exec = None
         self._pool_or_none()
 
     def _evaluate_batch(self, props: list, res: RoundResult) -> list:
-        """여러 후보를 한 번에. 순차와 **결과가 같아야 한다** (D-95).
+        """Several candidates at once. The result **must equal the
+        sequential one** (D-95).
 
-        ★ 결정론을 지키는 방법:
+        ★ How determinism is kept:
         ```
-        제출 순서대로 결과를 조립한다 (`sorted(by i)`)
-        rule_id 와 카운터는 부모가 그 순서로 매긴다
-        fit_weights 는 시드가 고정이라 워커 순서와 무관하다
+        results are assembled in submission order (`sorted(by i)`)
+        rule ids and counters are assigned by the parent in that order
+        fit_weights has a fixed seed, so it is independent of worker order
         ```
         """
         pool = self._pool_or_none()
@@ -659,7 +749,7 @@ class RoundLoop:
                 admitted.append((prop, got[1]))
         if not admitted:
             return []
-        if pool is None:                    # 순차 — 지금까지의 경로
+        if pool is None:               # sequential — the path so far
             out = []
             for prop, _rep in admitted:
                 e = self._evaluate_candidate(prop, res)
@@ -688,11 +778,12 @@ class RoundLoop:
                                self.table, list(shapes), ks=(1, 3))
 
     def _admit(self, prop, res: RoundResult):
-        """정적 검사 -> 컴파일 -> 샌드박스. **fail-closed.** 부모에서 돈다.
+        """Static checks -> compile -> sandbox. **fail-closed.** It runs in
+        the parent.
 
-        ★ 이 셋은 라운드의 3% 다. 병렬로 보내지 않는 이유는 비용이 아니라
-        `run_isolated` 가 프로세스를 띄우기 때문이다 — 워커 안에서 하면
-        중첩 spawn 이 된다 (D-95).
+        ★ These three are 3% of a round. They are not sent to the workers
+        not for cost but because `run_isolated` starts a process — doing it
+        inside a worker would be a nested spawn (D-95).
         """
         rep = check_rule(prop.code, limits=self._limits,
                          feature_names=self._feats,
@@ -723,7 +814,8 @@ class RoundLoop:
         return fn, rep
 
     def _elite_from(self, prop, rep, out: dict) -> Elite:
-        """워커 결과 -> `Elite`. ★ id 와 순서는 **부모가** 정한다 (결정론)."""
+        """Worker result -> `Elite`. ★ The ids and order are decided by
+        **the parent** (determinism)."""
         self._rule_seq += 1
         return Elite(
             rule_id=f"r{self._rule_seq:04d}", code=prop.code,
@@ -736,14 +828,15 @@ class RoundLoop:
             rank_loss=float(out.get("rank_loss", float("nan"))))
 
     def _evaluate_candidate(self, prop, res: RoundResult):
-        """정적 검사 -> 샌드박스 -> 가중치 최적화 -> 채점. **전부 fail-closed.**"""
+        """Static checks -> sandbox -> weight optimisation -> scoring.
+        **All fail-closed.**"""
         got = self._admit(prop, res)
         if got is None:
             return None
         fn, rep = got
 
         try:
-            # ★ 적합기는 **이 규칙의 len(W0)** 이 정한다 (D-144).
+            # ★ The fitter is decided by **this rule's len(W0)** (D-144).
             _ft = fitter_for(len(prop.w0))
             fr = fit_weights(fn, self.matrix, self.table, self.splits.train,
                              prop.w0, max_evals=_ft["max_evals"],
@@ -759,7 +852,8 @@ class RoundLoop:
             res.rejections.append(("fit", str(e)[:90]))
             return None
         except Exception as e:                            # noqa: BLE001
-            # 규칙이 채점 중 터지면 **기각**이다. 삼키지 않는다 (§26.4).
+            # A rule blowing up during scoring is a **rejection**. It is
+            # not swallowed (§26.4).
             res.n_rejected_fit += 1
             res.rejections.append(("run", f"{type(e).__name__}: {e}"[:90]))
             return None
@@ -782,12 +876,13 @@ class RoundLoop:
             "all": ev.at(1)})
 
     def score_only(self, code: str, w0) -> float:
-        """규칙 하나를 **학습 분할에서만** 채점한다. 아카이브에 안 넣는다.
+        """Scores one rule **on the training split only**. It does not
+        enter the archive.
 
-        RuleWriter 후보를 줄 세우는 데 쓴다 (§30.9 2단계). 홀드아웃은
-        `fit_weights` 가 보고용으로만 계산하고 여기서는 돌려주지 않는다 —
-        씨앗 선택이 홀드아웃을 보면 그 홀드아웃은 홀드아웃이 아니다
-        (§26.4, 원칙 6).
+        It is used to rank RuleWriter candidates (§30.9 stage 2).
+        `fit_weights` computes the holdout for reporting only and it is not
+        returned here — if seed selection looks at the holdout, that holdout
+        is not a holdout (§26.4, principle 6).
         """
         from kernelrule.agents.schemas import RuleProposal
 
@@ -795,15 +890,16 @@ class RoundLoop:
         e = self._evaluate_candidate(
             RuleProposal(code=code, w0=list(w0), changes="score_only"), res)
         if e is None:
-            raise ValueError(f"후보가 거부됐다: {res.rejections}")
+            raise ValueError(f"the candidate was refused: {res.rejections}")
         return float(e.regret)
 
     def seed(self, code: str, w0, *, changes: str = "seed") -> Elite:
-        """초기 규칙을 아카이브에 넣는다.
+        """Puts the initial rule into the archive.
 
-        **없으면 1라운드가 빈 부모에서 출발한다.** 손규칙을 기준선으로 삼아
-        "리포트를 읽고 그것을 고칠 수 있는가" 를 시험하려면 여기서 시작해야
-        한다 — 그러지 않으면 루프가 전혀 다른 규칙의 리포트를 본다.
+        **Without it, round 1 starts from an empty parent.** To take the
+        hand rule as the baseline and test "can it read the report and fix
+        that rule", it has to start here — otherwise the loop reads the
+        report of an entirely different rule.
         """
         from kernelrule.agents.schemas import RuleProposal
 
@@ -811,26 +907,29 @@ class RoundLoop:
         e = self._evaluate_candidate(
             RuleProposal(code=code, w0=list(w0), changes=changes), res)
         if e is None:
-            raise ValueError(f"초기 규칙이 거부됐다: {res.rejections}")
+            raise ValueError(
+                f"the initial rule was refused: {res.rejections}")
         e.round = -1
         self.archive.consider(e)
         self._seen_code[code.strip()] = e.regret
         return e
 
-    # -- 한 라운드 --------------------------------------------------------
+    # -- One round --------------------------------------------------------
     def _record_cross(self, r: int, codes: list[str], child: str) -> None:
-        """★ 자식이 **두 부모 각각에만 있던 피처**를 둘 다 썼는가 (D-96).
+        """★ Did the child use features **unique to each of the two
+        parents** (D-96)?
 
-        `cross` 가 두 부모를 받고도 한쪽만 베끼면 `explore` 와 다를 것이
-        없다 — 그것이 실험 계획서의 관찰 1이다. **섞을 것이 없는 경우**
-        (A 고유 또는 B 고유가 비었을 때) 를 따로 세지 않으면 분모가
-        틀린다.
+        If `cross` takes two parents and copies only one, it is no different
+        from `explore` — that is observation 1 of the experiment plan.
+        Without counting **the cases where there is nothing to mix** (when
+        A-unique or B-unique is empty) separately, the denominator is wrong.
         """
         def feats(code: str) -> set:
-            # ★ `except Exception` 이었다. 2026-09-03 에 `self._fmins` 를
-            #   추가하면서 그 `AttributeError` 를 삼켜 피처 집합이 **빈 채로**
-            #   지나갔다 — 관찰 장치가 조용히 0 이 되는 자리다. 규칙이
-            #   못 읽히는 경우만 삼킨다.
+            # ★ It used to be `except Exception`. Adding `self._fmins` on
+            #   2026-09-03 swallowed that `AttributeError` and the feature
+            #   set passed through **empty** — a place where the observation
+            #   device silently becomes 0. Only the case where the rule
+            #   cannot be parsed is swallowed.
             try:
                 return check_rule(code, limits=self._limits,
                                   feature_names=self._feats,
@@ -845,11 +944,13 @@ class RoundLoop:
             "round": r,
             "a": sorted(a), "b": sorted(b), "child": sorted(c),
             "only_a": sorted(only_a), "only_b": sorted(only_b),
-            # 섞을 것이 있었는가 — 없으면 분모에서 뺀다
+            # Was there anything to mix — if not, it is taken out of the
+            # denominator
             "mixable": bool(only_a and only_b),
             "took_a": sorted(c & only_a), "took_b": sorted(c & only_b),
             "mixed": bool(c & only_a) and bool(c & only_b),
-            # 한쪽을 통째로 베꼈는가 (부모 코드와 문자 단위로 같다)
+            # Did it copy one side whole (character-identical to a parent's
+            # code)
             "copied": child.strip() in (codes[0].strip(), codes[1].strip())})
 
     def run_round(self) -> RoundResult:
@@ -862,18 +963,19 @@ class RoundLoop:
                                     if self.archive.best else None),
                       cells=self.archive.n_cells)
 
-        # 1~2. 진단 리포트 -> 가설
-        #  ★ `use_analyst=False` 면 이 블록을 통째로 건너뛴다 (§16.1).
-        #    리포트를 만들지도 않는다 — 만들어 놓고 안 주면 "진단이 있는데
-        #    안 쓴다" 가 되어 다른 조건이 된다.
+        # 1~2. the diagnostic report -> hypotheses
+        #  ★ With `use_analyst=False` this whole block is skipped (§16.1).
+        #    The report is not even built — building it and not giving it
+        #    would be "there is a diagnosis and it is unused", a different
+        #    condition.
         hyps: list[dict] = []
         if self.cfg.use_analyst and self.archive.best is not None:
             def analyze() -> list[dict]:
-                """리포트를 **다시 만들고** 가설을 받는다.
+                """**Rebuilds** the report and receives hypotheses.
 
-                ★ 리포트를 재사용하지 않는다 — 3단계에서 축이 생기면
-                피처 목록이 바뀌고, 옛 리포트를 다시 주면 Analyst 는 방금
-                만든 축을 못 본다.
+                ★ The report is not reused — if stage 3 creates an axis the
+                feature list changes, and handing the old report back would
+                leave the Analyst blind to the axis just built.
                 """
                 fn = compile_rule(self.archive.best.code)
                 rep = build_report(
@@ -893,32 +995,38 @@ class RoundLoop:
             for h in first:
                 h["analyst_pass"] = 1
             hyps = first
-            # ★ 되돌아가면 **두 응답을 다 남긴다.** 전에는 `hyps` 를 덮어써서
-            #   첫 응답이 기록에서 사라졌다 — 요구가 담긴 쪽이 그쪽이라
-            #   "요구 빈도" 의 **분모가 통째로 없어진다.**
+            # ★ When it goes back, **both responses are kept.** It used to
+            #   overwrite `hyps`, so the first response vanished from the
+            #   record — and that is the one holding the requests, so the
+            #   **denominator of "request frequency" disappeared entirely.**
             replaced: list[dict] = []
 
-            # 3. ★ 없는 축을 요구했으면 만든다 (D-75)
+            # 3. ★ If it asked for an axis that does not exist, build it
+            #    (D-75)
             if self.cfg.max_new_features_per_round > 0 and first:
                 made = self._write_features(first, r, res)
                 calls["feature"] += min(res.n_feature_requests,
                                         self.cfg.max_new_features_per_round)
                 if made:
-                    # ★ **Analyst 로 되돌아간다.** 축을 만들어 놓고 그 라운드에
-                    #   못 쓰면 반쪽이다 — 다음 라운드까지 기다리면 그 축을
-                    #   요구한 가설과 이어지지 않는다.
+                    # ★ **It goes back to the Analyst.** Building an axis
+                    #   and not using it in that round is half a job —
+                    #   waiting for the next round breaks the link to the
+                    #   hypothesis that asked for it.
                     second = analyze()
                     if second:
                         for h in second:
                             h["analyst_pass"] = 2
                         replaced, hyps = first, second
 
-            # 가설에 id 를 붙인다. RuleEditor 프롬프트와 계보 추적에 쓰인다.
-            # ⚠️ 요구 빈도를 옛 실행과 견줄 때는 `analyst_pass == 1` 만 센다 —
-            #    옛 실행은 라운드당 Analyst 가 한 번이었다 (원칙 4).
-            # ★ id 는 **우리가 정한다.** 모델이 자기 응답 안에서 `H0..H4` 를
-            #   붙이므로 그것을 그대로 두면 라운드마다, 그리고 되돌아간
-            #   두 응답 사이에서 겹친다. 겹치면 계보 추적이 조용히 어긋난다.
+            # Ids are attached to the hypotheses. They are used in the
+            # RuleEditor prompt and for lineage tracking.
+            # ⚠️ When comparing request frequency against old runs, count
+            #    only `analyst_pass == 1` — old runs called the Analyst once
+            #    per round (principle 4).
+            # ★ **We** assign the ids. The model labels `H0..H4` within its
+            #   own response, so leaving those as they are makes them
+            #   collide across rounds and between the two responses of a
+            #   go-back. A collision silently misaligns the lineage.
             for h in replaced + hyps:
                 h["id"] = f"H{self._hyp_seq}"
                 self._hyp_seq += 1
@@ -934,31 +1042,36 @@ class RoundLoop:
                                          for h in hyps],
                           n_replaced=len(replaced))
         elif self.cfg.hypothesis_pool and self.archive.best is not None:
-            # ★ 대조군 C — Analyst 는 안 부르고 남의 가설을 넣는다 (D-91)
+            # ★ Control arm C — the Analyst is not called and someone
+            # else's hypotheses go in (D-91)
             hyps = self._pool_round(r)
             for h in hyps:
                 h["id"] = f"H{self._hyp_seq}"
                 self._hyp_seq += 1
                 h["round"] = r
-                h["analyst_pass"] = 0        # 0 = 빌려옴
+                h["analyst_pass"] = 0        # 0 = borrowed
             self.hypotheses.extend(hyps)
 
-        # 4. 규칙 생성 — ★ 병렬 호출 (§4-0). 12개나 1개나 벽시계가 비슷하다
+        # 4. Rule generation — ★ parallel calls (§4-0). 12 or 1, the wall
+        #    clock is similar
         parents = self.archive.parents(self.cfg.n_rules_per_round, self.rng)
         applied = [f"{h.get('id','?')}: {h.get('claim','')[:80]}"
                    for h in self.hypotheses[-4:]]
-        # ★ 칸은 3분위라 Elite 혼자서는 모른다 — 지금 배치를 뒤져 적는다.
+        # ★ The cells are tertiles, so an Elite alone does not know them —
+        #   the current placement is looked up and written down.
         _where = {id(v): list(k) for k, v in self.archive.cells.items()}
         self.trace.ev("parents", round=r, picks=[
             {"kind": k, "rules": [x.rule_id for x in ps],
              "cells": [_where.get(id(x)) for x in ps]}
             for k, ps in parents])
-        # ★ exploit 자리에는 **서로 다른 가설**을 준다 (D-144).
-        #   옛 방식은 전 자리 무작위라 exploit 끼리 같은 가설을 뽑을 수
-        #   있었고, 트레이스에서 exploit 중복 77건 중 67건(87%)이
-        #   "같은 부모 + 같은 가설" 이었다. 부모가 같으니(전역 최고 하나)
-        #   가설까지 같으면 프롬프트가 문자 그대로 같아진다.
-        #   ⚠️ 자리 전체의 무작위는 유지한다 — exploit 끼리만 다르게 한다.
+        # ★ The exploit slots are given **different hypotheses** (D-144).
+        #   The old way randomised across all slots, so two exploits could
+        #   draw the same hypothesis, and in the traces 67 of 77 exploit
+        #   duplicates (87%) were "the same parent + the same hypothesis".
+        #   The parent is the same (one global best), so if the hypothesis
+        #   matches too the prompts become literally identical.
+        #   ⚠️ The randomisation across all slots is kept — only the
+        #      exploits are made distinct from each other.
         n_exploit = sum(1 for k, _ in parents if k == "exploit")
         _exploit_hyps: list = []
         if hyps and n_exploit:
@@ -972,57 +1085,67 @@ class RoundLoop:
             if ps:
                 from kernelrule.agents.schemas import RuleProposal
                 parent = RuleProposal(code=ps[0].code, w0=ps[0].w)
-                # ★ 두 번째 부모를 **실제로 넘긴다** (D-96). `archive.parents`
-                #   는 `cross` 에 Elite 둘을 주는데 여기서 `ps[0]` 만 써서
-                #   **§13 의 교차가 구현된 적이 없었다** — `cross` 가
-                #   `explore` 와 같았다.
+                # ★ The second parent is **actually passed** (D-96).
+                #   `archive.parents` gives `cross` two Elites, but only
+                #   `ps[0]` was used here, so **§13's crossover was never
+                #   implemented** — `cross` was the same as `explore`.
                 if len(ps) > 1:
                     parent2 = RuleProposal(code=ps[1].code, w0=ps[1].w)
-                # 부모의 항 수를 세어 프롬프트에 넣는다 (교체 프레임)
+                # The parent's term count is measured and put into the
+                # prompt (the replacement frame)
                 pr = check_rule(ps[0].code, limits=self._limits,
                                 feature_names=self._feats,
                                 feature_mins=self._fmins,
                                 shape_value_names=self._shape_vals,
                                 n_weights=len(ps[0].w))
                 n_terms = pr.n_terms
-                # ★ 경로별 예산이므로 "남은 자리" 는 **가장 무거운 경로**로
-                #   센다 (D-144). `n_terms`(전체 항 수)로 세면 가지를 나눈
-                #   부모에게 "예산이 찼다" 고 거짓말한다.
+                # ★ The budget is per path, so "room left" is counted on
+                #   **the heaviest path** (D-144). Counting by `n_terms`
+                #   (the total term count) lies to a parent that split its
+                #   branches, telling it the budget is full.
                 path_params = pr.parameters_used
-            # ★ 가설 배정을 **무작위**로 (D-94). `hyps[i % len(hyps)]` 는
-            #   앞쪽 가설을 더 자주 쓴다 — 가설 5개면 3 3 2 2 2, 7개면
-            #   2 2 2 2 2 1 1 이다. **설계가 아니라 12 % n 이고**, 부모
-            #   종류(i=0~5 exploit / 6~8 explore / 9~11 cross)와도 상관된다.
-            #   `self.rng` 를 쓰므로 시드로 재현된다.
+            # ★ Hypothesis assignment is **random** (D-94).
+            #   `hyps[i % len(hyps)]` uses the earlier hypotheses more often
+            #   — with 5 hypotheses it is 3 3 2 2 2, with 7 it is
+            #   2 2 2 2 2 1 1. **That is 12 % n, not a design**, and it also
+            #   correlates with the parent kind (i=0~5 exploit / 6~8 explore
+            #   / 9~11 cross). It uses `self.rng`, so it is reproducible from
+            #   the seed.
             if kind == "exploit" and _exploit_hyps:
                 hyp = _exploit_hyps.pop(0)
             else:
                 hyp = (hyps[int(self.rng.integers(len(hyps)))]
                        if hyps else None)
             reqs.append({"prompt": f"round={r} parent={kind}",
-                         # ★ 부모 종류를 **별도 필드**로 남긴다. 프롬프트
-                         #   문자열에만 있으면 `llm_calls` 의 `prompt` 가 빈
-                         #   실행에서 못 읽는다 — 실제로 "가설-부모 불일치"
-                         #   를 옛 자료로 못 쟀다 (D-94).
+                         # ★ The parent kind is recorded as **its own
+                         #   field**. Living only in the prompt string, it
+                         #   cannot be read in runs where `llm_calls`'
+                         #   `prompt` is empty — "hypothesis-parent
+                         #   mismatch" really could not be measured from old
+                         #   material (D-94).
                          "parent_kind": kind,
                          "parent": parent, "parent2": parent2,
-                         # ★ 관찰용 부모 코드 (D-96 관찰 1). 프롬프트에는
-                         #   안 들어간다 — `_user_prompt` 가 안 읽는 키다.
-                         #   자식이 **두 부모 각각에만 있던 피처**를 둘 다
-                         #   쓰는지 세려면 부모 피처 집합이 필요하다.
+                         # ★ The parent code, for observation (D-96
+                         #   observation 1). It does not enter the prompt —
+                         #   it is a key `_user_prompt` does not read.
+                         #   Counting whether the child used features unique
+                         #   to each parent needs the parents' feature sets.
                          "_codes": [x.code for x in ps[:2]],
-                         # ★ 트레이스용 부모 id (D-133). `_user_prompt` 가
-                         #   안 읽는 키다 — 프롬프트에는 안 들어간다.
+                         # ★ The parent ids, for the trace (D-133). A key
+                         #   `_user_prompt` does not read — it does not enter
+                         #   the prompt.
                          "_parent_ids": [x.rule_id for x in ps[:2]],
                          "parent_n_terms": n_terms,
                          "parent_path_params": path_params,
                          "hypothesis": hyp,
                          "hypotheses_applied": applied,
-                         # ★ 가설 절을 만들지 말지 (§16.1). `hypothesis=None`
-                         #   으로 추측하면 안 된다 — 그것은 "가설이 없는
-                         #   라운드" 와 "Analyst 자체가 없음" 을 섞는다
-                         # 가설 절을 만들지 말지. 대조군 C 는 Analyst 를
-                         # 안 부르지만 **가설은 받으므로** 절이 있어야 한다
+                         # ★ Whether to build the hypothesis section
+                         #   (§16.1). It must not be guessed from
+                         #   `hypothesis=None` — that would mix "a round
+                         #   with no hypothesis" with "no Analyst at all".
+                         # Whether to build the hypothesis section. Control
+                         # arm C does not call the Analyst but **does
+                         # receive hypotheses**, so the section must exist
                          "analyst": bool(self.cfg.use_analyst
                                          or self.cfg.hypothesis_pool)})
         raws = self._call_optimizers(reqs)
@@ -1030,7 +1153,8 @@ class RoundLoop:
         self.trace.llm_calls(self.llm, round=r)
 
         elites: list[Elite] = []
-        #: 병렬로 보낼 후보 — 부모 종류를 함께 들고 간다 (D-94 계수용).
+        #: Candidates to send in parallel — the parent kind travels with
+        #: them (for the D-94 counts).
         batch: list = []
 
         def bump(kind: str, key: str) -> None:
@@ -1043,10 +1167,12 @@ class RoundLoop:
             bump(kind, "n")
             res.n_proposed += 1
             if isinstance(raw, BaseException):
-                # ★ 두 가지를 가른다 (D-43).
-                #   전송 실패   크레딧·인증·네트워크. **우리 문제**다
-                #   재시도 소진  모델이 스키마를 못 맞춘 것. 폐기다 (§26.4)
-                #   섞으면 "모델이 나쁜 규칙을 냈다" 로 읽힌다.
+                # ★ Two things are separated (D-43).
+                #   transport failure  credit / auth / network. **Our
+                #                      problem**
+                #   retries exhausted  the model failed to match the schema.
+                #                      Discarded (§26.4)
+                #   Mixed, it reads as "the model produced bad rules".
                 if _is_transport_error(raw):
                     res.n_llm_error += 1
                     res.rejections.append(("llm-transport", (
@@ -1063,8 +1189,9 @@ class RoundLoop:
                                   detail=f"{type(raw).__name__}: {raw}"[:300])
                 continue
             try:
-                # ★ 예산을 넘긴다 (D-107). 안 넘기면 MockLLM 경로와
-                #   구조화 출력을 안 쓰는 경로에서 16항이 조용히 거부된다.
+                # ★ The budget is passed (D-107). Without it, 16-term
+                #   rules are silently refused on the MockLLM path and on
+                #   any path not using structured output.
                 prop = validate_rule_proposal(raw,
                                               parameters=self.cfg.parameters)
             except SchemaViolation as e:
@@ -1083,24 +1210,27 @@ class RoundLoop:
                            changes=prop.changes, n_weights=len(prop.w0),
                            code=prop.code, code_sha=_sha(prop.code))
             key = prop.code.strip()
-            if key in self._seen_code:      # 재채점하지 않는다 (§15.4)
+            if key in self._seen_code:      # it is not rescored (§15.4)
                 bump(kind, "dup")
                 self.trace.ev("duplicate", round=r, i=i, kind=kind,
                               code_sha=_sha(prop.code))
                 continue
-            # ★ 중복 제거를 **병렬 진입 전에** 끝낸다 — 같은 라운드 안의
-            #   중복도 여기서 잡아야 워커가 같은 일을 두 번 안 한다.
+            # ★ Deduplication is finished **before entering the parallel
+            #   path** — duplicates within the same round have to be caught
+            #   here too, or the workers do the same job twice.
             self._seen_code[key] = float("nan")
             batch.append((prop, kind))
 
-        # ★ 채점·적합은 한 번에 (D-95). `n_workers=0` 이면 순차 그대로다.
+        # ★ Fitting and scoring happen in one batch (D-95). At
+        #   `n_workers=0` it stays sequential.
         got = self._evaluate_batch([b for b, _k in batch], res)
         by_code = {e.code.strip(): e for e in got}
         for prop, kind in batch:
             e2 = by_code.get(prop.code.strip())
             if e2 is None:
                 self._seen_code.pop(prop.code.strip(), None)
-                # ★ 채점까지 못 간 것 — 지금까지 어디에도 안 남았다 (D-133)
+                # ★ It never reached scoring — until now this was recorded
+                #   nowhere (D-133)
                 self.trace.ev("reject", round=r, kind=kind, why="fit_or_run",
                               code_sha=_sha(prop.code))
                 continue
@@ -1108,17 +1238,18 @@ class RoundLoop:
             self.trace.ev("scored", round=r, kind=kind, rule=e2.rule_id,
                           code_sha=_sha(e2.code), fit=e2.regret,
                           val=e2.val_regret,
-                          # ★ 적합기가 안 움직였는가 — "조용히 아무것도 안
-                          #   함" 의 자리다 (D-54)
+                          # ★ Did the fitter fail to move — this is the
+                          #   "silently did nothing" spot (D-54)
                           moved=bool(getattr(e2, "moved", True)))
             self._seen_code[prop.code.strip()] = e2.regret
             elites.append(e2)
 
-        # 6~7. 아카이브 갱신 + 실패 기록
+        # 6~7. Update the archive + record the failures
         before = self.archive.best.regret if self.archive.best else float("inf")
         for e in elites:
             won = self.archive.consider(e)
-            # ★ 3분위 칸은 모집단이 정한다 — 지금 배치를 뒤져 적는다 (D-144).
+            # ★ The tertile cell is decided by the population — the
+            #   current placement is looked up and written down (D-144).
             _cell = next((list(k) for k, v in self.archive.cells.items()
                           if v is e), None)
             self.trace.ev("archive", round=r, rule=e.rule_id,
@@ -1137,18 +1268,21 @@ class RoundLoop:
             res.best_regret = self.archive.best.regret
             res.best_rank_loss = self.archive.best.rank_loss
             res.best_val_regret = self.archive.best.val_regret
-            # ★ 라운드마다 **그때의 최고**를 코드째 남긴다 (D-101 관찰).
-            #   `archive.jsonl` 은 마지막 상태뿐이라 "라운드마다 tau 가
-            #   오르는가" 를 되짚을 수 없다.
+            # ★ **The best at that moment** is recorded per round, code
+            #   included (the D-101 observations). `archive.jsonl` holds
+            #   only the final state, so "does tau rise per round" cannot be
+            #   retraced from it.
             self.bests.append({
                 "round": len(self.rounds), "rule_id": self.archive.best.rule_id,
                 "code": self.archive.best.code, "w": self.archive.best.w,
                 "regret": self.archive.best.regret,
                 "rank_loss": self.archive.best.rank_loss})
             res.val_gap = res.best_val_regret - res.best_regret
-        # ★ 아카이브는 **학습** 점수로 고른다 (검증을 쓰면 홀드아웃이 오염된다).
-        #   그래서 검증에서 무너지는 규칙이 "최고" 가 될 수 있다 — 실제로 났다
-        #   (train 1.164 / val 6.085). 선택은 그대로 두되 **경보를 낸다.**
+        # ★ The archive selects on the **training** score (using
+        #   validation would contaminate the holdout). So a rule that
+        #   collapses on validation can become the "best" — it really
+        #   happened (train 1.164 / val 6.085). The selection is left as it
+        #   is, but **an alarm is raised.**
         res.n_val_blowups = sum(
             1 for e in self.archive.cells.values()
             if np.isfinite(e.val_regret) and e.val_regret - e.regret
@@ -1166,14 +1300,16 @@ class RoundLoop:
         return res
 
     def _call_optimizers(self, reqs: list[dict]) -> list:
-        """규칙 12개를 부른다. 클라이언트가 지원하면 **병렬**로.
+        """Calls for 12 rules. **In parallel** if the client supports it.
 
-        `MockLLM` 은 동기이고 `OpenAILLM` 은 `many()` 를 제공한다. 루프는
-        둘을 구분하지 않는다 — `LLMClient` Protocol 뒤에 있다.
+        `MockLLM` is synchronous and `OpenAILLM` provides `many()`. The loop
+        does not distinguish between them — they sit behind the `LLMClient`
+        Protocol.
         """
-        # ★ `_` 로 시작하는 키는 **관찰용**이고 프롬프트에 안 간다 (D-96).
-        #   `_user_prompt` 가 안 읽으므로 넘겨도 지금은 무해하지만, 그것은
-        #   **우연이다** — 나중에 누가 `kw` 를 훑으면 조용히 새어 들어간다.
+        # ★ Keys starting with `_` are **for observation** and do not go
+        #   into the prompt (D-96). `_user_prompt` does not read them, so
+        #   passing them is harmless today, but that is **an accident** —
+        #   the day someone sweeps `kw`, they leak in silently.
         reqs = [{k: v for k, v in q.items() if not k.startswith("_")}
                 for q in reqs]
         many = getattr(self.llm, "many", None)
@@ -1190,12 +1326,13 @@ class RoundLoop:
         import asyncio
         return asyncio.run(many("rule_editor", [dict(q) for q in reqs]))
 
-    # -- 목적함수 전환 (D-104) ---------------------------------------------
+    # -- The objective switch (D-104) -------------------------------------
     def _maybe_switch(self) -> bool:
-        """★ 직전 `switch_window` 라운드의 개선이 문턱 미만이면 바꾼다.
+        """★ Switches when the improvement over the last `switch_window`
+        rounds is below the threshold.
 
-        전환은 **한 번뿐이다.** 두 번 바꾸면 "언제 바꾸나" 가 두 개가 되고
-        그것이 곧 하이퍼파라미터다.
+        The switch happens **only once.** Switching twice makes two "when do
+        we switch" decisions, and that is a hyperparameter.
         """
         sw = self.cfg.objective_switch
         if not sw or self._switched:
@@ -1203,8 +1340,8 @@ class RoundLoop:
         src, dst = sw.split("->")
         if self._objective != src:
             raise ValueError(
-                f"objective_switch={sw!r} 인데 시작 목적함수가 "
-                f"{self._objective!r} 다. 앞쪽과 같아야 한다.")
+                f"objective_switch={sw!r} but the starting objective is "
+                f"{self._objective!r}. It must match the left-hand side.")
         n = self.cfg.switch_window
         if len(self.rounds) < n + 1:
             return False
@@ -1219,7 +1356,8 @@ class RoundLoop:
         return True
 
     def _switch_to(self, dst: str) -> None:
-        """목적함수를 바꾸고 **아카이브를 새 기준으로 재정렬한다.**"""
+        """Switches the objective and **re-sorts the archive under the new
+        criterion.**"""
         from kernelrule.core.archive import Archive
 
         self._objective = dst
@@ -1228,8 +1366,9 @@ class RoundLoop:
         old = list(self.archive.cells.values())
         if self.archive.best is not None and self.archive.best not in old:
             old.append(self.archive.best)
-        # ★ 새 기준값이 없으면 채운다. 조용히 NaN 으로 두면 아카이브가
-        #   거부한다 (그것이 맞는 동작이다).
+        # ★ If the new criterion's value is missing, it is filled in.
+        #   Leaving it silently NaN makes the archive refuse it (which is
+        #   the right behaviour).
         if dst == "rank":
             for e in old:
                 if not np.isfinite(e.rank_loss):
@@ -1246,31 +1385,35 @@ class RoundLoop:
         for e in sorted(old, key=lambda x: (x.rank_loss if dst == "rank"
                                             else x.regret)):
             self.archive.consider(e)
-        # ★ 프롬프트의 목표 정의도 바꾼다. 캐시된 에이전트를 버린다 —
-        #   안 버리면 옛 지시가 계속 간다 (원칙 1).
+        # ★ The goal definition in the prompt changes too. The cached
+        #   agents are discarded — without that, the old instructions keep
+        #   going out (principle 1).
         if hasattr(self.llm, "objective"):
             self.llm.objective = dst
             if hasattr(self.llm, "_agents"):
                 self.llm._agents.clear()
         self._restart_pool()
-        print(f"  ★ 목적함수 전환 r{self.switch_round}: -> {dst} "
-              f"(아카이브 {len(old)}개 재정렬 -> 셀 {len(self.archive.cells)})")
+        print(f"  ★ objective switch at r{self.switch_round}: -> {dst} "
+              f"({len(old)} archive entries re-sorted -> "
+              f"{len(self.archive.cells)} cells)")
 
-    # -- 종료 판정 (§14.3) -------------------------------------------------
+    # -- The stopping verdict (§14.3) -------------------------------------
     def should_stop(self) -> tuple[bool, str]:
-        """⛔ **봉인됨** (2026-09-08, D-144). 언제나 `(False, "")` 다.
+        """⛔ **Sealed** (2026-09-08, D-144). It is always `(False, "")`.
 
-        조기 종료는 D-132 에서 껐고 `patience` 는 0 이다. 그런데 아래 옛
-        구현은 **`best_val_regret` 을 읽었다** — 검증 분할이 종료 판정에
-        들어가는 경로다. 지금은 `patience=0` 이라 안 돌지만 **누가 켜면
-        그 순간 시험이 오염된다** (§29.7 — 검증/최종이 목적함수나 종료에
-        들어가는 경로를 두지 않는다).
+        Early stopping was turned off in D-132 and `patience` is 0. But the
+        old implementation below **read `best_val_regret`** — a path by
+        which the validation split enters the stopping verdict. It does not
+        run today because `patience=0`, but **the moment someone turns it on
+        the test is contaminated** (§29.7 — no path by which validation or
+        the final split enters the objective or the stopping rule).
 
-        ★ 그래서 경로를 지운다. 조기 종료를 되살리려면 **검증을 안 보는
-        기준**으로 새로 쓰고 실험 계획서를 먼저 써라.
+        ★ So the path is removed. To bring early stopping back, write a new
+        criterion **that does not look at validation**, and write the
+        experiment plan first.
 
         ```
-        옛 구현 (봉인, 지우지 않고 남긴다):
+        the old implementation (sealed, kept rather than deleted):
             n = self.cfg.patience
             if n <= 0: return False, ""
             if len(self.rounds) < n + 1: return False, ""
@@ -1288,27 +1431,31 @@ class RoundLoop:
         """
         if self.cfg.patience:
             raise ValueError(
-                f"patience={self.cfg.patience} 인데 조기 종료 경로가 "
-                "봉인돼 있다 (D-144). 그 경로는 검증 분할을 읽었다 — "
-                "되살리려면 검증을 안 보는 기준으로 새로 써라.")
+                f"patience={self.cfg.patience} but the early-stop path is "
+                f"sealed (D-144). That path read the validation split — to "
+                f"bring it back, write a new criterion that does not look "
+                f"at validation.")
         return False, ""
 
     def run(self, n_rounds: int | None = None, *, verbose: bool = True,
             dump_each_round: bool = True):
-        """라운드를 돌린다. ★ **끝날 때 반드시 저장한다** (D-33).
+        """Runs the rounds. ★ **It always saves at the end** (D-33).
 
-        전에는 `dump()` 를 호출자가 불러야 했고, 부르지 않은 러너가 78분
-        1400호출의 결과를 통째로 잃었다. 규칙 코드가 메모리에만 있었으므로
-        재채점이 불가능했다 — 표준출력의 요약만 남았다.
+        `dump()` used to be the caller's job, and a runner that did not call
+        it lost the entire result of 78 minutes and 1,400 calls. The rule
+        code lived only in memory, so rescoring was impossible — all that
+        remained was the summary on stdout.
 
-        `finally` 로 감싼 이유는 **중간에 죽어도 거기까지는 남아야** 하기
-        때문이다. 예산 초과·rate limit·Ctrl-C 가 전부 여기 걸린다.
-        `dump_each_round` 는 라운드마다 덮어써 장시간 실행의 보험이 된다
-        (아카이브가 작아 비용이 무시할 만하다).
+        The reason for the `finally` is that **whatever got that far must
+        survive even if it dies partway.** Budget overruns, rate limits and
+        Ctrl-C all land here. `dump_each_round` overwrites every round and
+        is the insurance for long runs (the archive is small, so the cost is
+        negligible).
         """
         n = n_rounds or self.cfg.max_rounds
-        # ★ 첫 줄이 자족해야 한다 (D-133 §3-3) — 트레이스 하나만 있어도
-        #   조건을 알 수 있게 config 전체와 커밋 해시를 담는다.
+        # ★ The first line must stand on its own (D-133 §3-3) — it holds
+        #   the whole config and the commit hash, so the conditions can be
+        #   known from the trace alone.
         self.trace.ev("run_start", run_id=self.cfg.run_id, n_rounds=n,
                       commit=_git_commit(), config=self._config_dict(),
                       table=str(getattr(self.table, "bundle", "")),
@@ -1321,17 +1468,20 @@ class RoundLoop:
                 res = self.run_round()
                 if verbose:
                     print(res.line(), flush=True)
-                # ★ 목적함수 전환 (D-104). 라운드가 끝난 **뒤에** 본다 —
-                #   그래야 그 라운드까지의 개선으로 판정한다.
+                # ★ The objective switch (D-104). It is checked **after**
+                #   the round ends — so the verdict uses the improvement up
+                #   to and including that round.
                 self._maybe_switch()
-                # ★ 제안이 **전부** 전송 실패면 멈춘다 (D-43). 크레딧이나
-                #   인증 문제는 저절로 낫지 않는다 — 남은 라운드를 태워도
-                #   빈 아카이브만 남는다. 실제로 12라운드를 그렇게 썼다.
+                # ★ If **every** proposal is a transport failure, stop
+                #   (D-43). A credit or authentication problem does not heal
+                #   by itself — burning the remaining rounds leaves nothing
+                #   but an empty archive. 12 rounds really were spent that
+                #   way.
                 if (STOP_ON_TOTAL_LLM_FAILURE and res.n_proposed
                         and res.n_llm_error == res.n_proposed):
                     raise LLMUnreachable(
-                        f"r{res.round}: 제안 {res.n_proposed}건이 전부 LLM "
-                        f"전송 실패다. 마지막 사유: "
+                        f"r{res.round}: all {res.n_proposed} proposals are "
+                        f"LLM transport failures. Last reason: "
                         + next((m for k, m in reversed(res.rejections)
                                 if k == "llm-transport"), "?"))
                 if dump_each_round:
@@ -1339,12 +1489,12 @@ class RoundLoop:
                 stop, why = self.should_stop()
                 if stop:
                     if verbose:
-                        print(f"조기 종료: {why}")
+                        print(f"early stop: {why}")
                     break
         finally:
             path = self.dump()
-            # ★ 워커를 남기지 않는다. 12개가 4.2GB 를 공유한 채 떠 있으면
-            #   다음 실행이 fork 할 때 메모리가 는다.
+            # ★ No workers are left behind. With 12 of them floating
+            #   around sharing 4.2GB, the next run's fork grows the memory.
             if self._pool_exec is not None:
                 self._pool_exec.shutdown(wait=True)
                 self._pool_exec = None
@@ -1353,25 +1503,31 @@ class RoundLoop:
         return self.rounds
 
     def _config_dict(self) -> dict:
-        """`config.json` 의 내용. ★ 트레이스 첫 줄도 **이것을** 쓴다 —
-        두 곳에서 따로 만들면 어긋난다 (원칙 2, D-133)."""
+        """The content of `config.json`. ★ The trace's first line uses
+        **this** too — built separately in two places they diverge
+        (principle 2, D-133)."""
         from kernelrule.core.splits import is_unsealed
 
         cfg: dict = {"loop": dict(self.cfg.__dict__),
                      "split": {"kind": self.splits.kind,
                                "n_train": len(self.splits.train.shapes),
                                "n_val": len(self.splits.val.shapes),
-                               # ★ 최종 분할이 열린 채로 돈 실행인가 (§30.15).
-                               #   열렸으면 그 수치는 **오염 가능**이다.
+                               # ★ Did this run go with the final split
+                               #   open (§30.15)? If it did, its numbers are
+                               #   **possibly contaminated**.
                                "unsealed": is_unsealed()},
                      "n_features": len(self.matrix.feature_names()),
-                     # ★ 루프 **안에서** 만든 축 (D-75). 밖에서 받은 것과
-                     #   섞이면 "라이브러리가 몇 개였나" 를 못 되짚는다.
+                     # ★ Axes built **inside** the loop (D-75). Mixed with
+                     #   those received from outside, "how many were in the
+                     #   library" cannot be retraced.
                      "n_features_made_in_loop": sum(
                          1 for x in self.features_made if x.get("accepted")),
-                     # ★ 규칙 제약. **조건이므로 실행마다 남긴다** (D-78).
-                     #   분기 비교 상수 면제 전후는 같은 계열이 아니다.
-                     # ★ 목적함수 전환 (D-104). **조건이므로 남긴다.**
+                     # ★ The rule constraints. **They are conditions, so
+                     #   they are recorded per run** (D-78). Before and
+                     #   after the branch-comparison-constant exemption are
+                     #   not the same family.
+                     # ★ The objective switch (D-104). **A condition, so it
+                     #   is recorded.**
                      "objective": self.cfg.objective,
                      "fit_method": self.cfg.fit_method,
                      "fit_restarts": self.cfg.fit_restarts,
@@ -1386,14 +1542,15 @@ class RoundLoop:
         llm_cfg = getattr(self.llm, "cfg", None)
         if llm_cfg is not None and hasattr(llm_cfg, "to_dict"):
             cfg["llm"] = llm_cfg.to_dict()
-        else:                                   # MockLLM 등
+        else:                                   # MockLLM and the like
             cfg["llm"] = {"class": type(self.llm).__name__}
         return cfg
 
     def dump(self, out: str | Path | None = None) -> Path:
-        # ★ **무엇으로 돌렸는지**를 남긴다 (D-31, D-45, D-51). 이것이 없으면
-        #   나중에 어느 실행이 어느 모델/엔드포인트/추론강도였는지 알 수
-        #   없고, 그러면 나란히 놓을 수 없다.
+        # ★ **What it was run with** is recorded (D-31, D-45, D-51).
+        #   Without it there is no way to know later which run used which
+        #   model / endpoint / reasoning effort, and then they cannot be
+        #   placed side by side.
         d = Path(out or (Path(self.cfg.out_dir) / self.cfg.run_id))
         d.mkdir(parents=True, exist_ok=True)
         cfg = self._config_dict()
@@ -1407,10 +1564,10 @@ class RoundLoop:
             json.dumps(x, ensure_ascii=False) for x in self.failures))
         (d / "hypotheses.jsonl").write_text("\n".join(
             json.dumps(h, ensure_ascii=False) for h in self.hypotheses))
-        # ★ 라운드 안에서 만든 축 (D-75). **거부된 것도 남긴다** — "무엇을
-        #   만들려다 실패했나" 가 관찰이다.
-        # ★ cross 계보 (D-96 관찰 1). 부모 코드는 어디에도 안 남으므로
-        #   여기서만 되짚을 수 있다.
+        # ★ Axes built inside a round (D-75). **The refused ones are kept
+        #   too** — "what did it try to build and fail" is an observation.
+        # ★ The cross lineage (D-96 observation 1). The parent code survives
+        #   nowhere else, so it can only be retraced here.
         if self.bests:
             (d / "bests.jsonl").write_text("\n".join(
                 json.dumps(x, ensure_ascii=False) for x in self.bests))

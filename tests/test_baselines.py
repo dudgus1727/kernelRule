@@ -1,4 +1,5 @@
-"""베이스라인 (§9, §30.5b). **세 절차를 병기한다.**"""
+"""The baselines (§9, §30.5b). **The three procedures are reported side by
+side.**"""
 from __future__ import annotations
 
 import warnings
@@ -16,10 +17,10 @@ from kernelrule.core.splits import (
 
 
 def test_greedy_finds_known_optimum():
-    """정적 top-k 가 명백한 경우에 최적 집합을 찾는다 (§26.2).
+    """The static top-k finds the optimal set in an obvious case (§26.2).
 
-    config 0 은 형상 A 에서만, config 1 은 형상 B 에서만 좋다. k=2 면
-    둘을 합쳐 완벽해야 한다.
+    config 0 is good only on shape A, config 1 only on shape B. At k=2 the
+    two together have to be perfect.
     """
     t = make_table({
         (1024, 4096, 4096): [1.0, 4.0, 8.0],
@@ -27,15 +28,15 @@ def test_greedy_finds_known_optimum():
     })
     r = StaticTopK(t, coverage="union").run(ks=(1, 2, 3))
     assert r.by_k[1]["all"] == pytest.approx(2.0)      # geomean(1, 4)
-    assert r.by_k[2]["all"] == pytest.approx(1.0)      # 둘을 합치면 완벽
+    assert r.by_k[2]["all"] == pytest.approx(1.0)      # the two together are perfect
     assert r.coverage[2] == 1.0
 
 
 def test_union_coverage_beats_individual_when_configs_are_partial():
-    """★ 합집합 덮개가 필요한 이유 (§30.5b).
+    """★ Why the union cover is needed (§30.5b).
 
-    `split_k=3` 은 K 가 3의 배수인 형상에서만 유효하다. 개별 전덮개를
-    요구하면 그런 config 가 통째로 배제된다.
+    `split_k=3` is valid only on shapes whose K is a multiple of 3. Requiring
+    a full individual cover excludes such a config entirely.
     """
     t = make_table({(1024, 4096, 4096): [1.0, 2.0],
                     (2048, 4096, 4096): [2.0, 1.0]})
@@ -47,11 +48,12 @@ def test_union_coverage_beats_individual_when_configs_are_partial():
 def test_procedures_are_three_and_canonical_is_last():
     names = [p[0] for p in PROCEDURES]
     assert names == ["ok_individual", "ok_union", "canonical"]
-    assert "대표값" in PROCEDURES[-1][2]
+    assert "representative" in PROCEDURES[-1][2]
 
 
 def test_coverage_is_always_reported():
-    """덮개율을 병기하지 않으면 완화 변형이 23% 로 도망간 것을 못 본다."""
+    """Without reporting the cover rate alongside, a relaxed variant escaping
+    to 23% goes unseen."""
     t = make_table({(1024, 4096, 4096): [1.0, 2.0]})
     r = StaticTopK(t).run(ks=(1,))
     assert 0.0 <= r.coverage[1] <= 1.0
@@ -59,7 +61,8 @@ def test_coverage_is_always_reported():
 
 @pytest.mark.needs_bundle
 def test_canonical_reproduces_documented_values(real_bundle_path):
-    """★ 대표값 절차가 문서 값(§30.5)을 재현한다. 회귀로 고정한다."""
+    """★ The representative procedure reproduces the documented value
+    (§30.5). It is pinned as a regression."""
     from kernelrule.core.table import PerfTable
 
     with warnings.catch_warnings():
@@ -82,10 +85,11 @@ def test_canonical_reproduces_documented_values(real_bundle_path):
 
 @pytest.mark.needs_bundle
 def test_ok_only_individual_reproduces_the_artifact(real_bundle_path):
-    """★ 옛 값 1.394 가 **덮개 인공물**임을 고정한다 (§30.5b).
+    """★ It pins that the old value 1.394 is **a cover artefact** (§30.5b).
 
-    후보가 3개로 줄어드는 것이 원인이다. 그 사실이 회귀로 남아야 나중에
-    같은 숫자를 다시 대표값으로 착각하지 않는다.
+    The cause is the candidates shrinking to 3. That fact has to stay as a
+    regression so the same number is not mistaken for a representative value
+    later.
     """
     from kernelrule.core.table import PerfTable
 
@@ -99,14 +103,16 @@ def test_ok_only_individual_reproduces_the_artifact(real_bundle_path):
                       and (tb.frame_for(p).align_c == 8).all())]
         r = StaticTopK(tb, sh, coverage="individual").run(ks=(1, 3, 8))
     assert r.n_configs_considered == 3, \
-        f"후보가 {r.n_configs_considered}개다 — 1.394 의 원인이 사라졌다"
+        (f"there are {r.n_configs_considered} candidates — the cause of "
+         f"1.394 is gone")
     assert r.by_k[1]["all"] == pytest.approx(1.394, abs=0.005)
-    # ★ k>=3 이 포화한다. 문서의 1.060 / 1.009 는 이 절차의 값이 아니다.
+    # ★ k>=3 saturates. The documented 1.060 / 1.009 are not values of this
+    #   procedure.
     assert r.by_k[3]["all"] == pytest.approx(r.by_k[8]["all"], abs=1e-9)
 
 
 # ---------------------------------------------------------------------------
-# 블록 분할 (§10.1)
+# Block splits (§10.1)
 # ---------------------------------------------------------------------------
 @pytest.mark.needs_bundle
 def test_block_splits_match_documented_sizes(real_bundle_path):
@@ -117,16 +123,17 @@ def test_block_splits_match_documented_sizes(real_bundle_path):
         tb = PerfTable.from_bundle(real_bundle_path, env_hash="c63710df",
                                    ok_only=False)
     sh = tb.shapes()
-    assert len(split_by_M_range(sh).val) == 11        # GBDT 주 지표의 홀드아웃
-    assert len(split_by_waves(sh, tb.hw).val) == 15   # §2 의 waves<1 형상
-    assert len(split_by_alignment(sh).val) == 5       # 층 D
+    assert len(split_by_M_range(sh).val) == 11        # the GBDT main metric's holdout
+    assert len(split_by_waves(sh, tb.hw).val) == 15   # the waves<1 shapes of §2
+    assert len(split_by_alignment(sh).val) == 5       # layer D
 
 
 @pytest.mark.needs_bundle
 def test_size_split_does_not_use_answers(real_bundle_path):
-    """★ 크기 분할 경계를 `best_ms`(정답)가 아니라 roofline 으로 잡는다.
+    """★ The size-split boundary is taken from the roofline, not from
+    `best_ms` (the answer).
 
-    그런데도 실측 짧은 형상 45개를 **전부** 포함해야 한다.
+    Even so it has to include **all** 45 of the really short shapes.
     """
     from kernelrule.core.table import PerfTable
 
@@ -139,10 +146,11 @@ def test_size_split_does_not_use_answers(real_bundle_path):
                                       if sp.test else set())
     real_small = {s.key for s in tb.all_stats() if s.is_small}
     assert real_small <= held, \
-        f"실측 짧은 형상 {len(real_small - held)}개가 홀드아웃에서 빠졌다"
+        f"{len(real_small - held)} really short shapes fell out of the holdout"
 
 
 def test_gbdt_module_imports_without_lightgbm():
-    """lightgbm 이 없어도 모듈은 import 된다 (별도 venv 에서 돌린다)."""
+    """The module imports even without lightgbm (it runs in a separate
+    venv)."""
     import kernelrule.baselines.gbdt as g
     assert callable(g.build_xy) and "objective" in g.GBDT_PARAMS

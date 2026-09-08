@@ -1,27 +1,31 @@
-"""벤더 휴리스틱 베이스라인 — **이것이 통과 조건이다** (§30.6b).
+"""Vendor heuristic baseline — **this is the gate** (§30.6b).
 
-정적 top-1 은 실무에서 아무도 안 쓰므로 베이스라인으로 약하다. 측정 없이
-config 하나를 고르는 **런타임 디스패치** 시나리오의 실질적 상대는
-nvMatmulHeuristics(CUTLASS 타깃)다.
+Nobody uses a static top-1 in practice, so it is a weak baseline. The real
+competitor in the **runtime dispatch** scenario — pick one config without
+measuring — is nvMatmulHeuristics (targeting CUTLASS).
 
-`C/A`(cuBLAS 대비)와 다르다. C/A 는 cuBLAS 의 **다른 커널 계열** 대비라
-구현 차이가 섞인다. 여기서는 **같은 CUTLASS 커널 공간 안에서** 휴리스틱의
-순위 품질만 본다.
+This differs from `C/A` (against cuBLAS). C/A compares against a **different
+kernel family** in cuBLAS, so implementation differences mix in. Here we look
+only at heuristic ranking quality **inside the same CUTLASS kernel space**.
 
-## 두 단계로 나뉜다
+## It has two stages
 
-    extract   nvMatmulHeuristics 에서 형상별 top-k 를 뽑는다.
-              **별도 venv 에서 돌린다** — 이 저장소 환경을 오염시키지 않는다.
-              ★ GPU 를 쓰지 않는다. GPU **프리셋**만 쓴다 (CPU 예측 모델).
-    score     그 산출물을 우리 표에 매핑해 채점한다. 이쪽은 본 환경.
+    extract   pull per-shape top-k out of nvMatmulHeuristics.
+              **Run it in a separate venv** — do not pollute this repo's
+              environment. ★ It uses no GPU. Only a GPU **preset** (a CPU
+              prediction model).
+    score     map that output onto our table and score it. This side runs in
+              the main environment.
 
-`extract` 산출물(`vendor.json`)을 저장해 두면 이후 재채점이 표만으로 된다.
-kernelTab 은 이것을 커밋하지 않아서 재계산에 네트워크가 필요했다 (C-2 보고).
+Saving the `extract` output (`vendor.json`) makes later rescoring a
+table-only operation. kernelTab did not commit it, so recomputation needed
+the network (report C-2).
 
-## ★ `status` 필터
+## ★ The `status` filter
 
-kernelTab 의 원 계산은 `status == "ok"` 만 썼다 (`baseline_vendor.py:143`).
-대표값은 **전체 status + 합집합 덮개**이므로 여기서 다시 계산한다 (§30.5b).
+kernelTab's original computation used only `status == "ok"`
+(`baseline_vendor.py:143`). Our representative value is **all statuses + the
+union cover**, so it is recomputed here (§30.5b).
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from pathlib import Path
 __all__ = ["GPU_PRESETS", "extract", "load_vendor", "vendor_order_fn",
            "match_report"]
 
-#: GPU 이름 -> nvMatmulHeuristics 프리셋. `hw.name` 에서 유도한다.
+#: GPU name -> nvMatmulHeuristics preset. Derived from `hw.name`.
 GPU_PRESETS = {
     "rtx a6000": "RTX_A6000", "rtx 4090": "RTX_4090", "rtx 3090": "RTX_3090",
     "rtx 5090": "RTX_5090", "rtx 6000 ada": "RTX_6000_ADA",
@@ -47,7 +51,7 @@ _PAT = re.compile(
     r"\s+instr\((\d+) (\d+) (\d+)\)\s+splitK\((\d+)\)\s+swizz\((\d+)\)"
     r"\s+ctaOrder\((\d+)\)")
 
-#: 최근접 매핑의 축별 가중치. cta tile 을 가장 중시한다.
+#: Per-axis weights for the nearest mapping. The cta tile weighs most.
 #: (tm, tn, tk, wm, wn, wk, stages, swizzle, split_k, mode)
 _NEAR_W = (3.0, 3.0, 3.0, 1.0, 1.0, 1.0, 1.0, 0.5, 2.0, 0.5)
 
@@ -58,19 +62,20 @@ def preset_for(name: str) -> str:
         if k in low:
             return v
     raise SystemExit(
-        f"{name!r} 에 대응하는 nvMatmulHeuristics 프리셋을 모른다. "
-        "GPU_PRESETS 에 추가하라.")
+        f"no nvMatmulHeuristics preset is known for {name!r}. "
+        "Add it to GPU_PRESETS.")
 
 
 # ---------------------------------------------------------------------------
-# 1단계 — 추출 (별도 venv. stdlib + nvMatmulHeuristics 만 쓴다)
+# Stage 1 — extract (separate venv; stdlib + nvMatmulHeuristics only)
 # ---------------------------------------------------------------------------
 def extract(bundle_dir: str | Path, out_path: str | Path,
             count: int = 8) -> int:
-    """번들의 형상 목록에 대해 휴리스틱 top-`count` 를 뽑는다.
+    """Pull the heuristic's top-`count` for the bundle's shape list.
 
-    ★ 이 함수는 `kernelrule` / `kerneltab` 을 import 하지 않는다 — 격리된
-    venv 에서 돌아야 하기 때문이다. 형상과 하드웨어는 번들 파일에서 직접 읽는다.
+    ★ This function imports neither `kernelrule` nor `kerneltab` — it has to
+    run in an isolated venv. Shapes and hardware are read straight from the
+    bundle files.
     """
     import nvMatmulHeuristics as nv
 
@@ -80,7 +85,7 @@ def extract(bundle_dir: str | Path, out_path: str | Path,
     preset = preset_for(gpu_name)
     shapes = sorted({tuple(int(x) for x in s)
                      for rows in info["shape_layers"].values() for s in rows})
-    print(f"{gpu_name} -> 프리셋 {preset}, 형상 {len(shapes)}개, top-{count}")
+    print(f"{gpu_name} -> preset {preset}, {len(shapes)} shapes, top-{count}")
 
     h = nv.NvMatmulHeuristicsInterface(nv.NvMatmulHeuristicsTarget.CUTLASS,
                                        precision="HSS")
@@ -119,12 +124,12 @@ def extract(bundle_dir: str | Path, out_path: str | Path,
                         "pred_ms": (rt or 0) * 1000.0})
         out[f"{M}x{N}x{K}"] = lst
     Path(out_path).write_text(json.dumps(out, indent=1))
-    print(f"{len(out) - 1} 형상 -> {out_path}")
+    print(f"{len(out) - 1} shapes -> {out_path}")
     return 0
 
 
 # ---------------------------------------------------------------------------
-# 2단계 — 채점 (본 환경)
+# Stage 2 — scoring (main environment)
 # ---------------------------------------------------------------------------
 def load_vendor(path: str | Path) -> dict:
     d = json.loads(Path(path).read_text())
@@ -133,7 +138,8 @@ def load_vendor(path: str | Path) -> dict:
 
 
 def _cand_keys(table, p):
-    """후보의 축 벡터. 벤더 config 와 같은 좌표계로 만든다."""
+    """Axis vector of a candidate, in the same coordinates as a vendor
+    config."""
     import numpy as np
 
     df = table.frame_for(p)
@@ -155,7 +161,8 @@ def _cand_keys(table, p):
 
 
 def _vendor_vec(cf) -> tuple:
-    """벤더 config -> 같은 좌표계. CUTLASS 2.x 의 split_k 기본은 serial 이다."""
+    """Vendor config -> the same coordinates. In CUTLASS 2.x split_k
+    defaults to serial."""
     return (cf["cta"][0], cf["cta"][1], cf["cta"][2],
             cf["warp"][0], cf["warp"][1], cf["warp"][2], cf["stages"],
             cf["swizzle"] if cf.get("cta_order", 0) == 0 else 0,
@@ -163,15 +170,15 @@ def _vendor_vec(cf) -> tuple:
 
 
 def vendor_order_fn(table, vendor: dict, *, mapping: str = "nearest"):
-    """벤더의 형상별 추천을 `order_fn` 으로 만든다.
+    """Turn the vendor's per-shape recommendation into an `order_fn`.
 
     `mapping`:
-        "nearest" — 우리 공간에 없는 조합은 **축 로그거리로 가장 가까운**
-                    측정치로 대체한다. 덮개 100%.
-        "strict"  — 정확히 일치하는 것만. 없으면 그 형상은 뒤로 민다.
+        "nearest" — a combination absent from our space is replaced by the
+                    **nearest measured one in log-axis distance**. 100% cover.
+        "strict"  — exact matches only. Without one, that shape is pushed back.
 
-    kernelTab 실측에서 두 값이 1.081 / 1.088 로 일치했으므로 매핑 방식이
-    결론을 바꾸지 않는다. 둘 다 계산해 병기한다.
+    kernelTab measured the two at 1.081 / 1.088, so the mapping method does
+    not change the conclusion. Both are computed and reported side by side.
     """
     import numpy as np
 
@@ -208,7 +215,8 @@ def vendor_order_fn(table, vendor: dict, *, mapping: str = "nearest"):
 
 
 def match_report(table, vendor: dict) -> dict:
-    """엄격 매핑이 얼마나 되는가. 결론을 바꿀 수 있는 지점이라 보고한다."""
+    """How much of the strict mapping lands. Reported because it is a point
+    that could change the conclusion."""
     import numpy as np
 
     n_exact = n_tot = 0

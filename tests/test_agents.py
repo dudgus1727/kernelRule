@@ -1,4 +1,4 @@
-"""MockLLM 과 스키마 경계 (§24, §11.7)."""
+"""MockLLM and the schema boundary (§24, §11.7)."""
 from __future__ import annotations
 
 import os
@@ -24,19 +24,20 @@ FEATS = ["traffic_amplification", "has_spill", "is_two_stage",
 
 
 # ---------------------------------------------------------------------------
-# 스키마 경계 — **부분 수용하지 않는다** (§26.4)
+# The schema boundary — **no partial acceptance** (§26.4)
 # ---------------------------------------------------------------------------
 BAD_RESPONSES = [
-    ("함수 없음", {"code": "x = 1", "w0": [1.0]}),
-    ("정답 참조", {"code": "def score(f,p,hw,w): return time_ms", "w0": [1.0]}),
-    ("난이도 참조", {"code": "def score(f,p,hw,w): return difficulty",
-                     "w0": [1.0]}),
+    ("no function", {"code": "x = 1", "w0": [1.0]}),
+    ("answer reference",
+     {"code": "def score(f,p,hw,w): return time_ms", "w0": [1.0]}),
+    ("difficulty reference",
+     {"code": "def score(f,p,hw,w): return difficulty", "w0": [1.0]}),
     ("import", {"code": "def score(f,p,hw,w):\n import os\n return 1",
                 "w0": [1.0]}),
-    ("w0 빔", {"code": "def score(f,p,hw,w): return 1", "w0": []}),
-    ("w0 문자열", {"code": "def score(f,p,hw,w): return 1", "w0": ["a"]}),
-    ("w0 폭주", {"code": "def score(f,p,hw,w): return 1", "w0": [1e9]}),
-    ("dict 아님", ["code"]),
+    ("empty w0", {"code": "def score(f,p,hw,w): return 1", "w0": []}),
+    ("string w0", {"code": "def score(f,p,hw,w): return 1", "w0": ["a"]}),
+    ("runaway w0", {"code": "def score(f,p,hw,w): return 1", "w0": [1e9]}),
+    ("not a dict", ["code"]),
 ]
 
 
@@ -55,12 +56,14 @@ def test_valid_response_passes():
 
 
 # ---------------------------------------------------------------------------
-# ★ adversarial — 하나라도 통과하면 방어에 구멍이 있다 (§24.3)
+# ★ adversarial — one of them passing means a hole in the defence
+# (§24.3)
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("name,code,w0", ADVERSARIAL_CASES,
                          ids=[c[0] for c in ADVERSARIAL_CASES])
 def test_adversarial_case_is_blocked_somewhere(name, code, w0):
-    """스키마 / 정적 검사 / 샌드박스 **어딘가에서** 반드시 걸린다."""
+    """It must be caught **somewhere** — the schema, the static checks or
+    the sandbox."""
     from kernelrule.rules.checks import check_rule
 
     blocked = False
@@ -81,11 +84,11 @@ def test_adversarial_case_is_blocked_somewhere(name, code, w0):
         out = run_isolated(code, (f, ShapeInfo({"is_memory_bound": 0.0}),
                                   None, np.asarray(w0)), timeout=6.0)
         blocked = not out.ok
-    assert blocked, f"{name} 이 모든 방어를 통과했다"
+    assert blocked, f"{name} passed every defence"
 
 
 # ---------------------------------------------------------------------------
-# mutate — ★ 구조를 섭동한다
+# mutate — ★ it perturbs the structure
 # ---------------------------------------------------------------------------
 def test_render_parse_roundtrip():
     code, w0 = _render_rule(["f.a", "f.b"], ("is_memory_bound", "f.c"))
@@ -95,7 +98,8 @@ def test_render_parse_roundtrip():
 
 
 def test_mutate_changes_structure_not_just_weights():
-    """★ 가중치만 흔들면 아무것도 시험하지 못한다 — `fit_weights` 가 맞춘다."""
+    """★ Shaking only the weights tests nothing — `fit_weights` fits
+    them."""
     m = MockLLM("mutate", seed=1, feature_names=FEATS)
     parent = RuleProposal(code="def score(f, p, hw, w):\n"
                                "    s = f.traffic_amplification * w[0]\n"
@@ -105,14 +109,15 @@ def test_mutate_changes_structure_not_just_weights():
         out = m.complete("rule_editor", "x", parent=parent,
                          hypothesis={"measurable_with": ["has_spill"]})
         codes.add(out["code"])
-    assert len(codes) > 1, "구조가 하나도 안 바뀐다"
-    # 항 개수가 실제로 달라진다
+    assert len(codes) > 1, "the structure never changes"
+    # The term count really does vary
     sizes = {len(_parse_terms(c)[0]) for c in codes}
-    assert len(sizes) > 1, f"항 개수가 고정이다: {sizes}"
+    assert len(sizes) > 1, f"the term count is fixed: {sizes}"
 
 
 def test_mutate_follows_the_hypothesis():
-    """가설이 지목한 피처를 우선 추가한다 — 진단이 기여하는 경로다."""
+    """It adds the feature the hypothesis named first — the path by which
+    the diagnosis contributes."""
     m = MockLLM("mutate", seed=3, feature_names=FEATS)
     parent = RuleProposal(code="def score(f, p, hw, w):\n"
                                "    s = f.traffic_amplification * w[0]\n"
@@ -123,7 +128,7 @@ def test_mutate_follows_the_hypothesis():
                          hypothesis={"measurable_with": ["is_two_stage"]})
         if "f.is_two_stage" in out["code"]:
             hits += 1
-    assert hits >= 8, f"가설을 따른 것이 {hits}/20 뿐이다"
+    assert hits >= 8, f"only {hits}/20 followed the hypothesis"
 
 
 def test_mutate_respects_the_literal_budget():
@@ -137,11 +142,12 @@ def test_mutate_respects_the_literal_budget():
 
 
 def test_diagnose_reads_the_unused_column():
-    """★ 진단이 리포트의 `★ 미사용` 열을 읽는다. 루프 배관의 시험이다."""
+    """★ The diagnosis reads the report's `★ unused` column. A test of the
+    loop plumbing."""
     m = MockLLM("mutate", seed=0, feature_names=FEATS)
-    report = ("is_two_stage       1.0   0.0  ★ 미사용\n"
-              "log_workspace_bytes 22.0 0.0  ★ 미사용\n"
-              "split_k_cost       0.5   0.0  사용 중\n")
+    report = ("is_two_stage       1.0   0.0  ★ unused\n"
+              "log_workspace_bytes 22.0 0.0  ★ unused\n"
+              "split_k_cost       0.5   0.0  in use\n")
     out = m.complete("analyze", report)
     names = [h["measurable_with"][0] for h in out["hypotheses"]]
     assert "is_two_stage" in names and "log_workspace_bytes" in names
@@ -149,7 +155,7 @@ def test_diagnose_reads_the_unused_column():
 
 
 # ---------------------------------------------------------------------------
-# replay — 결정론적 재현
+# replay — deterministic reproduction
 # ---------------------------------------------------------------------------
 def test_replay_reproduces_exactly(tmp_path):
     a = MockLLM("mutate", seed=11, feature_names=FEATS)
@@ -160,7 +166,7 @@ def test_replay_reproduces_exactly(tmp_path):
 
 
 def test_replay_missing_dir_is_an_error(tmp_path):
-    """★ 조용히 canned 로 떨어지지 않는다 (§26.4)."""
+    """★ It does not silently fall back to canned (§26.4)."""
     with pytest.raises(FileNotFoundError):
         MockLLM("replay", replay_dir=tmp_path / "nope")
 
@@ -176,7 +182,7 @@ def test_replay_detects_a_changed_loop(tmp_path):
 
 
 def test_unknown_mode_is_an_error():
-    with pytest.raises(ValueError, match="알 수 없는 모드"):
+    with pytest.raises(ValueError, match="unknown mode"):
         MockLLM("wishful")
 
 
@@ -188,33 +194,35 @@ def test_deterministic_across_instances():
 
 
 # ---------------------------------------------------------------------------
-# 강제 장치의 세 곳이 일치하는가 (D-26) — §30.8 패턴
+# Do the three enforcement sites agree (D-26) — the §30.8 pattern
 # ---------------------------------------------------------------------------
-# 설명 / validator / 에러 메시지가 셋 다 다른 채로 굴러갔다. 셋을 상수 하나로
-# 묶었으므로 **그 사실을 테스트가 고정한다** — 나중에 한 곳만 고치는 것을
-# 막는 것이 목적이다.
+# The description, the validator and the error message ran on all three
+# different. They were tied to one constant, so **the test pins that fact** —
+# the purpose is to stop someone fixing only one of them later.
 
 def test_hypothesis_count_desc_and_validator_share_one_constant():
     from kernelrule.agents import schemas as S
     if not S.HAVE_PYDANTIC:
-        pytest.skip("pydantic 없음")
-    # ★ 2026-09-08 (D-144): 3 으로 **고정**됐다. 설명·검증·에러가 같은
-    #   상수를 말해야 한다는 요구는 그대로다 (D-26).
+        pytest.skip("no pydantic")
+    # ★ 2026-09-08 (D-144): it is **fixed** at 3. The requirement that the
+    #   description, the validation and the error say the same constant is
+    #   unchanged (D-26).
     exact = S.N_HYP_MIN == S.N_HYP_MAX
-    want = (f"xactly {S.N_HYP_MIN}" if exact       # 설명은 "Exactly", 에러는 "exactly"
+    want = (f"xactly {S.N_HYP_MIN}" if exact   # "Exactly" in the description,
+                                               # "exactly" in the error
             else f"{S.N_HYP_MIN}~{S.N_HYP_MAX}")
     desc = S.AnalysisOutput.model_fields["hypotheses"].description
     assert want in desc
 
     def mk(n):
-        return S.AnalysisOutput(hypotheses=[{"claim": f"가설 {i}"}
+        return S.AnalysisOutput(hypotheses=[{"claim": f"hypothesis {i}"}
                                              for i in range(n)])
 
-    mk(S.N_HYP_MIN)                                   # 하한은 통과
-    for n in (S.N_HYP_MIN - 1, S.N_HYP_MAX + 1):      # 밖은 거부
+    mk(S.N_HYP_MIN)                                 # the lower bound passes
+    for n in (S.N_HYP_MIN - 1, S.N_HYP_MAX + 1):    # outside is refused
         with pytest.raises(Exception) as ei:
             mk(n)
-        # 에러 메시지도 같은 상수를 말해야 한다
+        # The error message must say the same constant
         assert want in str(ei.value)
 
 
@@ -225,9 +233,10 @@ def test_weight_cap_has_one_source_of_truth():
 
 
 def test_mock_and_real_paths_enforce_the_same_budget():
-    """§24 — `validate_rule_proposal` 에만 w0 길이 검사가 없었다.
+    """§24 — `validate_rule_proposal` alone had no w0 length check.
 
-    목으로 개발하면 예산 초과가 안 잡히고 실제 LLM 에서만 잡혔다.
+    Developing on the mock, a budget overrun went uncaught and was caught
+    only on the real LLM.
     """
     from kernelrule.agents.schemas import (
         MAX_WEIGHTS,
@@ -236,24 +245,24 @@ def test_mock_and_real_paths_enforce_the_same_budget():
     )
     code = "def score(f, p, hw, w):\n    return f.waves * w[0]\n"
     validate_rule_proposal({"code": code, "w0": [1.0] * MAX_WEIGHTS})
-    with pytest.raises(SchemaViolation, match="예산"):
+    with pytest.raises(SchemaViolation, match="budget"):
         validate_rule_proposal({"code": code, "w0": [1.0] * (MAX_WEIGHTS + 1)})
 
 
 # ---------------------------------------------------------------------------
-# 금지어 부분 매칭이 주석을 잡지 않는가 (D-27)
+# Does banned-word substring matching avoid catching comments (D-27)
 # ---------------------------------------------------------------------------
 
 _HDR = "def score(f, p, hw, w):\n"
 
 
 @pytest.mark.parametrize("code,banned", [
-    # 주석/문자열 안의 것은 실행되지 않는다 -> 잡지 않는다
-    (_HDR + "    # 난이도(difficulty)가 높은 형상이다\n"
+    # What is inside a comment or a string does not run -> not caught
+    (_HDR + "    # this shape has high difficulty\n"
             "    return f.tail_waste * w[0]\n", None),
-    (_HDR + "    note = 'import os 는 금지다'\n"
+    (_HDR + "    note = 'import os is forbidden'\n"
             "    return f.waves * w[0]\n", None),
-    # 실제 코드는 여전히 잡는다
+    # Real code is still caught
     (_HDR + "    return f.difficulty * w[0]\n", "difficulty"),
     ("import os\n" + _HDR + "    return f.waves * w[0]\n", "import "),
     (_HDR + "    return TABLE.time_ms * w[0]\n", "time_ms"),
@@ -264,40 +273,43 @@ def test_banned_check_ignores_comments_and_strings(code, banned):
 
 
 def test_banned_check_never_skips_on_tokenize_failure():
-    """문법 오류면 **원본을 보수적으로 검사한다** (§26.4)."""
+    """On a syntax error it **checks the original conservatively**
+    (§26.4)."""
     from kernelrule.agents.schemas import check_banned
-    assert check_banned("def score(  # 안 닫힘\n  import os") == "import "
+    assert check_banned("def score(  # unclosed\n  import os") == "import "
 
 
 # ---------------------------------------------------------------------------
-# Pydantic 부재를 쓰려는 순간 알리는가 (4-5)
+# Does it announce Pydantic's absence at the moment of use (4-5)
 # ---------------------------------------------------------------------------
 
 def test_missing_pydantic_fails_loudly():
     from kernelrule.agents.schemas import _NoPydantic
     stub = _NoPydantic("AnalysisOutput")
-    with pytest.raises(ImportError, match="비활성화된 상태"):
+    with pytest.raises(ImportError, match="is \\*\\*disabled\\*\\*"):
         stub()
-    with pytest.raises(ImportError, match="비활성화된 상태"):
-        _ = stub.model_validate       # 속성 접근만으로도 알린다
+    with pytest.raises(ImportError, match="is \\*\\*disabled\\*\\*"):
+        _ = stub.model_validate    # attribute access alone announces it
 
 
 def test_changes_is_optional():
-    """계보 추적용이다. 비었다고 규칙을 버리면 재시도만 소진한다 (4-4)."""
+    """For lineage tracking. Throwing a rule away for leaving it empty only
+    burns retries (4-4)."""
     from kernelrule.agents import schemas as S
     if not S.HAVE_PYDANTIC:
-        pytest.skip("pydantic 없음")
+        pytest.skip("no pydantic")
     out = S.RuleOutput(code="def score(f, p, hw, w):\n    return f.waves*w[0]",
                        w0=[1.0])
     assert out.changes == ""
 
 
 # ---------------------------------------------------------------------------
-# FeatureWriter — F1~F3 조건 (§11.4)
+# FeatureWriter — the F1~F3 conditions (§11.4)
 # ---------------------------------------------------------------------------
-# 근본 질문은 "LLM 이 물리량을 **만들** 수 있나" 다. 그러려면 조건마다
-# 무엇을 주는지가 엄밀해야 한다 — F1 에 기존 피처 이름이 하나라도 새면
-# 그 실험은 "조합만 했나" 를 다시 물은 것이 된다.
+# The fundamental question is "can the LLM **build** physical quantities".
+# For that, what is given under each condition has to be exact — if even one
+# existing feature name leaks into F1, that experiment has merely re-asked
+# "did it only combine".
 
 def _feat_client():
     import kernelrule.features.physical  # noqa: F401
@@ -310,11 +322,12 @@ def _feat_client():
 
 @pytest.mark.parametrize("cond", ["F1"])
 def test_f0_f1_leak_no_existing_feature_name(cond):
-    """★ 원시 값 조건에 기존 피처 이름이 들어가면 안 된다."""
+    """★ No existing feature name may enter the raw-values condition."""
     c, reg = _feat_client()
     text = c._feature_prompt(condition=cond)
     leaked = [n for n in reg._items if n in text]
-    assert not leaked, f"{cond} 프롬프트에 기존 피처가 샜다: {leaked}"
+    assert not leaked, (
+        f"an existing feature leaked into the {cond} prompt: {leaked}")
 
 
 def test_f3_shows_the_existing_features():
@@ -325,15 +338,16 @@ def test_f3_shows_the_existing_features():
 
 def test_unknown_condition_is_rejected():
     c, _ = _feat_client()
-    with pytest.raises(ValueError, match="알 수 없는 조건"):
+    with pytest.raises(ValueError, match="unknown condition"):
         c._feature_prompt(condition="F9")
 
 
 def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
-    """D-35 — **F1 의** 형태 예시가 실제 피처를 건네주면 안 된다.
+    """D-35 — **F1's** shape example must not hand over a real feature.
 
-    공개 지식을 주는 조건(F2/F3)은 실제 피처를 코드까지 보여준다 —
-    그것이 조건의 정의다 (§30.17). 그쪽은 `examples/known5.md` 다.
+    The conditions that give public knowledge (F2/F3) show the real features
+    down to the code — that is the definition of the condition (§30.17).
+    Those use `examples/known5.md`.
     """
     from kernelrule.agents.openai_client import load_prompt
     from kernelrule.features import REGISTRY
@@ -341,17 +355,19 @@ def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
     start = body.index("```python")
     example = body[start:body.index("```", start + 3)]
     leaked = [n for n in REGISTRY._items if n in example]
-    assert not leaked, f"형태 예시가 실제 피처를 담고 있다: {leaked}"
+    assert not leaked, (
+        f"the shape example contains a real feature: {leaked}")
 
 
 def test_prompts_never_hardcode_the_budget_number(monkeypatch):
-    """★ 예산 숫자의 출처는 `checks.PARAMETERS` **하나**다.
+    """★ The budget number has **one** source: `checks.PARAMETERS`.
 
-    프롬프트 다섯 파일과 스키마와 검사기가 각자 8 을 적고 있었다. 바꾸면
-    하나를 빠뜨린다 — `is_reference` / `top_k` / `DEFAULT_MODEL` /
-    `REGISTRY` / `load_generated` 에 이은 여섯 번째가 된다.
+    Five prompt files, the schema and the checker each wrote their own 8. A
+    change misses one — it would be the sixth after `is_reference` /
+    `top_k` / `DEFAULT_MODEL` / `REGISTRY` / `load_generated`.
 
-    `checks.PARAMETERS` 을 바꿨을 때 프롬프트가 따라 바뀌면 단일 출처다.
+    If the prompt follows when `checks.PARAMETERS` changes, it is a single
+    source.
     """
     from kernelrule.agents.openai_client import load_prompt
     from kernelrule.rules import checks
@@ -361,24 +377,28 @@ def test_prompts_never_hardcode_the_budget_number(monkeypatch):
     monkeypatch.setattr(checks, "PARAMETERS", 16)
     for f in files:
         txt = load_prompt(f)
-        assert "{budget}" not in txt, f"{f}: 치환이 안 됐다"
-        assert "16" in txt, f"{f}: 예산이 프롬프트에 안 흘러간다"
-        # 예산 문장에 옛 숫자가 남아 있으면 안 된다
+        assert "{budget}" not in txt, f"{f}: the substitution did not happen"
+        assert "16" in txt, f"{f}: the budget does not flow into the prompt"
+        # No old number may remain in a budget sentence
         for line in txt.splitlines():
-            if "예산" in line or "상한" in line or "리터럴" in line:
-                assert " 8 " not in line and "8개" not in line \
-                    and "<= 8" not in line, f"{f}: 굳은 8 이 남았다 — {line}"
+            low = line.lower()
+            if "budget" in low or "cap" in low or "literal" in low:
+                assert " 8 " not in line and "8 parameters" not in line \
+                    and "<= 8" not in line, (
+                        f"{f}: a frozen 8 remains — {line}")
 
 
 def test_prompt_tells_the_model_branch_constants_are_free():
-    """★ 규칙을 바꿨으면 **모델도 알아야 한다** (D-78).
+    """★ When the rule changes, **the model must know too** (D-78).
 
-    검사기만 풀고 프롬프트를 그대로 두면 모델은 계속 우회한다 — 제약이
-    풀린 것을 모르기 때문이다.
+    Loosening only the checker and leaving the prompt as it is keeps the
+    model going around — because it does not know the constraint was
+    loosened.
 
-    ★ 2026-09-08 (D-145): **조립된 프롬프트**로 본다. 설명이 어느 파일에
-    있는지는 중복 제거에 따라 달라지고(§3-4), 모델이 받는 것은 조립된
-    결과다. 파일 단위로 보면 중복을 없앨 때마다 시험이 깨진다.
+    ★ 2026-09-08 (D-145): it looks at the **assembled prompt**. Which file
+    the explanation lives in depends on deduplication (§3-4), and what the
+    model receives is the assembled result. Checking per file breaks the
+    test every time a duplicate is removed.
     """
     from kernelrule.agents.openai_client import assemble_instructions
 

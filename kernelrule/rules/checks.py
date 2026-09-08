@@ -1,24 +1,26 @@
-"""LLM 생성 규칙의 정적 검사 (§8.3 + 부록 §8.1 갱신본).
+"""Static checks on LLM-generated rules (§8.3 + the updated appendix
+§8.1).
 
-**파싱에 실패하면 거부다. 통과가 아니다** (§26.4). 이 파일의 모든 경로가
-실패 쪽으로 기운다.
+**A parse failure is a refusal, not a pass** (§26.4). Every path in this file
+leans towards failure.
 
-## 무엇을 막는가
+## What it blocks
 
-    암기          `if problem.M == 4096: ...`
-    조건부 특수화  `if f.waves < 1: s += 5.0`   <- config 수준 분기
-    정답 참조      `time_ms`, `difficulty`, `TABLE`
-    탈출          import, open, exec, 속성 우회(`__globals__`)
-    과적합        숫자 리터럴 + 가중치 개수 <= 8
+    memorisation             `if problem.M == 4096: ...`
+    conditional specialising `if f.waves < 1: s += 5.0`  <- a config-level branch
+    answer references        `time_ms`, `difficulty`, `TABLE`
+    escapes                  import, open, exec, attribute detours
+                             (`__globals__`)
+    overfitting              numeric literals + weight count <= 8
 
-## 허용하는 것
+## What it allows
 
-    형상 수준 분기  `if p.is_memory_bound:`      <- 스칼라라 일반화된다
-    np 연산        where/clip/minimum/log/sqrt/... 와 사칙연산
-    가중치         `w[0]`, `w[1]` — **인덱스 접근만**
+    shape-level branches  `if p.is_memory_bound:`   <- a scalar, so it generalises
+    np operations         where/clip/minimum/log/sqrt/... and arithmetic
+    weights               `w[0]`, `w[1]` — **index access only**
 
-`f.*` 는 배열이라 `if` 가 런타임에 `ValueError` 를 내지만, 그때는 이미 규칙을
-실행한 뒤다. AST 로 **실행 전에** 잡는다.
+`f.*` is an array, so an `if` raises `ValueError` at runtime, but by then the
+rule has already run. The AST catches it **before execution**.
 """
 
 from __future__ import annotations
@@ -34,18 +36,22 @@ __all__ = ["PARAMETERS", "MAX_PATHS", "fitter_for", "CheckReport", "RuleCheckErr
 
 
 def noop_term_message(code: str) -> str | None:
-    """누적 점수에 형상 상수만 더하는 항을 찾는다. 순위가 안 바뀐다.
+    """Finds terms that only add a shape constant to the running score.
+    They do not change the ranking.
 
-    ★ 규칙은 **형상마다 독립적으로 정렬**되므로 형상 수준 스칼라를 점수
-    전체에 더하거나 곱하는 것은 단조 변환이고 순서를 하나도 바꾸지 않는다.
-    그런 항은 예산 하나를 그냥 버린다.
+    ★ A rule is **sorted independently per shape**, so adding or multiplying
+    a shape-level scalar into the whole score is a monotone transform and
+    changes no ordering at all. Such a term simply throws away one unit of
+    budget.
 
-    문법적으로 합법이라 실행도 되고 예외도 없다 — **조용히 아무 일도
-    하지 않는다.** 그래서 이 검사가 필요하다 (§26.4). RuleWriter A 조건
-    첫 성공 규칙이 `p.log_sol_ms * w[0]` 으로 항 하나를 버렸다.
+    It is syntactically legal, so it runs and raises nothing — it **silently
+    does nothing.** That is why this check is needed (§26.4). The first
+    successful rule under RuleWriter condition A threw away one term as
+    `p.log_sol_ms * w[0]`.
 
-    형상 수준 값이 **`f.*` 와 곱해지면** 의미가 있다 — 그때는 config 수준
-    항의 가중치를 형상에 따라 바꾸는 것이므로 순위가 바뀐다.
+    A shape-level value **multiplied with `f.*`** does mean something — then
+    it changes the weight of a config-level term by shape, so the ranking
+    changes.
     """
     try:
         tree = ast.parse(code.strip())
@@ -62,7 +68,7 @@ def noop_term_message(code: str) -> str | None:
             if not isinstance(st, (ast.Assign, ast.AugAssign)):
                 continue
             val = st.value
-            # `s = s + <expr>` 또는 `s += <expr>` 의 <expr> 만 본다
+            # Only the <expr> of `s = s + <expr>` or `s += <expr>`
             if isinstance(st, ast.Assign) and isinstance(val, ast.BinOp) \
                     and isinstance(val.op, ast.Add):
                 expr = val.right
@@ -78,11 +84,12 @@ def noop_term_message(code: str) -> str | None:
     walk(tree.body[0].body)
     if not bad_terms:
         return None
-    return (f"순위에 아무 효과가 없는 항이 있다: {bad_terms}. 규칙은 형상마다 "
-            "독립적으로 정렬되므로 **형상 수준 값을 점수 전체에 더하면 "
-            "순서가 하나도 바뀌지 않는다** — 가중치 하나를 버리는 것이다. "
-            "형상 수준 값은 `if p.<이름>:` 으로 분기해 config 수준 항의 "
-            "가중치를 바꾸는 데 쓰거나, `f.*` 와 곱해서 써라")
+    return (f"there is a term with no effect on the ranking: {bad_terms}. "
+            "A rule is sorted independently per shape, so **adding a "
+            "shape-level value to the whole score changes no ordering at "
+            "all** — it throws away one weight. Use a shape-level value to "
+            "branch with `if p.<name>:` and change the weight of a "
+            "config-level term, or multiply it with `f.*`")
 
 
 def _uses_weight(node) -> bool:
@@ -92,53 +99,61 @@ def _uses_weight(node) -> bool:
 
 def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
                                               list[ast.Constant]]:
-    """숫자 리터럴을 **예산에 드는 것 / 안 드는 것**으로 나눈다 (D-78).
+    """Splits numeric literals into **those that count against the budget
+    and those that do not** (D-78).
 
-    반환은 `(예산에 드는 것, 비교 상수)`.
+    Returns `(counted, comparison constants)`.
 
-    ## 왜 나누나
+    ## Why split them
 
-    §29.4 가 두 가지를 한 예산에 묶고 있었다.
+    §29.4 tied two different things to one budget.
 
     ```
-    가중치 제한   파라미터 수를 막는다 — 구조 비교를 위해서다
-    리터럴 제한   "상수를 하드코딩해 이 표에 맞추는 것" 을 막으려던 것
+    the weight limit    caps the parameter count — for structural comparison
+    the literal limit   was meant to block "hardcoding constants to fit this
+                        table"
     ```
 
-    `p.roofline_ratio < 1` 은 뒤엣것이 아니다 — roofline 의 무릎이라는
-    **물리 상수**다. 그런데 합산 예산에 걸려 진화가 `1` 을 안 쓰고
-    우회했다:
+    `p.roofline_ratio < 1` is not the latter — it is a **physical constant**,
+    the knee of the roofline. Yet it hit the combined budget and evolution
+    avoided using `1`, going around it instead:
 
     ```
     np.square(x) < x        x < np.sqrt(x)        x < np.sign(x)
-    np.isfinite(x)          <- 한 규칙 안에 9번. 오로지 상수 1 을 쓰려고
+    np.isfinite(x)          <- 9 times in one rule. Purely to use the
+                               constant 1
     ```
 
-    **넷 다 `x < 1` 과 같고, 사람이 읽기 어렵다.** "해석 가능한 규칙" 이
-    이 연구의 주장인데 그 주장을 예산이 갉아먹고 있었다.
+    **All four equal `x < 1`, and they are hard for a human to read.**
+    "Interpretable rules" is this project's claim, and the budget was eating
+    that claim.
 
-    ## 무엇이 면제인가
+    ## What is exempt
 
-    `ast.Compare` 의 **직접 피연산자**인 숫자 리터럴만이다. 중첩된 식
-    안의 상수는 면제가 아니다 — `(f.x - 3) < 1` 에서 `3` 은 든다.
+    Only numeric literals that are **direct operands** of an `ast.Compare`. A
+    constant inside a nested expression is not exempt — in `(f.x - 3) < 1`,
+    the `3` counts.
 
-    ## 무엇이 여전히 금지인가
+    ## What is still forbidden
 
-    형상 크기와의 직접 비교(`p.M > 1024`)는 **면제와 무관하게 거부**다.
-    그 검사는 `check_rule` 이 따로 한다. 가르는 기준은 **그 상수가
-    하드웨어/물리에서 나오는가, 이 표의 형상 분포에서 나오는가** 이고,
-    정적으로는 못 가르므로 **면제된 상수를 전부 기록**해 사람이 본다
-    (`CheckReport.branch_constants`).
+    A direct comparison against a shape size (`p.M > 1024`) is **refused
+    regardless of the exemption**. That check is done separately by
+    `check_rule`. The dividing line is **whether that constant comes from
+    the hardware/physics or from this table's shape distribution**, and that
+    cannot be decided statically, so **every exempted constant is recorded**
+    for a human to look at (`CheckReport.branch_constants`).
     """
     skip = {id(n.slice) for n in ast.walk(tree)
             if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
             and n.value.id == "w"}
     exempt: set[int] = set()
     def _direct_const(side):
-        """비교의 **직접 피연산자**인 숫자 상수. ★ 음수도 잡는다 (D-144).
+        """A numeric constant that is a **direct operand** of a comparison.
+        ★ Negatives are caught too (D-144).
 
-        `-1.0` 은 `UnaryOp(USub, Constant)` 라 `Constant` 만 찾으면 못 잡고,
-        그러면 `p.log_sol_ms < -1.0` 의 `-1.0` 이 예산에 들어간다.
+        `-1.0` is a `UnaryOp(USub, Constant)`, so looking only for
+        `Constant` misses it, and then the `-1.0` of
+        `p.log_sol_ms < -1.0` enters the budget.
         """
         if isinstance(side, ast.UnaryOp) and isinstance(
                 side.op, (ast.USub, ast.UAdd)):
@@ -163,17 +178,19 @@ def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
                 and not isinstance(n.value, bool)):
             continue
         if id(n) in skip:
-            continue                    # w[0] 의 0 은 가중치 쪽에서 센다
+            continue          # the 0 of w[0] is counted on the weight side
         (branch if id(n) in exempt else counted).append(n)
     return counted, branch
 
 
 def _branch_depth(node: ast.AST) -> int:
-    """중첩된 `if` 문의 최대 깊이. `IfExp`(삼항)는 안 센다.
+    """The maximum nesting depth of `if` statements. `IfExp` (the ternary)
+    is not counted.
 
-    ⚠️ **판정에는 안 쓴다** (D-145). 깊이는 경로 수를 안 묶는다 —
-    `if/elif/elif/else` 는 깊이 3 인데 경로가 4 이고, 순차 `if` 4개는
-    깊이 1 인데 경로가 16 이다. 보고용으로만 남긴다.
+    ⚠️ **It is not used for the verdict** (D-145). Depth does not bound the
+    path count — `if/elif/elif/else` is depth 3 with 4 paths, while 4
+    sequential `if`s are depth 1 with 16 paths. It is kept for reporting
+    only.
     """
     if isinstance(node, ast.If):
         return 1 + max((_branch_depth(x)
@@ -183,7 +200,7 @@ def _branch_depth(node: ast.AST) -> int:
 
 
 def _path_use(node: ast.AST, counted_ids: set[int]) -> tuple[set, set]:
-    """이 조각이 쓰는 (예산에 드는 리터럴 id, 가중치 인덱스)."""
+    """The (counted literal ids, weight indices) this fragment uses."""
     lits: set[int] = set()
     ws: set[int] = set()
     for n in ast.walk(node):
@@ -198,17 +215,20 @@ def _path_use(node: ast.AST, counted_ids: set[int]) -> tuple[set, set]:
 
 def _paths(stmts, counted_ids: set[int], *,
            cap: int | None = None) -> list[tuple[set, set]]:
-    """★ 실행 경로마다 (리터럴 id 집합, 가중치 인덱스 집합) (D-144).
+    """★ Per execution path, the (set of literal ids, set of weight
+    indices) (D-144).
 
     ```
-    if/else 밖의 공통 항   ★ 모든 경로에 속한다
-    np.where               ★ 분기가 아니다 — 양쪽이 다 계산되므로 한 경로
+    a common term outside if/else   ★ belongs to every path
+    np.where                        ★ not a branch — both sides are computed,
+                                       so it is one path
     ```
 
-    ★ `cap` 을 주면 경로가 그 수를 넘는 순간 **만들기를 멈춘다** (D-145).
-    끝까지 데카르트 곱을 만든 뒤 거부하면 순차 `if` 14개에서 16,384개를
-    만든다 — 거부할 것을 위해 228ms 를 쓴다. 넘겼다는 사실만 알면 되므로
-    `cap + 1` 개까지만 들고 반환한다.
+    ★ With `cap`, it **stops building** the moment the paths exceed that
+    number (D-145). Building the full Cartesian product and then refusing
+    produces 16,384 entries for 14 sequential `if`s — 228ms spent on
+    something that will be refused. Only the fact that the cap was exceeded
+    matters, so it returns holding at most `cap + 1`.
     """
     paths: list[tuple[set, set]] = [(set(), set())]
     for st in stmts:
@@ -222,7 +242,7 @@ def _paths(stmts, counted_ids: set[int], *,
                 for sl, sw in subs:
                     out.append((pl | hl | sl, pw | hw | sw))
                     if cap is not None and len(out) > cap:
-                        return out          # ★ 조기 중단
+                        return out          # ★ early stop
             paths = out
         else:
             al, aw = _path_use(st, counted_ids)
@@ -232,48 +252,55 @@ def _paths(stmts, counted_ids: set[int], *,
     return paths
 
 
-#: ★ 실행 경로 수 상한 (D-145). 경로 4 -> 실질 파라미터 최대 32.
+#: ★ The cap on the number of execution paths (D-145). 4 paths -> at most
+#: 32 effective parameters.
 #:
-#: ⚠️ 옛 값은 `MAX_BRANCH_DEPTH = 2` 였다 (D-144). **깊이는 경로 수를 안
-#: 묶는다** — 파이썬 AST 에서 `elif` 는 `orelse` 안의 `If` 라 깊이를 먹는다:
+#: ⚠️ The old value was `MAX_BRANCH_DEPTH = 2` (D-144). **Depth does not
+#: bound the path count** — in the Python AST an `elif` is an `If` inside
+#: `orelse`, so it eats depth:
 #:
 #: ```
-#: 중첩 if/else 2단     깊이 2  경로 4    통과
-#: if/elif/elif/else    깊이 3  경로 4    ⛔ 같은 4경로인데 거부됐다
-#: 순차 if 4개          깊이 1  경로 16   ⛔ 깊이로는 안 잡혔다
+#: nested if/else, 2 levels   depth 2  4 paths    passed
+#: if/elif/elif/else          depth 3  4 paths    ⛔ refused, same 4 paths
+#: 4 sequential ifs           depth 1  16 paths   ⛔ depth did not catch it
 #: ```
 #:
-#: **문법 때문에 같은 경로 수가 갈렸다.** 경로를 직접 센다.
+#: **The syntax split identical path counts.** The paths are counted
+#: directly.
 MAX_PATHS = 4
 
-#: 인자가 유한하면 **언제나 1** 인 호출. 상수를 만드는 데밖에 못 쓴다.
-#: ⚠️ "이 표에서 유한하다" 는 **표 의존 사실**이다 (f 피처 19개 전부에서
-#: 확인, D-78). 다른 표에서는 실제 판별 기능을 가질 수 있으므로 메시지를
-#: "언제나 1" 이 아니라 **"상수 취급 위험"** 으로 쓴다.
+#: Calls that are **always 1** when the argument is finite. They can only
+#: be used to manufacture a constant.
+#: ⚠️ "it is finite in this table" is a **table-dependent fact** (confirmed
+#: across all 19 f features, D-78). On another table it may genuinely
+#: discriminate, so the message says **"risks being treated as a
+#: constant"** rather than "always 1".
 _CONST_CALLS = ("isfinite",)
 
 
 def identity_transform_message(code: str) -> str | None:
-    """★ 항등 변환으로 상수를 만드는가 (D-92).
+    """★ Is a constant being manufactured by an identity transform (D-92)?
 
     ```
-    np.isfinite(x)                    유한하면 언제나 1
-    np.sign(x)                        x > 0 이면 언제나 1
-    x < np.sqrt(x) / np.square(x) < x   둘 다 x < 1 과 같다
+    np.isfinite(x)                      always 1 when finite
+    np.sign(x)                          always 1 when x > 0
+    x < np.sqrt(x) / np.square(x) < x   both equal x < 1
     ```
 
-    **설명 가능성이 아니라 결함이다.** 넷 다 수학적으로 상수/단순 비교와
-    같은데 사람이 읽기 어렵고, "해석 가능한 규칙" 이라는 주장을 갉아먹는다.
+    **This is a defect, not explainability.** All four equal a constant or a
+    simple comparison mathematically, yet they are hard for a human to read,
+    and they eat away at the claim of "interpretable rules".
 
-    ## 왜 지금 막나
+    ## Why block it now
 
-    합산 예산이 리터럴을 막던 동안에는 **우회할 이유가 있었다** — 항 8개를
-    쓰려면 리터럴이 0개여야 했다. D-78 로 분기 비교 상수를 예산에서 빼서
-    그 이유를 없앴고, 실제로 리터럴 비교가 6/6 실행에 나왔다 (D-84).
-    **이유를 없앤 뒤에 막는다** — 순서를 바꾸면 다른 우회를 찾는다.
+    While the combined budget was blocking literals, there **was a reason to
+    go around** — using 8 terms required 0 literals. D-78 removed branch
+    comparison constants from the budget and so removed that reason, and
+    literal comparisons then appeared in 6/6 runs (D-84). **It is blocked
+    after the reason is gone** — in the other order, another detour is found.
 
-    거부 메시지에 **대안**을 함께 적는다. 무엇이 금지인지만 말하면 모델은
-    또 다른 우회를 만든다.
+    The refusal message states **the alternative** too. Saying only what is
+    forbidden makes the model invent yet another detour.
     """
     try:
         tree = ast.parse(code.strip())
@@ -281,14 +308,14 @@ def identity_transform_message(code: str) -> str | None:
         return None
     bad: list[str] = []
     for n in ast.walk(tree):
-        # np.isfinite(x) — 상수 1 을 만드는 호출
+        # np.isfinite(x) — a call that manufactures the constant 1
         if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
                 and isinstance(n.func.value, ast.Name)
                 and n.func.value.id == "np"
                 and n.func.attr in _CONST_CALLS):
-            bad.append(f"np.{n.func.attr}(...) — 인자가 유한하면 상수 1 로 "
-                       "취급될 위험이 있다")
-        # np.sign(x) 이 비교의 한쪽에 오면 사실상 리터럴 1 이다
+            bad.append(f"np.{n.func.attr}(...) — when the argument is "
+                       "finite this risks being treated as the constant 1")
+        # np.sign(x) on one side of a comparison is effectively the literal 1
         if isinstance(n, ast.Compare):
             for side in [n.left, *n.comparators]:
                 if (isinstance(side, ast.Call)
@@ -296,26 +323,28 @@ def identity_transform_message(code: str) -> str | None:
                         and isinstance(side.func.value, ast.Name)
                         and side.func.value.id == "np"
                         and side.func.attr == "sign"):
-                    bad.append("np.sign(...) 을 비교에 썼다 — 양수 입력에서 "
-                               "`< 1` 과 같다")
-            # x < np.sqrt(x) / np.square(x) < x  — 둘 다 x < 1 이다
+                    bad.append("np.sign(...) is used in a comparison — on "
+                               "positive input it equals `< 1`")
+            # x < np.sqrt(x) / np.square(x) < x  — both equal x < 1
             for lo, hi in zip([n.left, *n.comparators][:-1],
                               [n.left, *n.comparators][1:], strict=False):
                 if _same_arg_transform(lo, hi, "sqrt") \
                         or _same_arg_transform(hi, lo, "square"):
                     bad.append("`x < np.sqrt(x)` / `np.square(x) < x` — "
-                               "둘 다 `x < 1` 과 같다")
+                               "both equal `x < 1`")
     if not bad:
         return None
     uniq = sorted(set(bad))
-    return ("항등 변환으로 상수를 만들고 있다 (D-92): " + " / ".join(uniq)
-            + ". ★ 그럴 필요가 없다 — **분기 조건의 비교 상수는 예산에서 "
-              "면제된다** (D-78). `p.<형상값> < 1` 처럼 숫자를 그대로 써라. "
-              "읽는 사람이 물리적 경계를 볼 수 있어야 한다")
+    return ("a constant is being manufactured by an identity transform "
+            "(D-92): " + " / ".join(uniq)
+            + ". ★ There is no need — **comparison constants in branch "
+              "conditions are exempt from the budget** (D-78). Write the "
+              "number plainly, as in `p.<shape value> < 1`. The reader has "
+              "to be able to see the physical boundary")
 
 
 def _same_arg_transform(a, b, fn: str) -> bool:
-    """`a` 와 `np.<fn>(a)` 가 같은 식인가."""
+    """Are `a` and `np.<fn>(a)` the same expression?"""
     if not (isinstance(b, ast.Call) and isinstance(b.func, ast.Attribute)
             and isinstance(b.func.value, ast.Name) and b.func.value.id == "np"
             and b.func.attr == fn and len(b.args) == 1):
@@ -328,16 +357,19 @@ def _same_arg_transform(a, b, fn: str) -> bool:
 
 def literal_parameter_message(code: str, n_weights: int,
                            *, parameters: int | None = None) -> str | None:
-    """숫자 리터럴 + 가중치가 예산을 넘으면 메시지를, 아니면 `None`.
+    """A message when numeric literals + weights exceed the budget, else
+    `None`.
 
-    ★ `weight_reuse_message` 와 같은 이유로 따로 뺐다 — LLM 경계에서
-    재시도를 걸어야 모델이 무엇이 틀렸는지 듣는다. 이 검사가 정적 단계에만
-    있었을 때 RuleWriter 제안 3개가 연속으로 같은 이유로 폐기됐고, 모델은
-    "가중치 8개면 리터럴을 쓸 수 없다" 를 끝내 알지 못했다.
+    ★ Split out for the same reason as `weight_reuse_message` — the retry
+    has to happen at the LLM boundary for the model to hear what was wrong.
+    While this check lived only in the static stage, three RuleWriter
+    proposals in a row were discarded for the same reason and the model never
+    learned "with 8 weights you cannot use a literal".
 
-    ★ 세는 일은 `_numeric_literals` 하나가 한다 — `check_rule` 과 여기가
-    **따로 세면 달라진다** (D-37 계열). 달라지면 LLM 경계는 통과시키고 정적
-    검사가 조용히 버린다.
+    ★ The counting is done by `_numeric_literals` alone — if `check_rule`
+    and this counted **separately they would diverge** (the D-37 family).
+    Then the LLM boundary lets it through and the static check silently
+    throws it away.
     """
     try:
         tree = ast.parse(code.strip())
@@ -347,57 +379,64 @@ def literal_parameter_message(code: str, n_weights: int,
     n_lit = len(counted)
     b = int(parameters if parameters is not None
             else LIMITS["parameters"])
-    # ★ 예산은 **실행 경로별**로 센다 (D-144). `check_rule` 과 같은 함수를
-    #   쓴다 — 따로 세면 달라진다 (D-37 계열).
+    # ★ The budget is counted **per execution path** (D-144). It uses the
+    #   same function as `check_rule` — counted separately they would
+    #   diverge (the D-37 family).
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
     if fnode is not None:
         paths = _paths(fnode.body, {id(n) for n in counted}, cap=MAX_PATHS)
         if len(paths) > MAX_PATHS:
-            return (f"실행 경로가 {MAX_PATHS} 개를 넘는다. **{MAX_PATHS} 개까지**"
-                    "만 된다 — 경로별 예산이라 갈라서 자리를 무한히 늘릴 수 "
-                    "있다. 중첩 2단 · `if/elif/elif/else` · 순차 `if` 2개가 "
-                    "전부 4경로다")
+            return (f"there are more than {MAX_PATHS} execution paths. "
+                    f"**At most {MAX_PATHS}** are allowed — the budget is "
+                    f"per path, so splitting could grow the room without "
+                    f"limit. Two levels of nesting, `if/elif/elif/else`, and "
+                    f"two sequential `if`s are all 4 paths")
         per = sorted(len(a) + len(bw) for a, bw in paths)
         if per and max(per) <= b:
             return None
         if per:
-            return (f"실행 경로의 파라미터가 {per} 로 {b} 를 넘는다 (§29.4). "
-                    "★ 예산은 **경로마다** 센다 — `if/else` 밖의 공통 항은 "
-                    "모든 경로에 속하고, `np.where` 는 분기가 아니다"
-                    + (f". 분기 비교 상수 {len(branch)}개는 이미 면제됐다"
-                       if branch else "")
-                    + ". 가지를 나눠 각 가지에 자기 가중치를 주면 "
-                      f"`len(w0)` 은 {b} 를 넘어도 된다")
+            return (f"the parameters per execution path are {per}, "
+                    f"exceeding {b} (§29.4). ★ The budget is counted **per "
+                    f"path** — a common term outside `if/else` belongs to "
+                    f"every path, and `np.where` is not a branch"
+                    + (f". The {len(branch)} branch comparison constants are "
+                       f"already exempt" if branch else "")
+                    + f". If you split the branches and give each its own "
+                      f"weights, `len(w0)` may exceed {b}")
     total = n_lit + n_weights
     if total <= b:
         return None
     hint = ""
     if branch:
-        hint = (f" (분기 비교 상수 {len(branch)}개는 예산에서 빠졌다 — "
-                "그것은 계속 써도 된다)")
-    return (f"숫자 리터럴 {n_lit}개 + 가중치 {n_weights}개 = {total} > "
-            f"{b} (§29.4).{hint} 가중치와 **분기 비교가 "
-            f"아닌** 숫자 리터럴이 같은 예산을 쓴다 — 상수를 하나 쓰면 "
-            f"가중치를 하나 줄여야 한다. 항을 줄이거나, 그 상수를 분기 "
-            f"조건의 비교로 옮겨라")
+        hint = (f" ({len(branch)} branch comparison constants are excluded "
+                f"from the budget — you may keep using those)")
+    return (f"{n_lit} numeric literals + {n_weights} weights = {total} > "
+            f"{b} (§29.4).{hint} Weights and numeric literals that are "
+            f"**not branch comparisons** share the same budget — using one "
+            f"constant means dropping one weight. Reduce the terms, or move "
+            f"that constant into a branch condition's comparison")
 
 
-#: ★ 지수 자리 가중치의 경계 (D-112). **하이퍼파라미터가 아니라
-#: 정규화다** — 튜닝하려고 둔 값이 아니라 발산과 오버플로를 막는
-#: 물리적 상한이다.
+#: ★ The bounds on an exponent-slot weight (D-112). **Normalisation, not a
+#: hyperparameter** — not a value put there to be tuned but a physical cap
+#: that prevents divergence and overflow.
 #:
-#:   하한 0    음수 지수는 `f.* == 0` 에서 `inf` 다. 그리고 모든 피처가
-#:             "클수록 나쁨" 이라 음수 지수는 방향을 뒤집는다 (§8.2).
-#:   상한 4    정규화된 피처의 4제곱보다 빠르게 자라는 벌은 매끄러운
-#:             물리 반응이 아니라 사실상 문턱이고, 문턱은 `np.where` 가
-#:             이미 한다. 즉 **표현력을 안 뺀다.**
+#:   lower 0   A negative exponent is `inf` at `f.* == 0`. And every feature
+#:             is "larger is worse", so a negative exponent flips the
+#:             direction (§8.2).
+#:   upper 4   A penalty growing faster than the 4th power of a normalised
+#:             feature is not a smooth physical response but effectively a
+#:             threshold, and thresholds are already done by `np.where`. So
+#:             **no expressiveness is taken away.**
 #:
-#: 값을 쓸어보지 않는다. 쓸어보면 그때부터 하이퍼파라미터다.
+#: The values are not swept. Sweeping them makes it a hyperparameter from
+#: that moment on.
 EXPONENT_BOUNDS = (0.0, 4.0)
 
 
 def _exponent_sites(tree) -> list[tuple[int, object]]:
-    """`(가중치 인덱스, 밑 노드)` — `np.power(밑, w[i])` 와 `밑 ** w[i]`."""
+    """`(weight index, base node)` — `np.power(base, w[i])` and
+    `base ** w[i]`."""
     out = []
     for n in ast.walk(tree):
         base = expo = None
@@ -417,7 +456,7 @@ def _exponent_sites(tree) -> list[tuple[int, object]]:
 
 
 def exponent_indices(code: str) -> frozenset[int]:
-    """지수 자리에 쓰인 `w[i]` 의 인덱스."""
+    """The indices of the `w[i]` used in an exponent slot."""
     try:
         tree = ast.parse(code.strip())
     except SyntaxError:
@@ -426,10 +465,11 @@ def exponent_indices(code: str) -> frozenset[int]:
 
 
 def weight_bounds(code: str, n_weights: int) -> list[tuple] | None:
-    """가중치별 경계. **지수 자리가 없으면 `None`** — 기존 규칙은 그대로다.
+    """Per-weight bounds. **`None` when there is no exponent slot** —
+    existing rules are unchanged.
 
-    ★ `None` 을 돌려주는 것이 중요하다. 경계를 항상 붙이면 지수를 안 쓰는
-    옛 실행까지 조용히 다른 조건이 된다 (원칙 36).
+    ★ Returning `None` matters. Always attaching bounds would silently make
+    even old runs that use no exponent a different condition (principle 36).
     """
     idx = exponent_indices(code)
     if not idx:
@@ -442,21 +482,22 @@ def weight_bounds(code: str, n_weights: int) -> list[tuple] | None:
 
 def exponent_message(code: str,
                      feature_mins: dict | None = None) -> str | None:
-    """지수 자리의 **수치 가드**. 위반이면 메시지, 아니면 `None`.
+    """The **numerical guard** on the exponent slot. A message on
+    violation, else `None`.
 
     ```
-    np.power(x, w) 에서
-      x < 0 이고 w 가 정수가 아니면   nan
-      x = 0 이고 w < 0 이면           inf
-      x 가 크고 w 가 크면             오버플로
+    in np.power(x, w)
+      x < 0 and w not an integer   nan
+      x = 0 and w < 0              inf
+      x large and w large          overflow
     ```
 
-    앞의 둘은 **밑을 묶어서** 막는다 — 밑은 `f.<이름>` **하나**여야 하고
-    그 축의 선언 범위 최소가 0 이상이어야 한다. 셋째는 지수 상한
-    `EXPONENT_BOUNDS` 가 막는다.
+    The first two are blocked **by constraining the base** — the base must
+    be a **single** `f.<name>` whose declared range minimum is 0 or above.
+    The third is blocked by the exponent cap `EXPONENT_BOUNDS`.
 
-    ★ `weight_reuse_message` 와 같은 이유로 따로 뺐다 — LLM 경계에서
-    재시도를 걸어야 모델이 무엇이 틀렸는지 듣는다.
+    ★ Split out for the same reason as `weight_reuse_message` — the retry
+    has to happen at the LLM boundary for the model to hear what was wrong.
     """
     try:
         tree = ast.parse(code.strip())
@@ -473,20 +514,23 @@ def exponent_message(code: str,
         ok_w = (isinstance(e, ast.Subscript) and isinstance(e.value, ast.Name)
                 and e.value.id == "w")
         if not ok_w and _touches_weight(e):
-            return ("지수 자리에는 `w[i]` **하나만** 쓸 수 있다. 식을 "
-                    "지수로 올리면 경계를 못 붙이고 발산한다.")
+            return ("only a **single** `w[i]` may sit in the exponent "
+                    "slot. Raising an expression to the exponent leaves no "
+                    "way to bound it and it diverges.")
     for _i, base in _exponent_sites(tree):
         if not (isinstance(base, ast.Attribute)
                 and isinstance(base.value, ast.Name)
                 and base.value.id == "f"):
-            return ("`np.power` 의 **밑은 `f.<이름>` 하나**여야 한다. "
-                    "식을 밑으로 쓰면 음수가 될 수 있고 그러면 `nan` 이 "
-                    "된다 — 그것은 규칙을 조용히 쓸모없게 만든다.")
+            return ("the **base of `np.power` must be a single "
+                    "`f.<name>`**. An expression as the base can go "
+                    "negative, and then it is `nan` — which silently makes "
+                    "the rule useless.")
         if feature_mins is not None:
             m = feature_mins.get(base.attr)
             if m is not None and m < 0:
-                return (f"`f.{base.attr}` 는 음수가 될 수 있다(범위 최소 "
-                        f"{m}). 지수의 밑으로 쓰면 `nan` 이 된다.")
+                return (f"`f.{base.attr}` can be negative (range minimum "
+                        f"{m}). As the base of an exponent it becomes "
+                        f"`nan`.")
     return None
 
 
@@ -496,21 +540,23 @@ def _touches_weight(node) -> bool:
 
 
 def weight_reuse_message(code: str) -> str | None:
-    """`w[i]` 를 여러 항에 재사용했으면 그 메시지를, 아니면 `None`.
+    """A message if `w[i]` is reused across terms, else `None`.
 
-    ★ 이것만 따로 뺀 이유는 **LLM 경계에서 재시도를 걸기 위해서**다.
-    전체 검사는 AST 순회가 무겁고 등록된 피처 목록이 필요한데, 재사용은
-    코드만 보면 알 수 있다. 스키마 validator 가 이걸 부르면 Pydantic AI 가
-    메시지를 모델에 되먹여 **고쳐서 다시 내게** 한다.
+    ★ This one was split out **in order to trigger a retry at the LLM
+    boundary**. The full check walks the AST heavily and needs the list of
+    registered features, whereas reuse can be seen from the code alone. When
+    the schema validator calls this, Pydantic AI feeds the message back to
+    the model and **has it fixed and resubmitted**.
 
-    이 검사가 `checks.py` 에만 있었을 때는 RuleWriter 제안이 조용히 폐기됐다
-    — 모델은 무엇이 틀렸는지 듣지 못하고 같은 실수를 반복했다.
+    While this check lived only in `checks.py`, RuleWriter proposals were
+    silently discarded — the model never heard what was wrong and repeated
+    the same mistake.
     """
     uses: dict[int, int] = {}
     try:
         tree = ast.parse(code.strip())
     except SyntaxError:
-        return None                     # 문법 오류는 다른 검사가 잡는다
+        return None       # a syntax error is caught by another check
     for n in ast.walk(tree):
         if (isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
                 and n.value.id == "w" and isinstance(n.slice, ast.Constant)
@@ -519,23 +565,29 @@ def weight_reuse_message(code: str) -> str | None:
     dup = sorted(i for i, c in uses.items() if c > 1)
     if not dup:
         return None
-    return (f"가중치를 여러 항에 재사용했다: "
-            f"{[f'w[{i}]x{uses[i]}' for i in dup]}. 항 {sum(uses.values())}개를 "
-            f"가중치 {len(uses)}개로 만들었다 — 리터럴 예산(§29.4)을 우회한다. "
-            "항마다 **다른** 가중치를 써라. 항이 예산을 넘으면 항을 지워라")
+    return (f"a weight is reused across terms: "
+            f"{[f'w[{i}]x{uses[i]}' for i in dup]}. You built "
+            f"{sum(uses.values())} terms out of {len(uses)} weights — that "
+            f"goes around the literal budget (§29.4). Use a **different** "
+            f"weight for each term. If the terms exceed the budget, delete "
+            f"terms")
 
-#: ★ 예산의 **유일한 출처**. 프롬프트·스키마·검사기가 각자 8 을 적으면
-#: 하나를 빠뜨린다 (`is_reference` / `top_k` / `DEFAULT_MODEL` /
-#: `REGISTRY` / `load_generated` 에 이은 여섯 번째가 된다).
+#: ★ The **single source** for the budget. If the prompt, the schema and
+#: the checker each write 8 of their own, one gets missed (it would be the
+#: sixth after `is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
+#: `load_generated`).
 #:
-#: ⚠️ **8 은 임의로 정한 숫자이고 검증하지 않았다** (§29.4). 8 vs 16 을
-#: 재려 했으나 적합기가 16차원에서 버티지 못해 멈췄다 (D-77).
+#: ⚠️ **8 is an arbitrary number and has not been validated** (§29.4). An
+#: attempt to measure 8 vs 16 stopped because the fitter could not cope in
+#: 16 dimensions (D-77).
 PARAMETERS = 8
 
 LIMITS = {
-    #: 가중치 개수 + **분기 비교가 아닌** 숫자 리터럴 (D-78).
-    #: 가중치를 예산에 넣는 이유는 §29.4 — 가중치가 많으면 어떤 구조든
-    #: 비슷한 regret 에 도달해 구조 비교가 무의미해진다.
+    #: The weight count + numeric literals that are **not branch
+    #: comparisons** (D-78).
+    #: Weights are in the budget because of §29.4 — with many weights any
+    #: structure reaches a similar regret and structural comparison becomes
+    #: meaningless.
     "parameters": PARAMETERS,
     "ast_nodes": 400,
     "max_lines": 60,
@@ -543,28 +595,32 @@ LIMITS = {
 
 
 def fitter_for(n_weights: int | None) -> dict:
-    """★ **`len(W0)` 이** 적합기를 정한다 (D-144). 한 곳에서만 정한다.
+    """★ **`len(W0)`** decides the fitter (D-144). Decided in one place
+    only.
 
-    ⚠️ **2026-09-08 에 인자의 뜻이 바뀌었다.** 예전에는 캠페인의 `parameters`
-    (경로별 예산 상한)였고 지금은 **그 규칙의 `len(W0)`** 다. 경로별 예산이
-    되면서 한 규칙의 차원이 최대 32 까지 가므로, 캠페인 단위로 정하면
-    16차원 규칙을 Nelder-Mead 로 맞추게 된다 (도달률 42~58%, D-77).
+    ⚠️ **The meaning of the argument changed on 2026-09-08.** It used to be
+    the campaign's `parameters` (the per-path budget cap) and is now **that
+    rule's `len(W0)`**. With a per-path budget one rule can reach up to 32
+    dimensions, so deciding per campaign would fit a 16-dimensional rule with
+    Nelder-Mead (a reach rate of 42~58%, D-77).
 
     ```
-    <= 8   nelder-mead / 재시작 4 / 적합 200      지금까지의 모든 실행
-    >  8   cma         / 재시작 1 / 적합 300      §2 통과 조건이 고른 팔 (D-123)
+    <= 8   nelder-mead / 4 restarts / 200 evals   every run so far
+    >  8   cma         / 1 restart  / 300 evals   the arm §2's gate chose (D-123)
     ```
 
-    근거: 8차원에서는 두 적합기가 구분 불가고(D-125), 16차원에서는
-    Nelder-Mead 도달률이 92% 로 미달이다 (D-77·D-123). 다듬기 600 은
-    양쪽 같다.
+    Rationale: in 8 dimensions the two fitters are indistinguishable (D-125),
+    and in 16 dimensions Nelder-Mead's reach rate is 92%, short of the mark
+    (D-77 · D-123). The polish budget of 600 is the same on both sides.
 
-    ⚠️ **옛 실행 일부는 이 규칙과 다르다** — `rb08`/`rprod`/`rpow` 는
-    파라미터 8인데 CMA 로 돌았다 (D-124). 재측정할 때 이 규칙으로 돈다.
+    ⚠️ **Some old runs differ from this rule** — `rb08`/`rprod`/`rpow` ran
+    with CMA at 8 parameters (D-124). On re-measurement they run under this
+    rule.
     """
     b = int(n_weights if n_weights is not None else PARAMETERS)
-    # ★ 키 이름은 `LoopConfig` 의 필드 그대로다 — `**fitter_for(n)` 으로
-    #   그대로 펼쳐 넣을 수 있어야 달라질 자리가 안 생긴다 (원칙 2).
+    # ★ The key names are exactly `LoopConfig`'s fields — being splattable
+    #   as `**fitter_for(n)` is what leaves no place for divergence
+    #   (principle 2).
     if b <= PARAMETERS:
         return {"fit_method": "nelder-mead", "fit_restarts": 4,
                 "max_evals": 200}
@@ -572,44 +628,49 @@ def fitter_for(n_weights: int | None) -> dict:
 
 
 def limits_for(parameters: int | None) -> dict:
-    """★ 예산에 **따라 움직이는 상한들**. 예산만 올리면 다른 벽에 막힌다.
+    """★ The caps that **move with the budget**. Raising only the budget
+    runs into another wall.
 
-    실측: 8항 규칙의 AST 노드가 중앙 271 / 최대 383 이다. 상한 400 을
-    그대로 두고 예산만 16 으로 올리면 **16항 규칙은 노드 상한에서
-    거부된다.** 그러면 "예산 16 이 효과가 없다" 가 아니라 "16항을 쓸 수
-    없었다" 를 재게 된다 (D-105 와 같은 자리).
+    Measured: an 8-term rule has a median of 271 AST nodes and a maximum of
+    383. Leaving the cap at 400 and raising only the budget to 16 means
+    **16-term rules are refused at the node cap.** Then what gets measured is
+    not "a budget of 16 has no effect" but "16 terms could not be used" (the
+    same spot as D-105).
 
-    비례로 올린다 — 8항에 400 이면 16항에 800 이다.
+    They rise proportionally — 400 at 8 terms is 800 at 16.
     """
     b = int(parameters if parameters is not None else PARAMETERS)
     if b < 1:
-        raise ValueError(f"예산은 1 이상이어야 한다: {b}")
+        raise ValueError(f"the budget must be at least 1: {b}")
     k = b / PARAMETERS
     return {"parameters": b,
             "ast_nodes": int(round(LIMITS["ast_nodes"] * k)),
             "max_lines": int(round(LIMITS["max_lines"] * k))}
 
-#: 규칙 소스에 나타나면 안 되는 이름. 정답이거나 탈출 경로다.
+#: Names that must not appear in rule source. They are answers or escape
+#: routes.
 _BANNED_NAMES = frozenset({
-    # 정답 (ANSWER_COLS)
+    # answers (ANSWER_COLS)
     "time_ms", "time_std_ms", "time_min_ms", "time_max_ms", "n_reps",
     "outlier_frac", "cublas_ms", "tflops", "frac_of_peak", "vs_cublas",
     "difficulty", "distinct_time_frac", "n_distinct_times",
-    # 측정해야 아는 값 (OUTCOME_COLS)
+    # values knowable only by measuring (OUTCOME_COLS)
     "status", "max_rel_error", "actual_split_k", "drift_ratio",
     "sm_clock_mhz", "mem_clock_mhz", "gpu_temp_c", "power_w", "timestamp",
-    # 표 접근
+    # table access
     "TABLE", "PerfTable", "table", "times_of", "best_time", "answer_mask",
     "load_for_scoring", "load_for_ranking", "load_bundle", "read_parquet",
-    # 탈출
+    # escapes
     "eval", "exec", "compile", "open", "__import__", "globals", "locals",
     "vars", "getattr", "setattr", "delattr", "input", "breakpoint",
 })
 
-#: 속성 이름에 나타나면 안 되는 것 (`x.__globals__` 같은 우회).
+#: What must not appear in an attribute name (detours such as
+#: `x.__globals__`).
 _BANNED_ATTR_PREFIX = ("__",)
 
-#: 허용된 numpy 함수. 이 밖은 거부한다 — `np.random` 이 비결정론을 만든다.
+#: The allowed numpy functions. Anything else is refused — `np.random`
+#: makes things non-deterministic.
 _ALLOWED_NP = frozenset({
     "where", "clip", "minimum", "maximum", "log", "log2", "log10", "sqrt",
     "abs", "exp", "power", "sign", "floor", "ceil", "round", "isfinite",
@@ -623,60 +684,69 @@ _ALLOWED_BUILTINS = frozenset({"min", "max", "abs", "float", "int", "len",
 
 
 class RuleCheckError(RuntimeError):
-    """규칙이 정적 검사를 통과하지 못했다."""
+    """The rule did not pass the static checks."""
 
 
 @dataclass
 class CheckReport:
     ok: bool
     violations: list[str] = field(default_factory=list)
-    #: 거부는 아니지만 사람이 봐야 하는 것. **`ok` 에 영향을 주지 않는다.**
+    #: Not a refusal, but something a human should look at. **It does not
+    #: affect `ok`.**
     warnings: list[str] = field(default_factory=list)
     n_literals: int = 0
     n_weights: int = 0
     n_nodes: int = 0
     max_w_index: int = -1
-    #: 가중치가 곱해진 항의 개수. `n_weights` 를 넘으면 재사용이 있다는 뜻이다.
+    #: The number of terms a weight is multiplied into. Exceeding
+    #: `n_weights` means there is reuse.
     n_terms: int = 0
     features_used: set[str] = field(default_factory=set)
     shape_values_used: set[str] = field(default_factory=set)
-    #: ★ 예산에서 **면제된** 분기 비교 상수들 (D-78). 거부하지 않지만
-    #: 기록한다 — "물리 상수인가, 이 표의 형상 분포인가" 는 정적으로 못
-    #: 가르므로 사람이 본다.
+    #: ★ The branch comparison constants **exempted** from the budget
+    #: (D-78). They are not refused but they are recorded — "a physical
+    #: constant or this table's shape distribution" cannot be decided
+    #: statically, so a human looks.
     branch_constants: list[float] = field(default_factory=list)
-    #: ★ 실행 경로별 (리터럴 + 가중치) 수 (D-144). 예산은 **경로마다** 센다.
+    #: ★ The (literals + weights) count per execution path (D-144). The
+    #: budget is counted **per path**.
     path_parameters: list[int] = field(default_factory=list)
-    #: 중첩된 `if` 의 최대 깊이. ⚠️ 보고용이다 — 판정은 `n_paths` 가 한다.
+    #: The maximum nesting depth of `if`. ⚠️ For reporting — the verdict is
+    #: made by `n_paths`.
     branch_depth: int = 0
-    #: ★ 실행 경로 수 (D-145). 상한을 넘으면 `MAX_PATHS + 1` 에서 멈춘다.
+    #: ★ The number of execution paths (D-145). Beyond the cap it stops at
+    #: `MAX_PATHS + 1`.
     n_paths: int = 0
 
     @property
     def parameters_used(self) -> int:
-        """★ 가장 무거운 경로의 파라미터 수. 경로가 없으면 전역 합계."""
+        """★ The parameter count of the heaviest path. The global sum when
+        there are no paths."""
         return (max(self.path_parameters) if self.path_parameters
                 else self.n_literals + self.n_weights)
 
     def raise_if_bad(self) -> CheckReport:
         if not self.ok:
             raise RuleCheckError(
-                "규칙이 정적 검사를 통과하지 못했다:\n  "
+                "the rule did not pass the static checks:\n  "
                 + "\n  ".join(self.violations))
         return self
 
     def __str__(self) -> str:
-        head = "통과" if self.ok else "거부"
-        bc = (f", 분기상수 {self.branch_constants}(면제)"
+        head = "passed" if self.ok else "refused"
+        bc = (f", branch constants {self.branch_constants} (exempt)"
               if self.branch_constants else "")
-        pp = (f", 경로 {self.n_paths}개 {self.path_parameters} "
-              f"(깊이 {self.branch_depth})"
+        pp = (f", {self.n_paths} paths {self.path_parameters} "
+              f"(depth {self.branch_depth})"
               if len(self.path_parameters) > 1 else "")
-        return (f"[{head}] 리터럴 {self.n_literals} + 가중치 {self.n_weights} "
-                f"= 최대경로 {self.parameters_used}/{LIMITS['parameters']}"
+        return (f"[{head}] literals {self.n_literals} + weights "
+                f"{self.n_weights} "
+                f"= heaviest path {self.parameters_used}/"
+                f"{LIMITS['parameters']}"
                 f"{bc}{pp}, "
-                f"항 {self.n_terms}, "
-                f"노드 {self.n_nodes}/{LIMITS['ast_nodes']}, "
-                f"피처 {sorted(self.features_used)}"
+                f"terms {self.n_terms}, "
+                f"nodes {self.n_nodes}/{LIMITS['ast_nodes']}, "
+                f"features {sorted(self.features_used)}"
                 + "".join("\n    ✗ " + v for v in self.violations)
                 + "".join("\n    ! " + v for v in self.warnings))
 
@@ -684,9 +754,10 @@ class CheckReport:
 def check_rule(code: str, *, feature_names, shape_value_names,
                n_weights: int, limits: dict | None = None,
                feature_mins: dict | None = None) -> CheckReport:
-    """`score(f, p, hw, w)` 소스를 검사한다.
+    """Checks the source of `score(f, p, hw, w)`.
 
-    `n_weights` 는 LLM 이 제시한 `W0` 의 길이다. **리터럴 예산에 합산된다.**
+    `n_weights` is the length of the `W0` the LLM gave. **It is summed into
+    the literal budget.**
     """
     lim = {**LIMITS, **(limits or {})}
     rep = CheckReport(ok=True, n_weights=int(n_weights))
@@ -698,62 +769,66 @@ def check_rule(code: str, *, feature_names, shape_value_names,
         rep.violations.append(msg)
 
     def warn(msg: str) -> None:
-        """거부는 아니지만 사람이 봐야 하는 것."""
+        """Not a refusal, but something a human should look at."""
         rep.warnings.append(msg)
 
-    # -- 파싱. 실패는 **거부**다 (§26.4) ----------------------------------
+    # -- Parsing. A failure is a **refusal** (§26.4) -----------------------
     try:
         tree = ast.parse(code)
     except SyntaxError as e:
         rep.ok = False
-        rep.violations.append(f"파싱 실패: {e}. 통과가 아니라 거부다.")
+        rep.violations.append(
+            f"parse failure: {e}. That is a refusal, not a pass.")
         return rep
 
     if code.count("\n") + 1 > lim["max_lines"]:
-        bad(f"줄 수 {code.count(chr(10)) + 1} > {lim['max_lines']}")
+        bad(f"line count {code.count(chr(10)) + 1} > {lim['max_lines']}")
 
     fns = [n for n in tree.body if isinstance(n, ast.FunctionDef)]
     if len(fns) != 1 or fns[0].name != "score":
-        bad("최상위에 `def score(f, p, hw, w)` 하나만 있어야 한다 "
-            f"(찾은 것: {[getattr(n, 'name', type(n).__name__) for n in tree.body]})")
+        bad("there must be exactly one top-level `def score(f, p, hw, w)` "
+            f"(found: {[getattr(n, 'name', type(n).__name__) for n in tree.body]})")
         return rep
     fn = fns[0]
     args = [a.arg for a in fn.args.args]
     if args[:4] != ["f", "p", "hw", "w"]:
-        bad(f"시그니처가 `score(f, p, hw, w)` 여야 한다 (받은 것: {args})")
+        bad(f"the signature must be `score(f, p, hw, w)` (got: {args})")
 
     rep.n_nodes = sum(1 for _ in ast.walk(tree))
     if rep.n_nodes > lim["ast_nodes"]:
-        bad(f"AST 노드 {rep.n_nodes} > {lim['ast_nodes']}")
+        bad(f"AST nodes {rep.n_nodes} > {lim['ast_nodes']}")
 
-    # -- 순회 -------------------------------------------------------------
-    array_names: set[str] = set()      # f.* 에서 유래한 지역 변수
-    #: w[i] 가 몇 번 쓰였는가. 재사용은 예산 우회다.
+    # -- The walk ---------------------------------------------------------
+    array_names: set[str] = set()   # local variables derived from f.*
+    #: How many times each w[i] was used. Reuse goes around the budget.
     w_index_uses: dict[int, int] = {}
-    #: 가중치가 곱해진 식의 서명. 중복 항 검출용.
+    #: Signatures of the expressions a weight multiplies. For detecting
+    #: duplicate terms.
     term_sigs: list[str] = []
 
-    # ★ 리터럴은 `_numeric_literals` **하나**가 센다 — LLM 경계
-    #   (`literal_parameter_message`) 와 여기가 따로 세면 달라진다 (D-37 계열).
-    #   `w[0]` 의 `0` 은 거기서 빠진다: 가중치는 `n_weights` 로 이미 예산에
-    #   들어가 있어서, 안 빼면 항마다 두 번 세어 예산이 반토막 난다.
+    # ★ Literals are counted by `_numeric_literals` **alone** — if the LLM
+    #   boundary (`literal_parameter_message`) and this counted separately
+    #   they would diverge (the D-37 family). The `0` of `w[0]` is excluded
+    #   there: weights already enter the budget through `n_weights`, so
+    #   without excluding it each term would be counted twice and the budget
+    #   would halve.
     _counted, _branch = _numeric_literals(tree)
     rep.n_literals = len(_counted)
     rep.branch_constants = [n.value for n in _branch]
 
     for node in ast.walk(tree):
-        # import 금지
+        # no import
         if isinstance(node, (ast.Import, ast.ImportFrom)):
-            bad("import 금지. `np` 는 이미 주어진다")
+            bad("no import. `np` is already given")
 
-        # 금지 이름
+        # banned names
         if isinstance(node, ast.Name) and node.id in _BANNED_NAMES:
-            bad(f"금지된 이름 참조: {node.id!r}")
+            bad(f"banned name reference: {node.id!r}")
         if isinstance(node, ast.Attribute):
             if node.attr in _BANNED_NAMES:
-                bad(f"금지된 속성 참조: .{node.attr}")
+                bad(f"banned attribute reference: .{node.attr}")
             if node.attr.startswith(_BANNED_ATTR_PREFIX):
-                bad(f"던더 속성 접근 금지: .{node.attr}")
+                bad(f"no dunder attribute access: .{node.attr}")
 
         # f.<name> / p.<name>
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
@@ -761,29 +836,31 @@ def check_rule(code: str, *, feature_names, shape_value_names,
             if base == "f":
                 rep.features_used.add(attr)
                 if attr not in feature_names:
-                    bad(f"등록되지 않은 피처: f.{attr}. "
-                        "오타를 조용히 통과시키지 않는다")
+                    bad(f"unregistered feature: f.{attr}. "
+                        "A typo is not waved through silently")
             elif base == "p":
                 rep.shape_values_used.add(attr)
-                # ★ M/N/K 는 등록된 피처가 아니라 **형상 자체의 값**이다.
-                #   부등호 비교만 허용한다 — 등호는 위에서 거부한다 (D-144).
+                # ★ M/N/K are not registered features but **values of the
+                #   shape itself**. Only inequality comparisons are allowed —
+                #   equality is refused below (D-144).
                 if attr not in shape_value_names and attr not in ("M", "N",
                                                                   "K"):
-                    bad(f"등록되지 않은 형상 수준 값: p.{attr}")
+                    bad(f"unregistered shape-level value: p.{attr}")
             elif base == "hw":
                 pass
             elif base == "np":
                 if attr not in _ALLOWED_NP:
-                    bad(f"허용되지 않은 numpy 함수: np.{attr}. "
-                        f"허용: {sorted(_ALLOWED_NP)[:8]} ...")
+                    bad(f"numpy function not allowed: np.{attr}. "
+                        f"allowed: {sorted(_ALLOWED_NP)[:8]} ...")
 
-        # problem.M / p.M 직접 비교 — ★ 등호만 금지한다 (D-144)
+        # A direct comparison against problem.M / p.M — ★ only equality is
+        # forbidden (D-144)
         #
-        #   p.M == 4096   ⛔ 한 점을 외운다
-        #   p.M < 128     ★ 구간을 가른다 — 일반화되는 형태다
+        #   p.M == 4096   ⛔ memorises a single point
+        #   p.M < 128     ★ cuts a band — a form that generalises
         #
-        # 옛 규칙은 둘을 함께 막았다. 그러면 모델이 "작은 M" 이라는
-        # 개념을 아예 쓸 수 없었다.
+        # The old rule blocked both together. That left the model unable to
+        # express the notion of "a small M" at all.
         if isinstance(node, ast.Compare):
             eq_ops = any(isinstance(o, (ast.Eq, ast.NotEq, ast.In, ast.NotIn))
                          for o in node.ops)
@@ -792,11 +869,12 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                         and isinstance(sub.value, ast.Name)
                         and sub.value.id in ("p", "problem")
                         and sub.attr in ("M", "N", "K") and eq_ops):
-                    bad(f"형상 크기를 **등호로** 비교하는 분기 금지: "
-                        f"{sub.value.id}.{sub.attr}. 한 점을 외우는 형태다 — "
-                        "부등호(<, <=, >, >=)로 구간을 갈라라")
+                    bad(f"no branching on a shape size compared **by "
+                        f"equality**: {sub.value.id}.{sub.attr}. That is the "
+                        f"form that memorises a single point — cut a band "
+                        f"with an inequality (<, <=, >, >=)")
 
-        # w 접근은 인덱스만
+        # w is accessed by index only
         if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) \
                 and node.value.id == "w":
             sl = node.slice
@@ -804,15 +882,17 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                 rep.max_w_index = max(rep.max_w_index, sl.value)
                 w_index_uses[sl.value] = w_index_uses.get(sl.value, 0) + 1
             else:
-                bad("w 는 상수 인덱스로만 접근한다 (w[0], w[1] ...). "
-                    "슬라이싱/변수 인덱스 금지")
-        # 지역 변수 추적 — f.* 가 대입되면 그 변수도 배열이다
+                bad("w is accessed only by a constant index (w[0], w[1] "
+                    "...). No slicing, no variable index")
+        # Local-variable tracking — if f.* is assigned, that variable is an
+        # array too
         if isinstance(node, ast.Assign) and len(node.targets) == 1 \
                 and isinstance(node.targets[0], ast.Name):
             if _touches_features(node.value):
                 array_names.add(node.targets[0].id)
 
-    # 가중치가 곱해진 식의 서명을 모은다 (중복 항 검출)
+    # Collect signatures of the expressions weights multiply (duplicate
+    # term detection)
     for node in ast.walk(tree):
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
             for a, b_ in ((node.left, node.right), (node.right, node.left)):
@@ -823,75 +903,81 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                     with contextlib.suppress(Exception):
                         term_sigs.append(ast.dump(b_))
 
-    # `w` 를 인덱스 없이 통째로 쓰는 것 금지 (w.sum(), w * f 등)
+    # Using `w` whole, without an index, is forbidden (w.sum(), w * f, ...)
     for node in ast.walk(tree):
         if isinstance(node, ast.Name) and node.id == "w":
             if not _is_subscript_base(tree, node):
-                bad("w 를 통째로 쓰지 마라. 인덱스 접근만 허용된다 (§8.1)")
+                bad("do not use w whole. Only index access is allowed "
+                    "(§8.1)")
                 break
 
-    # -- ★ 지수 자리 가드 (D-112) ------------------------------------------
-    #    밑이 음수가 될 수 있으면 `nan` 이고, 그것은 거부가 아니라
-    #    **조용한 무력화**다 — 점수가 통째로 못 쓰게 된다.
+    # -- ★ The exponent-slot guard (D-112) --------------------------------
+    #    A base that can go negative is `nan`, and that is not a refusal but
+    #    **a silent neutering** — the whole score becomes unusable.
     if (m := exponent_message(code, feature_mins)) is not None:
         bad(m)
 
-    # -- ★ 가중치 재사용 금지 — 리터럴 예산 우회를 막는다 -------------------
+    # -- ★ No weight reuse — it blocks going around the literal budget ----
     #
-    #   실제 실행에서 LLM 이 이렇게 뚫었다:
+    #   In a real run the LLM broke through like this:
     #
     #       s = s + f.log_workspace_bytes * w[0]
-    #       s = s + f.log_dram_traffic    * w[0]      <- w[0] 재사용
-    #       s = s + f.is_two_stage        * w[0]      <- 또
+    #       s = s + f.log_dram_traffic    * w[0]      <- w[0] reused
+    #       s = s + f.is_two_stage        * w[0]      <- again
     #
-    #   가중치 8개로 **항 17개**를 만들었다. 예산(§29.4)의 목적은 "파라미터가
-    #   많으면 어떤 구조든 비슷한 regret 에 도달해 구조 비교가 무의미해진다"
-    #   를 막는 것인데, 항 수를 무제한으로 늘리면 그 목적이 무너진다.
-    #   `len(W0) == max_index + 1` 검사만으로는 못 잡는다.
+    #   It built **17 terms** out of 8 weights. The budget's purpose (§29.4)
+    #   is to block "with many parameters any structure reaches a similar
+    #   regret and structural comparison becomes meaningless", and growing
+    #   the term count without limit destroys that purpose. The
+    #   `len(W0) == max_index + 1` check alone cannot catch it.
     dup_w = sorted(i for i, c in w_index_uses.items() if c > 1)
     if dup_w:
-        bad(f"가중치를 여러 항에 재사용했다: "
+        bad(f"a weight is reused across terms: "
             f"{[f'w[{i}]x{w_index_uses[i]}' for i in dup_w]}. "
-            f"항 {sum(w_index_uses.values())}개에 가중치 {rep.n_weights}개다 — "
-            "리터럴 예산(§29.4)을 우회한다. 항마다 다른 가중치를 써라")
+            f"{sum(w_index_uses.values())} terms on {rep.n_weights} weights "
+            f"— that goes around the literal budget (§29.4). Use a different "
+            f"weight for each term")
     rep.n_terms = sum(w_index_uses.values())
 
-    # ⚠️ "같은 식이 두 번 나오면 거부" 는 넣지 않는다. **정당한 재가중을
-    #    오탐한다** — 형상 수준 분기에서 같은 피처에 다른 가중치를 주는 것이
-    #    바로 우리가 원하는 패턴이다 (§A-1):
+    # ⚠️ "refuse when the same expression appears twice" is not added. It
+    #    **false-positives on legitimate reweighting** — giving the same
+    #    feature a different weight under a shape-level branch is exactly the
+    #    pattern we want (§A-1):
     #
     #        s = f.traffic * w[0]
     #        if p.is_memory_bound:
-    #            s = s + f.traffic * w[6]      # 재가중. 정당하다
+    #            s = s + f.traffic * w[6]      # a reweight. Legitimate
     #
-    #    실제로 관측된 병리(같은 식 + **같은** 가중치가 두 번)는 위의
-    #    재사용 검사가 이미 잡는다.
+    #    The pathology actually observed (the same expression + **the same**
+    #    weight twice) is already caught by the reuse check above.
 
     if rep.max_w_index >= 0 and rep.max_w_index + 1 != rep.n_weights:
-        bad(f"W0 길이 {rep.n_weights} != 참조한 최대 인덱스 + 1 "
-            f"({rep.max_w_index + 1}). 안 쓰는 가중치는 예산 낭비다")
-    # ★ **인덱스에 구멍이 있으면 안 된다** (D-144).
+        bad(f"W0 length {rep.n_weights} != the largest referenced index + 1 "
+            f"({rep.max_w_index + 1}). An unused weight is wasted budget")
+    # ★ **There must be no hole in the indices** (D-144).
     #
-    #   옛 합산 예산에서는 `len(W0)` 자체가 예산에 들어가서 구멍이 저절로
-    #   막혔다. 경로별로 세면 **쓰이지 않은 인덱스는 어느 경로에도 안
-    #   잡히는데 적합기는 그것까지 맞춘다** — 공짜 파라미터가 된다.
-    #   시험이 잡았다: `w[0]` 과 `w[8]` 만 쓰고 `len(W0)=9` 인 규칙이 통과했다.
+    #   Under the old combined budget, `len(W0)` itself entered the budget so
+    #   holes were blocked automatically. Counting per path, **an unused
+    #   index is caught by no path yet the fitter still fits it** — it
+    #   becomes a free parameter. A test caught it: a rule using only `w[0]`
+    #   and `w[8]` with `len(W0)=9` passed.
     if rep.max_w_index >= 0:
         holes = [i for i in range(rep.max_w_index + 1)
                  if i not in w_index_uses]
         if holes:
-            bad(f"쓰지 않는 가중치 인덱스 {holes} 가 W0 에 있다. "
-                "적합기는 그것도 맞추므로 **공짜 파라미터**가 된다 — "
-                "인덱스를 0부터 빈틈없이 써라")
+            bad(f"the unused weight indices {holes} are in W0. The fitter "
+                f"fits those too, so they become **free parameters** — use "
+                f"the indices from 0 with no gaps")
 
     if (m := identity_transform_message(code)):
         bad(m)
 
-    # -- ★ 예산은 **실행 경로별**로 센다 (D-144) ---------------------------
-    #   RuleEditor 가 스스로 체제를 찾으려면 가지마다 자기 가중치가 있어야
-    #   한다. 전체가 8개면 두 가지가 4개씩 나눠 써야 했다.
-    #   ⚠️ 인덱스 재사용 허용은 답이 아니다 — 가중치 적합이 전체 shape 한
-    #      벌이라 `w[0]` 이 두 가지에서 서로 다른 피처의 계수를 겸하게 된다.
+    # -- ★ The budget is counted **per execution path** (D-144) ------------
+    #   For RuleEditor to find a regime on its own, each branch needs its own
+    #   weights. With 8 overall, two branches had to split 4 and 4.
+    #   ⚠️ Allowing index reuse is not the answer — weight fitting is one set
+    #      across all shapes, so `w[0]` would double as the coefficient of
+    #      different features in the two branches.
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
     if fnode is not None:
         rep.branch_depth = _branch_depth(fnode)
@@ -899,66 +985,76 @@ def check_rule(code: str, *, feature_names, shape_value_names,
         rep.n_paths = len(paths)
         rep.path_parameters = sorted(len(a) + len(b) for a, b in paths)
         if rep.n_paths > MAX_PATHS:
-            bad(f"실행 경로가 {MAX_PATHS} 개를 넘는다. "
-                "경로별 예산이라 갈라서 자리를 무한히 늘릴 수 있다 — "
-                f"경로는 {MAX_PATHS} 개까지다 (중첩 2단 · "
-                "if/elif/elif/else · 순차 if 2개가 전부 4경로다)")
+            bad(f"there are more than {MAX_PATHS} execution paths. The "
+                f"budget is per path, so splitting could grow the room "
+                f"without limit — at most {MAX_PATHS} paths are allowed "
+                f"(two levels of nesting, if/elif/elif/else, and two "
+                f"sequential ifs are all 4 paths)")
         over = [n for n in rep.path_parameters if n > lim["parameters"]]
         if over:
-            bad(f"실행 경로의 파라미터가 {over} 로 {lim['parameters']} 를 "
-                f"넘는다 (경로별 {rep.path_parameters}). "
-                "★ 예산은 경로마다 센다 — if/else 밖의 공통 항은 모든 경로에 "
-                "속한다. "
-                + (f"분기 비교 상수 {rep.branch_constants} 는 이미 면제됐다"
+            bad(f"the parameters of an execution path are {over}, "
+                f"exceeding {lim['parameters']} (per path "
+                f"{rep.path_parameters}). ★ The budget is counted per path — "
+                f"a common term outside if/else belongs to every path. "
+                + (f"The branch comparison constants {rep.branch_constants} "
+                   f"are already exempt"
                    if rep.branch_constants else
-                   "분기 조건의 비교 상수는 예산에서 빠진다 (D-78)"))
+                   "Comparison constants in branch conditions are excluded "
+                   "from the budget (D-78)"))
 
-    # -- ★ config 수준 분기 금지 -------------------------------------------
+    # -- ★ No config-level branching --------------------------------------
     for node in ast.walk(tree):
         if isinstance(node, (ast.If, ast.While, ast.IfExp)):
             if _touches_features(node.test, array_names):
-                bad("config 수준 피처로 분기하지 마라 — `f.*` 는 배열이다. "
-                    "`np.where(...)` 를 써라 (§2.3 의 '나쁜 수정')")
+                bad("do not branch on a config-level feature — `f.*` is an "
+                    "array. Use `np.where(...)` (the 'bad fix' of §2.3)")
         if isinstance(node, ast.comprehension):
-            bad("컴프리헨션 금지. 벡터 연산으로 써라")
+            bad("no comprehensions. Write it as a vector operation")
 
-    # -- ★ 형상 수준 분기가 순위를 못 바꾸는 경우 (경고) --------------------
+    # -- ★ When a shape-level branch cannot change the ranking (a warning) -
     for node in ast.walk(tree):
         if isinstance(node, ast.If) and not _touches_features(node.test,
                                                               array_names):
             noop = _noop_shape_branch(node, array_names)
             if noop:
-                warn(f"형상 수준 분기가 순위를 바꾸지 못한다: {noop}. "
-                     "점수 전체에 형상 상수를 곱하거나 더하는 것은 그 형상 "
-                     "안에서 **단조 변환**이라 정렬 결과가 같다. config 수준 "
-                     "항의 **가중치를 바꿔야** 의미가 있다")
+                warn(f"a shape-level branch cannot change the ranking: "
+                     f"{noop}. Multiplying or adding a shape constant into "
+                     f"the whole score is a **monotone transform** within "
+                     f"that shape, so the sort comes out the same. It only "
+                     f"means something if it **changes the weight** of a "
+                     f"config-level term")
 
     return rep
 
 
 def _noop_shape_branch(node: ast.If, array_names: set) -> str | None:
-    """형상 수준 `if` 블록이 순위에 영향이 없는가 (흔한 형태만).
+    """Does a shape-level `if` block have no effect on the ranking (common
+    forms only)?
 
-    ## 왜 필요한가 — 실제로 밟았다
+    ## Why it is needed — we stepped on it
 
         if p.is_memory_bound:
-            s = s * w[2]        # ⛔ 순위가 **하나도 안 바뀐다**
+            s = s * w[2]        # ⛔ the ranking **does not change at all**
 
-    규칙은 형상마다 독립적으로 정렬되므로, 누적 점수 전체에 곱하거나 더한
-    **형상 상수는 소거된다.** 문법적으로는 완전히 합법이라 다른 검사에
-    안 걸린다. 손규칙 첫 판이 이것 때문에 죽은 항을 들고 있었다.
+    A rule is sorted independently per shape, so a **shape constant
+    multiplied or added into the running score cancels out.** It is entirely
+    legal syntactically, so no other check catches it. The first version of
+    the hand rule carried a dead term because of this.
 
-    ## 무엇을 잡는가
+    ## What it catches
 
-    블록 안의 **모든** 문장이 `s = s <op> <형상 상수>` 형태이고 `op` 가
-    `*` 또는 `+`(또는 `-`, `/`)이면 no-op 이다. 형상 상수는
-    `p.*` / `hw.*` / `w[i]` / 숫자 리터럴과 그들의 조합이다.
+    If **every** statement in the block is of the form
+    `s = s <op> <shape constant>` and `op` is `*` or `+` (or `-`, `/`), it is
+    a no-op. A shape constant is `p.*` / `hw.*` / `w[i]` / a numeric literal
+    and combinations of those.
 
-    ## 무엇을 못 잡는가
+    ## What it cannot catch
 
-    일반적인 경우는 못 잡는다 (중간 변수를 거치거나 조건부로 항을 재정의하는
-    형태). **가장 흔한 실수만 잡고, 거부가 아니라 경고다.** 진짜 판정은
-    채점기가 한다 — §12 진단 리포트의 "형상 수준 분기가 순위를 바꾸는가".
+    The general case (going through an intermediate variable, or redefining
+    a term conditionally). **It catches only the most common mistake, and it
+    is a warning, not a refusal.** The real verdict is made by the scorer —
+    "does a shape-level branch change the ranking" in the §12 diagnostic
+    report.
     """
     stmts = list(node.body)
     if not stmts:
@@ -966,13 +1062,13 @@ def _noop_shape_branch(node: ast.If, array_names: set) -> str | None:
     target = None
     for st in stmts:
         if not isinstance(st, (ast.Assign, ast.AugAssign)):
-            return None          # return / if 중첩 등은 판정하지 않는다
+            return None   # no verdict on return / nested if and the like
         if isinstance(st, ast.Assign):
             if len(st.targets) != 1 or not isinstance(st.targets[0], ast.Name):
                 return None
             name = st.targets[0].id
             val = st.value
-            # `s = s <op> <스칼라>` 형태여야 한다
+            # It must be of the form `s = s <op> <scalar>`
             if not (isinstance(val, ast.BinOp)
                     and isinstance(val.op, (ast.Mult, ast.Add, ast.Sub,
                                             ast.Div))):
@@ -996,11 +1092,13 @@ def _noop_shape_branch(node: ast.If, array_names: set) -> str | None:
             return None
         if not _is_shape_scalar(other, array_names):
             return None
-    return f"`{target}` 에 형상 상수만 {len(stmts)}회 적용" if target else None
+    return (f"only shape constants applied to `{target}` {len(stmts)} times"
+            if target else None)
 
 
 def _is_shape_scalar(node, array_names: set) -> bool:
-    """이 식이 형상 수준 스칼라뿐인가 (`p.*` / `hw.*` / `w[i]` / 리터럴)."""
+    """Is this expression only shape-level scalars (`p.*` / `hw.*` /
+    `w[i]` / literals)?"""
     for sub in ast.walk(node):
         if isinstance(sub, ast.Attribute):
             if isinstance(sub.value, ast.Name) and sub.value.id in ("p", "hw"):
@@ -1022,7 +1120,7 @@ def _is_shape_scalar(node, array_names: set) -> bool:
 
 
 def _touches_features(node, extra: set | None = None) -> bool:
-    """이 식이 config 수준 피처(배열)를 건드리는가."""
+    """Does this expression touch a config-level feature (an array)?"""
     for sub in ast.walk(node):
         if isinstance(sub, ast.Attribute) and isinstance(sub.value, ast.Name) \
                 and sub.value.id == "f":
@@ -1033,7 +1131,7 @@ def _touches_features(node, extra: set | None = None) -> bool:
 
 
 def _is_subscript_base(tree, target: ast.Name) -> bool:
-    """이 `Name` 노드가 `w[...]` 의 밑변인가."""
+    """Is this `Name` node the base of a `w[...]`?"""
     for node in ast.walk(tree):
         if isinstance(node, ast.Subscript) and node.value is target:
             return True

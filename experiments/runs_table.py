@@ -1,33 +1,46 @@
-"""★ `docs/artifacts/runs.md` 를 **만든다** — 손으로 쓰지 않는다 (D-128).
+"""★ It **builds** `docs/artifacts/runs.md` — it is not written by hand
+(D-128).
 
-    python3 experiments/runs_table.py            # 생성
-    python3 experiments/runs_table.py --check    # 달라졌는지 검사 (시험이 부른다)
+    python3 experiments/runs_table.py            # build
+    python3 experiments/runs_table.py --check    # check whether it diverged
+                                                 # (the tests call this)
 
-조건은 `config.json` 에서, 최종 점수는 **artifacts json 에서** 읽는다.
-숫자를 이 파일에 적지 않는다 — 적으면 달라진다 (`decisions_index.py` 와 같은
-방식이다).
+The conditions are read from `config.json` and the final scores **from the
+artifacts json**. No number is written into this file — writing one makes it
+diverge (the same way as `decisions_index.py`).
 
-## 태그 규칙 (D-128 §1-7)
+⚠️ The strings that go **into `docs/artifacts/runs.md`** (the table header,
+the note and retirement texts, the status marks) stay in Korean — `docs/` is
+not translated (D-146). Only what this file prints to the terminal is
+English.
+
+## The tag rule (D-128 §1-7)
 
 ```
-<피처><씨앗>-p<파라미터>[-<표현력>][-<실험명>]
+<feature><seed>-p<parameters>[-<expressiveness>][-<experiment name>]
   F3rw-p8   F3rw-p16   F3rw-p8-prod   F3hg-p8-d75-a
-★ 표(GPU)·계승은 태그에 안 넣는다 — config.json 이 갖는다
-★ `x-` 로 시작하는 것은 **폐기**다 (순위 손실 계열 등). 표에 안 넣는다
+★ The table (GPU) and the inheritance do not go in the tag — config.json
+  holds them
+★ Anything starting with `x-` is **discarded** (the rank-loss line and so
+  on). It does not go in the table
 ```
 
-### ★ 코드 판 규칙을 고쳤다 (2026-09-05, D-137)
+### ★ The code-version rule was corrected (2026-09-05, D-137)
 
-D-128 은 "코드 판은 태그에 안 넣는다" 였다. 그런데 `__import__` 수정은
-**버려지던 제안 2% 를 채점되게 만든다** — 결과를 바꾸면 그것은 조건이다.
+D-128 said "the code version does not go in the tag". But the `__import__`
+fix **makes the 2% of proposals that were being thrown away get scored** —
+if it changes the result then it is a condition.
 
 ```
-결과를 바꾸는 코드 변경   ★ 태그에 붙인다 (`-nan` 처럼)
-그 밖의 변경             커밋으로만 — ★ 이 표의 `커밋` 열
+a code change that changes the result   ★ it is attached to the tag
+                                        (like `-nan`)
+any other change                        by commit only — ★ the `커밋`
+                                        column of this table
 ```
 
-커밋은 `trace.jsonl` 첫 줄(`run_start.commit`)에서 읽는다. 트레이스가
-없는 옛 실행은 `?` 다 — **추정해 채우지 않는다** (원칙 39).
+The commit is read from the first line of `trace.jsonl`
+(`run_start.commit`). An old run with no trace is `?` — **it is not filled
+in by guessing** (principle 39).
 """
 
 from __future__ import annotations
@@ -47,16 +60,20 @@ OUT = ROOT / "docs" / "artifacts" / "runs.md"
 BEGIN = "<!-- RUNS:BEGIN — experiments/runs_table.py 가 만든다 -->"
 END = "<!-- RUNS:END -->"
 
-#: 최종 점수가 **어느 산출물의 어디에** 있나. 값은 여기 안 적는다 (원칙 2).
-#: `(파일, 키 경로, 집계)` — 집계 `med` 는 리스트의 중앙값.
+#: **Where in which artefact** the final score is. The value is not written
+#: here (principle 2).
+#: `(file, key path, aggregation)` — the aggregation `med` is the median of
+#: the list.
 CANON: dict[str, tuple[str, tuple, str]] = {
-    # ★ 옛 대표값. 새 대표값(F3rw-p8)은 재측정이 끝나면 산출물이 생긴다
+    # ★ The old representative value. The new one (F3rw-p8) gets an artefact
+    #   once the re-measurement is done
     "F3rw-p8": ("canon-p8.json", ("holdout_regret",), "med"),
-    # ★ 옛 대표값 (D-131 이후 폐기). 값은 conclusion.json 이 갖는다
+    # ★ An old representative value (retired after D-131). conclusion.json
+    #   holds the value
     "F3rw-p8-old": ("conclusion.json", ("f1_vs_human", "human_median"),
                     "one"),
     "F1rw-p8": ("conclusion.json", ("f1_vs_human", "f1_median"), "one"),
-    # `f1k` 는 conclusion.json 안의 **옛 키**다 (개명 전 이름, D-128)
+    # `f1k` is an **old key** inside conclusion.json (D-128 renamed it)
     "F2rw-p8": ("conclusion.json", ("f1k", "median"), "one"),  # D-128
     "F3rw-p8-cma": ("expressive-regret.json", ("r1", "rb08"), "med"),
     "F3rw-p16": ("expressive-regret.json", ("r1", "rb16"), "med"),
@@ -64,12 +81,14 @@ CANON: dict[str, tuple[str, tuple, str]] = {
     "F3rw-p8-pow": ("expressive-regret.json", ("r1", "rpow"), "med"),
     "F3rw-p8-5090": ("c-ladder.json", ("regret", "5090sigma-hw2"), "med"),
     "F3rw-p8-4090": ("sigma-4090.json", ("holdout_regret",), "med"),
-    # ★ 지금 대표값 (D-140). 라운드가 12 이므로 **r11 에서 읽는다** —
-    #   캠페인은 24라운드까지 돌았지만 보고하는 값은 r11 이다
+    # ★ The current representative value (D-140). The rounds are 12, so it is
+    #   **read at r11** — the campaign ran to round 24 but the value we
+    #   report is the one at r11
     "F3rw-p8-nan": ("round-curve-bests.json",
                     ("groups", "F3rw-p8-nan", "curves"), "med@11"),
 }
-#: 폐기가 아닌데 설명이 필요한 태그. 상태 열에 그대로 실린다.
+#: Tags that are not retired but need an explanation. They go into the status
+#: column as they are.
 NOTES = {
     "F3rw-p8-nan": "★ 지금 대표값 — `-nan` 은 `compile_rule` 의 "
                    "np.errstate 방어(D-135) 를 뜻한다. 그 전 캠페인은 "
@@ -82,9 +101,11 @@ NOTES = {
                "버려졌다 (D-135). 대표값은 `F3rw-p8-nan` 이다",
     "F3rw-p8-p3": "patience 3 으로 r4~r6 에서 멈춘 캠페인 (D-131)",
 }
-#: 표에서 빼는 접두. **지우지 않는다** — 이름으로 표시만 한다.
+#: The prefixes dropped from the table. **They are not deleted** — they are
+#: only marked by name.
 DROP = ("x-",)
-#: ★ 폐기(재측정 대상) 태그와 이유. 표에 **상태로 남긴다** (D-129 §3-2).
+#: ★ The retired (to be re-measured) tags and the reason. They **stay in the
+#: table as a status** (D-129 §3-2).
 RETIRED = {
     "F3rw-p8-cma": "p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다",
     "F3rw-p8-prod": "p8 인데 CMA. 재측정 대상",
@@ -94,7 +115,7 @@ RETIRED = {
 
 
 def _canon(tag: str) -> tuple[str, str]:
-    """(값 문자열, 출처). 없으면 빈칸."""
+    """(the value string, the source). Blank if there is none."""
     spec = CANON.get(tag)
     if spec is None:
         return "", ""
@@ -114,9 +135,10 @@ def _canon(tag: str) -> tuple[str, str]:
             return "", ""
         v = st.median(v)
     elif how.startswith("med@"):
-        # ★ 라운드 N 에서의 중앙값. `round-curve-bests.json` 의 곡선을 읽는다.
-        #   곡선은 **최고가 안 바뀌면 값을 이어 쓰므로** 길이가 짧을 수 있다 —
-        #   `min(N, len-1)` 로 잡는 것이 '그때 멈췄다면' 과 같다 (D-139).
+        # ★ The median at round N. It reads the curve in
+        #   `round-curve-bests.json`. The curve **carries the value forward
+        #   while the best does not change**, so it can be short — taking
+        #   `min(N, len-1)` is the same as "if it had stopped there" (D-139).
         r = int(how[4:])
         if not isinstance(v, dict) or not v:
             return "", ""
@@ -125,7 +147,8 @@ def _canon(tag: str) -> tuple[str, str]:
 
 
 def _commit(runs: list[str]) -> str:
-    """`trace.jsonl` 첫 줄의 커밋. 없으면 `?` — 추정하지 않는다."""
+    """The commit on the first line of `trace.jsonl`. `?` if there is none —
+    it is not guessed."""
     got = set()
     for r in runs:
         p = RUNS / r / "trace.jsonl"
@@ -138,21 +161,25 @@ def _commit(runs: list[str]) -> str:
             got.add(json.loads(line).get("commit") or "?")
         except json.JSONDecodeError:
             got.add("?")
-    # ★ 캠페인 도중에 커밋하면 시드마다 달라진다. **숨기지 않고 다 적는다** —
-    #   `kernelrule/` 이 안 바뀐 커밋이면 동작은 같지만 그 판단은 사람이 한다.
+    # ★ Committing in the middle of a campaign makes it differ per seed. **It
+    #   is not hidden, all of them are written down** — if the commit did not
+    #   change `kernelrule/` the behaviour is the same, but that judgement is
+    #   made by a human.
     return "·".join(sorted(got)) if got else "?"
 
 
-#: 캠페인이 도는 동안 그 태그의 줄은 라운드마다 달라진다. `--check` 에서
-#: **그 줄만** 뺀다 — 나머지 줄의 검사는 그대로 살아 있다.
+#: While a campaign is running, that tag's row changes every round.
+#: `--check` leaves **only that row** out — the check on the other rows stays
+#: alive.
 LIVE_SECONDS = 1800
-#: 릴리즈 대장. `trace_release.py --upload` 이 쓴다 (D-138).
+#: The release ledger. `trace_release.py --upload` writes it (D-138).
 TRACE_MANIFEST = ROOT / "docs" / "artifacts" / "trace-releases.json"
 MISSING = "★ 미업로드"
 
 
 def _trace(tag: str, runs: list[str]) -> str:
-    """트레이스가 어느 릴리즈에 있나. 있는데 릴리즈가 없으면 그렇게 적는다."""
+    """Which release the trace is in. If there is a trace but no release, it
+    is written down as such."""
     if not any((RUNS / r / "trace.jsonl").exists() for r in runs):
         return ""
     m = (json.loads(TRACE_MANIFEST.read_text())
@@ -161,8 +188,8 @@ def _trace(tag: str, runs: list[str]) -> str:
 
 
 def _live_tags() -> set[str]:
-    """최근 `LIVE_SECONDS` 안에 쓰인 실행이 있는 태그. mtime 만 본다 —
-    추측하지 않는다."""
+    """The tags with a run written to within the last `LIVE_SECONDS`. It
+    looks only at mtime — it does not guess."""
     import time
     now, live = time.time(), set()
     for tag, runs in _groups().items():
@@ -192,12 +219,14 @@ def _rows() -> list[dict]:
         conds = [run_condition(r) for r in runs]
 
         def one(key: str, _c=conds) -> str:
-            """시드 전부가 같은 값인가. 달라지면 **표에 그렇게 적는다**."""
+            """Do all the seeds have the same value? If they differ, **the
+            table says so**."""
             vals = {str(c[key]) for c in _c}
             if len(vals) > 1:
                 return "★갈림"
             v = vals.pop()
-            # ★ 없는 것은 `?` 다. 추정해 채우지 않는다 (원칙 39).
+            # ★ What is absent is `?`. It is not filled in by guessing
+            #   (principle 39).
             return "?" if v in ("None", "") else v
 
         cfg = json.loads((RUNS / runs[0] / "config.json").read_text())
@@ -217,7 +246,7 @@ def _rows() -> list[dict]:
                     + ("지수" if one("power_hint") == "True" else "") or "기본",
             "fitter": f"{one('fit_method')}/{one('fit_restarts')}/"
                       f"{cfg['loop'].get('max_evals', '?')}",
-            # ★ §1-6 의 규칙과 다른 실행인가 (p<=8 이면 nelder-mead)
+            # ★ Is this run off the §1-6 rule (nelder-mead when p<=8)
             "off_rule": (one("parameters") not in ("?", "★갈림")
                          and one("fit_method") != fitter_for(
                              int(one("parameters")))["fit_method"]),
@@ -255,7 +284,8 @@ def render() -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true",
-                    help="달라졌으면 0 이 아닌 코드로 끝난다 (시험이 부른다)")
+                    help="exit with a non-zero code if it diverged (the tests "
+                         "call this)")
     a = ap.parse_args()
     body = render()
     txt = OUT.read_text() if OUT.exists() else ""
@@ -270,24 +300,26 @@ def main() -> None:
             return [x for x in t.splitlines()
                     if not any(x.startswith(f"| `{g}` |") for g in live)]
 
-        # ★ 트레이스가 있는데 릴리즈가 없으면 잡는다 (D-138). 도는 중은 뺀다.
+        # ★ Catch a trace that has no release (D-138). A running one is left
+        #   out.
         miss = [r["tag"] for r in _rows()
                 if r["trace"] == MISSING and r["tag"] not in live]
         if miss:
-            print(f"★ 트레이스가 있는데 릴리즈가 없다: {miss}. "
-                  "`python3 experiments/trace_release.py --tag <태그> "
-                  "--upload` 를 하고 다시 만들어라.")
+            print(f"★ there is a trace but no release: {miss}. Run "
+                  "`python3 experiments/trace_release.py --tag <tag> "
+                  "--upload` and build it again.")
             sys.exit(1)
         if strip(new) != strip(txt):
-            print("★ runs.md 가 실행 산출물과 달라졌다. "
-                  "`python3 experiments/runs_table.py` 로 다시 만들어라.")
+            print("★ runs.md diverged from the run artefacts. Build it again "
+                  "with `python3 experiments/runs_table.py`.")
             sys.exit(1)
         if live:
-            print(f"  ★ 도는 중이라 건너뛴 태그: {sorted(live)}")
-        print(f"runs.md 최신 ({len(_rows())}개 태그)")
+            print(f"  ★ tags skipped because they are running: "
+                  f"{sorted(live)}")
+        print(f"runs.md is up to date ({len(_rows())} tags)")
         return
     OUT.write_text(new)
-    print(f"runs.md 갱신 — {len(_rows())}개 태그")
+    print(f"runs.md updated — {len(_rows())} tags")
 
 
 if __name__ == "__main__":

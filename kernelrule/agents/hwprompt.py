@@ -1,30 +1,32 @@
-"""★ 하드웨어 사실 프롬프트를 **번들에서 만든다** (D-113).
+"""★ The hardware-facts prompt is **built from the bundle** (D-113).
 
-## 왜 파일로 두면 안 되나
+## Why it must not be a file
 
-`hw/` 에 손으로 쓴 `sm_86.md` 하나뿐이었고 `LLMConfig.arch_prompt` 의
-기본값이 그것으로 **고정**돼 있었다. `f1_pipeline` 은 그 값을 바꾸지
-않았다. 그래서 5090 표로 RuleWriter 를 돌린 §29.5 (c) 재생성이
-**A6000 하드웨어 사실을 받았다.**
-
-```
-RuleWriter 가 받은 것   A6000 / SM 84 / L2 6 MB / ridge 159.1 / 눈금 1.024us
-실제 5090              SM 170 / L2 96 MB / ridge 117.9 / 눈금 0.016us
-```
-
-조건이 코드에 상수로 박혀 있었고, 그 상수가 조건이라는 것을 아무도 안
-봤다. 원칙 2 의 또 다른 형태다.
-
-## 무엇이 arch 무관이고 무엇이 번들에서 오나
+`hw/` held a single hand-written `sm_86.md`, and the default of
+`LLMConfig.arch_prompt` was **pinned** to it. `f1_pipeline` did not change
+that value. So the §29.5 (c) regeneration, which ran RuleWriter on the 5090
+table, **received the A6000 hardware facts.**
 
 ```
-실행 모델 절      arch 무관 — CTA 배분 / 타일 경계 / split-K / stages
-숫자             전부 env.json 에서
-측정 한계 절      ★ 눈금과 "커널 길이별 몇 %" 표를 tick_ms 로 **계산**한다
+what RuleWriter got   A6000 / SM 84 / L2 6 MB / ridge 159.1 / tick 1.024us
+the actual 5090       SM 170 / L2 96 MB / ridge 117.9 / tick 0.016us
 ```
 
-`hw/sm_86.md` 는 **지우지 않고 둔다** — 2026-09-03 이전 실행의 조건이
-그 파일이고, 지우면 그 실행들을 되짚을 수 없다.
+The condition was nailed into the code as a constant, and nobody looked at
+that constant as a condition. Another form of principle 2.
+
+## What is arch-independent and what comes from the bundle
+
+```
+execution-model section  arch-independent — CTA distribution / tile
+                         boundaries / split-K / stages
+numbers                  all from env.json
+measurement-limit section  ★ the tick and the "what % per kernel length"
+                           table are **computed** from tick_ms
+```
+
+`hw/sm_86.md` is **kept, not deleted** — it is the condition of every run
+before 2026-09-03, and deleting it makes those runs impossible to retrace.
 """
 
 from __future__ import annotations
@@ -40,14 +42,16 @@ __all__ = ["render_hw_prompt", "hw_prompt_from_bundle", "check_hw_prompt",
 
 
 class HwPromptError(ValueError):
-    """번들과 프롬프트가 달라졌다. **조용히 진행하지 않는다** (§26.4)."""
+    """The bundle and the prompt have diverged. **Do not proceed silently**
+    (§26.4)."""
 
 
-#: 눈금 표에 쓸 **참고** 길이 [ms].
+#: **Reference** lengths [ms] for the tick table.
 #:
-#: 판정은 이 목록이 아니라 `min_ms` — **그 표의 실제 최소 best_ms** — 에서
-#: 한다 (D-117). 14us 가 관측 하한인 것은 A6000 뿐이고, 표에 없는 길이에서
-#: 판정하면 그것은 표와 무관한 기준이다 (원칙 2).
+#: The verdict is made not from this list but at `min_ms` — **that table's
+#: actual minimum best_ms** (D-117). 14us being the observed floor is true
+#: of the A6000 only, and judging at a length that is not in the table is a
+#: criterion unrelated to the table (principle 2).
 _TICK_ROWS = (0.5, 1.3)
 
 
@@ -59,26 +63,31 @@ def _fmt_bytes(n: int) -> str:
 
 def render_hw_prompt(hw: Hardware, *, noise, env: dict,
                      min_ms: float) -> str:
-    """`Hardware` + 노이즈 모델 -> 프롬프트 본문. **손으로 쓰지 않는다.**
+    """`Hardware` + noise model -> the prompt body. **Not written by
+    hand.**
 
-    ★ 측정 한계 절의 **결론이 표마다 다르다** (D-116). 노이즈 바닥은
-    `max(통계항, 눈금항)` 인데 어느 쪽이 이기는지가 표마다 달라진다:
+    ★ The **conclusion of the measurement-limit section differs per table**
+    (D-116). The noise floor is `max(statistical term, tick term)`, and
+    which one wins differs per table:
 
     ```
-    A6000   11.3us 에서 눈금 9.09% vs 통계 3.36%   -> ★ 눈금이 한계다
-    5090    28.7us 에서 눈금 0.06% vs 통계 0.10%   -> 눈금은 한계가 아니다
+    A6000   at 11.3us  tick 9.09% vs statistical 3.36%  -> ★ the tick is the limit
+    5090    at 28.7us  tick 0.06% vs statistical 0.10%  -> the tick is not the limit
     ```
 
-    ★ 판정하는 길이는 **그 표의 최소 `best_ms`** 다 (`min_ms`). 표에 없는
-    길이에서 판정하면 표와 무관한 기준이 된다 (D-117).
+    ★ The length at which the verdict is made is **that table's minimum
+    `best_ms`** (`min_ms`). Judging at a length that is not in the table
+    makes it a criterion unrelated to the table (D-117).
 
-    5090 에 A6000 의 결론("짧은 형상은 눈금 안에 묻힌다")을 그대로
-    보내면 **틀린 경고**다. 판정은 `NoiseModel` 이 이미 들고 있는 두 항을
-    비교해서 하고, 여기서 새 기준을 만들지 않는다 (원칙 2).
+    Sending the A6000's conclusion ("short shapes are buried inside the
+    tick") to the 5090 as is is a **wrong warning**. The verdict is made by
+    comparing the two terms `NoiseModel` already holds; no new criterion is
+    invented here (principle 2).
     """
     tick_ms = float(noise.tick_ms)
     if tick_ms <= 0:
-        raise HwPromptError(f"tick_ms 가 {tick_ms} 다. 눈금 절을 못 만든다.")
+        raise HwPromptError(
+            f"tick_ms is {tick_ms}. The tick section cannot be built.")
     spec_t = env.get("peak_tflops_f16_spec")
     spec_b = env.get("bandwidth_gbps_spec")
     sm_mhz = env.get("locked_mhz") or env.get("sm_clock_mhz")
@@ -93,15 +102,16 @@ def render_hw_prompt(hw: Hardware, *, noise, env: dict,
                      "correction the memory-bound verdict is wrong.\n")
     if not (min_ms and min_ms > 0):
         raise HwPromptError(
-            f"min_ms 가 {min_ms} 다. 이 표의 **가장 짧은 커널**에서 "
-            "판정해야 한다 (D-117).")
+            f"min_ms is {min_ms}. The verdict must be made at **this "
+            "table's shortest kernel** (D-117).")
     lens = (min_ms, *_TICK_ROWS)
     rows = "\n".join(
-        f"  {ms * 1000:>6.1f} us 커널   눈금 {noise.tick_pct(ms):7.3%}"
-        f"   통계 {noise.sigma(ms):7.3%}"
-        + ("   ← 이 표의 최솟값" if ms == min_ms else "")
+        f"  {ms * 1000:>6.1f} us kernel   tick {noise.tick_pct(ms):7.3%}"
+        f"   statistical {noise.sigma(ms):7.3%}"
+        + ("   <- this table's minimum" if ms == min_ms else "")
         for ms in lens)
-    # ★ 어느 항이 한계인가 — **이 표의 가장 짧은 커널**에서 본다.
+    # ★ Which term is the limit — read at **this table's shortest
+    #   kernel**.
     tick_binds = noise.tick_pct(min_ms) > noise.sigma(min_ms)
     limit_note = (
         """**A difference inside one tick may as well not exist.** Refining
@@ -175,42 +185,49 @@ form on any GPU — but **which term wins differs per table.**
 def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
                           table=None, min_ms: float | None = None
                           ) -> tuple[str, dict]:
-    """번들 경로 -> (프롬프트 본문, 사실 요약). **유일한 진입점**이다.
+    """Bundle path -> (prompt body, facts summary). **The only entry
+    point.**
 
-    ★ `table` 이나 `min_ms` 중 하나는 있어야 한다 (D-117) — 눈금 판정을
-    **그 표의 가장 짧은 커널**에서 하기 때문이다. 기본값을 두지 않는다.
+    ★ One of `table` or `min_ms` must be given (D-117) — because the tick
+    verdict is made at **that table's shortest kernel**. There is no
+    default.
     """
     p = Path(bundle) / "env.json"
     if not p.exists():
         raise HwPromptError(
-            f"{p} 가 없다. 하드웨어 사실을 만들 수 없으므로 진행하지 "
-            "않는다 — 기본값으로 떨어지면 다른 GPU 의 사실이 간다 (D-113).")
+            f"{p} is missing. The hardware facts cannot be built, so this "
+            "does not proceed — falling back to a default sends another "
+            "GPU's facts (D-113).")
     env = json.loads(p.read_text())
     hw = hardware_from_env(env)
     from kerneltab.core.bundle import load_bundle
 
     from kernelrule.core.noise import NoiseModel
 
-    # ★ `PerfTable` 과 **같은 진입점**을 쓴다 (원칙 2). 여기서 따로 읽으면
-    #   표가 쓰는 계수와 달라질 수 있다.
+    # ★ Uses **the same entry point** as `PerfTable` (principle 2).
+    #   Reading it separately here could diverge from the coefficients the
+    #   table uses.
     b = load_bundle(str(bundle), verify=True)
     if env_hash and not str(b.env_hash).startswith(str(env_hash)):
         raise HwPromptError(
-            f"env_hash 불일치. 요청 {env_hash!r}, 번들 "
+            f"env_hash mismatch. requested {env_hash!r}, bundle "
             f"{str(b.env_hash)[:16]!r}")
     noise = NoiseModel.from_bundle(b)
     tick_ms = float(noise.tick_ms)
     if min_ms is None:
         if table is None:
             raise HwPromptError(
-                "`table` 도 `min_ms` 도 없다. 눈금이 한계인지를 **그 표의 "
-                "가장 짧은 커널**에서 판정해야 한다 (D-117).")
+                "neither `table` nor `min_ms` is given. Whether the tick "
+                "is the limit must be judged at **that table's shortest "
+                "kernel** (D-117).")
         min_ms = float(min(table.best_time(q) for q in table.shapes()))
     txt = render_hw_prompt(hw, noise=noise, env=env, min_ms=min_ms)
     return txt, {"name": hw.name, "arch": hw.arch, "sm_count": hw.sm_count,
                  "l2_bytes": hw.l2_bytes, "ridge_point": hw.ridge_point,
                  "tick_ms": tick_ms, "source": str(p),
-                 # ★ 조건이므로 남긴다 — 측정 한계 절의 **결론**이 달라진다.
+                 # ★ Recorded because it is a condition — the
+                 #   **conclusion** of the measurement-limit section changes
+                 #   with it.
                  "min_ms": float(min_ms),
                  "tick_binds": bool(noise.tick_pct(min_ms)
                                     > noise.sigma(min_ms)),
@@ -219,24 +236,25 @@ def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
 
 
 def check_hw_prompt(text: str, hw: Hardware, tick_ms: float) -> None:
-    """프롬프트가 **이 표의** 하드웨어를 말하는가. 아니면 예외 (§26.4).
+    """Does the prompt speak of **this table's** hardware? If not, raise
+    (§26.4).
 
-    ★ 이름과 눈금 둘 다 본다. 이름만 보면 같은 GPU 의 다른 번들(다른
-    타이머 눈금)이 통과한다.
+    ★ It checks both the name and the tick. Checking only the name lets
+    another bundle of the same GPU (with a different timer tick) pass.
     """
     if hw.name not in text:
         raise HwPromptError(
-            f"하드웨어 프롬프트가 {hw.name!r} 를 말하지 않는다. "
-            "다른 GPU 의 사실이 가고 있다 (D-113).")
-    # ★ 2026-09-08 (D-146): 프롬프트가 영어가 됐다. **옛 한글 형태도 받는다**
-    #   — `hw/sm_86.md` 는 얼린 파일이라 한글이고, 그것도 검사할 수 있어야 한다.
+            f"the hardware prompt does not speak of {hw.name!r}. "
+            "Another GPU's facts are going out (D-113).")
+    # ★ 2026-09-08 (D-146): the prompt became English. **The old Korean form
+    #   is accepted too** — `hw/sm_86.md` is a frozen file and is in Korean,
+    #   and it must remain checkable.
     m = (re.search(r"tick \(([\d.]+) us\)", text)
          or re.search(r"눈금\(([\d.]+) us\)", text))
     if not m:
-        raise HwPromptError(
-            "the hardware prompt has no tick section / "
-            "하드웨어 프롬프트에 눈금 절이 없다.")
+        raise HwPromptError("the hardware prompt has no tick section.")
     got, want = float(m.group(1)), tick_ms * 1000
     if abs(got - want) > 0.5e-3 * max(1.0, want):
         raise HwPromptError(
-            f"프롬프트의 눈금 {got} us 가 번들의 {want:.3f} us 와 다르다.")
+            f"the prompt's tick {got} us differs from the bundle's "
+            f"{want:.3f} us.")

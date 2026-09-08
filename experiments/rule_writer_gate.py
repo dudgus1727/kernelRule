@@ -1,24 +1,33 @@
-"""★ 7. RuleWriter A/B 조건 — 전이 주장의 통과 조건.
+"""★ 7. The RuleWriter A/B condition — the pass condition of the transfer
+claim.
 
     python3 experiments/rule_writer_gate.py A 10
     python3 experiments/rule_writer_gate.py B 10
 
-## 무엇을 재는가
+## What is measured
 
-새 아키텍처로 규칙을 옮기려면 **표 없이 구조가 나와야 한다.** 표를 봐야
-구조가 나오면 §29.5(c) 재생성이고, 전수를 잴 거면 표를 직접 쓰면 되므로
-이 시스템을 쓸 이유가 없다.
+Moving the rule to a new architecture requires **the structure to come out
+without the table.** If the structure only comes out after seeing the table,
+that is §29.5(c) regrow, and if an exhaustive measurement is going to be made
+anyway, the table can be used directly and there is no reason for this
+system.
 
-    A 조건   하드웨어 사실 + 실행 모델 + 피처의 물리적 정의만
-    B 조건   거기에 **학습 분할의** 집계를 더한다 (형상 식별 불가)
+    condition A   the hardware facts + the execution model + the physical
+                  definitions of the features, and nothing else
+    condition B   plus the aggregates **of the training split** (the shapes
+                  cannot be identified)
 
-각 시도마다 가중치는 학습 분할에서 재적합한다 (§29 — 구조를 비교하려면
-가중치 운을 제거해야 한다). 판정은 **검증 분할**로 한다.
+For each attempt the weights are refitted on the training split (§29 — to
+compare structures, the luck of the weights has to be removed). The judgement
+is made on **the validation split**.
 
-    학습 regret 1.07 근처   ->  통과 조건 통과. 표 없이 구조 생성 + 표본 재적합
-    1.15+                   ->  구조 생성에 표가 필요하다
+    training regret near 1.07   ->  the pass condition passes. The structure
+                                    is generated without the table and
+                                    refitted on a sample
+    1.15+                       ->  generating the structure needs the table
 
-A 와 B 의 격차가 곧 "표의 값어치" 다. **B 를 포기하는 것이 아니다.**
+The gap between A and B is exactly "what the table is worth". **It does not
+mean giving B up.**
 """
 
 from __future__ import annotations
@@ -60,10 +69,11 @@ def main(condition: str, n_tries: int,
                     and (d.align_c == 8).all())
 
     shapes = [p for p in table.shapes() if aligned(p)]
-    # ★ 구조 분할 — 11008 레이어(MLP intermediate)를 통째로 홀드아웃.
-    #   첫 실제 실행과 같은 분할이라 결과를 나란히 놓을 수 있다.
-    #   무작위 k-fold 를 쓰지 않는 이유는 §10.1 — 같은 레이어 타입이
-    #   양쪽에 섞이면 홀드아웃이 홀드아웃이 아니다.
+    # ★ The structural split — the whole 11008 layer (the MLP intermediate)
+    #   is held out. It is the same split as the first real run, so the
+    #   results can be put side by side. A random k-fold is not used for the
+    #   reason in §10.1 — if the same layer type is mixed into both sides,
+    #   the holdout is not a holdout.
     held = [p for p in shapes if 11008 in (p.N, p.K)]
     splits = SplitSet(train=Split("train", tuple(p for p in shapes
                                                  if p not in held)),
@@ -78,14 +88,18 @@ def main(condition: str, n_tries: int,
                     registry=REGISTRY, budget=Budget(), cache=False)
 
     print("=" * 76)
-    print(f"7. RuleWriter 조건 {condition} — {n_tries}회  [{model}]")
+    print(f"7. RuleWriter condition {condition} — {n_tries} attempts  "
+          f"[{model}]")
     print("=" * 76)
-    print(f"  학습 {len(train.shapes)}형상 / 검증 {len(val.shapes)}형상")
-    print("  A 조건이면 프롬프트에 표에서 나온 문장이 **하나도** 없다\n")
+    print(f"  training {len(train.shapes)} shapes / validation "
+          f"{len(val.shapes)} shapes")
+    print("  under condition A there is **not one** sentence in the prompt "
+          "that came from the table\n")
 
-    # ★ 시도마다 즉시 append 한다 (D-33). 끝에서 한 번 쓰면 중간에 죽을 때
-    #   그때까지의 LLM 호출이 통째로 날아간다 — 실제로 RoundLoop 에서
-    #   78분치를 잃었다. 오래 걸리는 실행일수록 죽을 확률이 높다.
+    # ★ Every attempt is appended immediately (D-33). Writing once at the end
+    #   loses every LLM call up to that point if it dies in the middle — 78
+    #   minutes' worth really were lost in RoundLoop. The longer the run, the
+    #   more likely it is to die.
     d = OUT / f"architect-{condition}-{model}"
     d.mkdir(parents=True, exist_ok=True)
     out_path = d / "tries.jsonl"
@@ -103,9 +117,10 @@ def main(condition: str, n_tries: int,
             out = llm.complete("rule_writer", "", condition=condition,
                                table_facts=facts)
             prop = validate_rule_proposal(out)
-            # ★ `check_rule` 은 리포트를 돌려준다. `.raise_if_bad()` 를
-            #   빠뜨리면 위반이 조용히 통과하고 채점기에서 AttributeError 로
-            #   나온다 — 실제로 첫 호출이 그랬다.
+            # ★ `check_rule` returns a report. Leaving out `.raise_if_bad()`
+            #   lets a violation pass silently and it comes out as an
+            #   AttributeError in the scorer — which is what the very first
+            #   call did.
             check_rule(prop.code, feature_names=matrix.feature_names(),
                        shape_value_names=matrix.shape_value_names(),
                        n_weights=len(prop.w0)).raise_if_bad()
@@ -120,15 +135,15 @@ def main(condition: str, n_tries: int,
                     "n_w": len(prop.w0), "code": prop.code,
                     "w": list(fit.w), "changes": prop.changes})
             print(f"  #{i:02d}  train {tr:.4f}  val {va:.4f}  "
-                  f"{n_terms}항/{len(prop.w0)}w")
+                  f"{n_terms} terms/{len(prop.w0)}w")
         except (SchemaViolation, RuleCheckError) as e:
             record({"i": i, "error": f"{type(e).__name__}: {e}"})
-            print(f"  #{i:02d}  거부  {type(e).__name__}: {str(e)[:60]}")
+            print(f"  #{i:02d}  refused  {type(e).__name__}: {str(e)[:60]}")
         except Exception as e:                              # noqa: BLE001
             record({"i": i, "error": f"{type(e).__name__}: {e}"})
-            print(f"  #{i:02d}  실패  {type(e).__name__}: {str(e)[:70]}")
+            print(f"  #{i:02d}  failed   {type(e).__name__}: {str(e)[:70]}")
 
-    # ★ LLM 호출은 다시 만들 수 없다 (D-33). 채점보다 먼저 남긴다.
+    # ★ An LLM call cannot be made again (D-33). It is kept before the scoring.
     llm.dump(d / "llm_calls")
 
     ok = [r for r in rows if "train" in r]
@@ -137,32 +152,36 @@ def main(condition: str, n_tries: int,
     v_val = evaluate(vendor_order_fn(table, load_vendor(VENDOR),
                                      mapping="nearest"),
                      table, list(val.shapes), ks=(1,))
-    print(f"\n  성공 {len(ok)}/{n_tries}   {time.perf_counter() - t0:.0f}s"
-          f"   호출 {llm.budget.calls} (실패 {llm.budget.failed_calls})"
-          f"  입력 {llm.budget.input_tokens:,}"
-          f"  출력 {llm.budget.output_tokens:,}")
-    # ★ 재시도 소진이 무엇 때문인지 모르면 프롬프트를 어디를 고칠지 모른다.
+    print(f"\n  succeeded {len(ok)}/{n_tries}   "
+          f"{time.perf_counter() - t0:.0f}s"
+          f"   calls {llm.budget.calls} (failed {llm.budget.failed_calls})"
+          f"  input {llm.budget.input_tokens:,}"
+          f"  output {llm.budget.output_tokens:,}")
+    # ★ Without knowing what exhausted the retries there is no knowing where
+    #   to fix the prompt.
     vr = llm.violation_report()
     if vr.get("total"):
-        print(f"  위반 {vr['total']}건: {vr['by_code']}")
+        print(f"  {vr['total']} violations: {vr['by_code']}")
         if vr.get("useless_retries"):
-            print(f"  ★ 되먹임이 듣지 않는 사유: {vr['useless_retries']}")
+            print(f"  ★ reasons the feedback is not getting through: "
+                  f"{vr['useless_retries']}")
     if ok:
         tr = np.array([r["train"] for r in ok])
         va = np.array([r["val"] for r in ok])
         best = min(ok, key=lambda r: r["train"])
-        print(f"\n  {'':10s} {'최고':>8} {'중앙':>8} {'최악':>8}")
+        print(f"\n  {'':10s} {'best':>8} {'median':>8} {'worst':>8}")
         print(f"  {'train':10s} {tr.min():8.4f} {np.median(tr):8.4f} "
               f"{tr.max():8.4f}")
         print(f"  {'val':10s} {va.min():8.4f} {np.median(va):8.4f} "
               f"{va.max():8.4f}")
-        print(f"  {'벤더':10s} {v.at(1):8.4f} (train) / {v_val.at(1):.4f} (val)")
-        print(f"\n  ★ 통과 조건: train 최고 {tr.min():.4f}  "
-              f"-> {'통과 (1.07 근처)' if tr.min() < 1.09 else '미달'}")
-        print(f"\n  최고 규칙 (#{best['i']}, {best['n_terms']}항):")
+        print(f"  {'vendor':10s} {v.at(1):8.4f} (train) / "
+              f"{v_val.at(1):.4f} (val)")
+        print(f"\n  ★ the pass condition: the best train {tr.min():.4f}  "
+              f"-> {'pass (near 1.07)' if tr.min() < 1.09 else 'short'}")
+        print(f"\n  the best rule (#{best['i']}, {best['n_terms']} terms):")
         print("  " + best["code"].strip().replace("\n", "\n  "))
         print(f"  w = {[round(x, 3) for x in best['w']]}")
-        print(f"  물리 설명: {best['changes'][:300]}")
+        print(f"  the physical explanation: {best['changes'][:300]}")
 
     print(f"\n  -> {d}")
 

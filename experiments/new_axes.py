@@ -1,35 +1,38 @@
-"""★ 2번 — 생성된 새 축이 **쓸모 있는가**. F1 의 위상을 정한다.
+"""★ Item 2 — is a generated new axis **useful**? It settles F1's standing.
 
     python3 experiments/new_axes.py [rounds] [n_seeds]
 
-## 왜 이것이 먼저인가
+## Why this comes first
 
-F1 은 "만들 수 있다" 를 보였다. **"쓸모 있다" 는 다른 질문이고, 후자가
-없으면 전자가 "가능성 증명" 에 머문다.**
-
-```
-조건 A   사람이 쓴 24개              (= 지금 최고, 씨앗 없음 + 설명)
-조건 B   24 + 생성된 새 축 N개
-같은 시드 3개 / 같은 라운드 / 씨앗 없음 / 설명 있음
-```
-
-## 무엇을 "새 축" 으로 보나
-
-생성 피처 중 **기존과 스피어만 > 0.95 인 것을 뺀다** (§8.4 의 중복 판정).
-재발견된 것을 넣으면 같은 정보를 두 번 주는 것이라 "새 축이 쓸모 있나" 가
-흐려진다. 목록을 손으로 적지 않고 **여기서 계산한다** — 적어 두면 다음에
-F1 을 다시 돌렸을 때 어긋난다.
-
-## 판정
+F1 showed "it can be made". **"It is useful" is a different question, and
+without the latter the former stays a "proof of possibility".**
 
 ```
-표본내 regret 비교
-★ 생성 피처가 최종 규칙에 실제로 쓰이는가 (몇 개, 어느 것)
-구조 홀드아웃은 이 실험이 끝난 뒤 한 번만 (§12.3d)
+condition A   the human-written 24              (= the current best, no seed
+                                                 rule + descriptions)
+condition B   the 24 + N generated new axes
+the same 3 seeds / the same rounds / no seed rule / descriptions on
 ```
 
-**"쓰이는가" 가 regret 만큼 중요하다.** 37개를 줬는데 최종 규칙이 기존
-24개만 쓰면, 생성 피처가 유용하지 않다는 뜻이다.
+## What counts as a "new axis"
+
+Among the generated features, **those with Spearman > 0.95 against an
+existing one are dropped** (the §8.4 duplicate criterion). Putting a
+rediscovery in gives the same information twice and muddies "is a new axis
+useful". The list is not written by hand but **computed here** — writing it
+down makes it go out of step the next time F1 is re-run.
+
+## The verdict
+
+```
+comparing the in-sample regret
+★ is a generated feature actually used in the final rule (how many, which)
+the structural holdout is looked at once, after this experiment (§12.3d)
+```
+
+**"Is it used" matters as much as regret.** If 37 were given and the final
+rule uses only the existing 24, that means the generated features are not
+useful.
 """
 
 from __future__ import annotations
@@ -53,10 +56,10 @@ from kernelrule.features.loader import extended_registry, load_generated
 from kernelrule.features.validate import _spearman
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
-MODEL = DEFAULT_MODEL   # ★ 단일 출처 (D-45)
-#: ★ 자리표시자다. `<모델>` 을 실제 실행으로 바꿔야 돈다 — 이 스크립트가
-#: 쓰던 `featwriter-F1-gpt-5.4` 는 삭제됐다 (D-52).
-PROPOSALS = Path("runs/featwriter-F1-<모델>/proposals.jsonl")
+MODEL = DEFAULT_MODEL   # ★ a single source (D-45)
+#: ★ A placeholder. `<model>` has to be replaced with a real run for this to
+#: work — the `featwriter-F1-gpt-5.4` this script used was deleted (D-52).
+PROPOSALS = Path("runs/featwriter-F1-<model>/proposals.jsonl")
 DUP_RHO = 0.95
 
 
@@ -73,13 +76,14 @@ def _columns(reg: FeatureRegistry, table, shapes) -> dict:
 
 
 def novel_axes(table, shapes) -> list:
-    if "<모델>" in str(PROPOSALS) or not PROPOSALS.exists():
+    if "<model>" in str(PROPOSALS) or not PROPOSALS.exists():
         raise SystemExit(
-            f"피처 제안 파일이 없다: {PROPOSALS}\n"
-            "F1 을 지시된 모델로 먼저 돌리고 (experiments/feature_writer.py) "
-            "PROPOSALS 를 그 경로로 바꿔라. 이전 gpt-5.4 산출물은 삭제됐다 "
-            "(D-52).")
-    """생성 피처 중 **기존과 중복이 아닌 것**. 목록을 손으로 적지 않는다."""
+            f"the feature proposals file is missing: {PROPOSALS}\n"
+            "Run F1 with the instructed model first "
+            "(experiments/feature_writer.py) and change PROPOSALS to that "
+            "path. The earlier gpt-5.4 artefacts were deleted (D-52).")
+    """The generated features that **are not duplicates of an existing one**.
+    The list is not written by hand."""
     gen = load_generated(PROPOSALS, table=table)
     ref = _columns(REGISTRY, table, shapes)
     tmp = FeatureRegistry("gen-probe")
@@ -93,9 +97,10 @@ def novel_axes(table, shapes) -> list:
                     if len(rv) == len(gv) and abs(_spearman(gv, rv)) > DUP_RHO),
                    None)
         (dup if hit else novel).append((f, hit))
-    print(f"  생성 {len(gen)}개 -> 새 축 {len(novel)} / 중복 {len(dup)}")
+    print(f"  generated {len(gen)} -> new axes {len(novel)} / "
+          f"duplicates {len(dup)}")
     for f, hit in dup:
-        print(f"    중복  {f.name:30s} ~ {hit}")
+        print(f"    duplicate  {f.name:30s} ~ {hit}")
     return [f for f, _ in novel]
 
 
@@ -120,13 +125,14 @@ def main(rounds: int = 12, n_seeds: int = 3) -> None:
         val=Split("val", tuple(held)), kind="nk11008")
 
     print("=" * 78)
-    print(f"2번 — 새 축의 쓸모.  시드 {n_seeds} x {rounds}라운드  [{MODEL}]")
+    print(f"item 2 — the usefulness of a new axis.  {n_seeds} seeds x "
+          f"{rounds} rounds  [{MODEL}]")
     print("=" * 78)
     novel = novel_axes(table, list(table.shapes())[:12])
     ext = extended_registry(REGISTRY, novel)
     new_names = {f.name for f in novel}
-    print(f"  조건 A 피처 {len(REGISTRY._items)}  /  조건 B 피처 "
-          f"{len(ext._items)}\n")
+    print(f"  condition A features {len(REGISTRY._items)}  /  condition B "
+          f"features {len(ext._items)}\n")
 
     budget = Budget(max_calls=2000, max_input_tokens=40_000_000,
                     max_output_tokens=5_000_000)
@@ -136,7 +142,7 @@ def main(rounds: int = 12, n_seeds: int = 3) -> None:
         for s in range(n_seeds):
             run_id = f"newaxes-{cond}-s{s}"
             if (Path("runs") / run_id / "archive.jsonl").exists():
-                print(f"  [{run_id}] 이미 있다. 건너뛴다")
+                print(f"  [{run_id}] already there. Skipped")
                 continue
             llm = OpenAILLM(LLMConfig(model=MODEL, concurrency=6),
                             feature_names=matrix.feature_names(),
@@ -146,17 +152,20 @@ def main(rounds: int = 12, n_seeds: int = 3) -> None:
                                             n_rules_per_round=12, seed=7 + s),
                              table=table, matrix=matrix, splits=splits,
                              llm=llm)
-            print(f"\n  --- {run_id} (피처 {len(reg._items)}) ---", flush=True)
+            print(f"\n  --- {run_id} (features {len(reg._items)}) ---",
+                  flush=True)
             try:
                 loop.run(rounds)
             except Exception as e:                          # noqa: BLE001
-                print(f"  ★ 중단: {type(e).__name__}: {str(e)[:100]}")
-            print(f"  누적 호출 {budget.calls} 입력 {budget.input_tokens:,}"
+                print(f"  ★ stopped: {type(e).__name__}: {str(e)[:100]}")
+            print(f"  cumulative calls {budget.calls} "
+                  f"input {budget.input_tokens:,}"
                   f"  {time.perf_counter() - t0:.0f}s", flush=True)
 
-    # -- 생성 피처가 실제로 쓰였는가 ---------------------------------------
+    # -- were the generated features actually used -------------------------
     print(f"\n{'=' * 78}")
-    print("생성 피처가 최종 규칙에 쓰였는가 — regret 만큼 중요하다")
+    print("were the generated features used in the final rule — it matters as "
+          "much as regret")
     print("=" * 78)
     for s in range(n_seeds):
         d = Path("runs") / f"newaxes-B-extended-s{s}" / "archive.jsonl"
@@ -169,12 +178,14 @@ def main(rounds: int = 12, n_seeds: int = 3) -> None:
         used_any: set[str] = set()
         for e in arc:
             used_any |= used_features(e["code"]) & new_names
-        print(f"  s{s}  최고 규칙 {len(used_best)}개 {sorted(used_best)}")
-        print(f"      아카이브 전체 {len(used_any)}/{len(new_names)}개 "
+        print(f"  s{s}  the best rule uses {len(used_best)} "
+              f"{sorted(used_best)}")
+        print(f"      the whole archive {len(used_any)}/{len(new_names)} "
               f"{sorted(used_any)}")
 
-    print(f"\n  총 {time.perf_counter() - t0:.0f}s  호출 {budget.calls}")
-    print("  채점: python3 experiments/score_new_axes.py")
+    print(f"\n  total {time.perf_counter() - t0:.0f}s  "
+          f"calls {budget.calls}")
+    print("  scoring: python3 experiments/score_new_axes.py")
 
 
 if __name__ == "__main__":

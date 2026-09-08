@@ -1,58 +1,71 @@
-"""합성 성능 표 생성기 (§22, 부록 C).
+"""The synthetic performance-table generator (§22, appendix C).
 
-알려진 물리 구조를 심고, 파이프라인이 그 구조를 **되찾아내는지**로 검증한다.
-정답을 알고 있으므로 채점기 버그(부호 반전, 정답 누출)를 잡을 수 있다 —
-무작위 표에서는 정답 누출이 있어도 regret 이 좋아 보이지 않아 못 잡는다.
+A known physical structure is planted, and validation is whether the pipeline
+**recovers** that structure. Because the answer is known, scorer bugs (a
+flipped sign, an answer leak) can be caught — on a random table an answer
+leak does not make regret look good, so it cannot be caught.
 
-★ **이 파일은 `kernelrule.features` 를 import 하지 않는다** (§28).
-  같은 함수를 쓰면 파이프라인 검증이 동어반복이 된다. 물리는 같되 구현을
-  분리한다 — 여기서는 wave 항을 `ceil(w)/w` 로 쓰고, 피처 쪽은 낭비 비율
-  `tail_waste` 로 쓴다. 대수적으로 같은 물리이지만 코드도 계수도 다르다.
+★ **This file does not import `kernelrule.features`** (§28).
+  Using the same functions would make the pipeline validation a tautology.
+  The physics is the same but the implementations are separate — here the
+  wave term is written as `ceil(w)/w` while the feature side writes the waste
+  ratio `tail_waste`. Algebraically the same physics, but different code and
+  different coefficients.
 
-★ **생성기는 실측 시간을 볼 수 없다.** 격자를 실제 번들에서 가져올 때도
-  `load_for_ranking`(정답 제거)만 쓴다. 구조적으로 실측을 베낄 수 없다.
+★ **The generator cannot see the measured times.** Even when the grid comes
+  from a real bundle it uses only `load_for_ranking` (answers removed). It is
+  structurally impossible for it to copy the measurements.
 
-## 심는 구조
+## The structures planted
 
-    #1 wave quantization       ceil(waves)/waves
-    #2 occupancy (smem 압력)    1 + c * smem/smem_per_block
-    #3 스필                     1 + c * (spill > 0)
-    #4 메모리 바운드 감쇠        penalty -> 1 + damp*(penalty-1)
-    #5 split-K 리덕션 비용       1 + c * (split_k - 1)
-    #6 mainloop 워밍업          stages 가 깊고 K 가 짧으면 손해
-    #7 ★ 타일 연산 강도          작은 타일은 A/B 재사용이 적어 mainloop 이 느리다
-    #8 2단 파이프라인            stages=2 는 다른 커널 계열이고 지연 은닉이 약하다
-    #9 명령어 수                 mainloop 한 번의 실제 작업량
-   #10 레지스터 압력             SM 당 상주 블록 수를 깎는다
-   #11 ★ 부분 타일 낭비          M=1 에 128행 타일을 쓰면 일의 99%가 버려진다
+    #1 wave quantization        ceil(waves)/waves
+    #2 occupancy (smem pressure) 1 + c * smem/smem_per_block
+    #3 spilling                  1 + c * (spill > 0)
+    #4 memory-bound damping      penalty -> 1 + damp*(penalty-1)
+    #5 split-K reduction cost    1 + c * (split_k - 1)
+    #6 mainloop warm-up          deep stages with a short K costs
+    #7 ★ tile arithmetic intensity  a small tile reuses A/B less, so the
+                                    mainloop is slower
+    #8 two-stage pipeline        stages=2 is a different kernel family and
+                                 hides latency less well
+    #9 instruction count         the real work of one mainloop pass
+   #10 register pressure         it cuts the resident blocks per SM
+   #11 ★ partial-tile waste      a 128-row tile on M=1 throws away 99% of the
+                                 work
 
-## ★ 벌점은 roofline 의 **연산 쪽에만** 붙는다
+## ★ The penalties attach **only to the compute side** of the roofline
 
-`t = max(t_compute, t_memory)` 를 먼저 만들고 거기에 벌점을 곱하면, 형상과
-config 의 **상호작용이 사라진다** — 어떤 config 가 어느 형상에서 좋은지가
-거의 형상에 무관해지고, 그러면 고정 config 하나가 모든 형상에서 최적에 가까워
-정적 top-1 이 1.03 까지 내려간다. 그런 표에서는 규칙이 배울 것이 없다.
+Building `t = max(t_compute, t_memory)` first and multiplying the penalties
+onto that makes **the shape x config interaction disappear** — which config
+is good on which shape becomes almost shape-independent, and then one fixed
+config is near-optimal on every shape and the static top-1 falls to 1.03.
+There is nothing for a rule to learn from such a table.
 
-맞는 순서는 이것이다.
+The right order is this.
 
-    t_compute *= (config 벌점 전부)      # 연산량과 연산 효율의 문제
-    t_memory  *= (거의 config 무관)       # 대역폭은 타일 모양을 모른다
+    t_compute *= (all the config penalties)   # a matter of work and compute
+                                              # efficiency
+    t_memory  *= (almost config-independent)  # bandwidth does not know the
+                                              # tile shape
     t = max(...)
 
-이러면 **메모리 바운드 형상에서 config 영향이 약해지는 것(구조 #4)이
-부과되는 대신 자연히 나온다.** M=1 형상이 쉬운 이유가 "감쇠 계수를 곱해서"가
-아니라 "대역폭 바닥에 닿아서" 가 된다 — 실측이 말하는 물리와 같다.
+Then **the weakening of the config effect on memory-bound shapes (structure
+#4) emerges naturally instead of being imposed.** An M=1 shape is easy not
+"because a damping coefficient was multiplied in" but "because it hit the
+bandwidth floor" — the same physics the measurements state.
 
-**#7 이 난이도의 주 동인이다.** 실측 난이도 중앙 1.671 은 "무작위 config 가
-최적보다 67% 느리다" 는 뜻인데, wave 항이나 스필로는 그 크기가 안 나온다
-(스필은 소수 커널에만 있어 중앙값을 못 움직인다). 타일이 128x128 에서 32x64 로
-작아지면 타일당 FLOP/바이트가 3배 줄고, 그것이 전형적인 config 의 손해다.
+**#7 is the main driver of difficulty.** The measured median difficulty of
+1.671 means "a random config is 67% slower than the optimum", and neither the
+wave term nor spilling produces that magnitude (spilling is on few kernels,
+so it cannot move the median). Shrinking a tile from 128x128 to 32x64 cuts
+FLOP/byte per tile threefold, and that is the loss of a typical config.
 
-## 노이즈와 양자화를 둘 다 넣는 것이 중요하다 (§22.3)
+## Putting in both noise and quantisation matters (§22.3)
 
-노이즈를 고정값으로 두면 작은 형상의 어려움이 사라져 합성 표가 실제와
-근본적으로 달라진다. 양자화를 빼면 **실제로는 존재하지 않는 순위**가 생겨
-채점기의 눈금 처리를 검증할 수 없다.
+Fixing the noise to a constant removes the difficulty of small shapes and
+makes the synthetic table fundamentally different from reality. Leaving out
+the quantisation creates **an ordering that does not actually exist**, so the
+scorer's tick handling cannot be validated.
 """
 
 from __future__ import annotations
@@ -68,11 +81,12 @@ import pandas as pd
 
 __all__ = ["PRESETS", "Grid", "generate", "self_check", "synth_times"]
 
-#: 난이도 프리셋 (§22.5).
+#: Difficulty presets (§22.5).
 #:
-#: `struct` 가 0 이면 시간이 config 와 **완전히 무관**해진다 — 그것이 `null`
-#: 이고, **정답 누출 탐지기**다. 그 표에서 어떤 규칙이든 regret 이 1.0 을
-#: 크게 밑돌면 어딘가에서 정답이 새고 있다.
+#: With `struct` at 0 the time becomes **completely independent** of the
+#: config — that is `null`, and it is the **answer-leak detector**. If any
+#: rule's regret on that table falls well below 1.0, the answer is leaking
+#: somewhere.
 PRESETS: dict[str, dict] = {
     "easy":   dict(struct=1.5, noise_scale=0.4, mem_damp=0.05),
     "normal": dict(struct=1.0, noise_scale=1.0, mem_damp=0.15),
@@ -80,22 +94,27 @@ PRESETS: dict[str, dict] = {
     "null":   dict(struct=0.0, noise_scale=1.0, mem_damp=1.00),
 }
 
-# -- 생성 모델의 계수 --------------------------------------------------------
-# ★ 피처 라이브러리와 공유하지 않는다 (§28). 값도 일부러 다르게 둔다.
-_C_SMEM = 0.37          # occupancy 손해
-_C_SPILL = 2.60         # 스필 커널의 벌점
-_C_SPLITK = 0.023       # split-K 파티션당 리덕션 비용
-_C_WARMUP = 0.055       # stages 워밍업 (mainloop 이 짧을 때)
-_C_TILE_EXP = 0.34      # 타일 연산 강도 지수 (구조 #7 — 난이도의 주 동인)
-_REF_TILE_EFF = 128.0   # 128x128 타일의 2*tm*tn/(tm+tn)
-_C_WARP_EXP = 0.20      # warp 타일 연산 강도 지수 (구조 #7b)
-_REF_WARP_EFF = 64.0    # 64x64 warp 타일의 2*wm*wn/(wm+wn)
-_C_PIPELINED = 0.21     # stages=2 (MmaPipelined) 벌점
-_C_INST = 0.70          # 명령어 수 (구조 #9). GBDT 가 상위로 꼽은 축이다 (§30.6)
-_C_REG = 0.30           # 레지스터 압력 (구조 #10)
-_LAUNCH_MS = 0.0132     # 런치 오버헤드 (§18.2 의 13µs)
+# -- Coefficients of the generative model ------------------------------------
+# ★ Not shared with the feature library (§28). The values are deliberately
+#   different too.
+_C_SMEM = 0.37          # the occupancy loss
+_C_SPILL = 2.60         # the penalty on a spilling kernel
+_C_SPLITK = 0.023       # the reduction cost per split-K partition
+_C_WARMUP = 0.055       # the stages warm-up (when the mainloop is short)
+_C_TILE_EXP = 0.34      # the tile arithmetic-intensity exponent (structure
+                        # #7 — the main driver of difficulty)
+_REF_TILE_EFF = 128.0   # 2*tm*tn/(tm+tn) of a 128x128 tile
+_C_WARP_EXP = 0.20      # the warp-tile arithmetic-intensity exponent
+                        # (structure #7b)
+_REF_WARP_EFF = 64.0    # 2*wm*wn/(wm+wn) of a 64x64 warp tile
+_C_PIPELINED = 0.21     # the stages=2 (MmaPipelined) penalty
+_C_INST = 0.70          # the instruction count (structure #9). The axis GBDT
+                        # ranked highly (§30.6)
+_C_REG = 0.30           # register pressure (structure #10)
+_LAUNCH_MS = 0.0132     # the launch overhead (§18.2's 13µs)
 
-# 노이즈/눈금 — A6000 실측 (§30.2). 프리셋의 noise_scale 이 곱해진다.
+# Noise / tick — measured on the A6000 (§30.2). The preset's noise_scale is
+# multiplied in.
 _NOISE_A = 0.000374
 _NOISE_B = 0.00044
 _TICK_MS = 0.001024
@@ -105,9 +124,9 @@ _DTYPE_BYTES = {"f16": 2, "bf16": 2, "f32": 4, "f8": 1}
 
 @dataclass
 class Grid:
-    """(형상, config) 격자 + 하드웨어. **시간은 없다.**
+    """The (shape, config) grid + the hardware. **There are no times.**
 
-    `df` 는 `load_for_ranking` 과 같은 모양이다 — 정답 컬럼이 없다.
+    `df` has the same shape as `load_for_ranking` — no answer columns.
     """
 
     df: pd.DataFrame
@@ -119,26 +138,29 @@ class Grid:
     def __len__(self) -> int:
         return len(self.df)
 
-    # -- 실제 번들에서 격자만 가져오기 ------------------------------------
+    # -- Taking only the grid from a real bundle --------------------------
     @classmethod
     def from_bundle(cls, ref: str | Path, *, env_hash: str,
                     shapes: list[tuple[int, int, int]] | None = None,
                     max_configs_per_shape: int | None = None,
                     seed: int = 0) -> Grid:
-        """실제 번들의 (형상, config, 커널 정적 속성) 격자를 그대로 쓴다.
+        """Uses a real bundle's (shape, config, static kernel attributes)
+        grid as it is.
 
-        ★ `ranking` 로더만 부른다 — **실측 시간을 볼 수 없다.** 그래서 합성
-        표가 실측을 베끼는 것이 구조적으로 불가능하다.
+        ★ It calls only the `ranking` loader — **it cannot see the measured
+        times.** That makes it structurally impossible for the synthetic
+        table to copy the measurements.
 
-        실제 alignment 구조(a888 형상과 a448 형상의 후보가 다르다)가 공짜로
-        따라온다 (§22.3).
+        The real alignment structure (an a888 shape and an a448 shape have
+        different candidates) comes along for free (§22.3).
         """
         from kerneltab.core.bundle import load_bundle
         from kerneltab.core.hardware import hardware_from_env
 
         b = load_bundle(ref, verify=True)
         if not str(b.env_hash).startswith(str(env_hash)):
-            raise ValueError(f"env_hash 불일치: {env_hash!r} vs {b.env_hash[:16]!r}")
+            raise ValueError(
+                f"env_hash mismatch: {env_hash!r} vs {b.env_hash[:16]!r}")
         df = b.ranking(ok_only=False, unknown_columns="ignore")
         env = b.env()
         if shapes is not None:
@@ -153,25 +175,28 @@ class Grid:
                 if len(grp) > max_configs_per_shape:
                     idx = np.sort(rng.choice(len(grp), max_configs_per_shape,
                                              replace=False))
-                    grp = grp.iloc[idx]     # noqa: PLW2901 — 의도된 축소
+                    grp = grp.iloc[idx]  # noqa: PLW2901 — deliberate cut
                 parts.append(grp)
             df = pd.concat(parts, ignore_index=True)
         df = df.reset_index(drop=True)
         if df.empty:
-            raise ValueError("격자가 비었다. shapes 필터를 확인하라.")
+            raise ValueError(
+                "the grid is empty. Check the shapes filter.")
         return cls(df=df, env=env, hw=hardware_from_env(env),
                    source=f"bundle:{b.info.get('bundle_id')}")
 
-    # -- 번들 없이 열거 ---------------------------------------------------
+    # -- Enumeration without a bundle -------------------------------------
     @classmethod
     def enumerate(cls, env: dict, *,
                   shapes: list[tuple[int, int, int]] | None = None,
                   max_kernels: int | None = None, seed: int = 0) -> Grid:
-        """kernelTab 의 `shapes.py` / `backends/sm80.py` 로 직접 열거한다.
+        """Enumerates directly through kernelTab's `shapes.py` /
+        `backends/sm80.py`.
 
-        번들이 없을 때 쓴다. 커널 정적 속성(regs/spill/occupancy)은 실제
-        빌드가 있어야 알 수 있으므로 **해석적으로 모델링**한다 — 그 사실을
-        `BUNDLE.json` 의 `synthetic.build_attrs` 에 남긴다.
+        Used when there is no bundle. The static kernel attributes
+        (regs/spill/occupancy) are knowable only from a real build, so they
+        are **modelled analytically** — and that fact is recorded in
+        `BUNDLE.json`'s `synthetic.build_attrs`.
         """
         from kerneltab.backends.sm80 import Sm80Backend
         from kerneltab.core.config import alignments_for
@@ -218,23 +243,26 @@ class Grid:
                         **attrs,
                     })
         if not rows:
-            raise ValueError("열거 결과가 비었다. shapes / max_kernels 확인.")
+            raise ValueError("the enumeration is empty. Check shapes / "
+                             "max_kernels.")
         return cls(df=pd.DataFrame(rows), env=env, hw=hw,
                    source="enumerate:sm80",
                    extra_columns={"build_attrs": "analytic"})
 
 
 def _build_attrs(be, cfg, hw, ext) -> dict:
-    """빌드해야 알 수 있는 값들의 **해석적 모델**. 열거 모드 전용.
+    """An **analytic model** of the values only a build can give. For the
+    enumeration mode only.
 
-    실제 표에는 `-Xptxas -v` 실측이 들어 있다. 여기서는 근사한다 —
-    합성 표의 목적은 파이프라인 검증이지 커널 예측이 아니다.
+    A real table carries the `-Xptxas -v` measurements. Here they are
+    approximated — the purpose of the synthetic table is pipeline
+    validation, not kernel prediction.
     """
     warps_m = max(1, cfg.tile_m // ext.warp_m)
     warps_n = max(1, cfg.tile_n // ext.warp_n)
     warps_k = max(1, cfg.tile_k // ext.warp_k) if ext.warp_k else 1
     threads = warps_m * warps_n * warps_k * 32
-    accum = (ext.warp_m * ext.warp_n) // 32          # fp32 누산기 1개/레지스터
+    accum = (ext.warp_m * ext.warp_n) // 32   # one fp32 accumulator/register
     overhead = 28 + 4 * ext.stages
     want = accum + overhead
     regs = min(255, want)
@@ -256,13 +284,13 @@ def _build_attrs(be, cfg, hw, ext) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# 물리 — ★ features/ 를 쓰지 않는다 (§28)
+# The physics — ★ it does not use features/ (§28)
 # ---------------------------------------------------------------------------
 def synth_times(grid: Grid, preset: str = "normal", *, seed: int = 0,
                 return_parts: bool = False):
-    """격자에 시간을 합성한다. 벡터화되어 있다."""
+    """Synthesises times onto the grid. It is vectorised."""
     if preset not in PRESETS:
-        raise ValueError(f"알 수 없는 프리셋: {preset!r}. {sorted(PRESETS)}")
+        raise ValueError(f"unknown preset: {preset!r}. {sorted(PRESETS)}")
     ps = PRESETS[preset]
     df = grid.df
     hw = grid.hw
@@ -283,41 +311,44 @@ def synth_times(grid: Grid, preset: str = "normal", *, seed: int = 0,
     occ = np.maximum(1.0, _col(df, ("max_blocks_per_sm",), 1.0))
     stages = _col(df, ("ext_stages",), 3.0)
 
-    # -- 1. roofline 두 항을 **따로** 둔다 --------------------------------
+    # -- 1. the two roofline terms are kept **separate** ------------------
     flops = 2.0 * M * N * K
     bytes_moved = eb * (M * K + K * N + M * N)
     t_compute = flops / (hw.peak_tflops_f16 * 1e12) * 1e3        # ms
     t_memory = bytes_moved / (hw.bandwidth_gbps * 1e9) * 1e3     # ms
 
-    # -- 2. wave quantization (구조 #1) -----------------------------------
-    # ★ 피처 쪽의 tail_waste 와 대수적으로 같은 물리를 다른 형태로 쓴다.
+    # -- 2. wave quantization (structure #1) ------------------------------
+    # ★ The same physics as the feature side's tail_waste, algebraically,
+    #   written in a different form.
     tiles_m = np.ceil(M / tm)
     tiles_n = np.ceil(N / tn)
     tiles = tiles_m * tiles_n * sk
     waves = tiles / (hw.sm_count * occ)
     wave_pen = np.ceil(waves) / np.maximum(waves, 1e-12)
 
-    # -- 3. ★ 부분 타일 낭비 (구조 #11) — 형상 x config 상호작용의 주 동인 --
-    # 타일이 형상 경계를 넘으면 그 부분도 **전부 계산한다**. M=1 에 128행
-    # 타일이면 일의 99.2%가 버려진다. 작은 M 이 작은 tile_m 을 선호하는 이유다.
+    # -- 3. ★ partial-tile waste (structure #11) — the main driver of the
+    #    shape x config interaction ---------------------------------------
+    # When a tile crosses the shape boundary it computes that part **too**.
+    # A 128-row tile on M=1 throws away 99.2% of the work. That is why a
+    # small M prefers a small tile_m.
     edge_pen = (tiles_m * tm / M) * (tiles_n * tn / N)
 
-    # -- 4. occupancy (구조 #2) -------------------------------------------
+    # -- 4. occupancy (structure #2) --------------------------------------
     smem_pen = 1.0 + _C_SMEM * np.clip(smem / hw.smem_per_block, 0.0, 1.5)
 
-    # -- 5. 스필 (구조 #3) -------------------------------------------------
+    # -- 5. spilling (structure #3) ---------------------------------------
     spill_pen = 1.0 + _C_SPILL * (spill > 0)
 
-    # -- 6. split-K 리덕션 (구조 #5) --------------------------------------
+    # -- 6. the split-K reduction (structure #5) --------------------------
     sk_pen = 1.0 + _C_SPLITK * (sk - 1.0)
 
-    # -- 7. mainloop 워밍업 (구조 #6) --------------------------------------
+    # -- 7. the mainloop warm-up (structure #6) ---------------------------
     iters = np.maximum(1.0, K / (tk * sk))
     warm_pen = 1.0 + _C_WARMUP * np.clip(stages / iters, 0.0, 2.0)
 
-    # -- 8. 타일/warp 연산 강도 (구조 #7) ----------------------------------
-    # ★ 기준 타일 위로는 이득이 **포화**한다. 그 위에서는 A/B smem 트래픽이
-    #   더 이상 병목이 아니고 레지스터/에필로그가 병목이 된다.
+    # -- 8. tile/warp arithmetic intensity (structure #7) -----------------
+    # ★ Above the reference tile the gain **saturates**. Beyond it, A/B smem
+    #   traffic is no longer the bottleneck and registers/epilogue are.
     tile_eff = 2.0 * tm * tn / np.maximum(tm + tn, 1.0)
     tile_pen = np.power(_REF_TILE_EFF / np.clip(tile_eff, 1.0, _REF_TILE_EFF),
                         _C_TILE_EXP)
@@ -327,12 +358,13 @@ def synth_times(grid: Grid, preset: str = "normal", *, seed: int = 0,
     warp_pen = np.power(_REF_WARP_EFF / np.clip(warp_eff, 1.0, _REF_WARP_EFF),
                         _C_WARP_EXP)
 
-    # -- 9. 2단 파이프라인 (구조 #8) ---------------------------------------
+    # -- 9. the two-stage pipeline (structure #8) -------------------------
     pipe_pen = 1.0 + _C_PIPELINED * (stages <= 2)
 
-    # -- 10. 명령어 수 / 레지스터 압력 (구조 #9, #10) -----------------------
-    # 커널마다 조금씩 다른 **연속적인** 축이다. 이게 없으면 시간이 소수의
-    # 이산 조합에만 떨어져 눈금 충돌이 실제보다 훨씬 심해진다.
+    # -- 10. instruction count / register pressure (structures #9, #10) ---
+    # A **continuous** axis that differs slightly per kernel. Without it the
+    # times fall on only a few discrete combinations and tick collisions
+    # become far worse than in reality.
     inst = _col(df, ("inst_total",), 0.0)
     inst_ref = np.median(inst[inst > 0]) if np.any(inst > 0) else 1.0
     inst_pen = 1.0 + _C_INST * np.clip(inst / max(inst_ref, 1.0) - 1.0, -0.6, 3.0)
@@ -342,11 +374,13 @@ def synth_times(grid: Grid, preset: str = "normal", *, seed: int = 0,
     penalty = (wave_pen * edge_pen * smem_pen * spill_pen * sk_pen * warm_pen
                * tile_pen * warp_pen * pipe_pen * inst_pen * reg_pen)
 
-    # -- 11. 구조 강도 (프리셋) --------------------------------------------
-    # struct=0 -> penalty 가 정확히 1 -> 시간이 config 와 무관해진다 (null)
+    # -- 11. structure strength (the preset) ------------------------------
+    # struct=0 -> the penalty is exactly 1 -> the time becomes independent of
+    # the config (null)
     penalty = np.power(penalty, float(ps["struct"]))
 
-    # -- 12. 연산 쪽에만 곱한다. 메모리 바닥은 config 를 거의 모른다 --------
+    # -- 12. multiplied onto the compute side only. The memory floor
+    #    barely knows the config ------------------------------------------
     damp = float(ps["mem_damp"])
     t = np.maximum(t_compute * penalty,
                    t_memory * (1.0 + damp * (penalty - 1.0))) + _LAUNCH_MS
@@ -355,13 +389,14 @@ def synth_times(grid: Grid, preset: str = "normal", *, seed: int = 0,
     ridge = (hw.peak_tflops_f16 * 1e12) / (hw.bandwidth_gbps * 1e9)
     mem_bound = ai < ridge
 
-    # -- 13. 측정 노이즈 — ★ 커널 시간에 의존한다 (§30.2) -------------------
+    # -- 13. measurement noise — ★ it depends on the kernel time (§30.2) --
     sigma = (_NOISE_A / np.maximum(t, 1e-9) + _NOISE_B) * float(ps["noise_scale"])
     t_noisy = t * (1.0 + rng.normal(0.0, 1.0, size=t.shape) * sigma)
     t_noisy = np.maximum(t_noisy, _TICK_MS)
 
-    # -- 14. ★ 타이머 양자화 (§30.2) ---------------------------------------
-    # 빼면 합성 표에 실제로는 존재하지 않는 순위가 생긴다.
+    # -- 14. ★ timer quantisation (§30.2) --------------------------------
+    # Without it the synthetic table gains an ordering that does not actually
+    # exist.
     t_q = np.round(t_noisy / _TICK_MS) * _TICK_MS
 
     if return_parts:
@@ -376,26 +411,30 @@ def _col(df, names, default=None) -> np.ndarray:
         if n in df.columns:
             return df[n].fillna(0).to_numpy(np.float64)
     if default is None:
-        raise KeyError(f"격자에 {names} 중 아무것도 없다.")
+        raise KeyError(f"the grid has none of {names}.")
     return np.full(len(df), float(default))
 
 
 # ---------------------------------------------------------------------------
-# 번들로 저장
+# Saving as a bundle
 # ---------------------------------------------------------------------------
 def generate(preset: str, seed: int, out: str | Path, grid: Grid, *,
              bundle_id: str | None = None) -> Path:
-    """합성 표를 **진짜 번들과 같은 형식**으로 쓴다 (§22.3).
+    """Writes the synthetic table **in the same format as a real bundle**
+    (§22.3).
 
-    같은 파일 형식이어야 로더/어댑터/`PerfTable` 이 검증된다.
+    The same file format is what validates the loader, the adapter and
+    `PerfTable`.
 
-    ★ `SYNTHETIC` 이 `bundle_id` 와 디렉토리 이름에 박힌다 (§22.6). 합성
-    산출물이 실제 결과로 오인되는 경로를 이름 수준에서 막는다.
+    ★ `SYNTHETIC` is nailed into the `bundle_id` and the directory name
+    (§22.6). It blocks, at the level of names, any path by which a synthetic
+    artefact could be mistaken for a real result.
     """
     out = Path(out)
     bid = bundle_id or f"SYNTHETIC-{preset}-s{seed}"
     if "SYNTHETIC" not in bid:
-        raise ValueError("합성 번들의 bundle_id 에는 SYNTHETIC 이 들어가야 한다 (§22.6).")
+        raise ValueError("a synthetic bundle's bundle_id must contain "
+                         "SYNTHETIC (§22.6).")
     path = out / bid
     path.mkdir(parents=True, exist_ok=True)
 
@@ -404,7 +443,8 @@ def generate(preset: str, seed: int, out: str | Path, grid: Grid, *,
     df = grid.df.copy()
     df["time_ms"] = t
 
-    # 정답/결과 컬럼을 실제 표와 같은 모양으로 채운다.
+    # The answer/outcome columns are filled in the same shape as a real
+    # table.
     sig = parts["sigma"] * t
     df["time_std_ms"] = sig
     df["time_min_ms"] = np.maximum(t - sig, _TICK_MS)
@@ -422,7 +462,8 @@ def generate(preset: str, seed: int, out: str | Path, grid: Grid, *,
         df[c] = v
     df["timestamp"] = "1970-01-01T00:00:00Z"
 
-    # 형상 수준 파생 정답 (kernelTab 이 export 시 계산하는 것과 같은 정의)
+    # Shape-level derived answers (the same definitions kernelTab computes
+    # on export)
     g = df.groupby(["M", "N", "K"], sort=False)["time_ms"]
     best = g.transform("min")
     df["difficulty"] = g.transform("median") / best
@@ -445,8 +486,9 @@ def generate(preset: str, seed: int, out: str | Path, grid: Grid, *,
             "coefficients": PRESETS[preset],
             "grid_source": grid.source,
             "generator": "kernelrule.tools.synth",
-            "warning": ("합성 표다. 성능 수치를 보고하지 마라 (§28). "
-                        "이 표의 규칙을 실제 표에 이어서 쓰지 마라."),
+            "warning": ("this is a synthetic table. Do not report "
+                        "performance numbers from it (§28). Do not carry a "
+                        "rule from this table over to a real one."),
             **grid.extra_columns,
         },
         "gpu_name": grid.env.get("hardware", {}).get("name", "SYNTHETIC"),
@@ -458,12 +500,14 @@ def generate(preset: str, seed: int, out: str | Path, grid: Grid, *,
         "n_rows": int(len(df)),
         "peak_tflops_f16_effective": float(grid.hw.peak_tflops_f16),
         "bandwidth_gbps_effective": float(grid.hw.bandwidth_gbps),
-        # ★ schema_version 2 로 낸다 — tick_ms 를 실제로 싣기 때문이다.
+        # ★ It is emitted as schema_version 2 — because it really carries
+        #   tick_ms.
         "noise_floor": {
             "sigma_abs_ms": _NOISE_A, "sigma_rel": _NOISE_B,
             "tick_ms": _TICK_MS,
             "model": "noise_floor(t) = max(sigma_abs_ms/t + sigma_rel, tick_ms/t)",
-            "source": "kernelrule.tools.synth (A6000 실측 계수를 그대로 씀)",
+            "source": "kernelrule.tools.synth (uses the measured A6000 "
+                      "coefficients as they are)",
         },
         "shape_layers": _layers(df, grid),
         "created_seconds": round(time.perf_counter() - t0, 2),
@@ -479,7 +523,8 @@ def generate(preset: str, seed: int, out: str | Path, grid: Grid, *,
 
 
 def _layers(df, grid: Grid) -> dict:
-    """형상 층. 격자가 실제 번들에서 왔으면 그 층을 그대로 쓴다."""
+    """The shape layers. If the grid came from a real bundle, its layers
+    are used as they are."""
     try:
         from kerneltab.core.shapes import all_layers
         out = {}
@@ -504,18 +549,19 @@ def _sha256(p: Path) -> str:
 
 
 def _synth_env_hash(bid: str) -> str:
-    """합성 표의 `env_hash`. 실제 조건과 **절대 섞이지 않게** 접두어를 박는다."""
+    """The synthetic table's `env_hash`. A prefix is nailed on so that it
+    **can never mix** with a real condition."""
     return "5y47he71c" + hashlib.sha256(bid.encode()).hexdigest()[:55]
 
 
 # ---------------------------------------------------------------------------
-# 자기 검사 (§22.3, 부록 C)
+# Self-check (§22.3, appendix C)
 # ---------------------------------------------------------------------------
 def self_check(path: str | Path) -> dict:
-    """생성된 표가 목표 통계를 만족하는지 확인한다.
+    """Checks that the generated table meets the target statistics.
 
-    ⚠️ 생성기가 목표를 벗어나면 그 위에서 개발한 모든 것이 현실과 동떨어진다.
-    테스트로 고정한다.
+    ⚠️ If the generator drifts off target, everything developed on top of it
+    is detached from reality. It is pinned by a test.
     """
     from kerneltab.core.bundle import load_bundle
 
@@ -531,7 +577,7 @@ def self_check(path: str | Path) -> dict:
     n_cand = g.size().to_numpy()
     n_distinct = g.nunique().to_numpy()
 
-    # 동점 밀집도 — 짧은 형상에서 눈금이 지배하는지 (§22.3)
+    # Tie density — whether the tick dominates on short shapes (§22.3)
     short = best.to_numpy() < 0.05
     return {
         "preset": preset,

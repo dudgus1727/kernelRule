@@ -1,30 +1,34 @@
-"""가중치 최적화 — 구조와 파라미터의 분리 (§29).
+"""Weight optimisation — separating structure from parameters (§29).
 
-## 왜 나누는가
+## Why they are separated
 
-규칙은 두 가지가 섞여 있다.
+A rule mixes two things.
 
-    구조     이산, 조합적. "어떤 피처를 어떻게 엮을까"   -> LLM
-    가중치   연속.         "2.0 이 맞나 2.7 이 맞나"      -> 수치 최적화기
+    structure   discrete, combinatorial. "which features, wired how" -> the LLM
+    weights     continuous.              "is 2.0 right, or 2.7"      -> a
+                                          numerical optimiser
 
-## ★ 언제 돌리는가가 핵심 (§29.3)
+## ★ When it runs is the crux (§29.3)
 
-    잘못:  LLM 규칙 생성 -> 채점 -> 아카이브
-    맞음:  LLM 규칙 생성 -> **가중치 최적화** -> 채점 -> 아카이브
+    wrong:  LLM writes a rule -> score -> archive
+    right:  LLM writes a rule -> **optimise the weights** -> score -> archive
 
-안 하면 좋은 구조가 나쁜 초기값 때문에 버려지고 평범한 구조가 좋은 초기값으로
-살아남는다. 진화가 구조가 아니라 **가중치 운**을 선택하게 된다.
+Without it, a good structure is thrown away because of bad initial values
+while a mediocre structure survives on good ones. Evolution then selects not
+structure but **luck in the weights**.
 
-## gradient descent 를 쓸 수 없다 (§29.2)
+## Gradient descent cannot be used (§29.2)
 
-목적함수 regret 은 `argmin` 을 거쳐 나오므로 가중치에 대해 **계단 함수**다.
-가중치를 조금 바꿔도 순위가 안 바뀌면 regret 이 그대로고, 어느 순간 순위가
-뒤집히며 점프한다. 기울기가 0이거나 정의되지 않는다. Nelder-Mead 를 쓴다.
+The objective, regret, comes out through an `argmin`, so it is a **step
+function** in the weights. Changing a weight slightly leaves regret unchanged
+while the ranking holds, then it jumps as the ranking flips. The gradient is
+0 or undefined. Nelder-Mead is used.
 
-## 학습 분할만 받는다 (§29.7)
+## It takes the training split only (§29.7)
 
-`Split` 의 `role` 을 검사한다. 검증/최종 분할이 목적함수에 들어가는 경로를
-만들지 않는다 — 문서에 적는 것은 강제가 아니다 (§30.8).
+It checks the `role` of the `Split`. There is no path by which the validation
+or final split enters the objective — writing it in the documentation is not
+enforcement (§30.8).
 """
 
 from __future__ import annotations
@@ -47,12 +51,13 @@ __all__ = ["FitError", "FitWarning", "FittedRule", "ScoreFn", "fit_weights",
            "make_order_fn",
            "make_score_of"]
 
-#: LLM 이 쓰는 함수. `w` 는 **수치 최적화기가 맞춘다** (§8.1 대체본).
+#: The function the LLM writes. `w` is **fitted by the numerical
+#: optimiser** (the §8.1 replacement).
 ScoreFn = Callable[[Feats, ShapeInfo, Hardware, np.ndarray], np.ndarray]
 
 
 class FitError(RuntimeError):
-    """가중치를 적합할 수 없다. 규칙을 기각한다."""
+    """The weights cannot be fitted. The rule is rejected."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,53 +72,63 @@ class FittedRule:
     val_regret: float = float("nan")
     code: str = ""
     method: str = "nelder-mead"
-    #: 항별 **실효 기여도** = |w_i| x (그 피처 열의 표준편차) (D-70).
-    #: 절대 배율과 달리 피처 스케일에 불변이라 라이브러리를 바꿔도
-    #: 같은 기준으로 읽힌다. 계산할 수 없으면 `None`.
+    #: The **effective contribution** per term = |w_i| x (the standard
+    #: deviation of that feature's column) (D-70). Unlike the absolute
+    #: magnitude it is invariant to feature scale, so it reads on the same
+    #: basis even when the library changes. `None` if it cannot be computed.
     contrib: np.ndarray | None = None
-    #: ★ **다듬기 전** 평가 횟수. `n_evals` 는 다듬기까지 합한 값이라
-    #: `max_evals` 와 견줄 수 없다 — 견주면 다듬기가 켜진 순간 상한 경고가
-    #: **항상** 뜬다. 상한에 닿았는지는 이 값으로 본다.
+    #: ★ The evaluation count **before polish**. `n_evals` includes polish,
+    #: so it cannot be compared against `max_evals` — comparing it makes the
+    #: cap warning fire **always** the moment polish is on. Whether the cap
+    #: was reached is read from this value.
     n_fit_evals: int = 0
-    #: ★ 대리 손실로 **초기점만** 만드는 데 쓴 평가 수 (`init_objective`).
-    #: `n_evals` 에는 더해져 있고 `n_fit_evals` 에는 없다 — 상한 판정은
-    #: 참 목적함수의 평가로만 한다. 예산 비교에는 `n_evals` 를 쓴다.
+    #: ★ The evaluations spent building **only the starting point** from a
+    #: surrogate loss (`init_objective`). They are added into `n_evals` and
+    #: not into `n_fit_evals` — the cap verdict is made on evaluations of
+    #: the true objective alone. For budget comparisons use `n_evals`.
     n_init_evals: int = 0
 
     @property
     def moved(self) -> bool:
-        """★ 적합기가 실제로 움직였는가 (D-54).
+        """★ Did the fitter actually move (D-54)?
 
-        `False` 면 **초기값으로 채점된 것**이고, §29.3 의 "가중치 최적화
-        후에 채점한다 — 안 하면 진화가 구조가 아니라 가중치 운을 선택한다"
-        가 그 후보에 대해 성립하지 않는다.
+        `False` means it was **scored on the initial values**, and §29.3's
+        "score after optimising the weights — otherwise evolution selects
+        luck in the weights rather than structure" does not hold for that
+        candidate.
 
-        24회 중 13회가 그랬다. 로그에는 적합 후 regret 만 남아서 **찾으려고
-        해야 보였다** — 규칙을 내보내는 다른 작업이 우연히 드러냈다.
+        13 of 24 were like that. The logs kept only the post-fit regret, so
+        **you had to go looking to see it** — another task, exporting rules,
+        revealed it by accident.
         """
         return not np.allclose(self.w, self.w0)
 
     def invariants(self) -> list[str]:
-        """이 적합이 이상한 이유들. **비어 있어야 정상이다** (D-54).
+        """The reasons this fit is odd. **Normal means empty** (D-54).
 
-        계산 단계마다 "아무것도 안 했는가" 를 스스로 알리게 한다.
-        로그는 사후에 찾아야 보이고, 찾으려면 무엇을 찾을지 알아야 한다.
+        It makes each computation stage announce "did I do nothing" itself.
+        Logs have to be searched after the fact, and searching requires
+        knowing what to search for.
         """
         out: list[str] = []
         if not self.moved:
-            out.append(f"적합기가 움직이지 않았다 (n_evals={self.n_evals}) "
-                       "— 초기값으로 채점된다")
+            out.append(f"the fitter did not move (n_evals={self.n_evals}) "
+                       "— it is scored on the initial values")
         w = np.asarray(self.w)
-        # ★ **절대 배율(|w|/|w0|)은 지표가 아니다** (D-70).
+        # ★ **The absolute magnitude (|w|/|w0|) is not an indicator**
+        #   (D-70).
         #
-        #   F1 라이브러리는 피처가 대부분 [0, 0.2] 라 적합기가 배율을 크게
-        #   키운다 — |w| 최대가 4,159,634 까지 갔다. 사람이 쓴 24개는
-        #   [0, 300] 짜리가 섞여 있어 8.6~7,663 이다. **같은 100배 기준을
-        #   쓰면 F1 팔에서 상시 발화해 감시가 신호를 잃는다** (원칙 11).
+        #   In the F1 library most features are [0, 0.2], so the fitter
+        #   raises the magnitude greatly — max |w| went as high as
+        #   4,159,634. The 24 a human wrote include [0, 300] ones, so theirs
+        #   are 8.6~7,663. **Using the same 100x criterion makes it fire
+        #   constantly on the F1 arm and the watchdog loses its signal**
+        #   (principle 11).
         #
-        #   순위만 보는 목적함수라 전체 배율은 무해하다. 문제가 되는 것은
-        #   **한 항이 다른 항들을 압도하는 것**이고, 그것은 실효 기여도로
-        #   재야 한다: |w_i| x (그 피처의 표준편차).
+        #   The objective looks only at ranking, so the overall magnitude is
+        #   harmless. What matters is **one term overwhelming the others**,
+        #   and that has to be measured by effective contribution:
+        #   |w_i| x (that feature's standard deviation).
         if self.contrib is not None:
             c = np.asarray(self.contrib, dtype=np.float64)
             pos = c[c > 0]
@@ -122,33 +137,35 @@ class FittedRule:
                 dom = np.flatnonzero(c > _DOMINANCE * med)
                 if dom.size:
                     out.append(
-                        f"한 항이 다른 항들을 압도한다: "
-                        f"{[int(i) for i in dom]} — 실효 기여도가 중앙값의 "
-                        f"{_DOMINANCE:.0f}배를 넘는다")
+                        f"one term overwhelms the others: "
+                        f"{[int(i) for i in dom]} — its effective "
+                        f"contribution exceeds {_DOMINANCE:.0f}x the median")
                 dead = np.flatnonzero([approx_zero(x) for x in c])
                 if dead.size:
-                    out.append(f"실효 기여도가 0 인 항: "
-                               f"{[int(i) for i in dead]} — 순위에 관여하지 "
-                               "않는다")
+                    out.append(f"terms with zero effective contribution: "
+                               f"{[int(i) for i in dead]} — they take no "
+                               f"part in the ranking")
         neg = np.flatnonzero(w < 0)
         if neg.size:
-            # 전 피처가 "클수록 나쁨" 이므로 음수는 방향이 뒤집힌 것이다.
-            # 형상 분기로 재가중하는 경우 정당할 수 있어 **경고만** 한다.
-            out.append(f"음수 가중치: {[int(i) for i in neg]} — 피처는 전부 "
-                       "'클수록 나쁨' 이다 (§8.2)")
+            # Every feature is "larger is worse", so a negative flips the
+            # direction. It can be legitimate when reweighting under a shape
+            # branch, so this **only warns**.
+            out.append(f"negative weights: {[int(i) for i in neg]} — every "
+                       f"feature is 'larger is worse' (§8.2)")
         return out
 
     @property
     def gap(self) -> float:
-        """학습 - 검증 격차. 라운드마다 기록한다 (§29.4).
+        """The training-validation gap. Recorded every round (§29.4).
 
-        벌어지면 파라미터 수를 줄여야 한다.
+        If it widens, the parameter count has to come down.
         """
         return self.val_regret - self.fit_regret
 
     @property
     def dead_terms(self) -> list[int]:
-        """0 근처로 수렴했거나 둔감한 항. 피처 정리 후보다 (§29.6)."""
+        """Terms that converged near 0 or are insensitive. Candidates for
+        feature cleanup (§29.6)."""
         return [i for i in range(len(self.w))
                 if abs(self.w[i]) < 1e-3 or self.sensitivity[i] < 1e-6]
 
@@ -159,10 +176,11 @@ class FittedRule:
 
 
 class _Problem:
-    """적합용 사전 계산. 형상별로 피처/tie-break/시간을 한 번만 꺼내 둔다.
+    """Precomputation for fitting. Features / tie-break / times are pulled
+    out once per shape.
 
-    ★ `score_fn` 은 여기서도 시간을 못 본다. 시간은 `_regret` 안에서
-    **순서가 정해진 뒤** 인덱싱에만 쓰인다.
+    ★ `score_fn` cannot see the times here either. Times are used only for
+    indexing inside `_regret`, **after** the order is fixed.
     """
 
     __slots__ = ("hw", "items", "k", "_pairs", "n_pairs", "n_dropped",
@@ -181,24 +199,28 @@ class _Problem:
         self._pairs = None
         self.n_pairs = 0
         self.n_dropped = 0
-        #: ★ 참 1등 대 나머지 쌍 (D-109). `rank_lambda` 가 0 이면 안 만든다.
+        #: ★ The true-first-place versus the rest pairs (D-109). Not built
+        #: when `rank_lambda` is 0.
         self._pairs1 = None
         self.n_pairs1 = 0
 
-    # -- 순위 손실 (D-101) -------------------------------------------------
+    # -- The rank loss (D-101) --------------------------------------------
     def _make_pairs(self, table: PerfTable, top_k: int, *,
                     anchor_best: bool = False) -> tuple[list, int, int]:
-        """★ 참 상위 `top_k` 안의 쌍. **노이즈로 못 가르는 쌍은 뺀다.**
+        """★ Pairs within the true top `top_k`. **Pairs noise cannot
+        separate are dropped.**
 
-        가중치는 `|t_j - t_i| / t_best` — **실제 손해**다. 튜닝할 값이
-        없고, 노이즈 바닥 이내면 자동으로 0 에 가까워진다.
+        The weight is `|t_j - t_i| / t_best` — **the actual loss**. There is
+        nothing to tune, and inside the noise floor it automatically
+        approaches 0.
 
-        `anchor_best` 면 **참 1등이 낀 쌍만** 남긴다 — `regret` 의 부드러운
-        대리다 (D-109). 같은 쌍 집합의 부분집합이므로 정규화가 같고
-        `lambda` 가 순수한 비율이 된다.
+        With `anchor_best`, only **pairs involving the true first place**
+        are kept — a smooth surrogate for `regret` (D-109). It is a subset
+        of the same pair set, so the normalisation matches and `lambda`
+        becomes a pure ratio.
 
-        ⚠️ `NoiseModel.resolvable` 을 쓴다. 판정을 새로 정의하지 않는다
-        (원칙 2).
+        ⚠️ It uses `NoiseModel.resolvable`. The verdict is not redefined
+        (principle 2).
         """
         pairs, n_ok, n_drop = [], 0, 0
         for _f, _info, _cand, t, best in self.items:
@@ -218,7 +240,7 @@ class _Problem:
                 pairs.append(None)
                 continue
             iu, ju = iu[ok], ju[ok]
-            w = (tt[ju] - tt[iu]) / best              # ★ 실제 손해
+            w = (tt[ju] - tt[iu]) / best              # ★ the actual loss
             n_ok += int(iu.size)
             pairs.append((top, iu, ju, w, float(w.sum())))
         return pairs, n_ok, n_drop
@@ -228,19 +250,21 @@ class _Problem:
             table, top_k)
 
     def build_top1_pairs(self, table: PerfTable, top_k: int) -> None:
-        """★ 참 1등 대 나머지 — `regret` 의 부드러운 대리 (D-109)."""
+        """★ True first place versus the rest — a smooth surrogate for
+        `regret` (D-109)."""
         self._pairs1, self.n_pairs1, _ = self._make_pairs(
             table, top_k, anchor_best=True)
 
     def rank_loss(self, score_fn: ScoreFn, w: np.ndarray) -> float:
-        """가중 로지스틱 쌍 손실. **작을수록 좋다** 규약이므로 s_i < s_j."""
+        """The weighted logistic pairwise loss. The convention is **lower
+        is better**, so s_i < s_j."""
         if self._pairs is None:
-            raise FitError("build_pairs 를 먼저 불러야 한다.")
+            raise FitError("build_pairs must be called first.")
         return self._loss_on(self._pairs, score_fn, w)
 
     def rank_loss_top1(self, score_fn: ScoreFn, w: np.ndarray) -> float:
         if self._pairs1 is None:
-            raise FitError("build_top1_pairs 를 먼저 불러야 한다.")
+            raise FitError("build_top1_pairs must be called first.")
         return self._loss_on(self._pairs1, score_fn, w)
 
     def _loss_on(self, pairs, score_fn: ScoreFn, w: np.ndarray) -> float:
@@ -254,7 +278,8 @@ class _Problem:
             if s.shape != (cand.n,) or not np.all(np.isfinite(s)):
                 return float("inf")
             st = s[top]
-            # softplus(s_i - s_j): s_i 가 작아야(=좋아야) 손실이 준다
+            # softplus(s_i - s_j): the loss falls as s_i gets small
+            # (= good)
             tot += float((pw * np.logaddexp(0.0, st[iu] - st[ju])).sum())
             den += wsum
         return tot / den if den > 0 else float("inf")
@@ -264,14 +289,17 @@ class _Problem:
         for i, (f, info, cand, t, best) in enumerate(self.items):
             s = np.asarray(score_fn(f, info, self.hw, w), dtype=np.float64)
             if s.shape != (cand.n,) or not np.all(np.isfinite(s)):
-                return float("inf")      # 이 가중치에서 실행 불가 (기각 아님)
-            # ★ 상위 k개만 뽑는다. 전체 정렬은 이 루프에서 비용이 지배한다.
+                return float("inf")   # unrunnable at these weights (not a
+                                      # rejection)
+            # ★ Only the top k are picked. A full sort dominates the cost in
+            #   this loop.
             rs[i] = float(t[cand.top_k(s, self.k)].min()) / best
         return geomean(rs)
 
 
 class FitWarning(UserWarning):
-    """적합이 이상하다. **기각은 아니지만 조용히 넘기지 않는다** (D-54)."""
+    """The fit is odd. **Not a rejection, but not passed over silently**
+    (D-54)."""
 
 
 def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
@@ -280,86 +308,97 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 k: int = 1, val_split: Split | None = None,
                 n_restarts: int = 4,
                 warn_invariants: bool = True,
-                polish: bool = True,          # ★ D-55/D-56, 기본 켜짐
-                polish_budget: int = 600,   # ★ 적합 305 의 2배 이내 (D-59)
+                polish: bool = True,        # ★ D-55/D-56, on by default
+                polish_budget: int = 600,   # ★ within 2x the fit's 305 (D-59)
                 sensitivity_delta: float = 0.5,
-                objective: str = "regret",    # ★ D-128: 다시 regret
+                objective: str = "regret",  # ★ D-128: back to regret
                 rank_top_k: int = 100,
                 rank_lambda: float = 0.0,
                 init_objective: str | None = None,
                 init_evals: int = 0,
                 bounds: list | None = None) -> FittedRule:
-    """구조를 고정하고 가중치만 맞춘다.
+    """Fixes the structure and fits only the weights.
 
-    `split` 은 **`role="train"` 이어야 한다.** 검증/최종이 목적함수에
-    들어가는 경로는 없다 (§29.7).
+    `split` **must have `role="train"`.** There is no path by which the
+    validation or final split enters the objective (§29.7).
 
-    `val_split` 은 적합이 끝난 뒤 **보고용으로만** 채점된다. 목적함수에
-    관여하지 않는다 — 격차(`FittedRule.gap`)를 라운드마다 기록하기 위한 것이다.
+    `val_split` is scored **for reporting only**, after the fit has
+    finished. It takes no part in the objective — it exists so the gap
+    (`FittedRule.gap`) can be recorded every round.
 
-    ## ★ `objective` — 기본은 `"regret"` 다 (D-128 에서 되돌렸다)
-
-    ```
-    "rank"    ★ 기본. 참 상위 `rank_top_k` 안의 가중 쌍 손실.
-              미분 가능 -> L-BFGS-B
-    "regret"  argmin 하나의 상대 시간. 계단 함수라 Nelder-Mead + 재시작
-    ```
-
-    ### 기본이 두 번 바뀌었다 — 지금은 `"regret"` 이다
+    ## ★ `objective` — the default is `"regret"` (reverted in D-128)
 
     ```
-    ~2026-09-01   "regret"   지금까지의 모든 결과가 통과한 경로
-     2026-09-01   "rank"     그때 하는 실험이 순위 손실이었다 (D-101)
-    ★2026-09-04   "regret"   순위 손실은 **틀린 목적함수**로 결론났다
-                             (D-118·D-121). 진화 경로에서 뺀다 (D-128)
+    "rank"    ★ default. The weighted pairwise loss within the true top
+              `rank_top_k`. Differentiable -> L-BFGS-B
+    "regret"  the relative time of the single argmin. A step function, so
+              Nelder-Mead + restarts
     ```
 
-    ⚠️ `"rank"` 는 **함수로는 남는다** — `rank_loss` / `rank_loss_top1` /
-    `tau` 는 지표로 쓰고, 옛 실행을 재현하려면 명시해서 부르면 된다.
-    **진화 루프는 거부한다** (`LoopConfig`).
-
-    `"rank"` 에서도 `fit_regret` 은 계속 `regret` 으로 계산해 기록한다 —
-    **채점 기준은 안 바꾼다** (실험 계획서 `rank-evo-prereg.md` §3).
-
-    ## `init_objective` — 대리 손실로 **초기점만** 만든다
+    ### The default changed twice — it is now `"regret"`
 
     ```
-    init_objective="rank_top1"   1단계: rank_loss_top1 로 L-BFGS-B
-                                 (`init_evals` 회). 미분 가능하다
-                                 2단계: 그 점에서 **regret 으로** 본 적합
+    ~2026-09-01   "regret"   the path every result so far passed through
+     2026-09-01   "rank"     the experiment being run then was the rank loss
+                             (D-101)
+    ★2026-09-04   "regret"   the rank loss was concluded to be the **wrong
+                             objective** (D-118 · D-121). It is taken out of
+                             the evolution path (D-128)
     ```
 
-    ⚠️ **채택은 regret 이다.** 1단계 값은 반환값에 남지 않고 `best_v` /
-    `fit_regret` / 다듬기 전부가 참 목적함수로 다시 잰다. 조건이 섞이므로
-    쓸 때 실험 계획서에 명시한다 — "초기점 생성에만 쓰고 채택은 regret@1"
-    (`fitter-regret-prereg.md` §2).
+    ⚠️ `"rank"` **remains as a function** — `rank_loss` / `rank_loss_top1` /
+    `tau` are used as metrics, and reproducing an old run only needs it
+    passed explicitly. **The evolution loop refuses it** (`LoopConfig`).
 
-    `objective="regret"` 에서만 받는다. 순위 손실 경로에서 순위 손실로
-    초기점을 만드는 것은 같은 목적함수를 두 번 부르는 것이다.
+    Even under `"rank"`, `fit_regret` keeps being computed and recorded as
+    `regret` — **the scoring criterion does not change** (the experiment
+    plan `rank-evo-prereg.md` §3).
+
+    ## `init_objective` — builds **only the starting point** from a
+    surrogate loss
+
+    ```
+    init_objective="rank_top1"   stage 1: L-BFGS-B on rank_loss_top1
+                                 (`init_evals` evaluations). It is
+                                 differentiable
+                                 stage 2: from that point, a fit seen
+                                 **through regret**
+    ```
+
+    ⚠️ **Acceptance is by regret.** The stage-1 value does not survive into
+    the return value; `best_v` / `fit_regret` / the polish all re-measure
+    through the true objective. It mixes conditions, so using it must be
+    stated in the experiment plan — "used only to generate the starting
+    point; acceptance is regret@1" (`fitter-regret-prereg.md` §2).
+
+    It is accepted only under `objective="regret"`. Building the starting
+    point from the rank loss on the rank-loss path would be calling the same
+    objective twice.
     """
     if not isinstance(split, Split):
         raise SplitError(
-            "fit_weights 는 Split 을 받는다. 형상 리스트를 넘기면 어느 분할인지 "
-            "알 수 없다 — 명시하지 않으면 에러다 (§26.4).")
+            "fit_weights takes a Split. Passing a list of shapes leaves it "
+            "unknown which split it is — unstated means an error (§26.4).")
     if split.role != "train":
         raise SplitError(
-            f"fit_weights 에 role={split.role!r} 분할이 들어왔다. "
-            "학습 분할만 받는다 (§29.7). 검증/최종으로 적합하면 홀드아웃이 "
-            "아니게 된다.")
+            f"a split with role={split.role!r} came into fit_weights. "
+            f"Only the training split is accepted (§29.7). Fitting on the "
+            f"validation or final split stops it from being a holdout.")
     if val_split is not None and val_split.role != "val":
         raise SplitError(
-            f"val_split 의 role 이 {val_split.role!r} 다. 'val' 이어야 한다.")
+            f"val_split has role {val_split.role!r}. It must be 'val'.")
 
     w0 = np.asarray(list(w0), dtype=np.float64)
-    # ★ 가중치별 경계 (D-112). `None` 이면 아무것도 안 바뀐다 — 지수 자리를
-    #   안 쓰는 규칙은 옛 실행과 **같은 조건**이어야 한다 (원칙 36).
+    # ★ Per-weight bounds (D-112). With `None` nothing changes — a rule
+    #   that uses no exponent slot must be under **the same conditions** as
+    #   the old runs (principle 36).
     if bounds is None:
         def _proj(x):
             return x
     else:
         if len(bounds) != w0.size:
             raise FitError(
-                f"bounds 길이 {len(bounds)} != 가중치 {w0.size}")
+                f"bounds length {len(bounds)} != weights {w0.size}")
         _blo = np.array([b[0] for b in bounds], dtype=np.float64)
         _bhi = np.array([b[1] for b in bounds], dtype=np.float64)
 
@@ -368,57 +407,63 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
 
         w0 = _proj(w0)
     if w0.ndim != 1 or w0.size == 0:
-        raise FitError(f"W0 형태가 잘못됐다: {w0.shape}")
+        raise FitError(f"the shape of W0 is wrong: {w0.shape}")
     if not np.all(np.isfinite(w0)):
-        raise FitError("W0 에 비유한 값이 있다.")
+        raise FitError("W0 contains a non-finite value.")
 
     t0 = time.perf_counter()
     prob = _Problem(matrix, table, split.shapes, k)
     n_eval = 0
     n_inf = 0
 
-    # ★ **본 것 중 최선**을 직접 붙든다 (D-55). 최적화기의 `res.x` 만 받으면
-    #   탐색 도중 들른 더 좋은 점이 버려진다 — 목적함수가 계단이라 심플렉스가
-    #   좋은 꼭짓점을 밟고 지나쳐도 수축은 다른 곳에서 끝난다. 24회 중 5회가
-    #   그랬고, 최대 0.0277 을 버렸다. 평가는 이미 지불했으니 공짜 회수다.
+    # ★ It holds on to **the best it has seen** itself (D-55). Taking only
+    #   the optimiser's `res.x` throws away better points visited during the
+    #   search — the objective is a step function, so the simplex can step
+    #   on a good vertex and pass over it while the contraction ends
+    #   elsewhere. 5 of 24 were like that, discarding up to 0.0277. The
+    #   evaluations are already paid for, so recovering them is free.
     seen_v = float("inf")
     seen_w = w0.copy()
 
     if objective not in ("regret", "rank"):
-        raise FitError(f"알 수 없는 목적함수: {objective!r}. "
-                       "regret | rank 중 하나여야 한다.")
+        raise FitError(f"unknown objective: {objective!r}. It must be one "
+                       f"of regret | rank.")
     if rank_lambda < 0:
-        raise FitError(f"rank_lambda 는 0 이상이어야 한다: {rank_lambda}")
+        raise FitError(f"rank_lambda must be 0 or more: {rank_lambda}")
     if objective != "rank" and rank_lambda:
         raise FitError(
-            f"rank_lambda={rank_lambda} 인데 objective={objective!r} 다. "
-            "람다는 순위 손실 위에만 얹는다 (D-109).")
+            f"rank_lambda={rank_lambda} but objective={objective!r}. "
+            f"Lambda is only laid on top of the rank loss (D-109).")
     if objective == "rank":
         prob.build_pairs(table, rank_top_k)
         if prob.n_pairs == 0:
             raise FitError(
-                "순위 손실에 쓸 쌍이 하나도 없다 — 노이즈 바닥으로 가를 "
-                "수 있는 쌍이 상위 "
-                f"{rank_top_k} 안에 없다. 조용히 진행하지 않는다.")
+                "there is not one pair to use for the rank loss — no pair "
+                f"separable by the noise floor lies within the top "
+                f"{rank_top_k}. This does not proceed silently.")
         if rank_lambda:
             prob.build_top1_pairs(table, rank_top_k)
             if prob.n_pairs1 == 0:
                 raise FitError(
-                    "1등 쌍이 하나도 없다 — 참 1등을 노이즈 바닥으로 "
-                    f"2등과 못 가른다 (상위 {rank_top_k}). "
-                    "조용히 진행하지 않는다.")
+                    "there is not one first-place pair — the true first "
+                    f"place cannot be separated from the second by the "
+                    f"noise floor (top {rank_top_k}). This does not proceed "
+                    f"silently.")
 
     def value_at(w: np.ndarray) -> float:
-        """★ **적합하는 목적함수**의 값. 세지 않는다.
+        """★ The value of **the objective being fitted**. It does not
+        count.
 
-        ⚠️ 다듬기도 이것을 쓴다 (D-122). 예전에는 `_polish` 안에
-        `prob.regret` 이 박혀 있어서, `objective="rank"` 일 때 **순위 손실
-        기준값과 regret 을 견주고** 있었다 — regret(1.2) > 순위 손실(0.24)
-        이라 어떤 걸음도 채택되지 않아 다듬기가 조용히 아무것도 안 했다.
-        목적함수 값 함수를 **한 곳에만** 둔다 (원칙 2).
+        ⚠️ Polish uses this too (D-122). `prob.regret` used to be nailed
+        into `_polish`, so under `objective="rank"` it was **comparing a
+        rank-loss reference value against regret** — regret (1.2) > the rank
+        loss (0.24), so no step was ever accepted and polish silently did
+        nothing. The objective-value function lives in **exactly one place**
+        (principle 2).
         """
-        # ★ **경계 안으로 접어서** 잰다. Nelder-Mead 는 경계를 모르고
-        #   다듬기도 마찬가지라, 여기서 접어야 한 곳에서만 강제된다.
+        # ★ It measures **after folding into the bounds**. Nelder-Mead does
+        #   not know about bounds and neither does polish, so folding here is
+        #   what enforces them in one place.
         wa = _proj(np.asarray(w, dtype=np.float64))
         if objective == "regret":
             return prob.regret(score_fn, wa)
@@ -434,40 +479,45 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         v = value_at(wa)
         if not np.isfinite(v):
             n_inf += 1
-            return 1e6      # 이 가중치는 실행 불가. 구조 기각은 아니다.
+            return 1e6   # unrunnable at these weights. Not a structural
+                         # rejection.
         if v < seen_v:
             seen_v, seen_w = v, wa.copy()
         return v
 
     m = method.lower()
     if m not in ("nelder-mead", "neldermead", "powell", "cma"):
-        raise FitError(f"알 수 없는 최적화기: {method!r}. "
-                       "nelder-mead | powell | cma 중 하나여야 한다.")
+        raise FitError(f"unknown optimiser: {method!r}. It must be one of "
+                       f"nelder-mead | powell | cma.")
 
-    # ★ 대리 손실로 **초기점만** 만든다. 여기서 나온 값은 아무 데도 남지
-    #   않는다 — 아래 `best_v` 부터 전부 참 목적함수로 다시 잰다.
+    # ★ Builds **only the starting point** from the surrogate loss. The
+    #   value from here survives nowhere — from `best_v` below, everything
+    #   is re-measured through the true objective.
     n_init = 0
     start0 = w0.copy()
     if init_objective is not None:
         if init_objective != "rank_top1":
             raise FitError(
-                f"알 수 없는 초기점 목적함수: {init_objective!r}. "
-                "rank_top1 뿐이다.")
+                f"unknown starting-point objective: {init_objective!r}. "
+                f"Only rank_top1 exists.")
         if objective != "regret":
             raise FitError(
-                f"init_objective 는 regret 경로에만 쓴다 "
-                f"(objective={objective!r}). 순위 손실로 적합하면서 순위 "
-                "손실로 초기점을 만드는 것은 같은 것을 두 번 부르는 것이다.")
+                f"init_objective is used only on the regret path "
+                f"(objective={objective!r}). Fitting with the rank loss and "
+                f"building the starting point from the rank loss is calling "
+                f"the same thing twice.")
         if init_evals <= 0:
             raise FitError(
-                f"init_objective={init_objective!r} 인데 init_evals="
-                f"{init_evals} 다. 예산을 명시해야 한다 — 초기점 단계도 "
-                "evals 예산을 쓴다 (팔 비교의 공정성).")
+                f"init_objective={init_objective!r} but "
+                f"init_evals={init_evals}. The budget must be stated — the "
+                f"starting-point stage spends the evals budget too (fairness "
+                f"of the arm comparison).")
         prob.build_top1_pairs(table, rank_top_k)
         if prob.n_pairs1 == 0:
             raise FitError(
-                "1등 쌍이 하나도 없다 — 참 1등을 노이즈 바닥으로 2등과 "
-                f"못 가른다 (상위 {rank_top_k}). 조용히 진행하지 않는다.")
+                "there is not one first-place pair — the true first place "
+                f"cannot be separated from the second by the noise floor "
+                f"(top {rank_top_k}). This does not proceed silently.")
         seen_s = float("inf")
         seen_sw = w0.copy()
 
@@ -488,21 +538,24 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         if np.isfinite(seen_s):
             start0 = _proj(seen_sw)
 
-    # ★ 재시작이 필요하다. 목적함수가 **계단 함수**라 단순 심플렉스는
-    #   평평한 지대에서 수축해 멈춘다 (§29.2). 실제로 초기값에서 한 발도
-    #   못 움직이는 경우가 나온다. 매 재시작마다 심플렉스를 다시 부풀리고,
-    #   몇 개는 무작위 출발점에서 시작한다. 시드가 고정이라 결정론적이다.
+    # ★ Restarts are needed. The objective is a **step function**, so a
+    #   plain simplex contracts on a flat region and stops (§29.2). Cases
+    #   really do occur where it cannot move a single step from the initial
+    #   values. Each restart re-inflates the simplex, and some start from a
+    #   random point. The seed is fixed, so it is deterministic.
     best_w = start0.copy()
     best_v = obj(best_w)
-    #: 실제로 시작한 재시작 횟수. 아래에서 **세어서 경고한다**.
+    #: How many restarts actually started. Below, it **counts and warns**.
     n_started = 0
     if objective == "rank":
-        # ★ 계단이 아니므로 준뉴턴을 먼저 쓴다. 이것이 이 설계의 이점이다.
+        # ★ It is not a step function, so a quasi-Newton method comes
+        #   first. That is the benefit of this design.
         #
-        # ⚠️ **예산을 나눠 준다.** 처음에는 `maxfun=max_evals` 로 뒀는데,
-        #    실측에서 L-BFGS 혼자 209/200 을 써서 **재시작이 한 번도 안
-        #    돌았다.** "재시작은 그대로 둔다" 가 거짓이 되고, 전역 탐색
-        #    없이 국소해 하나로 끝난다 (원칙 1 — 장치가 안 돈다).
+        # ⚠️ **The budget is divided.** It was first set to
+        #    `maxfun=max_evals`, and in measurement L-BFGS alone used 209/200
+        #    so that **not one restart ran.** "the restarts are left as they
+        #    are" became false, and it ends at a single local optimum with no
+        #    global search (principle 1 — the device does not run).
         from scipy.optimize import minimize as _min
         for r in range(n_restarts):
             if n_eval >= max_evals:
@@ -518,10 +571,11 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 best_v, best_w = seen_v, seen_w.copy()
     rng = np.random.default_rng(_RESTART_SEED)
     per = max(20, max_evals // max(1, n_restarts))
-    # ★ **마지막 재시작이 예산을 다 쓰면서도 아직 나아지고 있었는가.**
-    #   "예산을 다 썼다" 자체는 경고가 아니다 — 재시작 일정이 `max_evals`
-    #   를 **설계상 전부 쓰게** 돼 있어 언제나 참이다(원칙 11). 신호는
-    #   "잘리는 순간까지 개선 중이었다" 쪽이다.
+    # ★ **Was the last restart still improving as it used up the budget?**
+    #   "the budget was used up" is not itself a warning — the restart
+    #   schedule is **designed to spend all of** `max_evals`, so it is always
+    #   true (principle 11). The signal is "it was still improving at the
+    #   moment it was cut".
     cut_while_improving = False
     for r in range(n_restarts):
         n_started += 1
@@ -532,41 +586,45 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
             0.0, 0.35 * np.maximum(np.abs(best_w), 1.0))
         res = _minimize_once(obj, start, m, per, r, bounds=bounds)
         obj(np.asarray(res.x, dtype=np.float64))
-        if seen_v < best_v:                 # ★ res.x 가 아니라 '본 것 중 최선'
+        if seen_v < best_v:            # ★ not res.x but 'the best seen'
             best_v, best_w = seen_v, seen_w.copy()
         cut_while_improving = (best_v < before_v - 1e-12
                                and n_eval - before_n >= per)
 
-    # ★ 재시작이 **실제로 돌았는가** (2026-09-01). `n_restarts=4` 라고
-    #   적어 놓고 1회만 도는 일이 실제로 있었다 — rank 경로에서 L-BFGS
-    #   가 `maxfun=max_evals` 로 예산을 혼자 다 썼다. 주석은 "재시작은
-    #   그대로 둔다" 였고 **거짓이었다** (원칙 1).
+    # ★ Did the restarts **actually run** (2026-09-01)? It really happened
+    #   that `n_restarts=4` was written down and only 1 ran — on the rank
+    #   path, L-BFGS used the whole budget alone through
+    #   `maxfun=max_evals`. The comment said "the restarts are left as they
+    #   are" and it was **false** (principle 1).
     if n_restarts > 1 and n_started < 2:
         warnings.warn(
-            f"fit_weights: 재시작이 {n_started}회만 돌았다 "
-            f"(n_restarts={n_restarts}). 첫 최적화가 예산 "
-            f"{max_evals} 을 혼자 쓴다 — 전역 탐색이 없다.",
+            f"fit_weights: only {n_started} restarts ran "
+            f"(n_restarts={n_restarts}). The first optimisation uses the "
+            f"whole budget of {max_evals} — there is no global search.",
             FitWarning, stacklevel=2)
     if n_inf >= n_eval:
         raise FitError(
-            f"모든 가중치에서 규칙이 유효한 점수를 내지 못했다 "
-            f"({n_inf}/{n_eval}). 구조를 기각한다.")
+            f"the rule produced no valid score at any weights "
+            f"({n_inf}/{n_eval}). The structure is rejected.")
 
-    n_fit = n_eval          # ★ 다듬기 전. 상한 판정은 이 값으로 한다.
+    n_fit = n_eval    # ★ before polish. The cap verdict uses this value.
     w = _proj(best_w)
     if polish:
         w, best_v, n_pol = _polish(prob, score_fn, w, best_v, polish_budget,
                                    value=value_at)
         n_eval += n_pol
-        # ★ 다듬기는 경계를 모른다. **여기서 한 번 더 접는다** — 접힌
-        #   값으로 아래 regret/민감도를 다시 재므로 보고값과 반환값이
-        #   같은 가중치에서 나온다.
+        # ★ Polish does not know about bounds. **It folds once more here**
+        #   — regret and sensitivity below are re-measured on the folded
+        #   values, so the reported and returned numbers come from the same
+        #   weights.
         w = _proj(w)
-    # ★ 채점 기준은 언제나 regret 이다 — `objective="rank"` 여도 그렇다.
-    #   "채점은 regret, 학습은 순위 손실" (rank-evo-prereg.md §3)
+    # ★ The scoring criterion is always regret — even under
+    #   `objective="rank"`. "score by regret, train by the rank loss"
+    #   (rank-evo-prereg.md §3)
     fit_regret = float(prob.regret(score_fn, w))
     if not np.isfinite(fit_regret) or fit_regret >= 1e6:
-        raise FitError("적합된 가중치에서 regret 이 유한하지 않다. 기각한다.")
+        raise FitError(
+            "regret is not finite at the fitted weights. Rejected.")
 
     sens = _sensitivity(prob, score_fn, w, fit_regret, sensitivity_delta)
     contrib = _contributions(prob, score_fn, w)
@@ -576,15 +634,18 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         vp = _Problem(matrix, table, val_split.shapes, k)
         val = float(vp.regret(score_fn, w))
 
-    # ★ 두 가지를 고쳤다 (D-76).
-    #   (1) 다듬기 평가를 뺀 `n_fit` 으로 견준다. `n_eval` 로 견주면 다듬기
-    #       예산 600 이 상한 300 을 언제나 넘는다.
-    #   (2) 예산 소진만으로는 경고하지 않는다 — 재시작 일정이 예산을 전부
-    #       쓰게 돼 있어 그것도 언제나 참이다. **잘리는 순간까지 개선 중**
-    #       이었을 때만 경고한다. 그래야 "수렴 전 중단" 이 사실이 된다.
+    # ★ Two things were fixed (D-76).
+    #   (1) It compares against `n_fit`, which excludes the polish
+    #       evaluations. Compared against `n_eval`, the polish budget of 600
+    #       always exceeds the cap of 300.
+    #   (2) Exhausting the budget alone does not warn — the restart schedule
+    #       is designed to spend it all, so that is always true too. It warns
+    #       only when it was **still improving at the moment it was cut**.
+    #       Only then is "cut before convergence" a fact.
     hit_cap = n_fit >= max_evals and cut_while_improving
     out = FittedRule(w=w, w0=w0, fit_regret=fit_regret,
-                     # ★ 예산 비교는 이 값으로 한다 — 초기점 단계도 센다.
+                     # ★ Budget comparisons use this value — the
+                     #   starting-point stage counts too.
                      n_evals=n_eval + n_init,
                      n_infeasible=n_inf, sensitivity=sens,
                      seconds=time.perf_counter() - t0, val_regret=val,
@@ -593,75 +654,88 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     if warn_invariants:
         msgs = out.invariants()
         if hit_cap:
-            # 상한을 조금 넘길 수 있다 — 재시작 진입 전에만 검사하고
-            # `obj(res.x)` 가 몇 번 더 불린다. 넘긴 양이 아니라 **닿았다는
-            # 사실**이 신호다: 예산을 다 쓸 때까지 개선을 찾고 있었다.
-            msgs.append(f"평가 상한에서 잘렸는데 아직 나아지고 있었다 "
-                        f"({n_fit}/{max_evals}, 다듬기 포함 총 {n_eval}회) "
-                        "— 예산을 늘리면 더 좋아질 수 있다")
+            # It can overshoot the cap slightly — the check happens only
+            # before entering a restart, and `obj(res.x)` is called a few
+            # more times. The signal is not the amount of overshoot but
+            # **the fact that it was reached**: it was still finding
+            # improvements when the budget ran out.
+            msgs.append(f"cut at the evaluation cap while still improving "
+                        f"({n_fit}/{max_evals}, {n_eval} in total including "
+                        f"polish) — a larger budget could do better")
         for msg in msgs:
             warnings.warn(f"fit_weights: {msg}", FitWarning, stacklevel=2)
     return out
 
 
-#: 재시작 출발점의 시드. 고정이라 `fit_weights` 는 결정론적이다.
+#: The seed for the restart starting points. It is fixed, so `fit_weights`
+#: is deterministic.
 _RESTART_SEED = 20260820
 
-#: 초기 심플렉스 스텝 = 이 값 x |start|. 재시작마다 절반이 된다.
-#: ★ 기본 0.6 에서 24회 중 13회가 **한 발짝도 못 움직였다** (D-54).
+#: The initial simplex step = this value x |start|. It halves per restart.
+#: ★ At the default of 0.6, 13 of 24 **could not move a single step**
+#: (D-54).
 SIMPLEX_SCALE = 0.6
-#: 0 보다 크면 **절대 스텝**을 쓴다 (|start| 무시). 지배적 항 포화를 시험한다.
+#: Above 0 it uses an **absolute step** (ignoring |start|). It tests
+#: saturation of a dominant term.
 SIMPLEX_ABS = 0.0
 
-#: 한 항의 실효 기여도가 **다른 항 중앙값의 이 배수**를 넘으면 경고한다.
-#: 절대 배율(100배)을 쓰면 F1 라이브러리에서 상시 발화한다 (D-70).
+#: Warns when one term's effective contribution exceeds **this multiple of
+#: the median of the others**. Using an absolute magnitude (100x) fires
+#: constantly on the F1 library (D-70).
 _DOMINANCE = 50.0
 
-#: 좌표 다듬기의 스텝 배율 (`polish=True` 일 때). 큰 것부터 훑고 줄인다.
-#: 좌표 다듬기의 스텝 배율. **로그 스케일로 넓게** 훑는다 (D-59).
+#: Step multipliers for the coordinate polish (when `polish=True`). It
+#: sweeps from large to small.
+#: The step multipliers of the coordinate polish. It sweeps **widely, on a
+#: log scale** (D-59).
 #:
-#: 처음에는 (0.5, 0.25, 0.1) 이었다 — 전부 1보다 작아서 **한 좌표를 크게
-#: 흔드는 시도가 아예 없었다.** 도달 실패 6건의 격차가 0.0085~0.0308 인데,
-#: 계단 함수에서 그 정도 격차는 좌표 하나를 배로 키우거나 반으로 줄이면
-#: 넘어갈 수 있다. 큰 것부터 훑어 큰 계단을 먼저 넘고, 작은 것으로 다듬는다.
+#: They were first (0.5, 0.25, 0.1) — all below 1, so **there was no attempt
+#: at all to shake one coordinate hard.** The six reach failures had gaps of
+#: 0.0085~0.0308, and on a step function a gap of that size can be crossed by
+#: doubling or halving one coordinate. Sweeping from large first crosses the
+#: big steps, and the small ones do the fine work.
 _POLISH_DELTAS = (10.0, 3.0, 1.0, 0.5, 0.25, 0.1)
 
-#: 쌍좌표 시도의 부호 조합. 단일 좌표로 못 넘는 계단이 있을 수 있다 —
-#: 두 항이 서로를 상쇄해 순위가 안 바뀌는 경우가 그렇다.
+#: The sign combinations for two-coordinate attempts. There can be steps a
+#: single coordinate cannot cross — when two terms cancel each other and the
+#: ranking does not move.
 _PAIR_SIGNS = ((+1.0, +1.0), (+1.0, -1.0), (-1.0, +1.0), (-1.0, -1.0))
 
 
 def _polish(prob, score_fn: ScoreFn, w: np.ndarray, base: float,
             budget: int, *, pairs: bool = True, value=None
             ) -> tuple[np.ndarray, float, int]:
-    """★ 좌표 하강으로 다듬는다 (D-55, D-59 강화).
+    """★ Polishes by coordinate descent (D-55, strengthened in D-59).
 
-    Nelder-Mead 가 멈춘 점은 **좌표 방향으로도 국소 최적이 아니었다** — 24회 중
-    9회가 좌표 하나를 흔드는 것만으로 나아졌고, 최대 0.0513 이었다. 목적함수가
-    계단이라 심플렉스는 평평한 지대에서 수축해 멈추는데, 축 방향의 계단 하나를
-    넘으면 값이 떨어진다.
+    The point where Nelder-Mead stopped **was not a local optimum along the
+    coordinate directions either** — 9 of 24 improved by shaking a single
+    coordinate, by up to 0.0513. The objective is a step function, so the
+    simplex contracts and stops on a flat region; crossing one step along an
+    axis drops the value.
 
-    세 가지를 한다.
+    It does three things.
 
     ```
-    1  단일 좌표 x delta      delta 는 10 ~ 0.1 로그 스케일 (D-59)
-    2  쌍좌표                 1이 한 바퀴 아무것도 못 찾았을 때만
-    3  반복                   개선되면 그 delta 로 다시 한 바퀴
+    1  single coordinate x delta   delta on a 10 ~ 0.1 log scale (D-59)
+    2  two coordinates             only when 1 found nothing in a full pass
+    3  repeat                      on improvement, another pass at that delta
     ```
 
-    쌍좌표는 **단일 좌표가 막혔을 때만** 켠다. `n^2 x 4` 라 비싸고, 단일
-    좌표로 풀리는 동안 쓰면 예산만 먹는다.
+    Two-coordinate steps are switched on **only when single coordinates are
+    stuck**. It is `n^2 x 4` and therefore expensive, and using it while
+    single coordinates still work only eats budget.
 
-    ⚠️ **훈련 형상만 본다** — `prob` 이 학습 분할로 만들어진다. 홀드아웃이
-    들어오는 인자가 없고 `test_polish_only_sees_the_training_split` 이
-    그것을 고정한다 (§29.7).
+    ⚠️ **It sees the training shapes only** — `prob` is built from the
+    training split. There is no argument by which the holdout could come in,
+    and `test_polish_only_sees_the_training_split` pins that (§29.7).
 
-    ## ★ `value` — 적합하는 목적함수를 받는다 (D-122)
+    ## ★ `value` — it takes the objective being fitted (D-122)
 
-    `None` 이면 `prob.regret` 이다. **`objective="rank"` 로 부를 때는
-    반드시 넘겨야 한다** — 안 넘기면 순위 손실 기준값과 regret 을 견주게
-    되고, 값의 자릿수가 달라 어떤 걸음도 채택되지 않는다. 그 상태로
-    D-101~D-112 의 순위 손실 실행 전부가 **다듬기 없이** 돌았다.
+    With `None` it is `prob.regret`. **When called with
+    `objective="rank"` it must be passed** — without it, a rank-loss
+    reference value is compared against regret, and the magnitudes differ so
+    that no step is ever accepted. In that state every rank-loss run of
+    D-101~D-112 ran **without polish**.
     """
     val = value if value is not None else (
         lambda t: prob.regret(score_fn, t))
@@ -687,7 +761,8 @@ def _polish(prob, score_fn: ScoreFn, w: np.ndarray, base: float,
                     t = w.copy()
                     t[i] = t[i] + sgn * d * max(abs(t[i]), 1.0)
                     improved |= try_step(t)
-        # ★ 단일 좌표가 이 delta 에서 막혔다. 쌍좌표로 한 바퀴 돈다.
+        # ★ Single coordinates are stuck at this delta. Do a pass with
+        #   coordinate pairs.
         if not pairs or n_ev >= budget or n < 2:
             continue
         for i in range(n - 1):
@@ -704,23 +779,25 @@ def _polish(prob, score_fn: ScoreFn, w: np.ndarray, base: float,
 
 def _cma_once(obj, start: np.ndarray, budget: int, r: int, *,
               bounds: list | None = None):
-    """CMA-ES 한 번 (D-123). **초기 스텝을 Nelder-Mead 와 같게 준다.**
+    """One CMA-ES run (D-123). **The initial step is given the same as
+    Nelder-Mead's.**
 
-    `sigma0=1.0` 에 `CMA_stds` 로 좌표별 스텝을 주면 `_minimize_once` 의
-    심플렉스 스텝과 같은 크기에서 출발한다 — 팔 비교에서 스텝 크기가
-    교락이 되지 않는다.
+    With `sigma0=1.0` and per-coordinate steps through `CMA_stds`, it starts
+    from the same size as `_minimize_once`'s simplex step — so the step size
+    is not a confounder in the arm comparison.
 
-    ⚠️ **예산을 정확히 맞추지 못한다.** 세대 단위로 끝나므로 몇 회
-    넘긴다 (16차원 popsize 12 -> 최대 11회). 실제 평가 수를 보고한다
-    (`n_evals`) — 예산이 같았다고 가정하지 않는다 (원칙 38).
+    ⚠️ **The budget cannot be matched exactly.** It ends on generation
+    boundaries, so it overshoots by a few (16 dimensions, popsize 12 -> at
+    most 11). The actual evaluation count is reported (`n_evals`) — it does
+    not assume the budgets were equal (principle 38).
     """
     try:
         import cma as _cma
-    except ImportError as e:      # pragma: no cover - 선택 의존성
+    except ImportError as e:      # pragma: no cover - optional dependency
         raise FitError(
-            "method='cma' 인데 `cma` 패키지가 없다. "
-            "`pip install cma` (pyproject 의 `fit` 추가 그룹). "
-            "조용히 다른 최적화기로 넘어가지 않는다.") from e
+            "method='cma' but the `cma` package is missing. "
+            "`pip install cma` (the `fit` extra group in pyproject). "
+            "It does not silently fall back to another optimiser.") from e
 
     step = SIMPLEX_SCALE * (0.5 ** r) * np.maximum(np.abs(start), 1.0)
     opts = {"CMA_stds": [float(x) for x in step], "maxfevals": int(budget),
@@ -738,14 +815,15 @@ def _cma_once(obj, start: np.ndarray, budget: int, r: int, *,
 
 @dataclass(frozen=True, slots=True)
 class _Res:
-    """`scipy` 결과 객체의 자리를 메운다 — 부르는 쪽은 `.x` 만 본다."""
+    """Stands in for a `scipy` result object — the caller looks only at
+    `.x`."""
 
     x: np.ndarray
 
 
 def _minimize_once(obj, start, method: str, budget: int, r: int, *,
                    bounds: list | None = None):
-    """재시작 한 번. 심플렉스를 **다시 부풀려서** 시작한다."""
+    """One restart. It starts by **re-inflating** the simplex."""
     from scipy.optimize import minimize
 
     start = np.asarray(start, dtype=np.float64)
@@ -755,10 +833,11 @@ def _minimize_once(obj, start, method: str, budget: int, r: int, *,
         return minimize(obj, start, method="Powell",
                         options={"maxfev": budget, "xtol": 1e-4, "ftol": 1e-6})
     n = len(start)
-    # ★ 스텝 크기. `SIMPLEX_SCALE` 로 쓸어볼 수 있게 뺐다 (D-54).
-    #   상대 스텝(|start| 비례)은 **지배적 항을 덜 흔든다** — 큰 항이 이미
-    #   순위를 포화시켰으면 더 흔들어도 순위가 안 바뀐다. `SIMPLEX_ABS` 는
-    #   그것을 시험한다 (절대 스텝).
+    # ★ The step size. Pulled out as `SIMPLEX_SCALE` so it can be swept
+    #   (D-54). A relative step (proportional to |start|) **shakes a
+    #   dominant term less** — if a large term has already saturated the
+    #   ranking, shaking it more does not move the ranking. `SIMPLEX_ABS`
+    #   tests that (an absolute step).
     if SIMPLEX_ABS > 0.0:
         step = np.full(n, SIMPLEX_ABS * (0.5 ** r))
     else:
@@ -773,23 +852,28 @@ def _minimize_once(obj, start, method: str, budget: int, r: int, *,
 
 def _contributions(prob: _Problem, score_fn: ScoreFn,
                    w: np.ndarray) -> np.ndarray | None:
-    """항별 **실효 기여도** = |w_i| x (그 항이 점수에 만드는 산포) (D-70).
+    """The **effective contribution** per term = |w_i| x (the spread that
+    term creates in the score) (D-70).
 
-    `w_i` 하나만 0 으로 두고 점수를 다시 계산해, 원래 점수와의 차이가
-    형상 안에서 얼마나 흩어지는지를 잰다. **형상 안의 산포만 본다** —
-    형상 상수는 순위를 안 바꾸므로 기여도가 0 이어야 한다 (절대 규칙 2).
+    It sets only `w_i` to 0, recomputes the score, and measures how much the
+    difference from the original scatters within a shape. **Only the spread
+    within a shape is looked at** — a shape constant does not change the
+    ranking, so its contribution must be 0 (absolute rule 2).
 
-    ★ **시간을 안 본다.** `score_fn` 만 부르고 `prob.regret` 은 안 부른다 —
-    정답이 들어오는 경로가 없다 (§3).
+    ★ **It does not look at the times.** It calls only `score_fn` and never
+    `prob.regret` — there is no path by which the answer comes in (§3).
 
-    절대 배율(|w|/|w0|)과 달리 **피처 스케일에 불변**이라, 라이브러리를
-    바꿔도 같은 기준으로 읽힌다. F1(피처 [0,0.2])과 사람 24개
-    (피처 [0,300])에서 |w| 자릿수가 셋 이상 달라 절대 기준이 무의미했다.
+    Unlike the absolute magnitude (|w|/|w0|), it is **invariant to feature
+    scale**, so it reads on the same basis even when the library changes.
+    Between F1 (features [0,0.2]) and the human 24 (features [0,300]) the
+    magnitude of |w| differed by more than three orders, which made an
+    absolute criterion meaningless.
     """
     out = np.zeros(len(w), dtype=np.float64)
     n = 0
-    # ★ `items` 는 `(feats, info, cand, times, best)` 다. 뒤의 둘은
-    #   **정답**이므로 이름을 `_` 로 받아 손댈 수 없게 한다 (§3).
+    # ★ `items` is `(feats, info, cand, times, best)`. The last two are
+    #   **the answer**, so they are bound to `_` names to keep them
+    #   untouchable (§3).
     for f, info, _cand, _times, _best in prob.items:
         try:
             base = np.asarray(score_fn(f, info, prob.hw, w),
@@ -814,10 +898,11 @@ def _contributions(prob: _Problem, score_fn: ScoreFn,
 
 def _sensitivity(prob: _Problem, score_fn: ScoreFn, w: np.ndarray,
                  base: float, delta: float) -> np.ndarray:
-    """각 `w[i]` 를 ±delta 만큼 흔들었을 때의 regret 변화 (§29.6).
+    """The change in regret when each `w[i]` is shaken by ±delta (§29.6).
 
-    둔감한 항은 그 피처가 쓸모없다는 뜻이고, 아주 민감한 항은 그 물리량이
-    지배적이라는 뜻이다. 둘 다 진단 리포트에 들어갈 정보다.
+    An insensitive term means that feature is useless; a very sensitive one
+    means that physical quantity dominates. Both belong in the diagnostic
+    report.
     """
     out = np.zeros(len(w), dtype=np.float64)
     for i in range(len(w)):
@@ -835,9 +920,10 @@ def _sensitivity(prob: _Problem, score_fn: ScoreFn, w: np.ndarray,
 
 def make_score_of(score_fn: ScoreFn, matrix: FeatureMatrix,
                   w: Sequence[float]):
-    """`score_fn` + 가중치 -> `evaluate_scores` 가 받는 `score_of`.
+    """`score_fn` + weights -> the `score_of` that `evaluate_scores`
+    takes.
 
-    채점 뜨거운 경로에서는 이쪽을 쓴다 (상위 k개만 뽑는다).
+    This is what the hot scoring path uses (it picks only the top k).
     """
     w = np.asarray(list(w), dtype=np.float64)
     hw = matrix.hw
@@ -851,10 +937,12 @@ def make_score_of(score_fn: ScoreFn, matrix: FeatureMatrix,
 
 def make_order_fn(score_fn: ScoreFn, matrix: FeatureMatrix,
                   w: Sequence[float]):
-    """`score_fn` + 가중치 -> 채점기가 받는 `order_fn` (§scoring).
+    """`score_fn` + weights -> the `order_fn` the scorer takes
+    (§scoring).
 
-    ★ 학습과 배포가 **같은 `score_fn`** 을 쓴다. 변환이 없으므로 "학습 때와
-    배포 때가 다르다" 는 오류가 원천 차단된다 (§8.1 대체본).
+    ★ Training and deployment use **the same `score_fn`**. There is no
+    conversion, so the error "training differed from deployment" is blocked
+    at the source (the §8.1 replacement).
     """
     w = np.asarray(list(w), dtype=np.float64)
     hw = matrix.hw

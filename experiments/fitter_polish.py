@@ -1,10 +1,11 @@
-"""★ 좌표 다듬기가 A/B 해석을 뒤집는가 (D-55). LLM 0회.
+"""★ Does the coordinate polish flip the A/B reading (D-55). 0 LLM calls.
 
     python3 experiments/fitter_polish.py
 
-Nelder-Mead 가 멈춘 점이 좌표 방향으로 국소 최적이 아니라는 것을 재고,
-다듬기를 켠 채 A/B(설명 vs 이름만)를 다시 읽는다. 판정 기준은
-`docs/artifacts/fitter-sweep.md` 에 실험 전에 박아 뒀다.
+It measures that the point where Nelder-Mead stopped is not a local optimum
+along the coordinate directions, and reads A/B (descriptions vs names only)
+again with the polish on. The decision criteria were nailed down in
+`docs/artifacts/fitter-sweep.md` before the experiment.
 """
 
 from __future__ import annotations
@@ -66,23 +67,26 @@ def main() -> None:
             out[pol][run] = geomean(np.array([reg[p] for p in held if p in reg]))
 
     print("=" * 70)
-    print("좌표 다듬기 아래 A/B — 설명(luna) vs 이름만(lunaNAMES)")
+    print("A/B under the coordinate polish — descriptions (luna) vs names "
+          "only (lunaNAMES)")
     print("=" * 70)
-    print(f"  {'조건':12s} {'다듬기 끔':>12} {'다듬기 켬':>12} {'변화':>9}")
-    for tag, pre in (("A 설명", "luna-"), ("B 이름만", "lunaNAMES-")):
+    print(f"  {'condition':14s} {'polish off':>12} {'polish on':>12} "
+          f"{'change':>9}")
+    for tag, pre in (("A descriptions", "luna-"),
+                     ("B names only", "lunaNAMES-")):
         f = [v for k, v in out[False].items() if k.startswith(pre)]
         t = [v for k, v in out[True].items() if k.startswith(pre)]
-        print(f"  {tag:12s} {np.median(f):12.4f} {np.median(t):12.4f} "
+        print(f"  {tag:14s} {np.median(f):12.4f} {np.median(t):12.4f} "
               f"{np.median(t) - np.median(f):+9.4f}")
     for pol in (False, True):
         a = [v for k, v in out[pol].items() if k.startswith("luna-")]
         b = [v for k, v in out[pol].items() if k.startswith("lunaNAMES-")]
         u = mannwhitneyu(a, b, alternative="two-sided")
-        print(f"\n  다듬기 {'켬' if pol else '끔'}: B - A = "
+        print(f"\n  polish {'on' if pol else 'off'}: B - A = "
               f"{np.median(b) - np.median(a):+.4f}  "
               f"Mann-Whitney p={u.pvalue:.3f}")
-    print("\n  ※ 12실행은 시드 폭 sigma=0.0274 안에 있다 (D-53). "
-          "이 차이는 폭 안이며 유의하지 않다.")
+    print("\n  ※ the 12 runs are inside the seed spread sigma=0.0274 (D-53). "
+          "This difference is inside that spread and is not significant.")
 
 
 if __name__ == "__main__":

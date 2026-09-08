@@ -1,49 +1,57 @@
-"""★ §29.5(b) 의 **비용** 주장 — 표본 몇 %면 가중치가 맞춰지나. LLM 0회.
+"""★ The **cost** claim of §29.5(b) — how many % of the sample fits the
+weights? 0 LLM calls.
 
     python3 experiments/refit_sample.py --workers 6
 
-## 무엇이 주장인가
+## What the claim is
 
-> §29.5(b) 가 성립하면 **"표 15시간" 이 "표본 5% + 수 초"** 가 된다.
+> If §29.5(b) holds, **"15 hours of table" becomes "5% of a sample + a few
+> seconds"**.
 
-`transfer_29_5.py` 는 학습 분할 **41형상 전부**로 재적합했다. 그것은
-**"구조가 전이되나"** 를 잰 것이고, 여기서 재는 것은 **"그것이 싼가"**
-다. 둘은 다른 질문이다.
+`transfer_29_5.py` refitted with **all 41 shapes** of the training split.
+That measured **"does the structure transfer"**, and what is measured here is
+**"is that cheap"**. They are different questions.
 
-## 재는 법
+## How it is measured
 
 ```
-5090 학습 41형상에서 k개를 뽑아 **그것만으로** 체제별 가중치를 맞춘다
--> 5090 구조 홀드아웃 20형상에서 채점    (홀드아웃은 언제나 전부)
+k shapes are drawn from the 5090's 41 training shapes and the per-regime
+weights are fitted **from those alone**
+-> scored on the 5090's 20 structural holdout shapes  (the holdout is always
+   all of them)
 k = 2(5%) 4 8 12 20 41(100%)
 ```
 
-★ **어느 k 개를 뽑느냐도 결과다.** 뽑기를 여러 번 해서 분포를 낸다 —
-"5% 면 된다" 가 운 좋은 한 번이면 안 된다.
+★ **Which k are drawn is also a result.** The draw is repeated many times to
+give a distribution — "5% is enough" must not be one lucky draw.
 
-## ★ 파국의 정체를 함께 남긴다 (2026-09-01)
+## ★ The nature of the catastrophe is recorded too (2026-09-01)
 
-최악이 2.35 였다 — "조금 나쁜" 것이 아니라 뭔가 깨진 것이다. 대응이
-달라지므로 원인을 기록한다.
+The worst was 2.35 — that is not "a bit bad", something broke. The response
+differs, so the cause is recorded.
 
 ```
-적합 집합에서는 좋은데 홀드아웃이 나쁘다  -> ★ 과적합. 표본 문제다
-                                          적합 예산을 늘려도 소용없다
-둘 다 나쁘다                              -> 적합기가 못 찾았다
+good on the fitting set but bad on the holdout  -> ★ overfitting. It is a
+                                                   sample problem. Raising
+                                                   the fitting budget does
+                                                   not help
+bad on both                                     -> the fitter did not find it
 ```
 
-★ 그리고 **형상 / 파라미터 비율**을 함께 본다. `k=2` 는 체제당 1형상에
-가중치 8개다 — 어떻게 골라도 과소결정이다. "몇 %" 가 맞는 단위가
-아닐 수 있다.
+★ And **the shapes / parameters ratio** is looked at alongside. `k=2` is 1
+shape per regime against 8 weights — however they are chosen it is
+underdetermined. "how many %" may not be the right unit.
 
-★ **체제별로 층화해서 뽑는다.** 체제마다 가중치를 따로 맞추므로 한
-체제가 0개면 적합 자체가 안 된다. k=2 면 체제당 1개다. **이 층화는
-조건이고, 실무에서도 그렇게 해야 한다** — "아무 2개나" 가 아니다.
+★ **The draw is stratified by regime.** The weights are fitted separately per
+regime, so if one regime gets 0 the fit does not happen at all. At k=2 it is
+1 per regime. **This stratification is a condition, and it has to be done
+that way in practice too** — it is not "any 2".
 
-## 하지 않는 것
+## What is not done
 
-`(c)` 와 겨루지 않는다. 여기서 겨루는 것은 **같은 구조의 41형상 재적합**
-이다 — "표본을 줄이면 얼마나 잃나" 가 질문이다.
+It is not put up against `(c)`. What it is put up against here is **the
+41-shape refit of the same structure** — the question is "how much is lost by
+shrinking the sample".
 """
 
 from __future__ import annotations
@@ -66,10 +74,10 @@ from kernelrule.features import REGISTRY
 
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
 SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
-#: ★ 8 과 12 사이가 꼭짓점이라 10/14/16 을 채운다 (2026-09-01)
+#: ★ The vertex is between 8 and 12, so 10/14/16 fill it in (2026-09-01)
 KS = (2, 4, 8, 10, 12, 14, 16, 20, 41)
 
-#: 워커가 fork 로 물려받는다 (4.2 GB 행렬을 복사하지 않는다).
+#: The workers inherit it by fork (the 4.2 GB matrix is not copied).
 _W: dict = {}
 
 
@@ -87,13 +95,15 @@ def _splits(table: PerfTable) -> SplitSet:
 
 
 def _stratified(rng, by_regime: dict, k: int) -> list:
-    """체제별로 고르게 k개. **각 체제에서 최소 1개**를 보장한다."""
+    """k evenly across the regimes. It guarantees **at least 1 from each
+    regime**."""
     names = sorted(by_regime)
     take = dict.fromkeys(names, 1)
     left = k - len(names)
     if left < 0:
-        raise ValueError(f"k={k} 가 체제 수 {len(names)} 보다 작다")
-    # 남은 자리는 체제 크기에 비례해서
+        raise ValueError(f"k={k} is smaller than the number of regimes "
+                         f"{len(names)}")
+    # The remaining slots go in proportion to the regime sizes
     sizes = np.array([len(by_regime[n]) for n in names], dtype=float)
     extra = np.floor(sizes / sizes.sum() * left).astype(int)
     for i in range(left - int(extra.sum())):
@@ -108,7 +118,7 @@ def _stratified(rng, by_regime: dict, k: int) -> list:
 
 
 def _job(arg):
-    """(규칙 index, k, 뽑기 seed) -> 홀드아웃 regret."""
+    """(rule index, k, draw seed) -> the holdout regret."""
     ri, k, seed = arg
     e = _W["rules"][ri]
     table, matrix = _W["table"], _W["matrix"]
@@ -120,7 +130,7 @@ def _job(arg):
     ws, fits, moved = {}, [], []
     for name in ("short", "long"):
         g = [p for p in sample if regime_of(p, table.hw) == name]
-        if not g:                       # ★ 조용히 넘기지 않는다
+        if not g:                    # ★ it is not passed over silently
             return {"ri": ri, "k": k, "seed": seed, "holdout": float("nan"),
                     "empty_regime": name}
         fr = fit_weights(fn, matrix, table, Split("train", tuple(g)),
@@ -137,7 +147,8 @@ def _job(arg):
         regs.append(float(t[cand.top_k(sc, 1)[0]] / t.min()))
     return {"ri": ri, "run": _W["runs"][ri], "k": k, "seed": seed,
             "n_sample": len(sample),
-            # ★ 적합 집합에서의 값. 홀드아웃과 달라지면 과적합이다
+            # ★ The value on the fitting set. Diverging from the holdout is
+            #   overfitting
             "fit_regret": float(np.exp(np.mean(np.log(fits)))),
             "moved": all(moved),
             "n_terms": _W["n_terms"][ri],
@@ -148,7 +159,7 @@ def _job(arg):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--draws", type=int, default=10,
-                    help="k 마다 몇 번 뽑나. k=41 은 결정적이라 1번")
+                    help="how many draws per k. k=41 is deterministic, so 1")
     ap.add_argument("--workers", type=int, default=0)
     ap.add_argument("--out", default="docs/artifacts/refit-sample.json")
     a = ap.parse_args()
@@ -169,7 +180,8 @@ def main() -> None:
                       if x.strip()), key=lambda e: e["regret"])
         rules.append(arc[0])
 
-    # ★ 파국이 항 수와 관계있나 — 예산 실험(8 vs 16)과 이어지는 질문이다
+    # ★ Is the catastrophe related to the number of terms — the question
+    #   continues from the budget experiment (8 vs 16)
     from kernelrule.rules.checks import check_rule
     n_terms = []
     for e in rules:
@@ -185,13 +197,14 @@ def main() -> None:
               n_terms=n_terms)
 
     print("=" * 76)
-    print("§29.5(b) 비용 — 표본 몇 %면 가중치가 맞춰지나")
+    print("§29.5(b) the cost — how many % of the sample fits the weights")
     print("=" * 76)
-    print(f"  5090 학습 {len(train)}형상  "
+    print(f"  5090 training {len(train)} shapes  "
           + "  ".join(f"{n} {len(v)}" for n, v in sorted(by_regime.items())))
-    print(f"  홀드아웃 {len(sp.val.shapes)}형상 — **언제나 전부**")
-    print(f"  구조 {len(rules)}개 (A6000 F3 6시드의 학습 최고)")
-    print(f"  뽑기 k 마다 {a.draws}번, 체제별 층화\n")
+    print(f"  holdout {len(sp.val.shapes)} shapes — **always all of them**")
+    print(f"  {len(rules)} structures (the training best of the 6 A6000 F3 "
+          f"seeds)")
+    print(f"  {a.draws} draws per k, stratified by regime\n")
 
     jobs = [(ri, k, 1000 * ri + 7 * k + d)
             for ri in range(len(rules)) for k in KS
@@ -210,12 +223,13 @@ def main() -> None:
         if np.isfinite(r["holdout"]):
             by_k[r["k"]].append(r["holdout"])
 
-    print(f"  {'k':>4} {'표본%':>7}  {'중앙':>8} {'범위':>19} {'폭':>8}  n")
+    print(f"  {'k':>4} {'sample%':>8}  {'median':>8} {'range':>19} "
+          f"{'width':>8}  n")
     rows = []
     for k in KS:
         v = np.array(by_k[k])
         pct = 100.0 * k / len(train)
-        print(f"  {k:4d} {pct:6.1f}%  {np.median(v):8.4f}  "
+        print(f"  {k:4d} {pct:7.1f}%  {np.median(v):8.4f}  "
               f"{v.min():.4f}~{v.max():.4f}  {v.max() - v.min():8.4f}  "
               f"{len(v)}")
         rows.append({"k": k, "pct": pct, "median": float(np.median(v)),
@@ -223,40 +237,46 @@ def main() -> None:
                      "n": len(v), "values": [float(x) for x in v]})
 
     full = np.median(by_k[len(train)]) if by_k.get(len(train)) else float("nan")
-    print(f"\n  ★ 41형상(100%) 중앙 {full:.4f} 대비 손실")
+    print(f"\n  ★ the loss against the 41-shape (100%) median {full:.4f}")
     for k in KS:
         if k >= len(train):
             continue
         v = np.array(by_k[k])
         print(f"     k={k:2d} ({100.0 * k / len(train):4.1f}%)  "
-              f"중앙 +{np.median(v) - full:.4f}   "
-              f"최악 +{v.max() - full:.4f}")
+              f"median +{np.median(v) - full:.4f}   "
+              f"worst +{v.max() - full:.4f}")
     # ------------------------------------------------------------------
-    # ★ 파국의 정체
+    # ★ The nature of the catastrophe
     # ------------------------------------------------------------------
     ok = [r for r in out if np.isfinite(r["holdout"])]
     cat = [r for r in ok if r["holdout"] > 1.15]
     print("\n" + "=" * 76)
-    print(f"★ 파국(홀드아웃 > 1.15) {len(cat)}건 / {len(ok)}건")
+    print(f"★ catastrophes (holdout > 1.15): {len(cat)} of {len(ok)}")
     print("=" * 76)
     if cat:
         fr = np.array([r["fit_regret"] for r in cat])
         fr_ok = np.array([r["fit_regret"] for r in ok if r not in cat])
-        print(f"  적합 집합에서의 regret   파국 중앙 {np.median(fr):.4f}   "
-              f"나머지 중앙 {np.median(fr_ok):.4f}")
-        print("  ★ 파국 쪽 적합 regret 이 **낮으면** 과적합이다 "
-              "(표본 문제) / 높으면 적합 실패다")
-        print(f"  적합기가 움직인 비율     파국 {np.mean([r['moved'] for r in cat]):.0%}"
-              f"   나머지 {np.mean([r['moved'] for r in ok if r not in cat]):.0%}")
-        print("\n  구조별 파국 (몰려 있나 흩어져 있나)")
+        print(f"  the regret on the fitting set   catastrophes median "
+              f"{np.median(fr):.4f}   the rest median {np.median(fr_ok):.4f}")
+        print("  ★ if the fitting regret on the catastrophe side is **low** "
+              "it is overfitting (a sample problem) / if it is high it is a "
+              "fitting failure")
+        print(f"  the fraction where the fitter moved   catastrophes "
+              f"{np.mean([r['moved'] for r in cat]):.0%}"
+              f"   the rest "
+              f"{np.mean([r['moved'] for r in ok if r not in cat]):.0%}")
+        print("\n  catastrophes per structure (are they clustered or "
+              "scattered)")
         for i, run in enumerate(SRC_RUNS):
             n_c = sum(1 for r in cat if r["ri"] == i)
             n_o = sum(1 for r in ok if r["ri"] == i)
-            print(f"    {run:26s} 항 {n_terms[i]:2d}  파국 {n_c:3d}/{n_o:3d}"
+            print(f"    {run:26s} terms {n_terms[i]:2d}  "
+                  f"catastrophes {n_c:3d}/{n_o:3d}"
                   f" = {n_c / max(n_o, 1):5.1%}")
-        print("\n  ★ 형상/파라미터 비 — 'k' 가 아니라 이것이 단위일 수 있다")
-        print(f"  {'k':>4} {'체제당 형상(최소)':>16} {'가중치':>7} "
-              f"{'비율':>7} {'파국':>7}")
+        print("\n  ★ the shape/parameter ratio — this, not 'k', may be the "
+              "unit")
+        print(f"  {'k':>4} {'shapes per regime (min)':>24} {'weights':>8} "
+              f"{'ratio':>7} {'catastr':>8}")
         for k in KS:
             rows_k = [r for r in ok if r["k"] == k]
             if not rows_k:
@@ -264,9 +284,10 @@ def main() -> None:
             per = k // len(by_regime)
             w = int(np.median([r["n_weights"] for r in rows_k]))
             c = np.mean([r["holdout"] > 1.15 for r in rows_k])
-            print(f"  {k:4d} {per:16d} {w:7d} {per / max(w, 1):7.2f} "
-                  f"{c:7.0%}")
-    print("\n  ⚠️ 유의성은 붙이지 않는다 — 5090 σ 신뢰구간이 넓다")
+            print(f"  {k:4d} {per:24d} {w:8d} {per / max(w, 1):7.2f} "
+                  f"{c:8.0%}")
+    print("\n  ⚠️ no significance is attached — the 5090 σ confidence "
+          "interval is wide")
     Path(a.out).write_text(json.dumps(
         {"bundle": G5090[0], "n_train": len(train),
          "n_holdout": len(sp.val.shapes), "src_runs": SRC_RUNS,

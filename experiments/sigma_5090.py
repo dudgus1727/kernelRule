@@ -1,22 +1,25 @@
-"""★ 5090 시드 폭 σ — §29.5 판정선의 근거. LLM 0회.
+"""★ The 5090 seed spread σ — the ground of the §29.5 decision line. 0 LLM
+calls.
 
     python3 experiments/sigma_5090.py
 
-## 왜 다시 재나
+## Why it is measured again
 
-A6000 의 σ 를 5090 에 그대로 쓰면 안 된다 (실험 계획서
-`transfer-prereg.md`). 눈금이 1/64 이고 ridge 가 0.74배다 — 동률 구조가
-다르므로 폭도 다를 수 있다.
+The A6000's σ must not be used on the 5090 as it is (the pre-registration
+`transfer-prereg.md`). The tick is 1/64 and the ridge is 0.74x — the tie
+structure differs, so the spread can differ too.
 
-## 재는 것
+## What is measured
 
-**최종 채점 절차 그대로**: 학습 점수로 아카이브에서 하나 고르고, 체제별로
-가중치를 다시 맞추고, 구조 홀드아웃에서 채점한다. 시드 간 표준편차가 σ 다.
+**Exactly the final scoring procedure**: pick one from the archive by the
+training score, refit the weights per regime, and score on the structural
+holdout. The standard deviation between seeds is σ.
 
-## ★ n=3 의 σ 는 아주 넓다
+## ★ The σ of n=3 is very wide
 
-카이제곱 신뢰구간을 **함께** 낸다. 점추정만 쓰면 판정선이 실제보다
-좁아진다 — 그것이 바로 "못 재는 차이를 보고" 하는 길이다 (원칙 7).
+The chi-squared confidence interval is reported **alongside**. Using the point
+estimate alone narrows the decision line below what it really is — and that is
+exactly the road to "reporting a difference we cannot measure" (principle 7).
 """
 
 from __future__ import annotations
@@ -51,7 +54,8 @@ def _splits(table: PerfTable) -> SplitSet:
 
 
 def _sigma_ci(x: np.ndarray, conf: float = 0.95) -> tuple[float, float, float]:
-    """표본 표준편차와 그 카이제곱 신뢰구간. `n` 이 작으면 아주 넓다."""
+    """The sample standard deviation and its chi-squared confidence interval.
+    With a small `n` it is very wide."""
     from scipy.stats import chi2
 
     n = len(x)
@@ -76,44 +80,52 @@ def main() -> None:
     sp = _splits(table)
 
     print("=" * 74)
-    print(f"시드 폭 σ   표={Path(a.bundle).name}")
+    print(f"the seed spread σ   table={Path(a.bundle).name}")
     print("=" * 74)
-    print(f"  학습 {len(sp.train.shapes)} / 구조 홀드아웃 "
+    print(f"  training {len(sp.train.shapes)} / structural holdout "
           f"{len(sp.val.shapes)}  ({sp.kind})")
-    print("  절차: 학습 점수로 아카이브에서 1개 -> 체제별 재적합 -> 홀드아웃\n")
+    print("  the procedure: 1 from the archive by the training score -> "
+          "per-regime refit -> the holdout\n")
 
-    # ★ 묶음의 조건이 하나인가 (D-120). σ 는 **한 조건의** 시드 폭이다 —
-    #   두 조건을 섞으면 그것은 조건 간 차이지 시드 폭이 아니다.
-    assert_same_condition(a.runs, label="σ 를 재는 묶음")
+    # ★ Is the set's condition single (D-120)? σ is the seed spread **of one
+    #   condition** — mixing two conditions makes it a between-condition
+    #   difference, not a seed spread.
+    assert_same_condition(a.runs, label="the set σ is measured on")
     hold, train = [], []
     for r in a.runs:
         f = Path("runs") / r / "archive.jsonl"
         arc = sorted((json.loads(x) for x in f.read_text().splitlines()
                       if x.strip()), key=lambda e: e["regret"])
-        e = arc[0]                       # ★ 학습 점수로 고른다
+        e = arc[0]                   # ★ it is chosen by the training score
         res = canonical_score(e["code"], e["w"], table=table, matrix=matrix,
                               splits=sp)
         hold.append(res.holdout)
         train.append(float(e["regret"]))
-        print(f"  {r:28s} 학습 {e['regret']:.4f}   홀드아웃 {res.holdout:.4f}",
+        print(f"  {r:28s} train {e['regret']:.4f}   "
+              f"holdout {res.holdout:.4f}",
               flush=True)
 
     h = np.array(hold)
     s, lo, hi = _sigma_ci(h)
-    print(f"\n  중앙 {np.median(h):.4f}   범위 {h.min():.4f}~{h.max():.4f}   "
-          f"폭 {h.max() - h.min():.4f}")
-    print(f"  ★ σ = {s:.4f}   95% 신뢰구간 [{lo:.4f}, {hi:.4f}]   (n={len(h)})")
-    print(f"\n  ⚠️ n={len(h)} 의 구간이다. **상한을 쓴다** — 점추정으로")
-    print("     판정선을 정하면 못 재는 차이를 보고하게 된다 (원칙 7).")
+    print(f"\n  median {np.median(h):.4f}   "
+          f"range {h.min():.4f}~{h.max():.4f}   "
+          f"width {h.max() - h.min():.4f}")
+    print(f"  ★ σ = {s:.4f}   95% confidence interval [{lo:.4f}, {hi:.4f}]   "
+          f"(n={len(h)})")
+    print(f"\n  ⚠️ it is an interval for n={len(h)}. **The upper bound is "
+          f"used** — setting")
+    print("     the decision line from the point estimate means reporting a "
+          "difference we cannot measure (principle 7).")
 
     def need(delta: float, sig: float) -> float:
-        """양측 0.05, 검정력 0.8 의 2표본 t 근사 시드 수."""
+        """The 2-sample t approximation of the number of seeds, two-sided
+        0.05, power 0.8."""
         return 2.0 * (2.8 * sig / delta) ** 2
 
-    print(f"\n  {'차이 delta':>12}  {'시드 수 (σ 점추정)':>20}  "
-          f"{'시드 수 (σ 상한)':>18}")
+    print(f"\n  {'difference delta':>18}  {'seeds (σ point est.)':>22}  "
+          f"{'seeds (σ upper bound)':>22}")
     for d in (0.02, 0.03, 0.05, 0.10):
-        print(f"  {d:12.2f}  {need(d, s):20.0f}  {need(d, hi):18.0f}")
+        print(f"  {d:18.2f}  {need(d, s):22.0f}  {need(d, hi):22.0f}")
 
     Path(a.out).write_text(json.dumps({
         "bundle": a.bundle, "env_hash": a.env_hash, "runs": a.runs,
@@ -121,8 +133,9 @@ def main() -> None:
         "n_holdout": len(sp.val.shapes),
         "train_regret": train, "holdout_regret": hold,
         "sigma": s, "sigma_ci95": [lo, hi], "n_seeds": len(h),
-        "procedure": ("학습 점수로 아카이브 1개 -> 체제별 재적합 -> "
-                      "구조 홀드아웃(nk11008)"),
+        "procedure": ("1 from the archive by the training score -> "
+                      "per-regime refit -> the structural holdout "
+                      "(nk11008)"),
     }, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
 

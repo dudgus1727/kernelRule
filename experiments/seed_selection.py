@@ -1,35 +1,39 @@
-"""★ 시드 선택이 실력인가 선택 편향인가.
+"""★ Is picking a seed skill, or selection bias?
 
     python3 experiments/seed_selection.py [n_seeds] [seed_base] [tag]
 
-## 무엇을 확인하나
+## What is checked
 
-같은 조건의 시드 6개에서 **표본내 점수가 구조 홀드아웃을 잘 예측했다**
-(스피어만 0.943). 표본내 최소 시드를 고르면 홀드아웃 1.0518 로, 무작위
-시드의 중앙 1.0817 보다 훨씬 낫고 벤더 1.0737 도 앞선다.
+Across 6 seeds of the same condition, **the in-sample score predicted the
+structural holdout well** (Spearman 0.943). Picking the in-sample minimum
+seed gives a holdout of 1.0518, far better than the median of a random seed,
+1.0817, and ahead of the vendor's 1.0737 as well.
 
-**그런데 그 1.0518 은 편향 없는 추정치가 아니다.** 6개 중 최소를 골랐으니
-그 홀드아웃 값도 6개 중 좋은 쪽일 확률이 높다. 상관이 높을수록 더 그렇다.
+**But that 1.0518 is not an unbiased estimate.** The minimum of 6 was picked,
+so its holdout value is likely to be on the good side of the 6 too. The
+higher the correlation, the more so.
 
-그래서 **절차를 고정하고 새 시드 묶음에서 다시 잰다.**
+So **the procedure is fixed and it is measured again on a new set of seeds.**
 
 ```
-새 시드 6개 -> 표본내 최소 시드 하나 -> 그 홀드아웃 값
-  1.05 근처면  실력. 절차로 확정
-  1.08 근처면  선택 편향이었다
+6 new seeds -> the one in-sample minimum seed -> its holdout value
+  near 1.05  it is skill. Settled as a procedure
+  near 1.08  it was selection bias
 ```
 
-## 절차가 §10.2 를 어기지 않는 이유
+## Why the procedure does not break §10.2
 
-선택 신호가 **전부 학습 분할에서** 나온다. 하이퍼파라미터 탐색과 같은
-구조다 — 학습에서 고르고 홀드아웃에서 한 번 잰다.
+The selection signal comes **entirely from the training split**. It is the
+same structure as a hyperparameter search — choose on training, measure once
+on the holdout.
 
-## 왜 시드 사이에서만 예측이 되는가
+## Why the prediction works only between seeds
 
-아카이브 **안** 규칙들은 서로 비슷해 학습 점수 0.001 차이가 노이즈다
-(상위 10개 중 홀드아웃 최고를 골라도 1.0817 -> 1.0778 뿐이다).
-**시드가 다르면 진화 궤적 자체가 달라 품질 차이가 실재한다.**
-"아카이브 안에서 고르는 것" 과 "실행을 고르는 것" 은 다른 문제다.
+The rules **inside** an archive resemble each other, so a 0.001 difference in
+the training score is noise (even picking the holdout best out of the top 10
+only goes 1.0817 -> 1.0778). **When the seed differs, the evolutionary
+trajectory itself differs and the quality difference is real.** "Choosing
+inside an archive" and "choosing a run" are different problems.
 """
 
 from __future__ import annotations
@@ -54,9 +58,11 @@ from kernelrule.features import REGISTRY
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
-MODEL = DEFAULT_MODEL   # ★ 단일 출처 (D-45)
+MODEL = DEFAULT_MODEL   # ★ a single source (D-45)
 
-#: 앞선 두 묶음. 12시드 합산 분포에 쓴다.
+#: The two earlier sets. Used for the pooled 12-seed distribution.
+#: ⚠️ The Korean in the first run id is **a directory name** — it is not
+#: translated (D-146).
 PRIOR = [f"seedabl-desc-다-noseed-s{s}" for s in range(3)] + \
         [f"newaxes-A-base-s{s}" for s in range(3)]
 
@@ -76,14 +82,16 @@ def _setup(table):
 
 def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
          feature_detail: str = "full") -> None:
-    """⚠️ `seed_base` 는 더 이상 **LLM 시드가 아니다** (D-47).
+    """⚠️ `seed_base` is **no longer the LLM seed** (D-47).
 
-    Responses 엔드포인트에 `seed` 파라미터가 없고, 추론 모델은
-    `temperature` 도 거부한다. 따라서 **LLM 쪽 난수는 통제되지 않는다.**
-    "시드 N개" 는 이제 `LoopConfig.seed`(부모 선택 등 우리 RNG)가 다른
-    N개 실행을 뜻하고, LLM 의 비결정성은 그 위에 얹힌다.
+    The Responses endpoint has no `seed` parameter, and a reasoning model
+    refuses `temperature` too. So **the randomness on the LLM side is not
+    controlled.** "N seeds" now means N runs with a different
+    `LoopConfig.seed` (our own RNG for parent selection and so on), and the
+    LLM's non-determinism sits on top of that.
 
-    시드 폭 0.0977 의 일부가 여기서 온다 — 통제할 수 없는 부분이다.
+    Part of the seed spread 0.0977 comes from here — it is the part that
+    cannot be controlled.
     """
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
@@ -92,17 +100,18 @@ def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
     budget = Budget(max_calls=3000, max_input_tokens=60_000_000,
                     max_output_tokens=8_000_000)
     print("=" * 76)
-    print(f"시드 선택 확인 — 새 시드 {n_seeds}개  [{MODEL}]  tag={tag}")
+    print(f"seed selection check — {n_seeds} new seeds  [{MODEL}]  tag={tag}")
     print("=" * 76)
-    print(f"  조건: 씨앗 없음 + 기본 24피처 + feature_detail={feature_detail}")
-    print(f"  학습 {len(splits.train.shapes)} / 구조 홀드아웃 "
+    print(f"  the condition: no seed rule + the base 24 features + "
+          f"feature_detail={feature_detail}")
+    print(f"  training {len(splits.train.shapes)} / structural holdout "
           f"{len(splits.val.shapes)}\n")
 
     t0 = time.perf_counter()
     for s in range(n_seeds):
         run_id = f"{tag}-s{s}"
         if (Path("runs") / run_id / "archive.jsonl").exists():
-            print(f"  [{run_id}] 이미 있다. 건너뛴다")
+            print(f"  [{run_id}] already there. Skipped")
             continue
         llm = OpenAILLM(LLMConfig(model=MODEL, concurrency=6,
                                   feature_detail=feature_detail),
@@ -116,11 +125,12 @@ def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
         try:
             loop.run(12)
         except Exception as e:                              # noqa: BLE001
-            print(f"  ★ 중단: {type(e).__name__}: {str(e)[:100]}")
-        print(f"  누적 호출 {budget.calls}  {time.perf_counter() - t0:.0f}s",
+            print(f"  ★ stopped: {type(e).__name__}: {str(e)[:100]}")
+        print(f"  cumulative calls {budget.calls}  "
+              f"{time.perf_counter() - t0:.0f}s",
               flush=True)
 
-    # -- 채점 -------------------------------------------------------------
+    # -- scoring ----------------------------------------------------------
     def score(run_id: str):
         f = Path("runs") / run_id / "archive.jsonl"
         if not f.exists():
@@ -128,9 +138,11 @@ def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
         with f.open() as fh:
             arc = [json.loads(ln) for ln in fh if ln.strip()]
         if not arc:
-            # ★ 빈 아카이브는 "나쁜 실행" 이 아니라 **실행이 안 된 것**이다.
-            #   채점에서 조용히 0 으로 넣으면 분포가 오염된다 (§26.4).
-            print(f"  {run_id:16s} ⚠️ 아카이브가 비었다 — 채점에서 제외")
+            # ★ An empty archive is not "a bad run" but **a run that did not
+            #   happen**. Quietly entering it as 0 in the scoring pollutes
+            #   the distribution (§26.4).
+            print(f"  {run_id:16s} ⚠️ the archive is empty — excluded from "
+                  f"the scoring")
             return None
         best = min(arc, key=lambda e: e["regret"])
         return canonical_score(best["code"], best["w"], table=table,
@@ -141,33 +153,39 @@ def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
                  table, list(splits.val.shapes), ks=(1,))
 
     print(f"\n{'=' * 76}")
-    print(f"새 묶음 {n_seeds}시드 — ★ 표본내로 고르고 홀드아웃은 한 번만 본다")
+    print(f"the new set of {n_seeds} seeds — ★ chosen in-sample, and the "
+          f"holdout is looked at only once")
     print("=" * 76)
-    print(f"  {'실행':16s} {'표본내':>9} {'구조HO':>9}")
+    print(f"  {'run':16s} {'in-sample':>10} {'struct HO':>10}")
     new = []
     for s in range(n_seeds):
         r = score(f"{tag}-s{s}")
         if r is None:
             continue
         new.append((f"{tag}-s{s}", r.in_sample, r.holdout))
-        print(f"  {f'{tag}-s{s}':16s} {r.in_sample:9.4f} {r.holdout:9.4f}")
+        print(f"  {f'{tag}-s{s}':16s} {r.in_sample:10.4f} {r.holdout:10.4f}")
     if not new:
         return
     pick = min(new, key=lambda x: x[1])
     ho = np.array([x[2] for x in new])
-    print(f"\n  ★ 표본내 최소 시드: {pick[0]}   구조HO {pick[2]:.4f}")
-    print(f"     무작위 시드 중앙 {np.median(ho):.4f}  최악 {ho.max():.4f}")
-    print(f"     벤더 {v.at(1):.4f}   기존 묶음의 선택값 1.0518")
-    # ★ 자동 판정을 하지 않는다 (D-46, D-50). "N개 중 최소" 는 그 자체로
-    #   낙관 편향이고, 임계값은 **다른 모델의 데이터**에서 온 것이었다.
-    #   판정은 절차를 고정하고 **새 묶음**에서 재야 나온다.
-    print(f"     ⚠️ 이 값은 {len(new)}개 중 최소다 — 그 자체로 낙관 편향이다"
-          f" (D-50).\n        절차를 고정하고 **새 묶음**에서 재기 전에는"
-          f" 추정치가 아니다.")
+    print(f"\n  ★ the in-sample minimum seed: {pick[0]}   "
+          f"struct HO {pick[2]:.4f}")
+    print(f"     random-seed median {np.median(ho):.4f}  "
+          f"worst {ho.max():.4f}")
+    print(f"     vendor {v.at(1):.4f}   the earlier set's chosen value "
+          f"1.0518")
+    # ★ It does not judge automatically (D-46, D-50). "the minimum of N" is
+    #   an optimism bias in itself, and the threshold came from **another
+    #   model's data**. The judgement only comes from fixing the procedure
+    #   and measuring on **a new set**.
+    print(f"     ⚠️ this value is the minimum of {len(new)} — that is an "
+          f"optimism bias in itself (D-50).\n        Before the procedure is "
+          f"fixed and it is measured on **a new set**, it is not an estimate.")
 
-    # -- 묶음 합산 ----------------------------------------------------------
-    #    ★ **같은 모델·엔드포인트끼리만** 합친다 (D-31 의 다섯 번째 축).
-    #      PRIOR 는 gpt-5.4 + chat 이므로 luna 실행과 섞으면 안 된다.
+    # -- pooling the sets ---------------------------------------------------
+    #    ★ Only **the same model and endpoint** are pooled (the fifth axis of
+    #      D-31). PRIOR is gpt-5.4 + chat, so it must not be mixed with the
+    #      luna runs.
     import json as _json
     def _model_of(run: str) -> str:
         f = Path("runs") / run / "config.json"
@@ -177,29 +195,33 @@ def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
                 return f"{c.get('model','?')}/{c.get('endpoint','chat')}"
             except Exception:                               # noqa: BLE001
                 pass
-        # config.json 이 없던 시절 — llm_calls 에서 **모델만** 복원한다.
-        # ★ 엔드포인트는 어디에도 안 남아 있다. `/chat` 으로 단정하면
-        #   responses 실행이 chat 으로 라벨링되어 **D-31 을 어기면서
-        #   어긴 줄도 모르게 된다.** 모르면 모른다고 적는다 (§26.4).
+        # From the time before config.json — **only the model** is recovered
+        # from llm_calls.
+        # ★ The endpoint is not left anywhere. Asserting `/chat` labels a
+        #   responses run as chat and **breaks D-31 without our even knowing
+        #   it was broken.** What is unknown is written down as unknown
+        #   (§26.4).
         for g in sorted((Path("runs") / run / "llm_calls").glob("*.json"))[:1]:
             try:
                 m = _json.loads(g.read_text()).get("model", "?")
-                return f"{m}/엔드포인트미상"
+                return f"{m}/endpoint-unknown"
             except Exception:                               # noqa: BLE001
                 pass
-        return "미상"
+        return "unknown"
 
     here = _model_of(f"{tag}-s0")
     same = [r for r in PRIOR if _model_of(r) == here]
     print(f"\n{'=' * 76}")
-    print(f"묶음 합산 — ★ 같은 조건끼리만 ({here})")
+    print(f"pooling the sets — ★ only within the same condition ({here})")
     print("=" * 76)
     if not same:
-        print("  앞선 묶음은 조건이 다르다 — 합치지 않는다 (D-31).")
-        print(f"  이 묶음 {len(new)}시드만으로는 폭을 추정할 수 없다.")
+        print("  the earlier sets have a different condition — they are not "
+              "pooled (D-31).")
+        print(f"  This set of {len(new)} seeds alone cannot estimate the "
+              f"spread.")
         ho2 = sorted(x[2] for x in new)
-        print(f"  {tag} 구조HO  " + "  ".join(f"{x:.4f}" for x in ho2)
-              + f"   폭 {ho2[-1] - ho2[0]:.4f}")
+        print(f"  {tag} struct HO  " + "  ".join(f"{x:.4f}" for x in ho2)
+              + f"   width {ho2[-1] - ho2[0]:.4f}")
         return
     allr = []
     for run in same:
@@ -209,12 +231,12 @@ def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
     allr += new
     a = np.array([[x[1], x[2]] for x in allr])
     from kernelrule.features.validate import _pearson, _spearman
-    print(f"  n={len(allr)}   구조HO 중앙 {np.median(a[:, 1]):.4f}  "
-          f"최소 {a[:, 1].min():.4f}  최대 {a[:, 1].max():.4f}  "
-          f"폭 {a[:, 1].max() - a[:, 1].min():.4f}")
-    print(f"  표본내 vs 홀드아웃  스피어만 {_spearman(a[:, 0], a[:, 1]):.3f}"
-          f"  피어슨 {_pearson(a[:, 0], a[:, 1]):.3f}")
-    print(f"  전체에서 표본내 최소를 고르면: "
+    print(f"  n={len(allr)}   struct HO median {np.median(a[:, 1]):.4f}  "
+          f"min {a[:, 1].min():.4f}  max {a[:, 1].max():.4f}  "
+          f"width {a[:, 1].max() - a[:, 1].min():.4f}")
+    print(f"  in-sample vs holdout  Spearman {_spearman(a[:, 0], a[:, 1]):.3f}"
+          f"  Pearson {_pearson(a[:, 0], a[:, 1]):.3f}")
+    print(f"  picking the in-sample minimum over everything: "
           f"{min(allr, key=lambda x: x[1])[0]} "
           f"-> {min(allr, key=lambda x: x[1])[2]:.4f}")
 

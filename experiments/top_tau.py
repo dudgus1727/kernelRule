@@ -1,37 +1,45 @@
-"""★ 상위권 순위 능력 — **분해능 교락을 통제하고** 다시 잰다. LLM 0회.
+"""★ The top-rank ordering ability — measured again **with the resolution
+confound controlled**. 0 LLM calls.
 
     python3 experiments/top_tau.py
 
-## 왜 다시 재나
+## Why it is measured again
 
-`degeneracy.py` 가 참 상위 100 안의 tau-b 를 0.141 로 냈다. 실험 계획서의
-판정선은 `>= 0.30 매긴다 / <= 0.10 못 매긴다` 이므로 **0.141 은
-"가운데"** 다 — "못 매긴다" 로 쓰면 안 된다.
+`degeneracy.py` gave 0.141 for the tau-b within the true top 100. The
+pre-registration's decision line is `>= 0.30 it ranks / <= 0.10 it cannot`,
+so **0.141 is "in between"** — it must not be written down as "it cannot".
 
-그리고 **교락이 있다.**
-
-```
-참 상위 100 의 고유 시간값: 중앙 24개, ★ 10개 이하인 형상이 10/41
-A6000 눈금 1.024 µs — 상위권은 분해능이 지배한다
--> tau 가 낮은 것이 규칙 탓인지 눈금 탓인지 안 달라진다
-```
-
-## 통제
+And **there is a confound.**
 
 ```
-상위 100 의 고유 시간값이 N 개 이상인 형상에서만 tau   (N = 30, 50)
-★ 남은 형상 수를 함께 찍는다
-★ 그 부분집합의 무작위 바닥도 함께 (20뽑기 — 바닥도 표본이다, 원칙 7)
+the distinct time values in the true top 100: 24 at the median, ★ 10 or
+fewer in 10/41 shapes
+the A6000 tick is 1.024 µs — at the top the resolution dominates
+-> a low tau does not separate the rule's fault from the tick's
 ```
 
-## ★ 5090 에서도 잰다 — 거기는 교락이 훨씬 덜하다
+## The control
 
 ```
-5090 눈금 16 ns  vs  A6000 1.024 µs   (1/64)
+tau only on the shapes with N or more distinct time values in the top 100
+(N = 30, 50)
+★ the number of shapes left is printed alongside
+★ so is the random floor of that subset (20 draws — the floor is a sample
+  too, principle 7)
 ```
 
-⚠️ 표가 다르므로 **절대값이 아니라 무작위 바닥 대비**로 견준다
-(원칙 4). 정답 집합 크기도 다르다 (A6000 중앙 5 / 5090 중앙 11).
+## ★ It is measured on the 5090 too — the confound is far weaker there
+
+```
+the 5090 tick is 16 ns  vs  the A6000's 1.024 µs   (1/64)
+```
+
+⚠️ The tables differ, so the comparison is **against the random floor, not on
+absolute values** (principle 4). The answer-set size differs too (A6000
+median 5 / 5090 median 11).
+
+⚠️ 2026-09-08 (D-146): **the three block labels stay in Korean.** They are the
+top-level keys of `top-tau.json`, and `docs/` is not translated.
 """
 
 from __future__ import annotations
@@ -56,7 +64,7 @@ A6000 = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
 SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 TOP_N = 100
-MIN_UNIQ = (1, 30, 50)      # 1 = 통제 없음(정의 가능한 것만)
+MIN_UNIQ = (1, 30, 50)      # 1 = no control (only what is defined)
 N_DRAWS = 20
 
 
@@ -88,11 +96,12 @@ def _tau_top(sc, t) -> float:
 def _one(label, table, matrix, fit_shapes, eval_shapes, out: dict) -> None:
     print(f"\n{'=' * 78}\n{label}\n{'=' * 78}")
     uniq = np.array([_uniq_top(table, p) for p in eval_shapes])
-    print(f"  {len(eval_shapes)}형상   상위 {TOP_N} 의 고유 시간값: "
-          f"중앙 {int(np.median(uniq))}  범위 {uniq.min()}~{uniq.max()}")
-    print(f"  눈금 {table.noise.tick_ms} ms")
-    print(f"\n  {'구조':22s} " + "  ".join(
-        f"{'통제없음' if n == 1 else f'고유>={n}':>10}" for n in MIN_UNIQ))
+    print(f"  {len(eval_shapes)} shapes   the distinct time values in the top "
+          f"{TOP_N}: median {int(np.median(uniq))}  "
+          f"range {uniq.min()}~{uniq.max()}")
+    print(f"  the tick is {table.noise.tick_ms} ms")
+    print(f"\n  {'structure':22s} " + "  ".join(
+        f"{'no control' if n == 1 else f'uniq>={n}':>12}" for n in MIN_UNIQ))
 
     rows: dict = {}
     for run in SRC_RUNS:
@@ -119,9 +128,9 @@ def _one(label, table, matrix, fit_shapes, eval_shapes, out: dict) -> None:
             row[n] = (float(np.median(v)) if v else float("nan"), len(v))
         rows[run] = row
         print(f"  {run:22s} " + "  ".join(
-            f"{row[n][0]:10.3f}" for n in MIN_UNIQ))
+            f"{row[n][0]:12.3f}" for n in MIN_UNIQ))
 
-    # ★ 무작위 바닥 — 같은 부분집합에서, 20뽑기
+    # ★ The random floor — on the same subset, 20 draws
     rng = np.random.default_rng(0)
     floor: dict = {n: [] for n in MIN_UNIQ}
     for _ in range(N_DRAWS):
@@ -134,17 +143,17 @@ def _one(label, table, matrix, fit_shapes, eval_shapes, out: dict) -> None:
                  if u >= n and np.isfinite(taus[p.key])]
             if v:
                 floor[n].append(float(np.median(v)))
-    print(f"  {'★ 무작위 바닥':22s} " + "  ".join(
-        f"{np.mean(floor[n]):10.3f}" if floor[n] else f"{'—':>10}"
+    print(f"  {'★ random floor':22s} " + "  ".join(
+        f"{np.mean(floor[n]):12.3f}" if floor[n] else f"{'—':>12}"
         for n in MIN_UNIQ))
-    print(f"  {'남은 형상':22s} " + "  ".join(
-        f"{rows[SRC_RUNS[0]][n][1]:10d}" for n in MIN_UNIQ))
+    print(f"  {'shapes left':22s} " + "  ".join(
+        f"{rows[SRC_RUNS[0]][n][1]:12d}" for n in MIN_UNIQ))
 
     med = {n: float(np.median([rows[r][n][0] for r in SRC_RUNS
                                if np.isfinite(rows[r][n][0])]))
            for n in MIN_UNIQ}
-    print("\n  ★ 6구조 중앙: " + "   ".join(
-        f"{'통제없음' if n == 1 else f'고유>={n}'} {med[n]:.3f}"
+    print("\n  ★ the median of the 6 structures: " + "   ".join(
+        f"{'no control' if n == 1 else f'uniq>={n}'} {med[n]:.3f}"
         for n in MIN_UNIQ))
     out[label] = {"rows": {r: {str(n): rows[r][n] for n in MIN_UNIQ}
                            for r in SRC_RUNS},
@@ -166,24 +175,25 @@ def main() -> None:
     A = PerfTable.from_bundle(A6000[0], env_hash=A6000[1], ok_only=False)
     mA = FeatureMatrix(A, REGISTRY)
     spA = _splits(A)
-    # ★ 실험 계획서 조건 그대로 (학습 41) — 앞 수치와 이어진다
-    _one("A6000 학습 41형상 (실험 계획서 조건)", A, mA,
+    # ★ Exactly the pre-registration condition (the training 41) — it
+    #   continues from the earlier numbers
+    _one("A6000 학습 41형상 (사전 등록 조건)", A, mA,
          list(spA.train.shapes), list(spA.train.shapes), out)
-    # 표 사이 비교용 — 홀드아웃끼리
+    # For comparison across tables — holdout against holdout
     _one("A6000 홀드아웃 20형상", A, mA,
          list(spA.train.shapes), list(spA.val.shapes), out)
 
     B = PerfTable.from_bundle(G5090[0], env_hash=G5090[1], ok_only=False)
     mB = FeatureMatrix(B, REGISTRY)
     spB = _splits(B)
-    # ★ (b) 재적합 가중치 — 5090 학습 분할로 맞춘다
+    # ★ The (b) refit weights — fitted on the 5090 training split
     _one("5090 홀드아웃 20형상 — (b) 재적합", B, mB,
          list(spB.train.shapes), list(spB.val.shapes), out)
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
-    print("  ⚠️ 표가 다르다 — 절대값이 아니라 **무작위 바닥 대비**로 "
-          "견줘라 (원칙 4)")
+    print("  ⚠️ the tables differ — compare **against the random floor**, not "
+          "on absolute values (principle 4)")
 
 
 if __name__ == "__main__":

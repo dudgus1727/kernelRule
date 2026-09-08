@@ -1,7 +1,7 @@
 
 
 # ---------------------------------------------------------------------------
-# D-101 — 채택 기준
+# D-101 — the acceptance criterion
 # ---------------------------------------------------------------------------
 def _e(rid, regret, rank_loss=float("nan"), code_len=10, short=1.0, long=1.0):
     from kernelrule.core.archive import Elite
@@ -13,28 +13,31 @@ def _e(rid, regret, rank_loss=float("nan"), code_len=10, short=1.0, long=1.0):
 
 
 def test_archive_default_selects_by_regret():
-    """★ 기본은 regret 이다 — 지금까지의 모든 실행이 그 조건이다."""
+    """★ The default is regret — every run so far is under that
+    condition."""
     from kernelrule.core.archive import Archive
 
     a = Archive()
     assert a.select_by == "regret"
     a.consider(_e("r1", 1.10, rank_loss=0.9))
-    a.consider(_e("r2", 1.05, rank_loss=9.9))   # regret 더 좋고 rank 더 나쁨
+    a.consider(_e("r2", 1.05, rank_loss=9.9))   # better regret, worse rank
     assert a.best.rule_id == "r2"
 
 
 def test_archive_rank_mode_selects_by_rank_loss():
-    """`select_by="rank"` 면 **rank_loss** 로 고른다 (셀 축은 그대로)."""
+    """With `select_by="rank"` it selects on **rank_loss** (the cell axes
+    are unchanged)."""
     from kernelrule.core.archive import Archive
 
     a = Archive(select_by="rank")
     a.consider(_e("r1", 1.10, rank_loss=0.9))
-    a.consider(_e("r2", 1.05, rank_loss=9.9))   # regret 은 좋지만 rank 나쁨
-    assert a.best.rule_id == "r1", "regret 으로 고르고 있다"
+    a.consider(_e("r2", 1.05, rank_loss=9.9))   # good regret, bad rank
+    assert a.best.rule_id == "r1", "it is selecting on regret"
 
 
 def test_archive_rank_mode_refuses_missing_rank_loss():
-    """★ `rank_loss` 가 없으면 **조용히 regret 으로 안 떨어진다** (§26.4)."""
+    """★ Without `rank_loss` it **does not silently fall back to regret**
+    (§26.4)."""
     import pytest
 
     from kernelrule.core.archive import Archive
@@ -49,5 +52,5 @@ def test_archive_refuses_unknown_select_by():
 
     from kernelrule.core.archive import Archive
 
-    with pytest.raises(ValueError, match="채택 기준"):
+    with pytest.raises(ValueError, match="acceptance criterion"):
         Archive(select_by="nope")

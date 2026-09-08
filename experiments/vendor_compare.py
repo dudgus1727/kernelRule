@@ -1,17 +1,21 @@
-"""★ 벤더 비교 — 형상별이 주 지표다. LLM 0회.
+"""★ The vendor comparison — per shape is the main metric. 0 LLM calls.
 
     python3 experiments/vendor_compare.py
 
-## 왜 형상별인가
+## Why per shape
 
 ```
-보조   실행 6개의 부호검정.  p 하한 0.031 — 5/6 이면 p=0.22 로 아무 말도 못 한다
-★ 주   각 형상에서 6실행의 **중앙값** vs 벤더, 형상 20개 부호검정
-       p 하한 ~1e-6.  분산이 한 번만 든다 (실행 간 분산이 중앙값으로 흡수)
+secondary  a sign test over the 6 runs.  The p lower bound is 0.031 — at 5/6
+           it is p=0.22 and says nothing
+★ main     the **median** of the 6 runs at each shape vs the vendor, a sign
+           test over the 20 shapes
+           The p lower bound is ~1e-6.  The variance enters once (the
+           between-run variance is absorbed by the median)
 ```
 
-형상별이 §30.4 의 "geomean 은 소수 형상이 끈다" 문제도 피한다.
-**둘 다 보고하되 형상별이 주 지표다** (재실행 실험 계획서 §3).
+Per shape also avoids §30.4's problem that "the geomean is dragged by a few
+shapes". **Both are reported, and per shape is the main metric** (the re-run
+pre-registration §3).
 """
 
 from __future__ import annotations
@@ -38,16 +42,16 @@ from kernelrule.features.loader import extended_registry, load_generated
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
 
-#: 두 팔. `(실행 접두사, 라이브러리 만드는 법)`
+#: The two arms. `(the run prefix, how the library is built)`
 ARMS = {
-    "F1 21개": ("F1rw-p8-s",
-                "runs/F1rw-p8/stage1-features/proposals.jsonl"),
-    "사람 24개": ("F3rw-p8-s", None),
+    "F1, 21 features": ("F1rw-p8-s",
+                        "runs/F1rw-p8/stage1-features/proposals.jsonl"),
+    "human 24": ("F3rw-p8-s", None),
 }
 
 
 def _sign_test(wins: int, losses: int) -> float:
-    """양측 부호검정. 동점은 뺀다."""
+    """A two-sided sign test. Ties are dropped."""
     n = wins + losses
     if n == 0:
         return 1.0
@@ -56,10 +60,11 @@ def _sign_test(wins: int, losses: int) -> float:
 
 
 def _pick(pre: str, s: int, rnd: int | None) -> dict | None:
-    """그 실행의 규칙 하나. `rnd` 가 있으면 **그 라운드의 최고**를 쓴다.
+    """One rule from that run. If `rnd` is given it uses **the best of that
+    round**.
 
-    ★ `bests.jsonl` 이 라운드별 최고를 갖는다. `archive.jsonl` 은 **마지막
-    상태**라 중간 라운드를 못 준다 (D-139).
+    ★ `bests.jsonl` holds the best per round. `archive.jsonl` is **the final
+    state** and cannot give an intermediate round (D-139).
     """
     d = Path("runs") / f"{pre}{s}"
     if rnd is None:
@@ -68,7 +73,8 @@ def _pick(pre: str, s: int, rnd: int | None) -> dict | None:
         return min(rows, key=lambda e: e["regret"]) if rows else None
     f = d / "bests.jsonl"
     if not f.exists():
-        raise SystemExit(f"{f} 가 없다 — 라운드를 지정한 비교를 못 한다 (D-139)")
+        raise SystemExit(f"{f} does not exist — a round-pinned comparison "
+                         f"cannot be made (D-139)")
     rows = [json.loads(ln) for ln in f.open() if ln.strip()]
     at = [e for e in rows if e["round"] <= rnd]
     return max(at, key=lambda e: e["round"]) if at else None
@@ -76,11 +82,11 @@ def _pick(pre: str, s: int, rnd: int | None) -> dict | None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--arm", action="append", metavar="이름=접두[:라이브러리]",
-                    help="팔을 직접 준다. 없으면 ARMS 를 쓴다")
+    ap.add_argument("--arm", action="append", metavar="NAME=PREFIX[:LIBRARY]",
+                    help="give the arms directly. Without it, ARMS is used")
     ap.add_argument("--round", type=int, default=None,
-                    help="그 라운드에서 멈췄다면의 규칙 (bests.jsonl). "
-                         "기본은 마지막 아카이브 최고")
+                    help="the rule as if it had stopped at that round "
+                         "(bests.jsonl). The default is the last archive best")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     arms = ARMS
@@ -102,16 +108,17 @@ def main() -> None:
     train = [p for p in shapes if 11008 not in (p.N, p.K)]
     held = [p for p in shapes if 11008 in (p.N, p.K)]
 
-    # -- 벤더: 형상별 regret ---------------------------------------------
+    # -- the vendor: per-shape regret ------------------------------------
     vend = load_vendor(VENDOR)
     ev = evaluate(vendor_order_fn(table, vend, mapping="nearest"),
-                  table, held, ks=(1,), label="벤더")
+                  table, held, ks=(1,), label="vendor")
     v_by_shape = {p: float(ev.regret[i, 0]) for i, p in enumerate(ev.shapes)}
     print("=" * 78)
-    print("벤더 비교 — ★ 형상별이 주 지표")
+    print("the vendor comparison — ★ per shape is the main metric")
     print("=" * 78)
-    print(f"  구조 홀드아웃 {len(held)}형상   "
-          f"벤더 geomean {geomean(np.array(list(v_by_shape.values()))):.4f}\n")
+    print(f"  structural holdout {len(held)} shapes   "
+          f"vendor geomean "
+          f"{geomean(np.array(list(v_by_shape.values()))):.4f}\n")
 
     out_json: dict = {"bundle": BUNDLE, "round": a.round, "arms": {}}
     for tag, (pre, lib) in arms.items():
@@ -126,7 +133,8 @@ def main() -> None:
                 reg.add(REGISTRY[n])
         matrix = FeatureMatrix(table, reg)
 
-        # 실행마다 형상별 regret. 최종 채점 절차대로 **체제별로 재적합**한다.
+        # Per-shape regret per run. **Refitted per regime**, as in the final
+        # scoring procedure.
         per_run: list[dict] = []
         used: list[str] = []
         for s in range(6):
@@ -149,9 +157,9 @@ def main() -> None:
                     reg_by_shape[p] = float(e.regret[i, 0])
             per_run.append(reg_by_shape)
 
-        print(f"  실행: {used}"
-              + (f"   ★ 라운드 {a.round} 에서" if a.round is not None
-                 else "   (마지막 아카이브 최고)"))
+        print(f"  runs: {used}"
+              + (f"   ★ at round {a.round}" if a.round is not None
+                 else "   (the last archive best)"))
         out_json["arms"][tag] = {
             "runs": used,
             "per_shape_median": {str(p): float(np.median(
@@ -168,42 +176,42 @@ def main() -> None:
 
 def _report(tag, per_run, v_by_shape, held, table) -> None:
     print("=" * 78)
-    print(f"{tag}   실행 {len(per_run)}개")
+    print(f"{tag}   {len(per_run)} runs")
     print("=" * 78)
 
-    # ★ 주 지표 — 형상별 중앙값 vs 벤더
+    # ★ The main metric — the per-shape median vs the vendor
     med = {p: float(np.median([r[p] for r in per_run if p in r]))
            for p in held if any(p in r for r in per_run)}
     rows = [(p, med[p], v_by_shape[p]) for p in med if p in v_by_shape]
     w = sum(1 for _, m, v in rows if m < v - 1e-9)
     lo = sum(1 for _, m, v in rows if m > v + 1e-9)
-    print(f"  ★ 형상별  이김 {w} / 짐 {lo} / 동점 {len(rows)-w-lo}"
-          f"   부호검정 p = {_sign_test(w, lo):.2e}")
-    print(f"     geomean  우리 {geomean(np.array([m for _, m, _ in rows])):.4f}"
-          f"   벤더 {geomean(np.array([v for _, _, v in rows])):.4f}")
+    print(f"  ★ per shape  wins {w} / losses {lo} / ties {len(rows)-w-lo}"
+          f"   sign test p = {_sign_test(w, lo):.2e}")
+    print(f"     geomean  ours {geomean(np.array([m for _, m, _ in rows])):.4f}"
+          f"   vendor {geomean(np.array([v for _, _, v in rows])):.4f}")
 
-    # 보조 — 실행 6개
+    # Secondary — the 6 runs
     vg = geomean(np.array([v_by_shape[p] for p in held if p in v_by_shape]))
     runs = [geomean(np.array([r[p] for p in held if p in r])) for r in per_run]
     rw = sum(1 for x in runs if x < vg)
-    print(f"  보조 실행별  이김 {rw}/{len(runs)}"
-          f"   부호검정 p = {_sign_test(rw, len(runs)-rw):.3f}")
+    print(f"  secondary, per run  wins {rw}/{len(runs)}"
+          f"   sign test p = {_sign_test(rw, len(runs)-rw):.3f}")
 
-    # ★ 체제별 분해
-    print(f"\n  {'체제':22s} {'형상':>4} {'우리':>8} {'벤더':>8} "
-          f"{'이김/짐':>9} {'p':>9}")
-    for name, label in (("short", "빠른 (SOL<0.5ms)"),
-                        ("long", "느린 (SOL>=0.5ms)")):
+    # ★ The per-regime decomposition
+    print(f"\n  {'regime':22s} {'shapes':>7} {'ours':>8} {'vendor':>8} "
+          f"{'win/loss':>10} {'p':>9}")
+    for name, label in (("short", "fast (SOL<0.5ms)"),
+                        ("long", "slow (SOL>=0.5ms)")):
         g = [(p, m, v) for p, m, v in rows
              if regime_of(p, table.hw) == name]
         if not g:
             continue
         gw = sum(1 for _, m, v in g if m < v - 1e-9)
         gl = sum(1 for _, m, v in g if m > v + 1e-9)
-        print(f"  {label:22s} {len(g):4d} "
+        print(f"  {label:22s} {len(g):7d} "
               f"{geomean(np.array([m for _, m, _ in g])):8.4f} "
               f"{geomean(np.array([v for _, _, v in g])):8.4f} "
-              f"{gw:4d}/{gl:<4d} {_sign_test(gw, gl):9.3f}")
+              f"{gw:5d}/{gl:<4d} {_sign_test(gw, gl):9.3f}")
     print()
 
 

@@ -1,13 +1,14 @@
-"""★ 문서가 달라지지 않는가 (2026-09-03 리뷰 §4).
+"""★ Do the documents diverge (the 2026-09-03 review §4)?
 
-수치가 두 곳에 있으면 어느 것이 대표값인지 다 읽어야 안다.
-색인이 손으로 쓰인 것이면 D 하나 추가할 때마다 달라진다.
+If a number is in two places, knowing which one is representative means
+reading both. A hand-written index diverges every time one D is added.
 """
 def test_decisions_index_is_current():
-    """★ 색인은 **생성물**이다. 달라지면 실패한다 (D-115).
+    """★ The index is **a generated artefact**. If it diverges it fails
+    (D-115).
 
-    손으로 쓰면 D 하나 추가할 때마다 달라진다 — 그리고 달라진 색인은
-    "없는 것보다 나쁘다" 쪽이다.
+    Writing it by hand makes it diverge every time one D is added — and a
+    diverged index is on the "worse than none" side.
     """
     import subprocess
     import sys
@@ -21,7 +22,8 @@ def test_decisions_index_is_current():
 
 
 def test_canonical_numbers_live_in_one_place():
-    """대표값 수치는 `conclusion.md` 한 곳이다 (원칙 2)."""
+    """The representative numbers live in one place, `conclusion.md`
+    (principle 2)."""
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
@@ -30,14 +32,15 @@ def test_canonical_numbers_live_in_one_place():
     readme = (root / "README.md").read_text()
     for n in ("1.0650", "1.0737", "1.0762", "1.0797"):
         assert n not in readme, (
-            f"README 에 성능 수치 {n} 이 있다 — 대표값은 conclusion.md 다")
+            f"the performance number {n} is in the README — the "
+            f"representative values are in conclusion.md")
 
 
 def test_runs_table_is_not_stale():
-    """★ `runs.md` 가 실행 산출물과 달라지지 않았는가 (D-128).
+    """★ Has `runs.md` diverged from the run artefacts (D-128)?
 
-    표를 손으로 쓰면 달라진다 — `decisions_index.py` 와 같은 방식으로
-    **생성물**로 두고 여기서 검사한다.
+    Writing the table by hand makes it diverge — it is kept as **a generated
+    artefact**, the same way as `decisions_index.py`, and checked here.
     """
     import subprocess
     import sys
@@ -50,10 +53,11 @@ def test_runs_table_is_not_stale():
 
 
 def test_trace_column_flags_missing_release(tmp_path, monkeypatch):
-    """★ 트레이스가 있는데 릴리즈가 없으면 표가 그렇게 적는다 (D-138).
+    """★ If there is a trace but no release, the table says so (D-138).
 
-    `runs.md` 의 `트레이스` 열은 대장(`trace-releases.json`) **하나만**
-    읽는다 — `gh` 를 부르면 시험이 네트워크를 탄다 (원칙 2).
+    The `트레이스` column of `runs.md` reads **only** the ledger
+    (`trace-releases.json`) — calling `gh` would put the test on the network
+    (principle 2).
     """
     import json
     import sys
@@ -75,13 +79,13 @@ def test_trace_column_flags_missing_release(tmp_path, monkeypatch):
     man.write_text(json.dumps({"ZZfake-p8": {"release": "trace-ZZ-abc1234"}}))
     assert rt._trace("ZZfake-p8", ["ZZfake-p8-s0"]) == "trace-ZZ-abc1234"
 
-    # 트레이스가 없으면 빈칸이다 — "미업로드" 가 아니다
+    # With no trace it is blank — not "★ 미업로드"
     (run / "trace.jsonl").unlink()
     assert rt._trace("ZZfake-p8", ["ZZfake-p8-s0"]) == ""
 
 
 def test_live_tags_uses_mtime_only(tmp_path, monkeypatch):
-    """★ '도는 중' 은 mtime 으로만 정한다 — 추측하지 않는다 (D-137)."""
+    """★ 'running' is decided by mtime alone — it is not guessed (D-137)."""
     import os
     import sys
     import time

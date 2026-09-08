@@ -1,9 +1,10 @@
-"""★ 묶음의 **조건 동일성** (D-120).
+"""★ The **condition sameness** of a run set (D-120).
 
 ```
-D-113   arch_prompt 가 config.json 에 있었고 안 읽었다
-D-119   씨앗 source 가 chosen.json 에 있었고 안 읽었다
-★ 원칙 39 가 생긴 지 하루 만에 두 번째다 — 그래서 검사로 만들었다
+D-113   arch_prompt was in config.json and was not read
+D-119   the seed source was in chosen.json and was not read
+★ it is the second time within a day of principle 39 being written — so it
+  was made into a check
 ```
 """
 from __future__ import annotations
@@ -24,7 +25,8 @@ from kernelrule.core.runset import (
 def _mk(root, run, *, source="rule_writer-try00", code="def score(): ...",
         objective="regret", budget=8, model="m", campaign=None,
         fit_method=None, fit_restarts=None):
-    """`fit_method=None` 이면 **키 자체를 안 쓴다** — 옛 실행의 모양이다."""
+    """With `fit_method=None` **the key itself is not written** — that is the
+    shape of an old run."""
     d = root / run
     (d).mkdir(parents=True, exist_ok=True)
     loop = {"objective": objective, "rank_top_k": 100,
@@ -55,14 +57,14 @@ def test_same_condition_passes(tmp_path):
 
 
 def test_mixed_seed_source_fails(tmp_path):
-    """★ D-119 가 정확히 이것이었다."""
+    """★ D-119 was exactly this."""
     for i in range(3):
         _mk(tmp_path, f"a-s{i}")
     for i in range(3):
         _mk(tmp_path, f"b-s{i}", source="human_guided", code="other")
     runs = [f"a-s{i}" for i in range(3)] + [f"b-s{i}" for i in range(3)]
     with pytest.raises(RunSetError, match="seed_source"):
-        assert_same_condition(runs, root=tmp_path, label="(c) 재생성")
+        assert_same_condition(runs, root=tmp_path, label="(c) regrow")
 
 
 def test_mixed_objective_fails(tmp_path):
@@ -73,8 +75,10 @@ def test_mixed_objective_fails(tmp_path):
 
 
 def test_mixed_seed_code_fails_even_with_same_source(tmp_path):
-    """출처 이름이 같아도 **코드가 다르면** 다른 씨앗이다."""
-    # ★ 캠페인이 둘이다 — 씨앗은 캠페인 단위이므로 이렇게 해야 달라진다
+    """Even with the same source name, **a different code** is a different
+    seed."""
+    # ★ There are two campaigns — the seed is per campaign, so this is what
+    #   makes it differ
     _mk(tmp_path, "d0-s0")
     _mk(tmp_path, "d1-s0", code="def score(): pass")
     with pytest.raises(RunSetError, match="seed_sha"):
@@ -82,7 +86,7 @@ def test_mixed_seed_code_fails_even_with_same_source(tmp_path):
 
 
 def test_missing_config_is_an_error_not_a_pass(tmp_path):
-    """★ 없는 것을 통과로 처리하면 검사가 조용히 0 이 된다."""
+    """★ Treating what is absent as a pass makes the check silently 0."""
     _mk(tmp_path, "e-s0")
     with pytest.raises(RunSetError, match="config.json"):
         assert_same_condition(["e-s0", "e-s9"], root=tmp_path)
@@ -102,34 +106,35 @@ def test_report_lists_observed_values(tmp_path):
 
 
 def test_real_c_arms_are_clean_and_the_recorded_six_are_not():
-    """★ 진짜 실행으로 확인한다 — 되돌려서 잡는지 (원칙 38)."""
+    """★ Confirmed with a real run — does it catch it when turned back
+    (principle 38)."""
     from pathlib import Path
 
     ok = [f"x-hwold-5090sigma-s{i}" for i in range(3)]
     if not all((Path("runs") / r / "config.json").exists() for r in ok):
-        pytest.skip("5090 실행 없음")
+        pytest.skip("no 5090 run")
     assert_same_condition(ok, label="(c)")
     mixed = ok + [f"x-hand-5090sigma-b-s{i}" for i in range(3)]
     with pytest.raises(RunSetError, match="human_guided"):
-        assert_same_condition(mixed, label="기록된 (c) 여섯")
+        assert_same_condition(mixed, label="the recorded (c), six of them")
 
 
 def test_run_condition_reads_the_hardware_prompt_identity():
-    """D-113 의 자리 — hw 가 조건으로 잡히는가."""
+    """The D-113 spot — is hw caught as a condition."""
     from pathlib import Path
 
     r = "x-hwmid-5090sigma-hw-s0"
     if not (Path("runs") / r / "config.json").exists():
-        pytest.skip("실행 없음")
+        pytest.skip("no run")
     assert run_condition(r)["hw"] is not None
 
 
 # ---------------------------------------------------------------------------
-# ★ 적합기 조건 (D-123)
+# ★ The fitter condition (D-123)
 # ---------------------------------------------------------------------------
 def test_old_run_without_fit_method_reads_as_nelder_mead(tmp_path):
-    """★ 옛 실행에는 키가 없다. **없음 = nelder-mead** 다 — 그때 코드가
-    그것뿐이었다. 봐주는 것이 아니라 사실을 채우는 것이다.
+    """★ An old run has no key. **Absent = nelder-mead** — that was all the
+    code had at the time. It is not being lenient, it is filling in a fact.
     """
     _mk(tmp_path, "old-s0")
     assert run_condition("old-s0", tmp_path)["fit_method"] == "nelder-mead"
@@ -137,7 +142,8 @@ def test_old_run_without_fit_method_reads_as_nelder_mead(tmp_path):
 
 
 def test_old_run_groups_with_an_explicit_nelder_mead_run(tmp_path):
-    """옛 실행과 `fit_method="nelder-mead"` 를 적은 실행은 **같은 조건**이다."""
+    """An old run and a run that wrote `fit_method="nelder-mead"` are **the
+    same condition**."""
     _mk(tmp_path, "camp-s0")
     _mk(tmp_path, "camp-s1", fit_method="nelder-mead", fit_restarts=4)
     got = assert_same_condition(["camp-s0", "camp-s1"], root=tmp_path)
@@ -145,10 +151,11 @@ def test_old_run_groups_with_an_explicit_nelder_mead_run(tmp_path):
 
 
 def test_mixed_fitter_fails(tmp_path):
-    """★ CMA 실행과 옛 실행을 한 묶음에 넣으면 실패한다 (D-123).
+    """★ Putting a CMA run and an old run in one set fails (D-123).
 
-    §3 에서 예산 8 팔과 16 팔을 같은 적합기로 돌려야 하고, 옛 기준선
-    (1.0762)은 다른 적합기다 — 나란히 놓으면 여기서 걸린다.
+    In §3 the budget-8 and budget-16 arms have to run with the same fitter,
+    and the old baseline (1.0762) is a different fitter — putting them side
+    by side is caught here.
     """
     _mk(tmp_path, "camp-s0", fit_method="cma", fit_restarts=1)
     _mk(tmp_path, "camp-s1")
@@ -157,7 +164,8 @@ def test_mixed_fitter_fails(tmp_path):
 
 
 def test_same_method_but_different_restarts_fails(tmp_path):
-    """재시작 수도 조건이다 — CMA 는 1, Nelder-Mead 는 4 다."""
+    """The number of restarts is a condition too — CMA is 1, Nelder-Mead
+    is 4."""
     _mk(tmp_path, "camp-s0", fit_method="cma", fit_restarts=1)
     _mk(tmp_path, "camp-s1", fit_method="cma", fit_restarts=4)
     with pytest.raises(RunSetError, match="fit_restarts"):

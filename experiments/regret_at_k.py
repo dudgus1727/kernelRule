@@ -1,21 +1,28 @@
-"""★ `regret@k` — 벽이 **지표**가 만든 것인가. LLM 0회.
+"""★ `regret@k` — is the wall made by **the metric**? 0 LLM calls.
 
     python3 experiments/regret_at_k.py
 
-실험 계획서 `docs/artifacts/regret-at-k-prereg.md`.
+The pre-registration is `docs/artifacts/regret-at-k-prereg.md`.
 
-## 왜
+## Why
 
-순위 손실은 **노이즈로 못 가르는 쌍을 뺀다.** `tau` 는 안 뺀다 —
-`kendalltau(variant="b")` 는 시간이 **정확히 같을 때만** 동률로 본다.
-홀드아웃 상위 100 에서 못 가르는 쌍이 47.2% 인데 tau 가 동률로 보는 것은
-14.8% 뿐이다. **32.4% 가 없는 순서를 채점당한다.**
+The rank loss **drops the pairs the noise cannot separate.** `tau` does not —
+`kendalltau(variant="b")` treats them as tied **only when the times are
+exactly equal**. In the holdout's top 100, 47.2% of pairs are unresolvable
+while tau treats only 14.8% as tied. **32.4% get scored on an order that does
+not exist.**
 
 ```
-regret@k = (규칙이 고른 상위 k 의 참 시간 평균) / (참 상위 k 의 평균)
+regret@k = (the mean true time of the top k the rule picked)
+           / (the mean of the true top k)
 ```
 
-평균이라 노이즈에 강하고, 38등을 36등으로 예측해도 거의 안 벌받는다.
+It is a mean, so it is robust to noise, and predicting 38th place as 36th is
+barely punished.
+
+⚠️ 2026-09-08 (D-146): **the arm labels stay in Korean.** They are the row
+names of `docs/artifacts/regret-at-k.md` and the keys of
+`regret-at-k.json`, and `docs/` is not translated.
 """
 
 from __future__ import annotations
@@ -41,7 +48,8 @@ TOP_N = 100
 N_DRAWS = 20
 CATASTROPHE = 1.15
 
-#: (라벨, 실행들, 아카이브 선택 기준, 가중치 적합 목적함수, k, λ)
+#: (label, the runs, the archive selection criterion, the weight-fitting
+#: objective, k, λ)
 ARMS: list[tuple] = [
     ("regret 구조+regret w", [f"F3rw-p8-s{i}" for i in range(6)],
      "regret", "regret", 100, 0.0),
@@ -75,11 +83,12 @@ def _best(run: str, by: str) -> dict:
 
 
 def _noise_ranks(t: np.ndarray, noise) -> np.ndarray:
-    """★ 노이즈 안을 **동률로 묶은** 참 순위.
+    """★ The true ranks with **everything inside the noise tied together**.
 
-    시간 오름차순으로 훑으며 `resolvable(그룹 첫 원소, t)` 가 True 가
-    되면 새 그룹을 연다 (단일 연결). **바닥을 새로 정의하지 않는다** —
-    `NoiseModel.resolvable` 을 그대로 쓴다 (원칙 2).
+    It sweeps in ascending time and opens a new group when
+    `resolvable(the group's first element, t)` becomes True (single linkage).
+    **It does not redefine the floor** — it uses `NoiseModel.resolvable` as
+    it is (principle 2).
     """
     order = np.argsort(t, kind="stable")
     out = np.empty(len(t), dtype=np.float64)
@@ -93,7 +102,7 @@ def _noise_ranks(t: np.ndarray, noise) -> np.ndarray:
 
 
 def _measure(fn, ws, table, matrix, shapes) -> dict:
-    """형상별 regret@k / tau 둘 / 파국 목록."""
+    """The per-shape regret@k / both taus / the catastrophe list."""
     rk = {k: [] for k in KS}
     tau_raw, tau_noise, per_shape1 = [], [], {}
     for p in shapes:
@@ -125,7 +134,8 @@ def _measure(fn, ws, table, matrix, shapes) -> dict:
 
 
 def _floor(table, matrix, shapes, rng) -> dict:
-    """★ 무작위 바닥 (20뽑기 평균). 바닥도 표본이다 (원칙 7)."""
+    """★ The random floor (the mean of 20 draws). The floor is a sample too
+    (principle 7)."""
     acc = {k: [] for k in KS}
     for _ in range(N_DRAWS):
         one = {k: [] for k in KS}
@@ -146,7 +156,8 @@ def _row(label: str, vals: list[dict]) -> None:
     a = np.array([[v["regret_at_k"][k] for k in KS] for v in vals])
     print(f"  {label:20s} " + " ".join(
         f"{m:6.3f}" for m in np.median(a, axis=0)))
-    # ★ 판정은 **시드 범위**로 한다 (실험 계획서 §5). 잘라 쓰면 못 읽는다.
+    # ★ The judgement is made by **the seed range** (pre-registration §5).
+    #   Trimming it makes it unreadable.
     print(f"  {'':20s} " + " ".join(
         f"{a[:, i].min():.2f}-{a[:, i].max():.2f}" for i in range(len(KS))))
 
@@ -164,7 +175,7 @@ def main() -> None:
     out: dict = {"ks": list(KS), "n_holdout": len(hold)}
 
     print("=" * 92)
-    print("§1  지금 tau 가 노이즈를 어떻게 다루나 — 홀드아웃 20형상")
+    print("§1  how tau treats the noise as it stands — the 20 holdout shapes")
     print("=" * 92)
     tot = res = eq = 0
     for p in hold:
@@ -173,22 +184,25 @@ def main() -> None:
         tot += iu.size
         res += int(T.noise.resolvable(t[iu], t[ju]).sum())
         eq += int((t[iu] == t[ju]).sum())
-    print(f"  상위 100 안의 쌍 {tot:,}")
-    print(f"    노이즈로 못 가르는 쌍   {tot - res:,} ({1 - res / tot:.1%})")
-    print(f"    tau-b 가 동률로 보는 쌍 {eq:,} ({eq / tot:.1%})  "
-          "← 시간이 정확히 같은 것만")
-    print(f"  ★ 차이 {(tot - res - eq) / tot:.1%} 가 **없는 순서를 채점당한다**")
+    print(f"  pairs within the top 100: {tot:,}")
+    print(f"    pairs the noise cannot separate {tot - res:,} "
+          f"({1 - res / tot:.1%})")
+    print(f"    pairs tau-b treats as tied      {eq:,} ({eq / tot:.1%})  "
+          "← only those with exactly equal times")
+    print(f"  ★ the difference, {(tot - res - eq) / tot:.1%}, **gets scored "
+          f"on an order that does not exist**")
     out["pairs"] = {"total": tot, "unresolvable": tot - res, "tied": eq}
 
     print("\n" + "=" * 92)
-    print("§2  regret@k — 전부 홀드아웃 20형상. 위=중앙 아래=시드 범위")
+    print("§2  regret@k — all on the 20 holdout shapes. Top=median, "
+          "bottom=seed range")
     print("=" * 92)
     print(f"  {'':20s} " + " ".join(f"{'k=' + str(k):>6}" for k in KS)
-          + "\n" + f"  {'':20s} " + " ".join(f"{'(범위)':>9}" for _ in KS))
+          + "\n" + f"  {'':20s} " + " ".join(f"{'(range)':>9}" for _ in KS))
     rows: dict[str, list[dict]] = {}
     for label, runs, by, obj, k, lam in ARMS:
         if not all((Path("runs") / r / "archive.jsonl").exists() for r in runs):
-            print(f"  {label:20s} (실행 없음 — 건너뜀)")
+            print(f"  {label:20s} (no such run — skipped)")
             continue
         vals = []
         for r in runs:
@@ -199,15 +213,17 @@ def main() -> None:
         rows[label] = vals
         _row(label, vals)
     fl = _floor(T, M, hold, np.random.default_rng(0))
-    print(f"  {'★ 무작위 바닥':20s} " + " ".join(f"{fl[k]:6.3f}" for k in KS))
+    print(f"  {'★ random floor':20s} " + " ".join(f"{fl[k]:6.3f}" for k in KS))
     out["floor"] = {str(k): v for k, v in fl.items()}
     out["arms"] = {lab: [v["regret_at_k"] for v in vs]
                    for lab, vs in rows.items()}
 
     print("\n" + "=" * 92)
-    print("§3  (a) 형상별 regret@1 — 파국(>1.15)이 어디서 오나")
+    print("§3  (a) per-shape regret@1 — where the catastrophes (>1.15) come "
+          "from")
     print("=" * 92)
-    print(f"  {'':22s} {'파국 형상 (중앙/20)':>18}  시드 범위   합집합")
+    print(f"  {'':22s} {'catastrophic shapes (median/20)':>32}  seed range"
+          f"   union")
     cat: dict[str, set] = {}
     for label, vs in rows.items():
         sets = [{s for s, v in x["per_shape_r1"].items() if v > CATASTROPHE}
@@ -215,25 +231,27 @@ def main() -> None:
         allc = set().union(*sets)
         cat[label] = allc
         ns = [len(s) for s in sets]
-        print(f"  {label:22s} {np.median(ns):18.1f}  {min(ns):2d}~{max(ns):-2d}"
+        print(f"  {label:22s} {np.median(ns):32.1f}  "
+              f"{min(ns):2d}~{max(ns):-2d}"
               f"      {len(allc):2d}")
     if cat:
         common = set.intersection(*[c for c in cat.values() if c]) \
             if all(cat.values()) else set()
         allu = set().union(*cat.values())
-        print(f"\n  ★ 모든 팔에서 파국인 형상 {len(common)}개 / "
-              f"어느 팔에서든 파국인 형상 {len(allu)}개")
-        print("  -> " + ("형상의 성질에 가깝다" if len(common) >= 0.5 * len(allu)
-                         else "규칙의 성질에 가깝다"))
-        print("  ⚠️ 순위 팔은 20형상 중 13~17개가 파국이다 — **몇 형상에 "
-              "몰린 것이 아니다.**")
+        print(f"\n  ★ shapes catastrophic in every arm: {len(common)} / "
+              f"shapes catastrophic in any arm: {len(allu)}")
+        print("  -> " + ("closer to a property of the shape"
+                         if len(common) >= 0.5 * len(allu)
+                         else "closer to a property of the rule"))
+        print("  ⚠️ the rank arms have 13~17 of the 20 shapes catastrophic — "
+              "**it is not concentrated in a few shapes.**")
         out["catastrophe"] = {"per_arm": {k: sorted(v) for k, v in cat.items()},
                               "common": sorted(common), "any": sorted(allu)}
 
     print("\n" + "=" * 92)
-    print("§4  (b) 노이즈 인식 tau — 옛 tau 와 나란히")
+    print("§4  (b) the noise-aware tau — beside the old tau")
     print("=" * 92)
-    print(f"  {'':22s} {'옛 tau':>9} {'노이즈 인식':>12} {'차이':>8}")
+    print(f"  {'':22s} {'old tau':>9} {'noise-aware':>12} {'diff':>8}")
     for label, vs in rows.items():
         r = float(np.median([v["tau_raw"] for v in vs]))
         n = float(np.median([v["tau_noise"] for v in vs]))
@@ -242,7 +260,8 @@ def main() -> None:
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
-    print("  ⚠️ 3·6시드는 유의성을 못 낸다 — 시드 범위로 읽는다 (원칙 27)")
+    print("  ⚠️ 3 and 6 seeds cannot give significance — it is read by the "
+          "seed range (principle 27)")
 
 
 if __name__ == "__main__":

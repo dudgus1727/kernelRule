@@ -1,6 +1,7 @@
-"""★ 정답 누출 방어 (§3, §22.5, §30.7).
+"""★ The answer-leak defences (§3, §22.5, §30.7).
 
-이 모듈이 스킵되면 `conftest.py` 의 감시가 세션을 실패시킨다 (§26.3).
+If this module is skipped, `conftest.py`'s watchdog fails the session
+(§26.3).
 """
 from __future__ import annotations
 
@@ -18,24 +19,27 @@ from kernelrule.core.types import CandidateSet, Config, Hardware, Problem
 ANSWERISH = ("time", "ms", "difficulty", "cublas", "tflops", "regret",
              "outlier", "distinct", "peak", "elapsed")
 
-#: 이름은 정답처럼 보이지만 **측정 조건 상수**인 것들. 측정 전에 정해지고
-#: 표 전체에서 값이 하나다. 아래 테스트가 "정말로 상수인가" 를 검사하므로
-#: 이 목록은 단순 화이트리스트가 아니다 — 어긋나면 걸린다.
+#: Names that look like answers but are **measurement-condition
+#: constants**. They are fixed before measurement and have a single value
+#: across the table. The test below checks "is it really constant", so this
+#: is not a plain whitelist — a mismatch is caught.
 SAFE_CONDITION_COLS = {"peak_tflops_used", "locked_mhz", "ridge_point",
                        "ridge_point_spec", "build_seconds"}
 
 
 # ---------------------------------------------------------------------------
-# 1. 자료구조 수준 — 규칙이 손댈 수 있는 객체에 시간이 없다 (§3.3)
+# 1. At the data-structure level — the objects a rule can touch have no
+#    times (§3.3)
 # ---------------------------------------------------------------------------
 def test_rule_facing_types_have_no_time_field():
-    """`Problem` / `Config` / `CandidateSet` 어디에도 측정 시간이 없다."""
+    """Nowhere in `Problem` / `Config` / `CandidateSet` is there a measured
+    time."""
     for cls in (Problem, Config, CandidateSet):
         names = [f.name for f in dataclasses.fields(cls)]
         bad = [n for n in names
                if any(k in n.lower() for k in ("time", "cublas", "difficulty",
                                                "regret", "tflops"))]
-        assert not bad, f"{cls.__name__} 에 정답스러운 필드: {bad}"
+        assert not bad, f"answer-like fields on {cls.__name__}: {bad}"
 
 
 def test_hardware_has_no_measurement():
@@ -44,25 +48,28 @@ def test_hardware_has_no_measurement():
 
 
 def test_candidate_set_cannot_reach_times(synth_table):
-    """★ `CandidateSet` 으로는 시간에 도달할 수 없다.
+    """★ The times cannot be reached through `CandidateSet`.
 
-    `sorted(..., key=lambda c: (score, time))` 을 쓰려면 없는 속성이 필요하다.
+    Writing `sorted(..., key=lambda c: (score, time))` requires an attribute
+    that does not exist.
     """
     p = synth_table.shapes()[0]
     cand = synth_table.candidates(p)
     for attr in ("time_ms", "time", "times", "best_time", "difficulty"):
-        assert not hasattr(cand, attr), f"CandidateSet.{attr} 가 존재한다"
+        assert not hasattr(cand, attr), f"CandidateSet.{attr} exists"
 
 
 def test_order_fn_signature_excludes_the_table():
-    """채점기가 규칙에 넘기는 인자가 `(Problem, CandidateSet)` 뿐이다."""
+    """The scorer passes a rule only `(Problem, CandidateSet)`."""
     src = inspect.getsource(evaluate)
-    assert "order_fn(p, cand)" in src, \
-        "order_fn 호출 인자가 바뀌었다 — 표나 시간이 넘어가지 않는지 확인하라"
+    assert "order_fn(p, cand)" in src, (
+        "the order_fn call arguments changed — check that no table or time "
+        "is being passed")
 
 
 def test_times_of_is_read_only(synth_table):
-    """채점기가 받는 시간 배열도 쓰기 금지다. 실수로 손대는 것을 막는다."""
+    """The time array the scorer receives is read-only too. It blocks
+    touching it by accident."""
     p = synth_table.shapes()[0]
     t = synth_table.times_of(p)
     with pytest.raises(ValueError):
@@ -70,11 +77,12 @@ def test_times_of_is_read_only(synth_table):
 
 
 def test_perftable_has_no_best_config():
-    """★ "형상별 최적 config" 를 제공하지 않는다.
+    """★ It does not provide "the optimal config per shape".
 
-    이 표에서 66형상 중 29개가 최적시간에 **정확한 동점**이고 최대 84중
-    동점이다. 그러면 "최적 config" 는 tie-break 규칙의 함수이지 물리적
-    사실이 아니다. 정의 가능한 것은 `best_time` 과 `answer_mask` 뿐이다.
+    In this table, 29 of 66 shapes have an **exact tie** at the best time,
+    with up to 84 tied. Then "the optimal config" is a function of the
+    tie-break rule, not a physical fact. What can be defined is only
+    `best_time` and `answer_mask`.
     """
     from kernelrule.core.table import PerfTable
     assert not hasattr(PerfTable, "best_config")
@@ -82,13 +90,14 @@ def test_perftable_has_no_best_config():
 
 
 # ---------------------------------------------------------------------------
-# 2. tie-break 가 정답을 보지 않는다 (§30.7)
+# 2. The tie-break does not look at the answer (§30.7)
 # ---------------------------------------------------------------------------
 def test_constant_score_gives_random_performance(synth_table):
-    """★ 모든 config 의 점수를 상수로 만들면 regret 이 무작위 선택과 동등해야 한다.
+    """★ With every config scored the same, regret must equal that of a
+    random pick.
 
-    좋게 나오면 tie-break 가 정답을 본다. kernelTab 베이스라인 실험에서
-    실제로 발생한 버그다 (§30.7).
+    If it comes out better, the tie-break is looking at the answer. It is a
+    bug that really occurred in kernelTab's baseline experiment (§30.7).
     """
     ev = evaluate(constant_score_order, synth_table, ks=(1,), label="constant")
     got = ev.at(1)
@@ -101,15 +110,16 @@ def test_constant_score_gives_random_performance(synth_table):
         draws.append(evaluate(rnd, synth_table, ks=(1,)).at(1))
     lo, hi = float(np.min(draws)), float(np.max(draws))
     assert lo * 0.7 <= got <= hi * 1.3, (
-        f"상수 점수 regret {got:.3f} 이 무작위 범위 [{lo:.3f}, {hi:.3f}] 밖이다 — "
-        "tie-break 가 정답을 보고 있다")
+        f"the constant-score regret {got:.3f} is outside the random range "
+        f"[{lo:.3f}, {hi:.3f}] — the tie-break is looking at the answer")
 
 
 def test_tiebreak_is_independent_of_row_order(synth_table):
-    """tie-break 가 **표의 행 순서**에 의존하지 않는다.
+    """The tie-break does not depend on **the table's row order**.
 
-    `groupby.idxmin()` 은 행 순서에 의존한다. 실제로 그 때문에 "형상별 최적
-    config" 의 축 분포가 절차마다 달라지는 것을 확인했다.
+    `groupby.idxmin()` does depend on row order. That really did make the
+    axis distribution of "the optimal config per shape" differ per
+    procedure.
     """
     from kernelrule.core.types import make_tiebreak
 
@@ -118,27 +128,30 @@ def test_tiebreak_is_independent_of_row_order(synth_table):
     perm = np.random.default_rng(3).permutation(c.n)
     tb2 = make_tiebreak(c.kernel_id[perm], c.split_k[perm],
                         c.split_k_mode[perm])
-    # 같은 config 는 섞여도 같은 상대 순위를 갖는다
+    # The same config keeps the same relative rank under shuffling
     assert np.array_equal(np.argsort(c.tiebreak[perm]), np.argsort(tb2))
 
 
 def test_order_by_rejects_nonfinite_scores(synth_table):
-    """nan 을 뒤로 미루고 조용히 진행하지 않는다. 규칙이 망가진 것이다."""
+    """It does not push nan to the back and carry on silently. The rule is
+    broken."""
     p = synth_table.shapes()[0]
     c = synth_table.candidates(p)
     s = np.zeros(c.n)
     s[3] = np.nan
-    with pytest.raises(ValueError, match="비유한"):
+    with pytest.raises(ValueError, match="non-finite"):
         c.order_by(s)
 
 
 # ---------------------------------------------------------------------------
-# 3. ★ null 프리셋 — 유일한 자동 누출 탐지기 (§22.5)
+# 3. ★ The null preset — the only automatic leak detector (§22.5)
 # ---------------------------------------------------------------------------
 def test_null_preset_gives_no_improvement(null_table):
-    """★ config 가 성능과 무관한 표에서 **어떤 규칙도 1.0 을 크게 밑돌 수 없다.**
+    """★ On a table where the config is unrelated to performance, **no rule
+    can fall well below 1.0.**
 
-    밑돌면 어딘가에서 정답이 새고 있다. 이것이 가장 중요한 테스트다.
+    If one does, the answer is leaking somewhere. This is the most important
+    test.
     """
     orders = {
         "constant": constant_score_order,
@@ -149,23 +162,26 @@ def test_null_preset_gives_no_improvement(null_table):
     for name, fn in orders.items():
         ev = evaluate(fn, null_table, ks=(1,), label=name)
         assert ev.at(1) >= 0.999, (
-            f"{name}: null 표에서 regret {ev.at(1):.4f} < 1.0 — 정답이 새고 있다")
+            f"{name}: regret {ev.at(1):.4f} < 1.0 on the null table — the "
+            f"answer is leaking")
 
 
 def test_null_preset_difficulty_is_near_one(null_table):
-    """null 표에서는 난이도가 1 근처여야 한다 (§22.5)."""
+    """On the null table the difficulty must be near 1 (§22.5)."""
     d = np.array([s.difficulty for s in null_table.all_stats()])
-    assert d.max() < 1.15, f"null 표의 난이도가 {d.max():.3f} — 구조가 남아 있다"
+    assert d.max() < 1.15, (
+        f"the null table's difficulty is {d.max():.3f} — structure remains")
 
 
 def test_null_preset_best_equals_typical(null_table):
-    """null 표에서 최적과 중앙값의 차이는 노이즈뿐이다."""
+    """On the null table the gap between the best and the median is noise
+    alone."""
     for s in null_table.all_stats():
         assert s.difficulty - 1.0 < 4.0 * s.noise_floor + 0.1
 
 
 # ---------------------------------------------------------------------------
-# 4. 로더 계약 (§3.2)
+# 4. The loader contract (§3.2)
 # ---------------------------------------------------------------------------
 def test_ranking_loader_has_no_answers(real_bundle_path):
     from kerneltab.core.bundle import load_bundle
@@ -180,7 +196,8 @@ def test_ranking_loader_has_no_answers(real_bundle_path):
 
 
 def test_perftable_feature_frame_has_no_answers(synth_table):
-    """`PerfTable.frame_for` 는 피처만 준다 — 피처 행렬의 입력이다."""
+    """`PerfTable.frame_for` gives only features — it is the feature
+    matrix's input."""
     from kerneltab.core.table import ANSWER_COLS, OUTCOME_COLS
 
     p = synth_table.shapes()[0]
@@ -191,18 +208,22 @@ def test_perftable_feature_frame_has_no_answers(synth_table):
                      if any(k in c.lower() for k in ANSWERISH))
     unexplained = [c for c in suspect if c not in SAFE_CONDITION_COLS]
     assert not unexplained, (
-        f"규칙 입력에 정답스러운 컬럼이 있다: {unexplained}. "
-        "측정 조건 상수라면 SAFE_CONDITION_COLS 에 넣고 이유를 적어라.")
-    # 조건 상수라고 주장한 것이 **정말로 상수인지** 확인한다.
+        f"there is an answer-like column in the rule input: {unexplained}. "
+        f"If it is a measurement-condition constant, put it in "
+        f"SAFE_CONDITION_COLS and write down why.")
+    # It checks that what is claimed to be a condition constant **really is
+    # constant**.
     df = synth_table.frame_for(p)
     for c in suspect:
         assert df[c].nunique(dropna=False) == 1, (
-            f"{c!r} 는 측정 조건 상수로 분류돼 있는데 형상 안에서 "
-            f"{df[c].nunique()}개 값을 갖는다 — 정답에서 유도된 값일 수 있다.")
+            f"{c!r} is classified as a measurement-condition constant yet "
+            f"takes {df[c].nunique()} values within a shape — it may be "
+            f"derived from the answer.")
 
 
 def test_env_hash_is_required(real_bundle_path):
-    """`env_hash` 는 조인 키가 아니라 격리 경계다. 기본값이 없다 (§3.4)."""
+    """`env_hash` is not a join key but an isolation boundary. It has no
+    default (§3.4)."""
     from kernelrule.core.table import PerfTable
 
     sig = inspect.signature(PerfTable.from_bundle)
@@ -214,17 +235,20 @@ def test_env_hash_is_required(real_bundle_path):
 
 
 # ---------------------------------------------------------------------------
-# 피처 함수가 받는 프레임에 정답이 없는가 (§3 5번째 겹)
+# Does the frame a feature function receives contain no answers (the 5th
+# layer of §3)
 # ---------------------------------------------------------------------------
-# `FeatureMatrix` 는 `table.frame_for(p)` 를 피처 함수에 그대로 넘긴다.
-# 그 프레임이 정답을 담고 있으면 **피처가 측정 시간을 볼 수 있다.**
+# `FeatureMatrix` passes `table.frame_for(p)` to the feature function as it
+# is. If that frame contains the answers, **a feature can see the measured
+# times.**
 #
-# 지금 24개는 사람이 썼으니 안 쓰지만, **FeatureWriter 가 만든 피처는
-# 다르다** — 그쪽은 우리가 안 본 코드다. 구조로 막혀 있어야 한다.
+# Today's 24 were written by a human so they do not use them, but **the
+# features the FeatureWriter builds are different** — that is code we have
+# not seen. It has to be blocked structurally.
 
 @pytest.mark.needs_bundle
 def test_feature_frame_has_no_answer_column(real_bundle_path):
-    """★ `frame_for` 가 `ANSWER_COLS` 를 한 칸도 담지 않는다."""
+    """★ `frame_for` contains not one cell of `ANSWER_COLS`."""
     from kerneltab.core.table import ANSWER_COLS
 
     from kernelrule.core.table import PerfTable
@@ -233,16 +257,18 @@ def test_feature_frame_has_no_answer_column(real_bundle_path):
     cols = set(t.frame_for(t.shapes()[0]).columns)
     leaked = cols & set(ANSWER_COLS)
     assert not leaked, (
-        f"피처 함수가 받는 프레임에 정답 컬럼이 있다: {sorted(leaked)}. "
-        "`PerfTable.from_bundle` 이 `bundle.ranking()` 을 쓰는지 확인하라 (§3)")
+        f"there is an answer column in the frame a feature function "
+        f"receives: {sorted(leaked)}. Check that `PerfTable.from_bundle` "
+        f"uses `bundle.ranking()` (§3)")
 
 
 def test_generated_feature_touching_answers_is_rejected():
-    """★ 정답 컬럼을 참조하는 생성 피처를 검사기가 잡는가 (§11.4).
+    """★ Does the checker catch a generated feature that references an
+    answer column (§11.4)?
 
-    프레임에 없으므로 실행하면 어차피 터지지만, **AST 단계에서 사유가
-    분명하게** 잡혀야 한다 — 실행 예외로 터지면 "모델이 나쁜 피처를 냈다"
-    로 읽힌다 (D-49).
+    It is absent from the frame, so running it blows up anyway, but the
+    reason must be caught **clearly at the AST stage** — blowing up as a
+    runtime exception reads as "the model produced a bad feature" (D-49).
     """
     from kernelrule.features.generated import FeatureRejected, check_feature_code
 

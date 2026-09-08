@@ -1,31 +1,39 @@
-"""★ 벽이 예산 탓인가 — 두 목적함수가 쓰는 축이 겹치나. LLM 0회.
+"""★ Is the wall the budget's fault — do the two objectives use overlapping
+axes? 0 LLM calls.
 
     python3 experiments/feature_overlap.py
 
-## 묻는 것
+## What is asked
 
-`regret` 진화 규칙과 순위 손실 진화 규칙이 **같은 축을 쓰는가.**
+Do the `regret`-evolved rule and the rank-loss-evolved rule **use the same
+axes**?
 
-    합집합 <= 8    8 로 둘 다 담을 수 있다 -> 벽이 예산 탓이 아니다
-    합집합 >  8    예산이 부족하다 -> 16 이 뚫을 수 있다
+    union <= 8    8 can hold both -> the wall is not the budget's fault
+    union >  8    the budget is short -> 16 might break through
 
-## ⚠️ 축 개수는 예산 단위가 **아니다**
+## ⚠️ The number of axes is **not** the budget unit
 
-예산은 `숫자 리터럴 + 가중치 개수` 를 센다 (`rules/checks.py`). 한 항이
-축 두 개를 쓸 수 있다 —
+The budget counts `numeric literals + the number of weights`
+(`rules/checks.py`). One term can use two axes —
 
     np.where(p.is_memory_bound, f.log_dram_traffic, f.log_inst_total) * w[4]
 
-축 3개(피처 2 + 술어 1)를 가중치 1개로 담는다. 그래서 **축 합집합이 8을
-넘어도 8항에 들어갈 수 있다.** 판정선은 "넉넉히 담기나" 의 대리 지표로만
-읽고, 항 수도 같이 센다.
+holds 3 axes (2 features + 1 predicate) in 1 weight. So **even if the union
+of axes goes over 8 it can fit in 8 terms.** The decision line is read only
+as a proxy for "does it fit comfortably", and the number of terms is counted
+alongside.
 
-## ⚠️ 자카드는 바닥이 있어야 읽힌다 (원칙 7)
+## ⚠️ A Jaccard cannot be read without a floor (principle 7)
 
-"두 계열이 0.5 만큼 겹친다" 는 그 자체로 크지도 작지도 않다. 세 가지를
-같이 낸다: 계열 **안**의 자카드(같은 목적함수끼리 얼마나 같은가),
-계열 **사이**의 자카드, 그리고 **무작위 바닥**(같은 크기의 집합을
-레지스트리에서 아무렇게나 뽑았을 때).
+"the two families overlap by 0.5" is on its own neither large nor small.
+Three things are reported together: the Jaccard **within** a family (how
+alike the same objective is to itself), the Jaccard **between** families, and
+**the random floor** (sets of the same size drawn at random from the
+registry).
+
+⚠️ 2026-09-08 (D-146): **the three pair labels stay in Korean.** They are the
+row names of `docs/artifacts/feature-overlap.md` and the keys of
+`feature-overlap.json`, and `docs/` is not translated.
 """
 
 from __future__ import annotations
@@ -44,7 +52,8 @@ from kernelrule.features import REGISTRY
 
 REG_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 RANK_RUNS = [f"x-rank-rankevo-s{i}" for i in range(3)]
-#: 상한 측정에서 상위 100 안에서 크게 변하던 것들 (ranking-ceiling.md §3).
+#: The ones that moved a lot inside the top 100 in the ceiling measurement
+#: (ranking-ceiling.md §3).
 WATCH = ("split_k_cost", "sm_idle_cost", "pipeline_warmup_frac",
          "tail_waste", "waves")
 N_DRAWS = 2000
@@ -60,7 +69,7 @@ def _best(run: str, by: str) -> dict:
 
 
 def _feats(code: str) -> set[str]:
-    """`f.<이름>` 만 센다 — `p.<이름>` (술어)은 따로."""
+    """It counts `f.<name>` only — `p.<name>` (the predicates) separately."""
     return {n.attr for n in ast.walk(ast.parse(code))
             if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
             and n.value.id == "f"}
@@ -84,7 +93,8 @@ def _jac(a: set, b: set) -> float:
 
 
 def _floor(sizes_a, sizes_b, pool: int, rng) -> tuple[float, float]:
-    """★ 무작위 바닥 — 같은 크기를 레지스트리에서 아무렇게나 뽑는다."""
+    """★ The random floor — sets of the same size drawn at random from the
+    registry."""
     js, us = [], []
     for _ in range(N_DRAWS):
         na = int(rng.choice(sizes_a))
@@ -112,13 +122,13 @@ def main() -> None:
         else len(list(REGISTRY))
 
     print("=" * 80)
-    print("두 목적함수가 쓰는 축 — 벽이 예산 탓인가")
+    print("the axes the two objectives use — is the wall the budget's fault")
     print("=" * 80)
-    print(f"  레지스트리 {pool}개 축 (F3)")
-    print(f"  regret 진화 {len(REG_RUNS)}실행 / 순위 진화 "
-          f"{len(RANK_RUNS)}실행 — 각 실행의 **최종 최고 규칙 하나**\n")
+    print(f"  the registry has {pool} axes (F3)")
+    print(f"  regret evolution {len(REG_RUNS)} runs / rank evolution "
+          f"{len(RANK_RUNS)} runs — **one final best rule** from each run\n")
 
-    print(f"  {'실행':22s} {'항':>3} {'축':>3} {'술어':>4}  축 이름")
+    print(f"  {'run':22s} {'trm':>3} {'ax':>3} {'pred':>4}  axis names")
     for k in ("regret", "rank"):
         for (r, _), f, p, t in zip(fam[k], F[k], P[k], TERMS[k], strict=True):
             print(f"  {r.replace('f1pipe-F3-', ''):22s} {t:3d} {len(f):3d} "
@@ -127,17 +137,21 @@ def main() -> None:
 
     uni = {k: set().union(*F[k]) for k in F}
     both = uni["regret"] | uni["rank"]
-    print("  계열 합집합")
-    print(f"    regret {len(uni['regret']):2d}개  {', '.join(sorted(uni['regret']))}")
-    print(f"    순위   {len(uni['rank']):2d}개  {', '.join(sorted(uni['rank']))}")
-    print(f"    ★ 둘 다 {len(both):2d}개   자카드 {_jac(uni['regret'], uni['rank']):.3f}")
-    print(f"    순위에만 {sorted(uni['rank'] - uni['regret'])}")
-    print(f"    regret 에만 {sorted(uni['regret'] - uni['rank'])}")
-    print("    ⚠️ 실행 수가 6 대 3 이라 합집합 크기는 나란히 못 놓는다 —")
-    print("       아래 **규칙 쌍**으로 본다.")
+    print("  the family union")
+    print(f"    regret {len(uni['regret']):2d}  "
+          f"{', '.join(sorted(uni['regret']))}")
+    print(f"    rank   {len(uni['rank']):2d}  {', '.join(sorted(uni['rank']))}")
+    print(f"    ★ both {len(both):2d}   "
+          f"jaccard {_jac(uni['regret'], uni['rank']):.3f}")
+    print(f"    rank only {sorted(uni['rank'] - uni['regret'])}")
+    print(f"    regret only {sorted(uni['regret'] - uni['rank'])}")
+    print("    ⚠️ the run counts are 6 against 3, so the union sizes cannot "
+          "be put side by side —")
+    print("       it is read from the **rule pairs** below.")
 
     print("\n" + "=" * 80)
-    print("규칙 쌍 자카드 — ★ 바닥과 계열 안 값을 같이 놓는다 (원칙 7)")
+    print("rule-pair jaccard — ★ the floor and the within-family value are "
+          "put beside it (principle 7)")
     print("=" * 80)
     rows = {}
     for lab, pairs in (
@@ -153,25 +167,30 @@ def main() -> None:
         js = [_jac(x, y) for x, y in ps]
         us = [len(x | y) for x, y in ps]
         rows[lab] = {"jaccard": js, "union": us}
-        print(f"  {lab:14s} n={len(js):3d}  자카드 중앙 {np.median(js):.3f} "
-              f"({min(js):.3f}~{max(js):.3f})   합집합 중앙 "
+        print(f"  {lab:14s} n={len(js):3d}  jaccard median "
+              f"{np.median(js):.3f} "
+              f"({min(js):.3f}~{max(js):.3f})   union median "
               f"{np.median(us):.1f} ({min(us)}~{max(us)})")
     fj, fu = _floor(([len(x) for x in F["regret"]]),
                     ([len(x) for x in F["rank"]]), pool, rng)
-    print(f"  {'★ 무작위 바닥':14s} n={N_DRAWS}  자카드 평균 {fj:.3f}"
-          f"                    합집합 평균 {fu:.1f}")
+    print(f"  {'★ random floor':14s} n={N_DRAWS}  jaccard mean {fj:.3f}"
+          f"                     union mean {fu:.1f}")
 
     print("\n" + "=" * 80)
-    print("판정 — 지시에 박은 선 (합집합 <= 8 이면 예산 탓이 아니다)")
+    print("the verdict — the line nailed down in the instruction (union <= 8 "
+          "means it is not the budget's fault)")
     print("=" * 80)
     u = rows["★ 계열 사이"]["union"]
     med, n_le = float(np.median(u)), sum(1 for x in u if x <= 8)
-    print(f"  계열 사이 축 합집합 중앙 {med:.1f}  ({n_le}/{len(u)} 쌍이 8 이하)")
-    print("  -> " + ("★ 8 로 둘 다 담을 수 있다 — 벽이 예산 탓이 아니다"
+    print(f"  the between-family axis union, median {med:.1f}  "
+          f"({n_le}/{len(u)} pairs are 8 or under)")
+    print("  -> " + ("★ 8 can hold both — the wall is not the budget's fault"
                      if med <= 8 else
-                     "★ 축이 8을 넘는다 — 예산이 뚫을 여지가 있다"))
-    # ★ 판정선을 예산 단위로 옮긴다. 실제 규칙은 한 항에 축을 여럿
-    #   담는다 — 그 밀도로 나눠야 "몇 항이 필요한가" 가 나온다.
+                     "★ the axes go over 8 — there is room for the budget to "
+                     "break through"))
+    # ★ The decision line is moved onto the budget unit. A real rule holds
+    #   several axes in one term — dividing by that density is what gives
+    #   "how many terms are needed".
     allf = F["regret"] + F["rank"]
     allp = P["regret"] + P["rank"]
     allt = TERMS["regret"] + TERMS["rank"]
@@ -181,17 +200,20 @@ def main() -> None:
         zip(F["regret"], P["regret"], strict=True),
         zip(F["rank"], P["rank"], strict=True))]
     need = [u / d for u, d in product(ub, [float(np.median(dens))])]
-    print("\n  ⚠️ 축 개수 != 예산 단위. 항 수는 전부 8 이고 한 항이 축을")
-    print(f"     {min(dens):.2f}~{max(dens):.2f}개 (중앙 {np.median(dens):.2f}) "
-          f"담는다 — 술어까지 센 값이다.")
-    print(f"     그 밀도로 계열 사이 합집합(축+술어 {int(min(ub))}~{int(max(ub))})을 "
-          f"담으려면 **{np.median(need):.1f}항** 이 필요하다.")
-    print(f"     -> 8 은 {'모자란다' if np.median(need) > 8 else '넉넉하다'}, "
-          f"16 은 {'넉넉하다' if np.median(need) <= 16 else '모자란다'}. "
-          f"부족분은 약 {max(0.0, np.median(need) - 8):.1f}항이다.")
+    print("\n  ⚠️ the number of axes != the budget unit. The term counts are "
+          "all 8 and one term holds")
+    print(f"     {min(dens):.2f}~{max(dens):.2f} axes (median "
+          f"{np.median(dens):.2f}) — that counts the predicates too.")
+    print(f"     At that density, holding the between-family union "
+          f"(axes+predicates {int(min(ub))}~{int(max(ub))}) needs "
+          f"**{np.median(need):.1f} terms**.")
+    print(f"     -> 8 is {'short' if np.median(need) > 8 else 'comfortable'}, "
+          f"16 is {'comfortable' if np.median(need) <= 16 else 'short'}. "
+          f"The shortfall is about {max(0.0, np.median(need) - 8):.1f} terms.")
 
-    print("\n  ★ 상한 측정의 다섯 축이 **regret 규칙에도** 있는가")
-    print(f"    {'':24s} {'regret':>8} {'순위':>6}")
+    print("\n  ★ are the ceiling measurement's five axes **in the regret "
+          "rules too**")
+    print(f"    {'':24s} {'regret':>8} {'rank':>6}")
     watch = {}
     for n in WATCH:
         cr = sum(n in f for f in F["regret"])

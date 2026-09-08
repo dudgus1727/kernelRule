@@ -1,24 +1,27 @@
-"""★ 커밋된 규칙으로 문서의 숫자를 다시 낸다. `runs/` 없이도 돈다.
+"""★ It reproduces the documents' numbers from the committed rules. It runs
+without `runs/`.
 
     python3 experiments/verify_rules.py
 
-## 무엇을 검증하는가
+## What is verified
 
 ```
 docs/artifacts/rules/<run>.py      score() + W_FITTED
-docs/artifacts/rules/index.json    그때 기록된 점수
+docs/artifacts/rules/index.json    the scores recorded at the time
 ```
 
-**이 스크립트는 `.py` 를 실행해 점수를 다시 계산하고 `index.json` 과
-대조한다.** 어긋나면 실패한다.
+**This script executes the `.py`, recomputes the score and checks it against
+`index.json`.** If they diverge it fails.
 
-## 왜 이것이 중요한가
+## Why this matters
 
-LLM 실행은 재현할 수 없다 (난수 통제 불가 — §24.4b). 하지만 **채점은
-완전히 결정론적**이다. 규칙 파일을 커밋해 두면 **성능 주장의 절반이
-검증 가능해진다** — 누구나 몇 초에 확인한다.
+An LLM run cannot be reproduced (the randomness is not controllable —
+§24.4b). But **the scoring is completely deterministic**. With the rule files
+committed, **half of the performance claim becomes verifiable** — anyone can
+confirm it in seconds.
 
-`runs/` 는 `.gitignore` 라 저장소에 없다. 이 스크립트는 그것을 안 읽는다.
+`runs/` is in `.gitignore`, so it is not in the repository. This script does
+not read it.
 """
 
 from __future__ import annotations
@@ -53,8 +56,8 @@ def main() -> None:
 
     idx_path = RULES / "index.json"
     if not idx_path.exists():
-        raise SystemExit(f"{idx_path} 가 없다. "
-                         "`python3 experiments/export_rules.py` 를 먼저 돌려라.")
+        raise SystemExit(f"{idx_path} does not exist. "
+                         "Run `python3 experiments/export_rules.py` first.")
     index = json.loads(idx_path.read_text())
 
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
@@ -72,15 +75,15 @@ def main() -> None:
         val=Split("val", tuple(held)), kind="nk11008")
 
     print("=" * 66)
-    print("커밋된 규칙 재채점 — index.json 과 대조한다")
+    print("rescoring the committed rules — checked against index.json")
     print("=" * 66)
-    print(f"  {'실행':16s} {'기록':>9} {'재계산':>9}  판정")
+    print(f"  {'run':16s} {'recorded':>10} {'recomputed':>12}  verdict")
     bad = []
     for row in index:
         run = row["run"]
         f = RULES / f"{run}.py"
         if not f.exists():
-            bad.append(f"{run}: 규칙 파일이 없다")
+            bad.append(f"{run}: the rule file does not exist")
             continue
         fn, W = _load(f)
         reg = {}
@@ -97,17 +100,18 @@ def main() -> None:
         want = row["holdout"]
         ok = approx_equal(got, want, TOL)
         if not ok:
-            bad.append(f"{run}: 기록 {want:.4f} != 재계산 {got:.4f}")
-        print(f"  {run:16s} {want:9.4f} {got:9.4f}  {'✅' if ok else '❌'}")
+            bad.append(f"{run}: recorded {want:.4f} != recomputed {got:.4f}")
+        print(f"  {run:16s} {want:10.4f} {got:12.4f}  {'✅' if ok else '❌'}")
 
     print()
     if bad:
-        print("★ 어긋난 것:")
+        print("★ what diverged:")
         for b in bad:
             print(f"    {b}")
         raise SystemExit(1)
-    print(f"  ★ {len(index)}개 전부 일치 (허용 {TOL})")
-    print("  문서의 구조 홀드아웃 숫자는 이 값들로 검증된다.")
+    print(f"  ★ all {len(index)} match (tolerance {TOL})")
+    print("  The documents' structural holdout numbers are verified by these "
+          "values.")
 
 
 if __name__ == "__main__":

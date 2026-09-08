@@ -1,20 +1,23 @@
-"""★ **선택 비용** — 고르는 데 몇 µs 걸리나. LLM 0회 · GPU 0회.
+"""★ **The selection cost** — how many µs does choosing take? 0 LLM calls ·
+0 GPU.
 
     python3 experiments/select_cost.py
     python3 experiments/select_cost.py --shapes 6 --reps 50
 
-§2 의 첫 제약이 "µs 안에 골라야 한다" 인데 **우리 쪽 수치가 없었다.**
-regret 만 쟀다. 여기서 잰다.
+§2's first constraint is "it has to choose within µs", but **we had no number
+of our own.** Only regret was measured. It is measured here.
 
-## 세 팔 — 같은 프로세스, 같은 파이썬
+## The three arms — the same process, the same Python
 
 ```
-A 우리    피처 계산 -> 규칙 평가 -> argmin   ★ 피처 계산을 **포함**한다
-B 벤더    nvMatmulHeuristics.get_with_mnk 한 번  (파이썬 바인딩 포함)
-C GBDT    학습된 모델로 그 형상 후보 전부 예측 -> argmin
+A ours    compute the features -> evaluate the rule -> argmin
+          ★ it **includes** the feature computation
+B vendor  one nvMatmulHeuristics.get_with_mnk  (the Python binding included)
+C GBDT    predict every candidate of that shape with the trained model
+          -> argmin
 ```
 
-실험 계획서 `docs/artifacts/select-cost-prereg.md`.
+The pre-registration is `docs/artifacts/select-cost-prereg.md`.
 """
 
 from __future__ import annotations
@@ -35,7 +38,7 @@ from kernelrule.features import REGISTRY
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 ENV_HASH = "c63710df"
-#: 대표값 실행. r11 의 규칙을 쓴다 (D-140).
+#: The representative run. It uses the rule at r11 (D-140).
 RUNS = [f"F3rw-p8-nan-s{i}" for i in range(6)]
 ROUND = 11
 
@@ -48,7 +51,8 @@ def _rule(run: str, rnd: int) -> dict:
 
 
 def _timed(fn, reps: int, warmup: int = 5) -> tuple[float, float, float]:
-    """(중앙 µs, 최악 µs, 평균 µs). ★ 최악을 반드시 낸다 — 배포 기준이다."""
+    """(median µs, worst µs, mean µs). ★ The worst is always reported — that
+    is the deployment criterion."""
     for _ in range(warmup):
         fn()
     ts = []
@@ -63,7 +67,8 @@ def _timed(fn, reps: int, warmup: int = 5) -> tuple[float, float, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--shapes", type=int, default=6,
-                    help="형상 몇 개를 잴 것인가 (후보 수 순으로 고루)")
+                    help="how many shapes to measure (spread evenly by "
+                         "candidate count)")
     ap.add_argument("--reps", type=int, default=50)
     ap.add_argument("--out", default="docs/artifacts/select-cost.json")
     a = ap.parse_args()
@@ -76,28 +81,30 @@ def main() -> None:
     fn = compile_rule(rule["code"])
     w = np.asarray(rule["w"], dtype=np.float64)
 
-    # ★ 규칙이 실제로 쓰는 피처만 계산한다 — 배포에서 안 쓰는 것을 계산할
-    #   이유가 없다. 이름을 코드에서 뽑는다.
+    # ★ Only the features the rule actually uses are computed — there is no
+    #   reason to compute what deployment does not use. The names are taken
+    #   from the code.
     cfg_feats = [f for f in REGISTRY.items(shape_level=False)
                  if f"f.{f.name}" in rule["code"]]
     shp_feats = [f for f in REGISTRY.items(shape_level=True)
                  if f"p.{f.name}" in rule["code"]]
-    print(f"규칙 {RUNS[0]}@r{ROUND}  피처 {len(cfg_feats)}개 "
-          f"(config) + {len(shp_feats)}개 (형상)  가중치 {len(w)}")
+    print(f"rule {RUNS[0]}@r{ROUND}  features {len(cfg_feats)} "
+          f"(config) + {len(shp_feats)} (shape)  weights {len(w)}")
 
     shapes = sorted(T.shapes(), key=lambda p: len(T.frame_for(p)))
     pick = [shapes[i] for i in
             np.linspace(0, len(shapes) - 1, a.shapes).astype(int)]
 
-    # -- 카탈로그 (전수 상한) ------------------------------------------------
+    # -- the catalogue (the exhaustive upper bound) -------------------------
     X = T._X
     key = ["kernel_id", "split_k", "split_k_mode"]
     cat = X.drop_duplicates(key).reset_index(drop=True)
-    print(f"카탈로그 {len(cat):,} 조합 · 형상별 후보 "
+    print(f"catalogue {len(cat):,} combinations · candidates per shape "
           f"{len(T.frame_for(shapes[0])):,}~{len(T.frame_for(shapes[-1])):,}")
 
-    # 대표적인 필터. ⚠️ kernelTab 의 실제 판정식이 아니다 — **비용의 자릿수**를
-    # 재는 것이다. 정적 배열에 대한 벡터 비교 넷.
+    # A representative filter. ⚠️ It is not kernelTab's real predicate — it
+    # measures **the order of magnitude of the cost**. Four vector comparisons
+    # against static arrays.
     c_tile_k = cat["tile_k"].to_numpy(dtype=np.float64)
     c_split = cat["split_k"].to_numpy(dtype=np.float64)
     c_align = cat[["align_a", "align_b", "align_c"]].to_numpy(dtype=np.float64)
@@ -112,7 +119,7 @@ def main() -> None:
         ok &= (c_smem <= SMEM_LIMIT) & (c_regs <= REGS_LIMIT)
         return ok
 
-    # -- 벤더 ---------------------------------------------------------------
+    # -- the vendor ---------------------------------------------------------
     vend = None
     try:
         import nvMatmulHeuristics as nv
@@ -124,9 +131,9 @@ def main() -> None:
             nv.NvMatmulHeuristicsNvidiaGpu, preset_for(hw.name)))
         layout = nv.NvMatmulHeuristicsMatmulLayout.TN_ROW_MAJOR
         vend = (h, hd, layout)
-        print(f"벤더 프리셋 {preset_for(hw.name)}")
+        print(f"vendor preset {preset_for(hw.name)}")
     except Exception as e:                                  # noqa: BLE001
-        print(f"⚠️ 벤더 팔 없음: {type(e).__name__}: {e}")
+        print(f"⚠️ no vendor arm: {type(e).__name__}: {e}")
 
     # -- GBDT ---------------------------------------------------------------
     gbdt = None
@@ -137,15 +144,16 @@ def main() -> None:
         m = LGBMRegressor(n_estimators=200, num_leaves=63, verbose=-1)
         m.fit(Xg, yg)
         gbdt = (m, Xg, g, gshapes)
-        print(f"GBDT 학습 완료 — 피처 {len(cols)}개")
+        print(f"GBDT trained — {len(cols)} features")
     except Exception as e:                                  # noqa: BLE001
-        print(f"⚠️ GBDT 팔 없음: {type(e).__name__}: {e}")
+        print(f"⚠️ no GBDT arm: {type(e).__name__}: {e}")
 
     print("\n" + "=" * 100)
-    print(f"선택 비용 (µs) — 반복 {a.reps}회, 워밍업 5회. ★ 중앙 / 최악")
+    print(f"the selection cost (µs) — {a.reps} repetitions, 5 warm-ups. "
+          f"★ median / worst")
     print("=" * 100)
-    print(f"  {'형상':22s} {'후보':>7s} {'우리 필터후':>16s} "
-          f"{'우리 전수':>16s} {'벤더':>14s} {'GBDT':>14s}")
+    print(f"  {'shape':22s} {'cand':>7s} {'ours, filtered':>16s} "
+          f"{'ours, catalogue':>17s} {'vendor':>14s} {'GBDT':>14s}")
     out: dict = {"bundle": BUNDLE, "reps": a.reps, "rule_run": RUNS[0],
                  "rule_round": ROUND, "n_catalogue": int(len(cat)),
                  "shapes": {}}
@@ -161,14 +169,14 @@ def main() -> None:
             return int(np.argmin(np.asarray(s)))
 
         def ours_full(i=info):
-            ok = _filter(p)                       # ★ 필터 비용 포함
+            ok = _filter(p)                # ★ the filter cost is included
             d = cat.loc[ok]
             cols_ = {f.name: M._vector(f, p, d, i) for f in cfg_feats}
             from kernelrule.core.matrix import Feats, ShapeInfo
             s = fn(Feats(cols_), ShapeInfo(i), hw, w)
             return int(np.argmin(np.asarray(s)))
 
-        # ★ 내역 — 어디에 시간이 가나. 판정이 아니라 진단이다.
+        # ★ The breakdown — where the time goes. A diagnostic, not a verdict.
         from kernelrule.core.matrix import Feats, ShapeInfo
         d_np = {f.name: None for f in cfg_feats}
         _feat = _timed(lambda: {f.name: M._vector(f, p, df, info)
@@ -177,8 +185,9 @@ def main() -> None:
         _eval = _timed(lambda: int(np.argmin(np.asarray(
             fn(Feats(_cols), ShapeInfo(info), hw, w)))), a.reps)[0]
         _filt = _timed(lambda: int(_filter(p).sum()), a.reps)[0]
-        # ★ 배포형 — 정적 열은 numpy 로 **미리 변환**해 둔다 (카탈로그는
-        #   배포 시점에 알려져 있다). 피처는 여전히 매번 계산한다.
+        # ★ The deployment form — the static columns are **converted to numpy
+        #   in advance** (the catalogue is known at deployment time). The
+        #   features are still computed every time.
         df_np = df.reset_index(drop=True)
         _deploy = _timed(lambda: int(np.argmin(np.asarray(fn(
             Feats({f.name: M._vector(f, p, df_np, info) for f in cfg_feats}),
@@ -202,7 +211,7 @@ def main() -> None:
             m, Xg, g, gshapes = gbdt
             idx = [i for i, q in enumerate(gshapes) if q.key == p.key]
             rows_ = np.flatnonzero(g == idx[0]) if idx else np.array([], int)
-            # `build_xy` 가 DataFrame 을 준다 — 위치 색인으로 잡는다
+            # `build_xy` gives a DataFrame — it is taken by positional index
             Xs = Xg.iloc[rows_] if hasattr(Xg, "iloc") else Xg[rows_]
             gs, gm, _ = _timed(
                 lambda: int(np.argmin(m.predict(Xs))), a.reps)
@@ -217,27 +226,30 @@ def main() -> None:
         return (float(np.median(v)), float(np.max(v))) if v else (
             float("nan"), float("nan"))
 
-    print("\n  내역 (중앙, µs) — 어디에 시간이 가나")
-    print(f"  {'형상':22s} {'필터':>9s} {'피처 계산':>11s} {'평가+argmin':>12s}")
+    print("\n  the breakdown (median, µs) — where the time goes")
+    print(f"  {'shape':22s} {'filter':>9s} {'features':>11s} "
+          f"{'eval+argmin':>12s}")
     for k, r in out["shapes"].items():
         print(f"  {k:22s} {r['part_filter']:9.0f} {r['part_feat']:11.0f} "
               f"{r['part_eval']:12.0f}")
     print("\n  " + "-" * 96)
-    for lab, a_, b_ in (("우리 (필터 후)", "ours_med", "ours_max"),
-                        ("우리 (카탈로그 전수 + 필터)", "ours_cat_med",
+    for lab, a_, b_ in (("ours (after the filter)", "ours_med", "ours_max"),
+                        ("ours (whole catalogue + filter)", "ours_cat_med",
                          "ours_cat_max"),
-                        ("우리 (배포형: 정적열 numpy)", "ours_deploy_med",
-                         "ours_deploy_med"),
-                        ("  그중 피처 계산", "part_feat", "part_feat"),
-                        ("  그중 평가+argmin", "part_eval", "part_eval"),
-                        ("벤더", "vendor_med", "vendor_max"),
+                        ("ours (deployment: static cols numpy)",
+                         "ours_deploy_med", "ours_deploy_med"),
+                        ("  of which, the features", "part_feat", "part_feat"),
+                        ("  of which, eval+argmin", "part_eval", "part_eval"),
+                        ("vendor", "vendor_med", "vendor_max"),
                         ("GBDT", "gbdt_med", "gbdt_max")):
         m1, _ = agg(a_)
         _, m2 = agg(b_)
-        print(f"  {lab:28s} 형상 중앙 {m1:9.0f} µs   형상 최악 {m2:9.0f} µs")
+        print(f"  {lab:36s} shape median {m1:9.0f} µs   "
+              f"shape worst {m2:9.0f} µs")
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
-    print("  ⚠️ 필터는 **대표적인 것**이지 kernelTab 의 판정식이 아니다")
+    print("  ⚠️ the filter is **a representative one**, not kernelTab's "
+          "predicate")
 
 
 if __name__ == "__main__":

@@ -1,41 +1,56 @@
-"""★ 예산 16 실험의 **선행 검사** — 적합기가 16차원에서 버티는가. LLM 0회.
+"""★ The **preliminary check** for the budget-16 experiment — does the fitter
+hold up in 16 dimensions? 0 LLM calls.
 
-    python3 experiments/fitter_dim.py            # 전체 (약 15분, 12프로세스)
+    python3 experiments/fitter_dim.py            # everything (about 15 min,
+                                                 # 12 processes)
     python3 experiments/fitter_dim.py --arm B16-one
 
-**왜 먼저 하는가.** 예산을 8 -> 16 으로 늘리고 결과가 나빠지면 두 해석이
-달라진다: "예산 16 이 나쁘다" 와 "적합기가 16차원에서 못 찾는다". 뒤엣것을
-먼저 배제해야 앞엣것을 잴 수 있다 (원칙 1 — 인프라 -> 검사기 -> 피험자).
+**Why this comes first.** If the budget is raised from 8 to 16 and the result
+gets worse, two readings diverge: "budget 16 is bad" and "the fitter cannot
+find it in 16 dimensions". The latter has to be ruled out before the former
+can be measured (principle 1 — infrastructure -> checker -> subject).
 
-## 잰다
-
-```
-도달률       실험 계획서 기준 (D-56). 무작위 4000점이 적합 결과를 못 이긴 비율
-             ★ 차원이 오르면 4000점이 상대적으로 성겨져 **저절로 올라간다**.
-                이 지표는 8차원과 16차원 사이에서 비교하면 안 된다
-차원 손실률  ★ 같은 출발점에서 항만 늘렸을 때 **더 나쁘게 끝나는 비율**
-             새 항의 초기 가중치가 작으면 확장 규칙은 원본과 거의 같은 함수다.
-             그러므로 16차원 적합이 8차원 적합보다 나쁘게 끝나면, 그 손실은
-             **차원 때문**이지 구조 때문이 아니다. 차원에 공평하다
-재적합 도달률 무작위 출발점에서 다시 적합한 것이 w0 출발을 이기는 비율
-             무작위 '점' 대신 무작위 '적합' 과 견준다 — 차원에 공평하다
-```
-
-## 팔
+## What is measured
 
 ```
-A8        원본 8항
-B16-lo    16항, 새 항 초기 가중치 0.01,  예산 그대로 (300 / 600)
-B16-one   16항, 새 항 초기 가중치 1.0,   예산 그대로
-C16-one   16항, 새 항 초기 가중치 1.0,   ★ 예산 비례 (600 / 4000)
+reach rate      the pre-registration criterion (D-56). The fraction where
+                4000 random points fail to beat the fit result
+                ★ As the dimension goes up, 4000 points get relatively
+                  sparser, so this **rises by itself**. This metric must not
+                  be compared between 8 and 16 dimensions
+dimension       ★ the fraction that **ends up worse** when only the terms are
+loss rate         added from the same starting point
+                If the new terms' initial weights are small, the extended
+                rule is almost the same function as the original. So if the
+                16-dimensional fit ends up worse than the 8-dimensional one,
+                that loss is **because of the dimension**, not the structure.
+                It is fair to the dimension
+refit reach     the fraction where refitting from a random starting point
+rate            beats starting from w0
+                It compares against a random 'fit' instead of a random
+                'point' — it is fair to the dimension
 ```
 
-`B16-*` 두 팔은 **초기 가중치가 교락**이라 나눠 잰다 — 심플렉스 스텝이
-`max(|start|, 1.0)` 비례라 0.01 과 1.0 이 같은 스텝을 받지만, 다듬기의
-`d * max(|t[i]|, 1.0)` 도 같으므로 차이는 함수 자체에서만 온다.
-`C16-one` 은 **차원 손실이 예산 탓인지 알고리즘 탓인지**를 가른다.
+## The arms
 
-regret 의 절대값은 보고하지 않는다 (D-56 §2). 차이와 비율만 쓴다.
+```
+A8        the original 8 terms
+B16-lo    16 terms, the new terms' initial weight 0.01, the budget unchanged
+          (300 / 600)
+B16-one   16 terms, the new terms' initial weight 1.0,  the budget unchanged
+C16-one   16 terms, the new terms' initial weight 1.0,  ★ the budget scaled
+          (600 / 4000)
+```
+
+The two `B16-*` arms are measured separately because **the initial weight is
+a confound** — the simplex step is proportional to `max(|start|, 1.0)` so
+0.01 and 1.0 get the same step, but the polish `d * max(|t[i]|, 1.0)` is the
+same too, so the difference comes only from the function itself.
+`C16-one` separates **whether the dimension loss is the budget's fault or the
+algorithm's**.
+
+The absolute value of regret is not reported (D-56 §2). Only differences and
+ratios are used.
 """
 
 from __future__ import annotations
@@ -50,20 +65,23 @@ from pathlib import Path
 import numpy as np
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
-#: 사람 24개 라이브러리 팔. 예산 실험의 기준선 팔과 같은 실행들이다.
+#: The human-24 library arm. The same runs as the baseline arm of the budget
+#: experiment.
 RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
-#: ★ 순위 손실 진화 3실행 (D-101). `--objective rank` 일 때 쓴다 —
-#: 그 경로를 재려면 그 경로가 만든 구조로 재야 한다.
+#: ★ The 3 rank-loss evolution runs (D-101). Used when `--objective rank` —
+#: to measure that path it has to be measured on the structure that path
+#: produced.
 RANK_RUNS = [f"x-rank-rankevo-s{i}" for i in range(3)]
 N_PROBE = 4000
 PROBE_LO, PROBE_HI = 0.05, 50.0
-#: 재적합 도달률의 무작위 출발 횟수. 한 번이 적합 한 번이라 비싸다.
+#: The number of random starts for the refit reach rate. One of them is one
+#: fit, so it is expensive.
 N_RESTART_FITS = 3
 TARGET_REACH = 0.90
 BIG = 16
 
 ARMS = {
-    #  이름        항  새항초기값  max_evals  polish_budget
+    #  name        terms  new-term init  max_evals  polish_budget
     "A8":      (8,  None, 300, 600),
     "B16-lo":  (16, 0.01, 300, 600),
     "B16-one": (16, 1.0,  300, 600),
@@ -73,32 +91,38 @@ ARMS = {
 
 def extend_code(code: str, f_names: list[str], p_names: list[str],
                 n_add: int) -> tuple[str, list[str]]:
-    """규칙을 `n_add` 개의 **선형 항**으로 늘린다.
+    """Extends the rule by `n_add` **linear terms**.
 
-    안 쓰인 피처를 하나씩 붙인다 — 새 항이 기존 항과 같은 물리량을 반복하면
-    '차원만 늘었다' 가 아니라 '중복 항이 생겼다' 가 되어 측정이 흐려진다.
+    It attaches unused features one at a time — if a new term repeats the
+    same physical quantity as an existing one, it becomes 'a duplicate term
+    appeared' instead of 'only the dimension went up', and the measurement
+    gets muddy.
 
-    ★ `f` 와 `p` 는 **다른 이름 공간**이다. `f` 는 (형상, config) 행렬이고
-    `p` 는 형상 수준 값이라 `p.roofline_ratio` 를 `f.` 로 쓰면 `AttributeError`
-    가 난다. 사람 24개 중 5개(`arith_intensity`, `can_use_cp_async`,
-    `is_memory_bound`, `log_sol_ms`, `roofline_ratio`)가 형상 수준이라
-    `f` 에는 19개뿐이고, 그것만으로는 8항을 못 채우는 규칙이 있다.
-    모자라면 **이미 쓴 피처의 제곱**으로 채운다 — 새 물리량은 아니지만
-    선형 독립인 항이라 차원은 정직하게 늘어난다. 무엇을 붙였는지 기록한다.
+    ★ `f` and `p` are **different name spaces**. `f` is the (shape, config)
+    matrix and `p` is a shape-level value, so writing `p.roofline_ratio` as
+    `f.` raises `AttributeError`. 5 of the human 24 (`arith_intensity`,
+    `can_use_cp_async`, `is_memory_bound`, `log_sol_ms`, `roofline_ratio`)
+    are shape level, so `f` has only 19, and there are rules that cannot fill
+    8 terms from those alone. When they run short it fills up with **the
+    square of an already used feature** — it is not a new physical quantity,
+    but it is a linearly independent term, so the dimension goes up honestly.
+    What was attached is recorded.
     """
     used_f = set(re.findall(r"\bf\.(\w+)", code))
     used_p = set(re.findall(r"\bp\.(\w+)", code))
     pool = [f"f.{n}" for n in f_names if n not in used_f]
     pool += [f"p.{n}" for n in p_names if n not in used_p]
-    # ★ 이진 피처의 제곱은 **자기 자신**이다 (0^2=0, 1^2=1). 그대로 붙이면
-    #   완전 중복 항이 생겨 "차원이 늘었다" 가 거짓이 된다. 제외한다.
+    # ★ The square of a binary feature is **itself** (0^2=0, 1^2=1).
+    #   Attaching it as it is creates a fully duplicated term and makes "the
+    #   dimension went up" false. It is excluded.
     cont = [n for n in sorted(used_f)
             if not (n.startswith(("is_", "has_", "can_")))]
     pool += [f"np.square(f.{n})" for n in cont]
     pool += [f"(f.{x} * f.{y})" for i, x in enumerate(cont)
              for y in cont[i + 1:]]
     if len(pool) < n_add:
-        raise SystemExit(f"붙일 항이 {len(pool)}개뿐이다 — {n_add}개 필요")
+        raise SystemExit(f"there are only {len(pool)} terms to attach — "
+                         f"{n_add} are needed")
     pick = pool[:n_add]
     k = max(int(i) for i in re.findall(r"\bw\[(\d+)\]", code)) + 1
     lines = [f"    s = s + {e} * w[{k + i}]" for i, e in enumerate(pick)]
@@ -111,7 +135,7 @@ def extend_code(code: str, f_names: list[str], p_names: list[str],
 _G: dict = {}
 
 
-#: 워커가 fork 로 물려받는다. `main` 이 채운다.
+#: The workers inherit it by fork. `main` fills it in.
 _OBJECTIVE = {"v": "regret"}
 
 
@@ -167,10 +191,11 @@ def work(task: tuple[str, str, str]) -> dict:
                      warn_invariants=False, polish=True, polish_budget=pol,
                           objective=_G.get("objective", "regret"))
 
-    # ★ 탐침은 **적합과 같은 목적함수**로 재야 한다 (D-103). 처음에는
-    #   `prob.regret` 을 고정으로 썼는데, `objective="rank"` 로 적합한
-    #   결과를 regret 탐침과 견주면 **다른 것을 잰다** — 도달률이
-    #   0% 로 나왔고 그것은 지표가 어긋난 것이지 적합기 얘기가 아니었다.
+    # ★ The probe has to be measured with **the same objective as the fit**
+    #   (D-103). At first `prob.regret` was used fixed, and comparing a
+    #   result fitted with `objective="rank"` against a regret probe
+    #   **measures a different thing** — the reach rate came out 0%, and that
+    #   was the metric being off, not something about the fitter.
     obj = _G.get("objective", "regret")
     prob = W._Problem(_G["matrix"], _G["table"], tuple(g), 1)
     if obj == "rank":
@@ -203,8 +228,9 @@ def work(task: tuple[str, str, str]) -> dict:
     return dict(arm=arm, run=run, regime=regime, fit=_value(fr.w),
                 fit_regret=fr.fit_regret,
                 n_evals=fr.n_evals, n_fit_evals=fr.n_fit_evals,
-                # ★ 다듬기 평가를 뺀 값으로 견준다 — 합산값으로 견주면
-                #   다듬기 예산이 상한을 언제나 넘어 100% 로 나온다.
+                # ★ It compares on the value with the polish evaluations
+                #   taken out — comparing on the summed value makes the
+                #   polish budget always exceed the cap and come out 100%.
                 hit_cap=fr.n_fit_evals >= max_evals,
                 moved=bool(fr.moved), seconds=fr.seconds,
                 probe_best=float(bv), restart_best=float(rb),
@@ -212,8 +238,8 @@ def work(task: tuple[str, str, str]) -> dict:
 
 
 def summarize(rows: list[dict], arms: list[str]) -> dict:
-    """칸에서 팔별 요약을 만든다. **적합을 다시 하지 않는다** — `--reduce`
-    로 저장된 json 에서 그대로 다시 뽑을 수 있다."""
+    """Builds the per-arm summary from the cells. **It does not fit again** —
+    it can be re-derived from the saved json with `--reduce`."""
     import statistics as _st
 
     by: dict = {}
@@ -221,8 +247,8 @@ def summarize(rows: list[dict], arms: list[str]) -> dict:
         by.setdefault(r["arm"], {})[(r["run"], r["regime"])] = r
 
     print()
-    print(f"  {'팔':9s} {'도달률':>8} {'재적합 도달':>11} {'차원 손실':>10} "
-          f"{'예산소진':>8} {'이동':>6}")
+    print(f"  {'arm':9s} {'reach':>8} {'refit reach':>11} {'dim loss':>10} "
+          f"{'budget up':>9} {'moved':>6}")
     summary: dict = {}
     for arm in arms:
         cells = by.get(arm, {})
@@ -250,8 +276,9 @@ def summarize(rows: list[dict], arms: list[str]) -> dict:
             "restart_lost": len(rg),
             "restart_gap_max": (max(rg) if rg else 0.0),
             "restart_gap_median": (_st.median(rg) if rg else 0.0),
-            # ★ `_` 로 시작하면 md/json 일치 검사가 건너뛴다 — 칸별 원자료는
-            #   재현용이지 보고 대상이 아니다.
+            # ★ A key starting with `_` is skipped by the md/json agreement
+            #   check — the per-cell raw data is for reproduction, not a
+            #   reporting target.
             "_gaps_vs_A8": sorted(gaps, reverse=True),
             "_restart_gaps": rg,
         }
@@ -263,19 +290,21 @@ def summarize(rows: list[dict], arms: list[str]) -> dict:
     for arm in arms:
         g = (summary.get(arm) or {}).get("_gaps_vs_A8")
         if g:
-            print(f"  {arm} 대 A8 격차 (양수 = 16차원이 더 나쁘다): "
+            print(f"  {arm} vs A8 gap (positive = 16 dimensions is worse): "
                   + ", ".join(f"{x:+.4f}" for x in g))
 
     print()
     a8 = summary.get("A8")
     if a8:
         r = a8["reach"] / a8["n"]
-        print(f"  ★ 8차원 도달률 {r:.0%} "
-              f"{'통과' if r >= TARGET_REACH else '미달'} — 실험 계획서 기준")
-    print("  ★ 16차원 도달률은 8차원과 **비교하지 마라** — 무작위 4000점이 "
-          "16차원에서 훨씬 성기다")
-    print("  ★ '예산소진' 은 이상이 아니라 상태다 — 재시작 일정이 예산을 "
-          "설계상 전부 쓴다 (D-76)")
+        print(f"  ★ the 8-dimensional reach rate {r:.0%} "
+              f"{'passes' if r >= TARGET_REACH else 'falls short'} — the "
+              f"pre-registration criterion")
+    print("  ★ **do not compare** the 16-dimensional reach rate with the "
+          "8-dimensional one — 4000 random points are far sparser in 16 "
+          "dimensions")
+    print("  ★ 'budget up' is a state, not an anomaly — the restart schedule "
+          "uses the whole budget by design (D-76)")
     return summary
 
 
@@ -286,10 +315,12 @@ def main() -> None:
     ap.add_argument("--out", default="docs/artifacts/fitter-dim16.json")
     ap.add_argument("--objective", choices=("regret", "rank"),
                     default="regret",
-                    help="★ 기본 regret — D-77 이 잰 조건이다. rank 는 "
-                         "미분 가능해 L-BFGS 를 쓰므로 결과가 다를 수 있다")
+                    help="★ the default is regret — that is the condition "
+                         "D-77 measured. rank is differentiable and uses "
+                         "L-BFGS, so the result can differ")
     ap.add_argument("--reduce", metavar="JSON",
-                    help="저장된 칸에서 요약만 다시 만든다 (적합 없음)")
+                    help="rebuild only the summary from the saved cells (no "
+                         "fitting)")
     a = ap.parse_args()
     arms = a.arm or list(ARMS)
 
@@ -309,13 +340,14 @@ def main() -> None:
 
     os.environ.setdefault("OMP_NUM_THREADS", "1")
     _OBJECTIVE["v"] = a.objective
-    # ★ 순위 손실 경로를 재려면 **그 경로가 만든 구조**로 재야 한다.
+    # ★ To measure the rank-loss path it has to be measured on **the
+    #   structure that path produced**.
     runs = RANK_RUNS if a.objective == "rank" else RUNS
     tasks = [(arm, run, rg) for arm in arms for run in runs
              for rg in ("short", "long")]
     print("=" * 78)
-    print(f"16차원 적합기 검사 — {len(tasks)}칸, 팔 {arms}, "
-          f"★ 목적함수 {a.objective}, 실행 {len(runs)}개")
+    print(f"the 16-dimensional fitter check — {len(tasks)} cells, "
+          f"arms {arms}, ★ objective {a.objective}, {len(runs)} runs")
     print("=" * 78)
 
     import multiprocessing as mp
@@ -324,9 +356,9 @@ def main() -> None:
         for i, r in enumerate(pool.imap_unordered(work, tasks), 1):
             rows.append(r)
             print(f"  [{i:2d}/{len(tasks)}] {r['arm']:8s} {r['run'][-2:]:3s} "
-                  f"{r['regime']:5s} 적합={r['n_fit_evals']:4d} "
-                  f"총={r['n_evals']:5d} "
-                  f"{'상한' if r['hit_cap'] else '  ':4s} "
+                  f"{r['regime']:5s} fit={r['n_fit_evals']:4d} "
+                  f"total={r['n_evals']:5d} "
+                  f"{'cap' if r['hit_cap'] else '   ':4s} "
                   f"{r['seconds']:5.1f}s", flush=True)
 
     summary = summarize(rows, arms)
@@ -336,8 +368,10 @@ def main() -> None:
                            objective=a.objective, n_probe=N_PROBE,
                            probe_range=[PROBE_LO, PROBE_HI],
                            n_restart_fits=N_RESTART_FITS, arms=ARMS,
-                           note="`fit` 은 재현용 원자료다. 절대값은 보고 "
-                                "대상이 아니다 (D-56 §2) — 문서는 차이만 쓴다."),
+                           note="`fit` is raw data for reproduction. The "
+                                "absolute value is not a reporting target "
+                                "(D-56 §2) — the documents use only the "
+                                "differences."),
         "_cells": rows, "summary": summary},
         ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")

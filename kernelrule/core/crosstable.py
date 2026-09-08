@@ -1,32 +1,29 @@
-"""두 표(다른 GPU)를 견주기 위한 공통 부분집합 (D-88).
+"""The common subset used to compare two tables (different GPUs) (D-88).
 
-5090 표가 오면 "구조가 전이되는가" 를 재야 한다. 그런데 **두 표는 같은
-격자가 아니다.**
+When the 5090 table arrives, "does the structure transfer" has to be
+measured. But **the two tables are not the same grid.**
 
-```
-형상 격자   66 vs 66 인데 값이 다르다 (층 B 의 M 상향, 층 E 사다리 이동)
-config 축   split_k 8종 vs 10종
-ridge       159.1 vs 117.9  -> ★ 같은 형상의 바운드 분류가 뒤집힌다
-눈금        1.024us vs 32ns
-```
+    shape grid   66 vs 66, but the values differ (layer B's M raised, layer
+                 E's ladder moved)
+    config axes  8 vs 10 kinds of split_k
+    ridge        159.1 vs 117.9  -> ★ the bound class of the same shape flips
+    tick         1.024us vs 32ns
 
-**교집합을 명시적으로 만들고, 통제하지 못하는 것을 세어 남긴다.**
-조용히 한쪽에만 있는 것을 버리면 "전이가 됐다" 가 표본 선택의 결과일 수
-있다 (§26.4).
+**Build the intersection explicitly, and count what cannot be controlled.**
+Silently discarding what exists on only one side can make "it transferred" a
+result of sample selection (§26.4).
 
-## config 동일성 — 아키텍처 독립 축으로만 정한다
+## Config identity — decided by architecture-independent axes only
 
-`kernel_id` 는 아키텍처마다 다르게 컴파일되므로 조인 키가 될 수 없다.
-`regs_per_thread` / `smem_bytes` / `spill_bytes` 도 **빌드 결과**라 GPU 가
-바뀌면 달라진다. 남는 것은 **사람이 고르는 축**뿐이다.
+`kernel_id` compiles differently per architecture, so it cannot be a join key.
+`regs_per_thread` / `smem_bytes` / `spill_bytes` are **build results** and
+change with the GPU. What remains is only **the axes a human chooses**.
 
-```
-tile_m, tile_n, tile_k, split_k, split_k_mode, align_a/b/c
-★ pipeline_kind 는 넣지 않는다 — 세대마다 이름이 달라질 수 있다
-```
+    ★ pipeline_kind is not included — the name may change between generations
 
-⚠️ 이 키가 같아도 **다른 커널**일 수 있다. 같은 타일 축이라도 세대별로
-다른 명령어를 쓴다. "같은 config" 가 아니라 **"같은 축 좌표"** 다.
+⚠️ Even with this key equal it may be a **different kernel**. The same tile
+axes use different instructions per generation. It is not "the same config"
+but **"the same axis coordinates"**.
 """
 
 from __future__ import annotations
@@ -38,50 +35,54 @@ from kernelrule.core.types import Hardware, Problem
 __all__ = ["AXIS_FIELDS", "CrossReport", "axis_key", "common_shapes",
            "common_axis_keys", "bound_flipped", "cross_report"]
 
-#: config 동일성을 정하는 **아키텍처 독립 축**. 빌드 결과(레지스터·smem·
-#: 스필)와 `kernel_id` 는 GPU 가 바뀌면 달라지므로 넣지 않는다.
+#: The **architecture-independent axes** that define config identity. Build
+#: results (registers, smem, spills) and `kernel_id` change with the GPU, so
+#: they are excluded.
 AXIS_FIELDS = ("tile_m", "tile_n", "tile_k", "split_k", "split_k_mode",
                "align_a", "align_b", "align_c")
 
 
 def axis_key(row) -> tuple:
-    """행 하나의 축 좌표. `row` 는 dict 또는 `Config`."""
+    """One row's axis coordinates. `row` is a dict or a `Config`."""
     get = row.get if isinstance(row, dict) else (lambda k: getattr(row, k))
     return tuple(get(f) for f in AXIS_FIELDS)
 
 
 def common_shapes(a, b) -> list[Problem]:
-    """두 표에 다 있는 형상. **순서는 `a` 를 따른다** (결정론)."""
+    """Shapes present in both tables. **The order follows `a`**
+    (deterministic)."""
     bk = {(p.M, p.N, p.K, p.dtype) for p in b.shapes()}
     return [p for p in a.shapes() if (p.M, p.N, p.K, p.dtype) in bk]
 
 
 def common_axis_keys(a, b, p: Problem) -> set[tuple]:
-    """형상 `p` 에서 두 표에 다 있는 축 좌표."""
+    """Axis coordinates present in both tables for shape `p`."""
     return {axis_key(r) for r in a.frame_for(p).to_dict("records")} & \
            {axis_key(r) for r in b.frame_for(p).to_dict("records")}
 
 
 def _arith_intensity(p: Problem) -> float:
-    """FLOP / 이동 바이트. **형상만의 함수다** — 하드웨어가 안 들어간다.
+    """FLOP / bytes moved. **A function of the shape alone** — no hardware.
 
-    ## ★ 정정 (2026-08-31) — 정의를 여기서 다시 쓰지 않는다
+    ## ★ Correction (2026-08-31) — the definition is not rewritten here
 
-    원래 이 함수는 출력 항에 `acc_bytes_per_element`(f32, 4바이트)를
-    곱했다. 그런데 누산기는 레지스터에 있고 **DRAM 으로 나가는 C 는
-    f16** 이다. kernelTab 의 `arith_intensity` 컬럼과 등록 피처
-    `features.physical.arith_intensity` 는 둘 다 셋 다 원소 바이트로
-    센다.
+    This function used to multiply the output term by
+    `acc_bytes_per_element` (f32, 4 bytes). But the accumulator lives in
+    registers and **the C that goes out to DRAM is f16**. kernelTab's
+    `arith_intensity` column and the registered feature
+    `features.physical.arith_intensity` both count all three at element
+    bytes.
 
     ```
-    128x4096x4096   여기 117.03   표/피처 120.471   5090 ridge 117.855
+    128x4096x4096   here 117.03   table/feature 120.471   5090 ridge 117.855
     ```
 
-    **경계가 그 사이에 있어서 `bound_flipped` 가 이 형상을 놓쳤다** —
-    5090 전이에서 뒤집힘 4개를 3개로 셌다. 53개 공통 형상 **전부**에서
-    두 정의가 달랐다.
+    **The boundary sits between them, so `bound_flipped` missed this
+    shape** — it counted 4 flips as 3 in the 5090 transfer. The two
+    definitions differed on **all** 53 common shapes.
 
-    ★ 세 번째 정의를 만든 것이 잘못이다 (원칙 2). 등록 피처에 위임한다.
+    ★ Creating a third definition was the mistake (principle 2). It delegates
+    to the registered feature.
     """
     from kernelrule.features.physical import arith_intensity
 
@@ -89,22 +90,25 @@ def _arith_intensity(p: Problem) -> float:
 
 
 def _ridge(hw: Hardware) -> float:
-    """★ `hw.ridge_point` 를 쓴다 — 여기서 다시 나누지 않는다.
+    """★ It uses `hw.ridge_point` — the division is not redone here.
 
-    실효값/스펙값 중 무엇을 쓰는지가 26% 어긋나고 경계 형상의 분류를
-    뒤집는다 (§6.2). 그 판단은 `Hardware` 한 곳에만 있어야 한다.
+    Whether effective or spec values are used differs by 26% and flips the
+    class of boundary shapes (§6.2). That judgement must live in `Hardware`
+    alone.
     """
     return float(hw.ridge_point)
 
 
 def bound_flipped(a, b, shapes=None) -> list[tuple[Problem, bool, bool]]:
-    """★ ridge 차이로 **바운드 분류가 뒤집히는** 형상 (D-88).
+    """Shapes whose **bound class flips** because of the ridge difference
+    (D-88).
 
-    `(형상, a 에서 메모리 바운드인가, b 에서 메모리 바운드인가)`.
+    `(shape, memory-bound in a?, memory-bound in b?)`.
 
-    체제별로 가중치를 따로 적합하는데(§10) 그 체제 판정이 표마다 다르면
-    **두 표에서 다른 것을 재게 된다.** 조용히 넘어가면 "전이가 안 됐다" 가
-    사실은 "다른 것을 비교했다" 일 수 있다.
+    Weights are fitted per regime (§10), so if the regime verdict differs
+    per table **the two tables measure different things.** Letting it pass
+    silently can make "it did not transfer" actually mean "we compared
+    different things".
     """
     sh = shapes if shapes is not None else common_shapes(a, b)
     ra, rb = _ridge(a.hw), _ridge(b.hw)
@@ -119,7 +123,7 @@ def bound_flipped(a, b, shapes=None) -> list[tuple[Problem, bool, bool]]:
 
 @dataclass(frozen=True, slots=True)
 class CrossReport:
-    """두 표의 겹침. **버린 것을 센다.**"""
+    """The overlap of two tables. **It counts what was discarded.**"""
 
     n_shapes_a: int
     n_shapes_b: int
@@ -136,17 +140,18 @@ class CrossReport:
             return f"{k}/{n} = {k / n:.0%}" if n else f"{k}/0"
         drop_a = frac(self.n_shapes_a - self.n_shapes_common, self.n_shapes_a)
         drop_b = frac(self.n_shapes_b - self.n_shapes_common, self.n_shapes_b)
-        flip = ("  — 체제별 적합이 두 표에서 다른 것을 잰다"
+        flip = ("  — per-regime fitting measures different things in the "
+                "two tables"
                 if self.n_bound_flipped else "")
         return "\n".join([
-            (f"  형상      A {self.n_shapes_a}  B {self.n_shapes_b}  "
-             f"공통 {self.n_shapes_common}"),
-            f"            A 에서 버림 {drop_a}   B 에서 버림 {drop_b}",
-            (f"  축 좌표    A {self.n_axis_a}  B {self.n_axis_b}  "
-             f"공통 {self.n_axis_common}"),
+            (f"  shapes    A {self.n_shapes_a}  B {self.n_shapes_b}  "
+             f"common {self.n_shapes_common}"),
+            f"            dropped from A {drop_a}   from B {drop_b}",
+            (f"  axis coords A {self.n_axis_a}  B {self.n_axis_b}  "
+             f"common {self.n_axis_common}"),
             (f"  ridge     A {self.ridge_a:.1f}  B {self.ridge_b:.1f}  "
-             f"({self.ridge_b / self.ridge_a:.2f}배)"),
-            f"  ★ 바운드 뒤집힘  {self.n_bound_flipped} 형상{flip}",
+             f"({self.ridge_b / self.ridge_a:.2f}x)"),
+            f"  ★ bound flips  {self.n_bound_flipped} shapes{flip}",
         ])
 
 

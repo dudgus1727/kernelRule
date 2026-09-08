@@ -1,41 +1,49 @@
-"""채점 — regret, 난이도 층화, 유의성 (§7, §30.4, §30.5).
+"""Scoring — regret, difficulty stratification, significance (§7, §30.4,
+§30.5).
 
-## 인터페이스가 곧 방어다
+## The interface is the defence
 
-채점기가 받는 것은 **순서를 내는 함수** 하나다.
+What the scorer receives is one **function that produces an order**.
 
-    order_fn(p: Problem, cand: CandidateSet) -> np.ndarray   # 후보 인덱스 순열
+    order_fn(p: Problem, cand: CandidateSet) -> np.ndarray   # a permutation
+                                                             # of candidate
+                                                             # indices
 
-`cand` 에 시간이 없고(§types) `order_fn` 은 표를 받지 않는다. 규칙도 베이스라인도
-GBDT 도 벤더 휴리스틱도 전부 이 시그니처를 만족하며, **누구도 시간을 볼 수 없다.**
-시간은 `evaluate()` 안에서 순서가 **이미 정해진 뒤에** 인덱싱에만 쓰인다.
+`cand` has no times (§types) and `order_fn` is not given the table. Rules,
+baselines, GBDT and the vendor heuristic all satisfy this signature, and
+**none of them can see the times.** Times are used only for indexing inside
+`evaluate()`, **after** the order is already fixed.
 
-## 보고 규약 (§7.3, §30.4, §30.5)
+## Reporting convention (§7.3, §30.4, §30.5)
 
-전체 geomean 만 내는 경로를 만들지 않는다. 모든 결과는 세 축으로 쪼개진다.
+There is no path that reports the overall geomean alone. Every result is
+split along three axes.
 
-    ★ 크기  t_best >= 0.5ms / < 0.5ms      — **먼저 본다** (아래)
-      난이도 상위 절반 / 하위 절반          — k=1 에서만 의미가 있다
-      k      1 / 3 / 5 / 10                 — k=1 과 k>=3 은 다른 배포 시나리오다
+    ★ size        t_best >= 0.5ms / < 0.5ms  — **looked at first** (below)
+      difficulty  upper half / lower half    — only meaningful at k=1
+      k           1 / 3 / 5 / 10             — k=1 and k>=3 are different
+                                               deployment scenarios
 
-## ★ 크기 층화가 난이도 층화보다 5배 더 달라진다 (§30.5)
+## ★ Size stratification moves 5x more than difficulty stratification (§30.5)
 
-정적 top-1 의 대표값 값에서:
+At the reference value of the static top-1:
 
-    난이도 상/하    1.099  vs  1.132     차이 0.03
-    크기 >=/<0.5ms  1.021  vs  1.164     차이 0.14   <- 5배
+    difficulty hi/lo    1.099  vs  1.132     difference 0.03
+    size >=/<0.5ms      1.021  vs  1.164     difference 0.14   <- 5x
 
-**고정 config 의 손해는 거의 전부 0.5ms 미만 형상에서 온다.** 그런데 그
-구간이 정확히 **측정 분해능이 가장 나쁜 곳**이다 (§30.2 — 0.5ms 에서 눈금
-하나가 0.2%, 14µs 에서 7.3%).
+**Almost all of a fixed config's loss comes from shapes under 0.5ms.** And
+that band is exactly **where the measurement resolution is worst** (§30.2 —
+one tick is 0.2% at 0.5ms and 7.3% at 14µs).
 
-    노릴 여지가 있는 곳  =  측정으로 확인하기 가장 어려운 곳
+    where there is room to gain  =  where it is hardest to confirm by
+                                    measurement
 
-이것이 이 프로젝트의 가장 큰 긴장이고, 지표 설계에 그대로 들어간다.
-그래서 `stratified()` 는 크기를 먼저 내고, `report()` 도 크기를 먼저 찍는다.
-`hit_rate`(정답 집합 적중)를 regret 과 함께 보는 이유도 이것이다 — 짧은
-형상에서는 regret 차이가 노이즈일 수 있지만 "구분 불가능한 집합 안에
-들어갔는가" 는 노이즈 바닥을 이미 반영한 판정이다.
+This is the biggest tension in this project, and it goes straight into the
+design of the metric. That is why `stratified()` puts size first and
+`report()` prints size first. It is also why `hit_rate` (hitting the answer
+set) is read alongside regret — on short shapes a regret difference may be
+noise, but "did it land inside the indistinguishable set" is a verdict that
+already accounts for the noise floor.
 """
 
 from __future__ import annotations
@@ -61,19 +69,21 @@ __all__ = [
     "is_significant",
 ]
 
-#: 임의의 랭커. 후보 인덱스의 **순열**을 낸다. **표를 받지 않는다.**
-#: 벤더 휴리스틱처럼 점수가 없는 베이스라인도 이걸로 표현된다.
+#: An arbitrary ranker. It produces a **permutation** of candidate indices.
+#: **It is not given the table.** A baseline with no scores, like the vendor
+#: heuristic, is expressed this way too.
 OrderFn = Callable[[Problem, CandidateSet], np.ndarray]
 
-#: 점수 기반 랭커. 후보별 점수 배열을 낸다 (낮을수록 좋다).
-#: 규칙은 전부 이쪽이며, 상위 k개만 뽑는 빠른 경로를 탄다.
+#: A score-based ranker. It produces a per-candidate score array (lower is
+#: better). Every rule is one of these, and it takes the fast path that only
+#: picks the top k.
 ScoreOf = Callable[[Problem, CandidateSet], np.ndarray]
 
 DEFAULT_KS: tuple[int, ...] = (1, 3, 5, 10)
 
 
 def geomean(x) -> float:
-    """기하평균. regret 은 비율 척도이므로 산술평균을 쓰지 않는다."""
+    """Geometric mean. regret is a ratio scale, so no arithmetic mean."""
     a = np.asarray(x, dtype=np.float64)
     a = a[np.isfinite(a) & (a > 0)]
     if a.size == 0:
@@ -83,10 +93,11 @@ def geomean(x) -> float:
 
 @dataclass(frozen=True, slots=True)
 class Strata:
-    """평가 층. `PerfTable` 의 정답 쪽 통계로 만든다. **규칙에 넘기지 마라.**"""
+    """Evaluation strata. Built from `PerfTable`'s answer-side statistics.
+    **Do not hand it to a rule.**"""
 
     shapes: tuple[Problem, ...]
-    hard: np.ndarray          # bool (n_shapes,) 난이도 상위 절반
+    hard: np.ndarray          # bool (n_shapes,) the harder half
     small: np.ndarray         # bool (n_shapes,) t_best < 0.5ms
     difficulty: np.ndarray    # float
     best_ms: np.ndarray       # float
@@ -97,12 +108,13 @@ class Strata:
               shapes: Sequence[Problem] | None = None) -> Strata:
         shapes = tuple(shapes if shapes is not None else table.shapes())
         if not shapes:
-            # 빈 집합으로 진행하지 않는다 (§26.4).
-            raise ValueError("Strata.build 에 형상이 하나도 없다.")
+            # Do not proceed with an empty set (§26.4).
+            raise ValueError("Strata.build was given no shapes at all.")
         st = [table.stats(p) for p in shapes]
         diff = np.asarray([s.difficulty for s in st], dtype=np.float64)
         best = np.asarray([s.best_ms for s in st], dtype=np.float64)
-        # 중앙값 초과를 "어려운 절반" 으로 본다. 홀수여도 결정론적이다.
+        # Above the median counts as "the hard half". Deterministic even
+        # with an odd count.
         hard = diff > np.median(diff)
         small = np.asarray([s.is_small for s in st])
 
@@ -118,16 +130,16 @@ class Strata:
 
 @dataclass(frozen=True, slots=True)
 class Evaluation:
-    """채점 결과. 형상별 원값 + 층별 집계."""
+    """A scoring result. Per-shape raw values + per-stratum aggregates."""
 
     ks: tuple[int, ...]
     shapes: tuple[Problem, ...]
-    #: (n_shapes, n_ks) — 형상별 regret@k
+    #: (n_shapes, n_ks) — per-shape regret@k
     regret: np.ndarray
-    #: (n_shapes, n_ks) — 상위 k 안에 정답 집합 원소가 있었는가
+    #: (n_shapes, n_ks) — was there a member of the answer set in the top k
     hit: np.ndarray
     strata: Strata
-    #: 형상별 2σ 허용치. 유의성 판정에 쓴다.
+    #: Per-shape 2σ tolerance. Used for the significance verdict.
     tol: np.ndarray
     label: str = ""
     extra: dict = field(default_factory=dict)
@@ -136,7 +148,7 @@ class Evaluation:
         try:
             return self.ks.index(k)
         except ValueError:
-            raise KeyError(f"k={k} 는 채점되지 않았다. 채점된 k: {self.ks}"
+            raise KeyError(f"k={k} was not scored. scored k: {self.ks}"
                            ) from None
 
     def at(self, k: int = 1, *, mask: np.ndarray | None = None) -> float:
@@ -154,28 +166,32 @@ class Evaluation:
         return float(v.mean()) if v.size else float("nan")
 
     def stratified(self, k: int = 1) -> dict[str, float]:
-        """§30.4 + §7.3 의 필수 층화. **이 dict 를 통째로 보고한다.**
+        """The mandatory stratification of §30.4 + §7.3. **Report this
+        dict whole.**
 
-        ★ 크기 층화가 먼저다 (§30.5). 난이도보다 5배 더 달라진다.
+        ★ Size stratification comes first (§30.5). It moves 5x more than
+        difficulty.
         """
         s = self.strata
         return {
             "all": self.at(k),
-            # 크기 — 먼저 본다
+            # size — looked at first
             "large(>=0.5ms)": self.at(k, mask=~s.small),
             "small(<0.5ms)": self.at(k, mask=s.small),
             "n_small": float(int(s.small.sum())),
-            # 난이도
+            # difficulty
             "hard": self.at(k, mask=s.hard),
             "easy": self.at(k, mask=~s.hard),
             "n_shapes": float(len(s.shapes)),
         }
 
     def size_gap(self, k: int = 1) -> float:
-        """짧은 형상과 긴 형상의 regret 격차. **주 진단량이다** (§30.5).
+        """The regret gap between short and long shapes. **The main
+        diagnostic** (§30.5).
 
-        정적 top-1 에서 0.14 였다. 규칙이 이 격차를 줄이고 있는지가
-        "짧은 형상에서 실제로 뭘 배웠는가" 의 직접 신호다.
+        It was 0.14 for the static top-1. Whether a rule is narrowing this
+        gap is the direct signal of "what did it actually learn on short
+        shapes".
         """
         s = self.strata
         return self.at(k, mask=s.small) - self.at(k, mask=~s.small)
@@ -192,17 +208,19 @@ class Evaluation:
         return out
 
     def report(self) -> str:
-        """★ 크기 층화를 먼저 찍는다 (§30.5)."""
+        """★ Prints the size stratification first (§30.5)."""
         st = self.strata
         lines = [(f"== {self.label or 'evaluation'} =="
-                 f"  ({len(st.shapes)}형상, <0.5ms {int(st.small.sum())}개)")]
+                 f"  ({len(st.shapes)} shapes, "
+                 f"{int(st.small.sum())} under 0.5ms)")]
         for k in self.ks:
             s = self.stratified(k)
             lines.append(
-                f"  regret@{k:<2d} 전체 {s['all']:.4f} "
+                f"  regret@{k:<2d} all {s['all']:.4f} "
                 f"| >=0.5ms {s['large(>=0.5ms)']:.4f} "
-                f"| <0.5ms {s['small(<0.5ms)']:.4f} (격차 {self.size_gap(k):+.4f}) "
-                f"| 어려움 {s['hard']:.4f} 쉬움 {s['easy']:.4f} "
+                f"| <0.5ms {s['small(<0.5ms)']:.4f} "
+                f"(gap {self.size_gap(k):+.4f}) "
+                f"| hard {s['hard']:.4f} easy {s['easy']:.4f} "
                 f"| hit {self.hit_rate(k):.3f}")
         return "\n".join(lines)
 
@@ -211,15 +229,16 @@ def evaluate(order_fn: OrderFn, table: PerfTable,
              shapes: Sequence[Problem] | None = None, *,
              ks: Sequence[int] = DEFAULT_KS, label: str = "",
              strata: Strata | None = None) -> Evaluation:
-    """`order_fn` 을 채점한다.
+    """Scores `order_fn`.
 
-    ★ `order_fn` 은 `(Problem, CandidateSet)` 만 받는다. 표도 시간도 안 준다.
-    시간은 순서가 정해진 **뒤에** 여기서만 인덱싱된다 (§30.7).
+    ★ `order_fn` receives only `(Problem, CandidateSet)`. Neither the table
+    nor the times are given. Times are indexed only here, **after** the
+    order is fixed (§30.7).
     """
     shapes = tuple(shapes if shapes is not None else table.shapes())
     if not shapes:
-        raise ValueError("evaluate 에 형상이 하나도 없다. 빈 집합으로 진행하지 "
-                         "않는다 (§26.4).")
+        raise ValueError("evaluate was given no shapes at all. It does not "
+                         "proceed with an empty set (§26.4).")
     ks = tuple(int(k) for k in ks)
     strata = strata or Strata.build(table, shapes)
 
@@ -232,7 +251,7 @@ def evaluate(order_fn: OrderFn, table: PerfTable,
         order = np.asarray(order_fn(p, cand))
         _check_order(order, cand, p)
 
-        t = table.times_of(p)              # ← 시간이 등장하는 유일한 지점
+        t = table.times_of(p)          # <- the only place times appear
         ans = table.answer_mask(p)
         st = table.stats(p)
         tol[i] = st.answer_tol
@@ -249,17 +268,20 @@ def evaluate_scores(score_of: ScoreOf, table: PerfTable,
                     shapes: Sequence[Problem] | None = None, *,
                     ks: Sequence[int] = DEFAULT_KS, label: str = "",
                     strata: Strata | None = None) -> Evaluation:
-    """점수 기반 규칙을 채점한다. `evaluate` 와 **결과가 같고 훨씬 빠르다.**
+    """Scores a score-based rule. **Same result as `evaluate`, much
+    faster.**
 
-    전체 정렬 대신 `CandidateSet.top_k` 를 쓴다. 형상당 후보가 15,000개인데
-    상위 10개만 보므로 전체 정렬은 낭비다 — 실측으로 규칙당 2.7초가 나왔고
-    라운드당 12규칙이면 32초라 LLM 호출과 맞먹었다.
+    Instead of a full sort it uses `CandidateSet.top_k`. There are 15,000
+    candidates per shape and only the top 10 are looked at, so a full sort is
+    waste — measured at 2.7 s per rule, which at 12 rules per round is 32 s,
+    on a par with the LLM calls.
 
-    ★ tie-break 는 그대로 config 정체성으로만 한다 (§30.7).
+    ★ The tie-break is still made on config identity alone (§30.7).
     """
     shapes = tuple(shapes if shapes is not None else table.shapes())
     if not shapes:
-        raise ValueError("evaluate_scores 에 형상이 하나도 없다 (§26.4).")
+        raise ValueError(
+            "evaluate_scores was given no shapes at all (§26.4).")
     ks = tuple(int(k) for k in ks)
     kmax = max(ks)
     strata = strata or Strata.build(table, shapes)
@@ -271,7 +293,7 @@ def evaluate_scores(score_of: ScoreOf, table: PerfTable,
     for i, p in enumerate(shapes):
         cand = table.candidates(p)
         top = cand.top_k(np.asarray(score_of(p, cand)), kmax)
-        t = table.times_of(p)              # ← 시간이 등장하는 유일한 지점
+        t = table.times_of(p)          # <- the only place times appear
         ans = table.answer_mask(p)
         st = table.stats(p)
         tol[i] = st.answer_tol
@@ -285,35 +307,40 @@ def evaluate_scores(score_of: ScoreOf, table: PerfTable,
 
 
 def _check_order(order: np.ndarray, cand: CandidateSet, p: Problem) -> None:
-    """순열인지 검사한다. **조용히 넘어가지 않는다** (§26.4).
+    """Checks that it is a permutation. **It does not pass silently**
+    (§26.4).
 
-    LLM 이 만든 규칙은 후보를 빠뜨리거나 중복시키는 코드를 실제로 낸다.
-    그대로 두면 regret 이 좋아 보이는 방향(후보를 줄이면 top-k 가 유리)으로
-    틀린다.
+    Rules the LLM writes really do produce code that drops or duplicates
+    candidates. Left alone, that errs in the direction that makes regret look
+    good (shrinking the candidates favours top-k).
     """
     if order.ndim != 1 or order.size != cand.n:
         raise ValueError(
-            f"{p.key}: 순서 길이 {order.size} != 후보 수 {cand.n}. "
-            "규칙은 모든 후보를 정렬해 돌려줘야 한다.")
+            f"{p.key}: order length {order.size} != candidate count "
+            f"{cand.n}. A rule must return every candidate, ordered.")
     if order.dtype.kind not in "iu":
-        raise ValueError(f"{p.key}: 순서가 정수 인덱스가 아니다 ({order.dtype}).")
+        raise ValueError(
+            f"{p.key}: the order is not integer indices ({order.dtype}).")
     seen = np.zeros(cand.n, dtype=bool)
     seen[order] = True
     if not seen.all():
         raise ValueError(
-            f"{p.key}: 순서가 순열이 아니다 (누락 {int((~seen).sum())}개). "
-            "후보를 빠뜨리면 top-k 가 유리해져 채점이 틀린다.")
+            f"{p.key}: the order is not a permutation "
+            f"({int((~seen).sum())} missing). Dropping candidates favours "
+            f"top-k and makes the scoring wrong.")
 
 
 def is_significant(delta: float, ev: Evaluation, *,
                    mask: np.ndarray | None = None) -> bool:
-    """이 regret 차이가 측정 노이즈보다 큰가 (§7.4).
+    """Is this regret difference larger than the measurement noise (§7.4)?
 
-    ⚠️ 고정 임계값을 쓰지 마라. 형상마다 다르다. 여기서는 평가에 포함된
-    형상들의 2σ 허용치를 기하평균해 문턱으로 쓴다.
+    ⚠️ Do not use a fixed threshold. It differs per shape. Here the geometric
+    mean of the 2σ tolerances of the shapes in the evaluation is used as the
+    threshold.
 
-    ⚠️ 계산할 수 없으면 **유의하지 않다**고 본다 (§26.4 — 실패 쪽으로 기운다).
-    아카이브를 갱신하지 않는 쪽이 노이즈를 개선으로 착각하는 것보다 안전하다.
+    ⚠️ When it cannot be computed it is taken as **not significant** (§26.4
+    — leaning towards failure). Not updating the archive is safer than
+    mistaking noise for an improvement.
     """
     tol = ev.tol if mask is None else ev.tol[mask]
     if tol.size == 0 or not np.all(np.isfinite(tol)):
@@ -322,32 +349,35 @@ def is_significant(delta: float, ev: Evaluation, *,
 
 
 # ---------------------------------------------------------------------------
-# ★ 두 방법의 비교 — geomean 차이만으로 이겼다/졌다 하지 않는다 (§7.4)
+# ★ Comparing two methods — won/lost is not declared from a geomean
+# difference alone (§7.4)
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True, slots=True)
 class Comparison:
-    """A 와 B 를 **형상별로** 비교한 결과.
+    """The result of comparing A and B **per shape**.
 
-    `1.085 > 1.080 이니 졌다` 는 부정확하다. 61형상 geomean 에서 0.5% 면
-    형상 몇 개가 눈금 하나 차이로 달라져도 나올 수 있는 크기다.
+    "1.085 > 1.080, so it lost" is imprecise. In a 61-shape geomean, 0.5% is
+    a size that can appear when a few shapes move by a single tick.
 
-    **"유의하게 진 형상이 N개" 가 정확한 서술이다.**
+    **"It lost significantly on N shapes" is the precise statement.**
     """
 
     name_a: str
     name_b: str
     geo_a: float
     geo_b: float
-    #: 형상별 (t_A - t_B) / (t_best * noise_floor(t_best)). A 가 크면 A 가 나쁨
+    #: Per shape, (t_A - t_B) / (t_best * noise_floor(t_best)). Larger
+    #: means A is worse.
     sigma: np.ndarray
-    #: 형상별 regret 차이 (A - B). 시그마는 "실재하는가", 이것은 "얼마나 큰가".
+    #: Per-shape regret difference (A - B). Sigma says "is it real", this
+    #: says "how large".
     delta: np.ndarray
     shapes: tuple[Problem, ...]
     k_sigma: float = 2.0
 
     @property
     def a_loses(self) -> np.ndarray:
-        """A 가 B 에 **유의하게** 진 형상."""
+        """Shapes where A lost to B **significantly**."""
         return self.sigma > self.k_sigma
 
     @property
@@ -365,43 +395,47 @@ class Comparison:
         n_tie = int(self.tied.sum())
         lines = [
             (f"{self.name_a} {self.geo_a:.4f}  vs  {self.name_b} "
-             f"{self.geo_b:.4f}   (차이 {self.geo_a - self.geo_b:+.4f})"),
-            (f"  {n}형상 중 — {self.name_a} 가 유의하게 이긴 것 {n_win}, "
-             f"진 것 {n_lose}, 구분 불가 {n_tie}   "
-             f"({self.k_sigma}시그마 기준)"),
+             f"{self.geo_b:.4f}   "
+             f"(difference {self.geo_a - self.geo_b:+.4f})"),
+            (f"  of {n} shapes — {self.name_a} won significantly on {n_win}, "
+             f"lost on {n_lose}, indistinguishable on {n_tie}   "
+             f"(at {self.k_sigma} sigma)"),
         ]
         if n:
-            # ★ 시그마는 "실재하는가" 이지 "얼마나 큰가" 가 아니다.
-            #   긴 형상은 노이즈 바닥이 0.05% 라 작은 차이도 수백 시그마다.
-            #   크기(regret 차이)를 함께 보여야 오독하지 않는다.
+            # ★ Sigma says "is it real", not "how large". On long shapes
+            #   the noise floor is 0.05%, so even a small difference is
+            #   hundreds of sigma. The size (the regret difference) has to
+            #   be shown alongside or it gets misread.
             mw = int(np.argmin(self.delta))
             ml = int(np.argmax(self.delta))
             pw, pl = self.shapes[mw], self.shapes[ml]
-            lines.append(f"  최대 이득 {pw.M}x{pw.N}x{pw.K} "
+            lines.append(f"  largest gain {pw.M}x{pw.N}x{pw.K} "
                          f"regret {self.delta[mw]:+.3f} "
-                         f"({-self.sigma[mw]:.0f}시그마)")
-            lines.append(f"  최대 손실 {pl.M}x{pl.N}x{pl.K} "
+                         f"({-self.sigma[mw]:.0f} sigma)")
+            lines.append(f"  largest loss {pl.M}x{pl.N}x{pl.K} "
                          f"regret {self.delta[ml]:+.3f} "
-                         f"({self.sigma[ml]:.0f}시그마)")
+                         f"({self.sigma[ml]:.0f} sigma)")
             big = int((self.delta > 0.05).sum())
             if big:
                 lines.append(
-                    f"  regret 을 0.05 넘게 잃은 형상 {big}개 — geomean 은 "
-                    "이런 소수 형상에 끌린다")
+                    f"  {big} shapes lost more than 0.05 of regret — the "
+                    f"geomean is dragged by a handful like these")
         return "\n".join(lines)
 
 
 def compare(a: Evaluation, b: Evaluation, table: PerfTable, *,
             name_a: str = "A", name_b: str = "B", k: int = 1,
             k_sigma: float = 2.0) -> Comparison:
-    """두 채점 결과를 **형상별 노이즈 바닥 단위**로 비교한다.
+    """Compares two scoring results **in units of the per-shape noise
+    floor**.
 
-    ⚠️ 같은 형상 집합에서 잰 것이어야 한다 (§30.8 — 같은 절차/분모/집계).
+    ⚠️ They must have been measured on the same shape set (§30.8 — same
+    procedure / denominator / aggregation).
     """
     if tuple(p.key for p in a.shapes) != tuple(p.key for p in b.shapes):
         raise ValueError(
-            "두 평가의 형상 집합이 다르다. 같은 집합에서 재야 비교가 "
-            "성립한다 (§30.8).")
+            "the two evaluations have different shape sets. A comparison "
+            "only holds when measured on the same set (§30.8).")
     ci = a.ks.index(k), b.ks.index(k)
     sig = np.empty(len(a.shapes), dtype=np.float64)
     dlt = np.empty(len(a.shapes), dtype=np.float64)
@@ -409,7 +443,7 @@ def compare(a: Evaluation, b: Evaluation, table: PerfTable, *,
         st = table.stats(p)
         r_a, r_b = a.regret[i, ci[0]], b.regret[i, ci[1]]
         dlt[i] = r_a - r_b
-        # regret 은 t/best 이므로 t 로 되돌린다
+        # regret is t/best, so convert back to t
         denom = st.best_ms * st.noise_floor
         sig[i] = ((r_a - r_b) * st.best_ms / denom) if denom > 0 else 0.0
     return Comparison(name_a=name_a, name_b=name_b, geo_a=a.at(k),

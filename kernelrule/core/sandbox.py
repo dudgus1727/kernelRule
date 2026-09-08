@@ -1,30 +1,34 @@
-"""LLM 생성 코드의 격리 실행 (§15.3).
+"""Isolated execution of LLM-generated code (§15.3).
 
-`exec` 를 그대로 쓰면 안 된다. LLM 은 무한 루프를 **실제로** 만들어낸다.
+Plain `exec` will not do. The LLM **really does** produce infinite loops.
 
-## 두 겹
+## Two layers
 
-    1. 정적 검사 (`rules/checks.py`)   실행 **전에** AST 로 거른다
-    2. 이 파일                          그래도 통과한 것을 격리해서 돌린다
+    1. static checks (`rules/checks.py`)   filtered by AST **before** running
+    2. this file                           what still got through is run in
+                                           isolation
 
-정적 검사가 1차 방어이고 여기는 2차다. 순서를 바꾸면 안 된다 — 파싱조차
-안 되는 코드를 별도 프로세스에 넘기는 것은 비용만 든다.
+The static checks are the first line of defence and this is the second. The
+order must not be swapped — handing code that does not even parse to a
+separate process only costs.
 
-## 무엇을 막는가
+## What it blocks
 
-    무한 루프      별도 프로세스 + 타임아웃 -> 죽인다
-    메모리 폭주    RLIMIT_AS
-    파일/네트워크   builtins 제한 + import 훅
-    크래시         별도 프로세스라 부모가 안 죽는다
+    infinite loop     a separate process + timeout -> killed
+    memory blowup     RLIMIT_AS
+    files/network     restricted builtins + an import hook
+    crashes           a separate process, so the parent does not die
 
-## 왜 컴파일과 실행을 나누는가
+## Why compilation and execution are separated
 
-`compile_rule()` 은 **부모 프로세스에서** 제한된 네임스페이스로 `exec` 한다.
-정적 검사를 통과한 코드는 import 도 파일 접근도 못 하므로 여기서는 안전하고,
-채점 루프가 프로세스 경계를 매번 넘지 않아도 된다 (라운드당 12규칙 x 66형상).
+`compile_rule()` does an `exec` **in the parent process** with a restricted
+namespace. Code that passed the static checks can neither import nor touch
+files, so it is safe here, and the scoring loop need not cross a process
+boundary every time (12 rules x 66 shapes per round).
 
-`run_isolated()` 는 **처음 보는 코드**를 시험 실행할 때 쓴다. 무한 루프와
-크래시를 여기서 걸러낸 뒤 `compile_rule()` 로 넘긴다.
+`run_isolated()` is for trial-running **code seen for the first time**.
+Infinite loops and crashes are filtered out here before handing it to
+`compile_rule()`.
 """
 
 from __future__ import annotations
@@ -44,9 +48,10 @@ __all__ = ["SandboxError", "SandboxResult", "compile_rule", "run_isolated",
 DEFAULT_TIMEOUT_S = 5.0
 DEFAULT_MEM_MB = 2048
 
-#: 규칙에 주는 `np` 는 **모듈 전체가 아니다.** `np.random` 이 비결정론을
-#: 만들고 `np.load` 가 파일을 연다. 정적 검사가 이미 이름을 거르지만
-#: 실행 시점에도 없는 편이 낫다 — 두 겹이 같은 방향으로 실패해야 한다.
+#: The `np` given to a rule is **not the whole module.** `np.random` makes
+#: things non-deterministic and `np.load` opens files. The static checks
+#: already filter the names, but it is better for them to be absent at
+#: runtime too — the two layers must fail in the same direction.
 _NP_ALLOWED = (
     "where", "clip", "minimum", "maximum", "log", "log2", "log10", "sqrt",
     "abs", "exp", "power", "sign", "floor", "ceil", "round", "isfinite",
@@ -65,7 +70,7 @@ _BUILTINS = {
 
 
 class SandboxError(RuntimeError):
-    """격리 실행이 실패했다. **규칙을 폐기한다.**"""
+    """The isolated run failed. **The rule is discarded.**"""
 
 
 @dataclass
@@ -78,60 +83,67 @@ class SandboxResult:
 
     def __str__(self) -> str:
         if self.timed_out:
-            return f"[시간 초과] {self.seconds:.1f}s"
-        return f"[{'성공' if self.ok else '실패'}] {self.error[:200]}"
+            return f"[timed out] {self.seconds:.1f}s"
+        return f"[{'ok' if self.ok else 'failed'}] {self.error[:200]}"
 
 
 class _NpProxy:
-    """허용된 함수만 노출하는 numpy 대역. 나머지는 `AttributeError`."""
+    """A numpy stand-in exposing only the allowed functions. Everything
+    else is an `AttributeError`."""
 
     __slots__ = ()
 
     def __getattr__(self, name: str):
         if name not in _NP_ALLOWED:
             raise AttributeError(
-                f"np.{name} 는 규칙에서 쓸 수 없다. "
-                f"허용: {', '.join(sorted(_NP_ALLOWED)[:10])} ...")
+                f"np.{name} cannot be used in a rule. "
+                f"allowed: {', '.join(sorted(_NP_ALLOWED)[:10])} ...")
         return getattr(np, name)
 
 
 def safe_namespace() -> dict:
-    """규칙이 보는 전역. **import 도 파일 접근도 없다.**"""
+    """The globals a rule sees. **No import, no file access.**"""
     return {"__builtins__": dict(_BUILTINS), "np": _NpProxy()}
 
 
 def compile_rule(code: str, *, name: str = "score"):
-    """제한된 네임스페이스에서 `exec` 하고 함수를 꺼낸다.
+    """`exec`s in a restricted namespace and pulls the function out.
 
-    ⚠️ **정적 검사를 먼저 통과시켜라.** 이 함수는 AST 를 안 본다.
+    ⚠️ **Pass the static checks first.** This function does not look at the
+    AST.
 
-    ## ★ numpy 경고를 끄고 부른다 (D-135)
+    ## ★ It is called with numpy warnings off (D-135)
 
-    numpy 는 경고를 내려고 `warnings` 를 import 하는데, 제한된 builtins 에
-    `__import__` 가 없어서 **`KeyError: '__import__'` 로 죽는다.** 규칙이
-    `log(음수)` · 0 나누기 · overflow 를 한 번이라도 만들면 점수도 못 받고
-    버려졌다 — 대표값 6실행에서 **제안 1,728개 중 34개(2.0%)** 가 그랬다.
+    numpy imports `warnings` in order to raise one, and the restricted
+    builtins have no `__import__`, so it **dies with
+    `KeyError: '__import__'`.** A rule that produced `log(negative)`, a
+    division by zero, or an overflow even once was thrown away without even
+    getting a score — **34 of 1,728 proposals (2.0%)** across the six
+    reference runs.
 
     ```
-    샌드박스 자식   np.seterr(all="ignore") 가 **있었다** (여기 아래)
-    채점·적합 경로  ★ 없었다   -> 같은 방어가 한쪽에만 (원칙 2)
+    sandbox child      np.seterr(all="ignore") **was there** (below)
+    scoring/fit path   ★ was not   -> the same defence on one side only
+                       (principle 2)
     ```
 
-    ★ 전역 `np.seterr` 대신 **호출마다 `np.errstate`** 를 쓴다 — 전역
-    상태를 바꾸면 이 프로세스의 다른 계산까지 조용히 달라진다.
+    ★ Instead of a global `np.seterr`, **a per-call `np.errstate`** is used
+    — changing global state would silently change other computations in this
+    process too.
 
-    비유한 값이 나온 뒤는 **이미 정해져 있다**: 적합기는 그 가중치를
-    실행 불가로 보고(`inf`, 구조 기각 아님), 채점의 `top_k` 는
-    `ValueError` 로 그 규칙을 거부한다.
+    What happens after a non-finite value **is already settled**: the fitter
+    treats those weights as unrunnable (`inf`, not a structural rejection),
+    and scoring's `top_k` refuses that rule with a `ValueError`.
     """
     ns = safe_namespace()
     try:
         exec(compile(code, "<rule>", "exec"), ns)      # noqa: S102
     except Exception as e:                             # noqa: BLE001
-        raise SandboxError(f"규칙 컴파일 실패: {type(e).__name__}: {e}") from e
+        raise SandboxError(
+            f"rule compilation failed: {type(e).__name__}: {e}") from e
     fn = ns.get(name)
     if not callable(fn):
-        raise SandboxError(f"규칙에 `{name}` 함수가 없다")
+        raise SandboxError(f"the rule has no `{name}` function")
 
     @functools.wraps(fn)
     def guarded(*a, **kw):
@@ -142,27 +154,29 @@ def compile_rule(code: str, *, name: str = "score"):
 
 
 def _child(code: str, name: str, args_pickle: bytes, mem_mb: int, q) -> None:
-    """자식 프로세스. 자원 한도를 걸고 규칙을 한 번 실행한다."""
+    """The child process. Sets resource limits and runs the rule once."""
     try:
         soft = mem_mb * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (soft, soft))
         resource.setrlimit(resource.RLIMIT_NOFILE, (16, 16))
-        # ⚠️ RLIMIT_NPROC 을 0 으로 두면 안 된다 — 리눅스에서 **스레드도
-        #    프로세스로 센다.** `multiprocessing.Queue` 의 피더 스레드가 못
-        #    떠서 결과를 못 돌려주고, 모든 케이스가 "시간 초과" 로 보인다.
-        #    (실제로 밟았다. 정상 코드까지 타임아웃으로 나왔다.)
-        #    프로세스 생성은 `os`/`subprocess` 를 못 import 하는 것으로 막힌다.
-    except (ValueError, OSError):        # pragma: no cover - 플랫폼 차이
+        # ⚠️ RLIMIT_NPROC must not be set to 0 — on Linux **threads count
+        #    as processes too.** The feeder thread of
+        #    `multiprocessing.Queue` cannot start, so no result comes back
+        #    and every case looks like a "timeout". (We stepped on this.
+        #    Even correct code came out as a timeout.) Process creation is
+        #    blocked by not being able to import `os`/`subprocess`.
+    except (ValueError, OSError):        # pragma: no cover - platform diff
         pass
     try:
         import pickle
-        # numpy 의 경고 경로는 `warnings` 를 import 하는데 제한된 builtins 에는
-        # `__import__` 가 없다. 그러면 `np.log(-1)` 이 nan 검사에 도달하지 못하고
-        # `KeyError: __import__` 로 죽어서 **원인이 가려진다.** 경고를 끈다 —
-        # 어차피 nan/inf 는 아래에서 명시적으로 잡는다.
+        # numpy's warning path imports `warnings`, and the restricted
+        # builtins have no `__import__`. Then `np.log(-1)` never reaches the
+        # nan check and dies with `KeyError: __import__`, **hiding the
+        # cause.** Warnings are turned off — nan/inf are caught explicitly
+        # below anyway.
         np.seterr(all="ignore")
         fn = compile_rule(code, name=name)
-        args = pickle.loads(args_pickle)     # noqa: S301 - 우리가 만든 것
+        args = pickle.loads(args_pickle)     # noqa: S301 - we made it
         out = fn(*args)
         arr = np.asarray(out, dtype=np.float64)
         q.put(("ok", (arr.shape, arr.tobytes(),
@@ -172,21 +186,23 @@ def _child(code: str, name: str, args_pickle: bytes, mem_mb: int, q) -> None:
 
 
 def _context():
-    """자식 프로세스 시작 방식.
+    """How the child process is started.
 
-    `fork` 는 부모 상태를 통째로 물려받아 격리가 아니다.
-    `spawn` 은 **자식이 `__main__` 을 다시 import 한다** — 호출 스크립트가
-    `if __name__ == "__main__":` 로 감싸여 있지 않으면 무한 재귀로 깨진다.
-    루프를 돌리는 스크립트마다 그 가드를 요구할 수는 없다 (실제로 밟았다).
+    `fork` inherits the whole parent state, so it is not isolation.
+    `spawn` makes **the child re-import `__main__`** — if the calling script
+    is not wrapped in `if __name__ == "__main__":` it breaks with infinite
+    recursion. That guard cannot be demanded of every script that runs the
+    loop (we stepped on this).
 
-    `forkserver` 는 깨끗한 서버 프로세스에서 fork 하므로 부모 상태를 안
-    물려받는다. 리눅스에서는 이쪽이 맞다.
+    `forkserver` forks from a clean server process, so it does not inherit
+    the parent state. On Linux this is the right one.
 
-    ⚠️ **`forkserver` 도 `spawn` 도 자식이 `__main__` 을 다시 import 한다**
-    (`multiprocessing.spawn.get_preparation_data`). 호출 스크립트가
-    `if __name__ == "__main__":` 로 감싸여 있지 않으면 무한 재귀로 깨지고,
-    파이썬은 그것을 `BrokenPipeError` 로 보여준다 — 원인이 전혀 안 보인다.
-    아래 `_preflight()` 가 그것을 **읽을 수 있는 에러**로 바꾼다.
+    ⚠️ **Both `forkserver` and `spawn` make the child re-import `__main__`**
+    (`multiprocessing.spawn.get_preparation_data`). If the calling script is
+    not wrapped in `if __name__ == "__main__":` it breaks with infinite
+    recursion, and Python shows that as a `BrokenPipeError` — the cause is
+    completely invisible. `_preflight()` below turns it into **a readable
+    error**.
     """
     try:
         ctx = mp.get_context("forkserver")
@@ -197,9 +213,9 @@ def _context():
 
 
 def _preflight() -> None:
-    """자식 프로세스를 띄울 수 있는지 **한 번** 확인한다.
+    """Checks **once** whether a child process can be started.
 
-    실패하면 `BrokenPipeError` 대신 무엇을 고쳐야 하는지 말한다.
+    On failure it says what to fix instead of a `BrokenPipeError`.
     """
     if getattr(_preflight, "done", False):
         return
@@ -210,19 +226,21 @@ def _preflight() -> None:
         proc.start()
     except (BrokenPipeError, OSError, RuntimeError) as e:
         raise SandboxError(
-            f"샌드박스 자식 프로세스를 띄울 수 없다: {type(e).__name__}: {e}\n"
-            "  가장 흔한 원인: 호출 스크립트에 `if __name__ == \"__main__\":`\n"
-            "  가드가 없다. multiprocessing 의 forkserver/spawn 은 자식이\n"
-            "  `__main__` 을 다시 import 하므로 가드가 없으면 무한 재귀다.\n"
+            f"cannot start the sandbox child process: "
+            f"{type(e).__name__}: {e}\n"
+            "  The most common cause: the calling script has no\n"
+            "  `if __name__ == \"__main__\":` guard. multiprocessing's\n"
+            "  forkserver/spawn make the child re-import `__main__`, so\n"
+            "  without the guard it is infinite recursion.\n"
             "\n"
-            "  고치는 법:\n"
+            "  How to fix it:\n"
             "      def main():\n"
             "          ...\n"
             "      if __name__ == \"__main__\":\n"
             "          main()\n"
             "\n"
-            "  샌드박스를 끄는 것은 답이 아니다 — LLM 은 무한 루프를 실제로\n"
-            "  만들어낸다 (§15.3)."
+            "  Turning the sandbox off is not the answer — the LLM really\n"
+            "  does produce infinite loops (§15.3)."
         ) from e
     try:
         proc.join(20.0)
@@ -234,7 +252,8 @@ def _preflight() -> None:
 
 
 def _ping(q) -> None:                                # pragma: no cover
-    """preflight 자식. 실패해도 부모가 타임아웃으로 판정하므로 삼켜도 된다."""
+    """The preflight child. Even on failure the parent judges it a timeout,
+    so it may be swallowed."""
     import contextlib
 
     with contextlib.suppress(Exception):
@@ -244,9 +263,10 @@ def _ping(q) -> None:                                # pragma: no cover
 def run_isolated(code: str, args: tuple, *, name: str = "score",
                  timeout: float = DEFAULT_TIMEOUT_S,
                  mem_mb: int = DEFAULT_MEM_MB) -> SandboxResult:
-    """별도 프로세스에서 한 번 실행한다. 무한 루프와 크래시를 여기서 잡는다.
+    """Runs once in a separate process. Infinite loops and crashes are
+    caught here.
 
-    ⚠️ 타임아웃이면 **실패**다. "느리지만 통과" 가 아니다 (§26.4).
+    ⚠️ A timeout is a **failure**. Not "slow but passing" (§26.4).
     """
     import pickle
     import time
@@ -268,7 +288,8 @@ def run_isolated(code: str, args: tuple, *, name: str = "score",
             proc.join(1.0)
         return SandboxResult(ok=False, timed_out=True,
                              seconds=time.perf_counter() - t0,
-                             error=f"{timeout}s 안에 끝나지 않았다. 폐기한다")
+                             error=f"did not finish within {timeout}s. "
+                                   f"Discarded")
     finally:
         if proc.is_alive():
             proc.join(1.0)
@@ -282,5 +303,5 @@ def run_isolated(code: str, args: tuple, *, name: str = "score",
     arr = np.frombuffer(raw, dtype=np.float64).reshape(shape)
     if not finite:
         return SandboxResult(ok=False, seconds=dt,
-                             error="점수에 nan/inf 가 있다. 폐기한다")
+                             error="the scores contain nan/inf. Discarded")
     return SandboxResult(ok=True, value=arr, seconds=dt)

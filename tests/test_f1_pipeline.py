@@ -1,8 +1,9 @@
-"""F1~F3 파이프라인의 배관 (§30.9).
+"""The plumbing of the F1~F3 pipeline (§30.9).
 
-**실험 결과가 아니라 배관을 시험한다.** 조건이 정하는 것은 하나뿐이다 —
-어느 레지스트리가 세 단계 전부에 들어가는가. F1 에서 사람이 쓴 24개가
-하나라도 새면 "LLM 이 피처를 만들 수 있는가" 라는 질문 자체가 무너진다.
+**It tests the plumbing, not the experimental results.** The condition
+decides one thing only — which registry goes into all three stages. If even
+one of the 24 a human wrote leaks into F1, the question "can the LLM build
+features" collapses.
 """
 from __future__ import annotations
 
@@ -25,31 +26,35 @@ def pipe():
 
 @pytest.mark.parametrize("cond", ["F1"])
 def test_f0_f1_start_from_an_empty_registry(pipe, cond):
-    """★ 사람이 쓴 것이 **하나도** 없어야 한다."""
+    """★ **Not one** of the human-written features may be there."""
     r = pipe._base_registry(cond)
-    assert not r._items, f"{cond} 출발 레지스트리가 비어 있지 않다: {sorted(r._items)}"
+    assert not r._items, (
+        f"the {cond} starting registry is not empty: {sorted(r._items)}")
 
 
 def test_f2_is_the_public_knowledge_five(pipe):
-    """★ F2 = **공개 지식 다섯** (D-128 개명 전 이름은 `F1-K`).
+    """★ F2 = **the five public facts**
+    (before the D-128 rename its name was `F1-K`).
 
-    옛 `F2`(원시 물리량 5개, `F2_BASE`)는 실행이 0회라 삭제했다. 이름이
-    같으므로 **무엇이 F2 인지**를 시험으로 고정한다 — 달라지면 여기서 잡는다.
+    The old `F2` (5 raw physical quantities, `F2_BASE`) had 0 runs and was
+    deleted. The name is the same, so **what F2 is** is pinned by a test —
+    a change is caught here.
     """
     from kernelrule.features.known5 import KNOWN5
 
     r = pipe._base_registry("F2")
     assert sorted(r._items) == sorted(KNOWN5._items)
     assert len(r._items) == 5
-    # 이름은 24개 안에 있지만 **정리본**이다 — 표 관측을 뺀 docstring (§12.3)
+    # The names are among the 24, but it is the **cleaned-up version** —
+    # docstrings with the table observations removed (§12.3)
     assert set(r._items) <= set(REGISTRY._items)
     assert sorted(r._items) != sorted(REGISTRY._items)
 
 
 def test_no_alias_for_the_old_condition_names(pipe):
-    """★ alias 를 두지 않는다 (D-128). 옛 이름은 **에러**여야 한다."""
-    for old in ("F0", "F1-K", "F1K"):   # 전부 D-128 이 없앤 이름이다
-        with pytest.raises(ValueError, match="알 수 없는 조건"):
+    """★ There are no aliases (D-128). An old name must be an **error**."""
+    for old in ("F0", "F1-K", "F1K"):   # all names D-128 removed
+        with pytest.raises(ValueError, match="unknown condition"):
             pipe._base_registry(old)
 
 
@@ -59,12 +64,13 @@ def test_f3_is_the_human_24(pipe):
 
 
 def test_unknown_condition_is_an_error(pipe):
-    with pytest.raises(ValueError, match="알 수 없는 조건"):
+    with pytest.raises(ValueError, match="unknown condition"):
         pipe._base_registry("F9")
 
 
 def test_mock_llm_gets_only_the_given_registry(pipe, monkeypatch):
-    """`_make_llm` 이 프롬프트용 이름을 **레지스트리에서** 뽑는가."""
+    """Does `_make_llm` take the names for the prompt **from the
+    registry**?"""
     import argparse
 
     from kernelrule.agents.openai_client import Budget
@@ -81,18 +87,21 @@ def test_mock_llm_gets_only_the_given_registry(pipe, monkeypatch):
 
 
 def test_architect_mock_refuses_an_empty_feature_list():
-    """씨앗을 만들 피처가 없으면 **조용히 사람 24개로 안 떨어진다**."""
+    """With no features to build a seed from, it **does not silently fall
+    back to the human 24**."""
     from kernelrule.agents.mock import MockLLM
 
-    with pytest.raises(ValueError, match="조용히"):
+    with pytest.raises(ValueError, match="silently fall back"):
         MockLLM("mutate", feature_names=[]).complete("rule_writer", "")
 
 
 def test_regime_split_does_not_need_the_registry():
-    """★ 체제는 (형상, 하드웨어)의 성질이다 — 피처 목록의 성질이 아니다.
+    """★ A regime is a property of (shape, hardware) — not of the feature
+    list.
 
-    전에는 `info.log_sol_ms` 를 읽어서 F1 레지스트리로는 루프도 리포트도
-    통째로 죽었다. `regime_of` 로 모았다 (원칙 2).
+    It used to read `info.log_sol_ms`, so with the F1 registry both the loop
+    and the report died entirely. It was gathered into `regime_of`
+    (principle 2).
     """
     import ast
 
@@ -107,49 +116,55 @@ def test_regime_split_does_not_need_the_registry():
                     and node.value.id in ("info", "f", "feats")):
                 bad.append(f"  {rel}:{node.lineno} {node.value.id}.{node.attr}")
     assert not bad, (
-        "체제 판정이 레지스트리 피처를 읽는다 — F1 에서 죽는다 "
-        "(§30.9). `core.splits.regime_of` 를 써라:\n" + "\n".join(bad))
+        "the regime verdict reads a registry feature — it dies under F1 "
+        "(§30.9). Use `core.splits.regime_of`:\n" + "\n".join(bad))
 
 
 def test_stage1_loader_redetects_shape_level(pipe):
-    """★ `_load_stage1` 이 `table` 을 넘겨야 `shape_level` 이 다시 판정된다.
+    """★ `_load_stage1` must pass `table` for `shape_level` to be
+    re-judged.
 
-    안 넘기면 기록된 값(대부분 없음 = False)을 쓰고, **형상 수준 피처가
-    0개인 채로** 2·3단계가 돈다. 실제로 F1 2단계를 그 상태로 한 번
-    돌렸다 (D-67).
+    Without it, the recorded value is used (mostly absent = False) and
+    stages 2 and 3 run **with 0 shape-level features**. F1 stage 2 really
+    was run once in that state (D-67).
     """
     import inspect
 
     sig = inspect.signature(pipe._load_stage1)
-    assert "table" in sig.parameters, "_load_stage1 이 표를 안 받는다"
+    assert "table" in sig.parameters, "_load_stage1 does not take the table"
     src = inspect.getsource(pipe._load_stage1)
-    assert "table=table" in src, "load_generated 에 표를 안 넘긴다"
+    assert "table=table" in src, (
+        "the table is not passed to load_generated")
 
 
 # ---------------------------------------------------------------------------
-# ★ 4-3 — 씨앗 선택이 홀드아웃을 안 봤다는 **증거를 남긴다**
+# ★ 4-3 — **leaving evidence** that seed selection did not look at the
+# holdout
 #
-#   절차로는 지켜지고 있다 (`score_only` 가 홀드아웃을 안 돌려준다).
-#   나중에 "정말 안 봤는가" 를 물으면 답할 것이 있어야 한다 (D-50).
+#   Procedurally it is held (`score_only` does not return the holdout). When
+#   someone asks later "did it really not look", there has to be an answer
+#   (D-50).
 # ---------------------------------------------------------------------------
 def test_chosen_json_records_what_was_seen(pipe):
     import inspect
 
     src = inspect.getsource(pipe.stage2)
     for key in ("selected_on", "holdout_seen_at_selection", "unsealed"):
-        assert f'"{key}"' in src, f"chosen.json 에 {key} 를 안 적는다"
+        assert f'"{key}"' in src, (
+            f"chosen.json does not record {key}")
     assert '"holdout_seen_at_selection": False' in src
 
 
 def test_score_only_does_not_return_holdout():
-    """★ 씨앗 선택이 홀드아웃을 볼 **경로 자체가 없다** (원칙 6)."""
+    """★ There is **no path at all** by which seed selection could see the
+    holdout (principle 6)."""
     import inspect
 
     from kernelrule.core.loop import RoundLoop
 
     src = inspect.getsource(RoundLoop.score_only)
-    assert "return float(e.regret)" in src, "반환이 바뀌었다"
-    assert "val_regret" not in src, "홀드아웃을 돌려준다"
+    assert "return float(e.regret)" in src, "the return changed"
+    assert "val_regret" not in src, "it returns the holdout"
 
 
 def test_config_records_seal_state(pipe):
@@ -157,7 +172,8 @@ def test_config_records_seal_state(pipe):
 
     from kernelrule.core.loop import RoundLoop
 
-    # ★ config 를 만드는 자리가 `_config_dict` 로 옮겼다 (D-133 — 트레이스
-    #   첫 줄이 같은 것을 쓴다). 검사 대상도 따라간다.
+    # ★ The place that builds the config moved to `_config_dict` (D-133 —
+    #   the trace's first line uses the same thing). The subject of the check
+    #   follows it.
     assert '"unsealed"' in inspect.getsource(RoundLoop._config_dict)
     assert '"unsealed": is_unsealed()' in inspect.getsource(pipe.main)

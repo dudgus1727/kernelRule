@@ -1,8 +1,14 @@
-"""재실행 실험 계획서 — 문서와 코드가 달라지지 않는가 (원칙 2).
+"""The re-run pre-registration — do the document and the code diverge
+(principle 2)?
 
-같은 판정이 두 곳에 있으면 달라진다. 실험 계획서는 **문서**로 읽히고
-**코드**로 실행되므로 특히 위험하다 — 문서만 고치고 코드를 안 고치면
-"실험 계획서대로 했다" 가 거짓이 된다.
+The same judgement in two places diverges. A pre-registration is especially
+dangerous because it is read as **a document** and executed as **code** —
+fixing only the document and not the code makes "we did it as pre-registered"
+false.
+
+⚠️ 2026-09-08 (D-146): **the asserted strings stay in Korean.** They are the
+text of `docs/artifacts/rerun-preregistration.md` and of the frozen `PREREG`
+that mirrors it, and `docs/` is not translated.
 """
 from __future__ import annotations
 
@@ -30,32 +36,36 @@ def test_doc_exists_and_says_it_is_preregistered():
 
 
 def test_numbers_match_between_doc_and_code(rr):
-    """규모·비용 상한이 문서와 코드에서 같은가."""
+    """Do the scale and the cost cap match between the document and the
+    code?"""
     body = DOC.read_text()
     p = rr.PREREG
     for text in (f"{p['n_seeds']}시드", f"{p['rounds']}라운드",
                  f"{p['n_rules_per_round']}제안"):
-        assert text in body, f"문서에 {text!r} 가 없다"
+        assert text in body, f"{text!r} is not in the document"
     assert p["feature_detail"] == "full"
     assert p["split_kind"] in body
 
 
 def test_expected_result_is_written_down(rr):
-    """★ 예상 결과를 미리 적어야 사후 합리화를 막는다."""
+    """★ The expected result has to be written in advance to block
+    rationalising afterwards."""
     assert "구분 불가" in rr.PREREG["expected"]
     assert "구분 불가" in DOC.read_text()
     assert "실패가 아니다" in rr.PREREG["expected"]
 
 
 def test_primary_metric_is_per_shape(rr):
-    """형상별이 주 지표다 — 실행 6개 부호검정은 p 하한 0.031 이라 약하다."""
+    """Per shape is the main metric — a sign test over 6 runs has a p lower
+    bound of 0.031 and is weak."""
     assert "형상" in rr.PREREG["primary_metric"]
     assert "중앙값" in rr.PREREG["primary_metric"]
     assert "0.031" in rr.PREREG["secondary_metric"]
 
 
 def test_failure_policy_forbids_dropping_a_run(rr):
-    """★ 실패한 실행을 결과에서 빼는 것이 가장 위험하다 (D-50)."""
+    """★ Dropping a failed run from the results is the most dangerous thing
+    (D-50)."""
     one = rr.PREREG["on_gate_failure"]["1건"]
     assert "빼지 말" in one
     assert "2건 이상" in rr.PREREG["on_gate_failure"]
@@ -71,13 +81,15 @@ def test_ab_comparison_is_explicitly_excluded(rr):
     joined = " ".join(rr.PREREG["not_doing"])
     assert "A/B" in joined
     assert "삭제한 값과의 비교" in joined
-    # ★ 빼는 이유가 "결론이 났으니까" 여야 한다. "적합기가 실패하니까" 면
-    #   그것은 기준을 결과에 맞춰 바꾼 것이다 (원칙 18).
+    # ★ The reason for excluding it has to be "because the conclusion is
+    #   already in". "Because the fitter fails" would be changing the
+    #   criterion to fit the result (principle 18).
     assert "이미 결론이 났다" in joined
 
 
 def test_budget_is_bounded(rr):
     for k in ("max_calls", "max_input_tokens", "max_output_tokens"):
         assert rr.BUDGET[k] > 0
-    # 기존 6실행 실측(호출 155/실행)보다는 커야 하고 터무니없이 크면 안 된다
+    # It has to be larger than the existing 6 runs' measurement (155 calls per
+    # run) and must not be absurdly large
     assert 900 < rr.BUDGET["max_calls"] < 3000

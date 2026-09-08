@@ -1,48 +1,55 @@
-"""진단 리포트 — **이 시스템의 엔진** (§12).
+"""The diagnostic report — **the engine of this system** (§12).
 
-LLM 이 기존 최적화 알고리즘을 이길 수 있는 유일한 지점이다. 스칼라 점수만
-주면 성능 나쁜 수치 최적화기가 된다.
+It is the only place an LLM can beat an existing optimisation algorithm.
+Given only a scalar score it becomes a poor numerical optimiser.
 
-## 다섯 블록
+## Five blocks
 
-    1    하드웨어 사실        매번 고정 주입. 기억에서 꺼내게 하면 틀린다
-    2    현재 규칙 코드 전문
-    3    체제별 regret 분해   ★ 크기 층화를 먼저 (§30.5)
-    3.5  표 구조 관찰        개별 사례로는 절대 안 보이는 패턴
-    4    사례 10~15개        ★ 핵심. 선택 vs 최적을 나란히
-    5    실패 이력           없으면 같은 아이디어를 3라운드마다 반복한다
+    1    hardware facts       injected fixed every time. Recalled from
+                              memory it comes out wrong
+    2    the current rule code in full
+    3    per-regime regret breakdown  ★ size stratification first (§30.5)
+    3.5  table-structure observations  patterns individual cases never show
+    4    10~15 cases          ★ the core. The pick and the optimum side by side
+    5    the failure history  without it the same idea returns every 3 rounds
 
-## ★ 검증 방법 (§12.4)
+## ★ How it is validated (§12.4)
 
-**프롬프트를 완성하기 전에 사람이 먼저 읽는다.** 이 다섯 블록만 보고
-"나라면 뭘 고칠까" 가 떠오르면 리포트가 잘 만들어진 것이다.
-안 떠오르면 **프롬프트가 아니라 리포트를 고친다.**
+**A human reads it before the prompt is finished.** If these five blocks
+alone make "what would I fix" come to mind, the report is good. If not,
+**fix the report, not the prompt.**
 
-## ★ 리포트는 결론을 미리 쓰지 않는다. 전부 계산한다
+## ★ The report does not write its conclusions in advance. It computes them
 
-    금지  "X 가 Y 보다 크게 달라진다", "A 가 지배적이다" 를 **템플릿에 박는 것**
-    허용  계산 결과를 서술로 렌더링하는 것 (어느 쪽이 큰지 재서 문장을 만든다)
+    forbidden  **nailing** "X differs greatly from Y" or "A dominates" into
+               the template
+    allowed    rendering a computed result as prose (measuring which is
+               larger and building the sentence)
 
-이 규칙이 왜 필요한지는 실제로 밟았기 때문이다. 블록 3 에 "크기 층화가
-난이도 층화보다 크게 달라진다" 를 미리 적어 뒀는데, **학습 분할(M<=2048)의
-실제 숫자는 반대였다** (0.0007 vs 0.1651). 그 분할에는 긴 형상이 9개뿐이라
-크기 격차가 사라진다. **리포트가 자기 데이터와 모순되면 LLM 은 데이터가
-아니라 문장을 믿는다.**
+Why this rule is needed: we stepped on it. Block 3 had "size stratification
+moves more than difficulty stratification" written in advance, and **the
+actual numbers on the training split (M<=2048) were the opposite** (0.0007 vs
+0.1651). That split has only 9 long shapes, so the size gap disappears.
+**When the report contradicts its own data, the LLM believes the sentence,
+not the data.**
 
-★ 이 규칙은 **하드웨어 사실 블록에는 적용되지 않는다.** 그것은 물리 상수이지
-이 분할의 관측이 아니다. `hardware_block()` 만 예외다.
+★ This rule **does not apply to the hardware-facts block.** Those are
+physical constants, not observations of this split. `hardware_block()` is the
+only exception.
 
-`tests/test_diagnostic.py` 가 렌더된 텍스트에 계산되지 않은 비교어가 있는지
-검사한다.
+`tests/test_diagnostic.py` checks the rendered text for uncomputed
+comparative words.
 
-## 절대 넣지 말 것 (§12.3)
+## Never put in (§12.3)
 
-    표 전체              토큰도 안 되고 넣는 순간 암기한다
-    홀드아웃 점수         넣으면 홀드아웃에 맞춰 최적화한다
-    모든 형상의 최적 목록   전부 주면 조건문으로 옮겨 쓴다
+    the whole table          it does not fit in tokens, and it memorises the
+                             moment it goes in
+    holdout scores           put them in and it optimises against the holdout
+    the optimum of every     given all of them it transcribes them into
+    shape                    conditionals
 
-**구조적 강제:** `DiagnosticReport` 는 `train_shapes` 만 받는다. 검증/최종
-분할이 들어오는 경로를 만들지 않는다 (§10.2).
+**Structural enforcement:** `DiagnosticReport` takes only `train_shapes`.
+There is no path by which the validation or final split can come in (§10.2).
 """
 
 from __future__ import annotations
@@ -62,12 +69,13 @@ from kernelrule.report.table_facts import TableFacts
 
 __all__ = ["DiagnosticReport", "Case", "Regime", "build_report"]
 
-#: 체제 정의. `(이름, 형상 술어)`.
+#: The regime definitions. `(name, shape predicate)`.
 #:
-#: ★ 2026-09-08 (D-145): **memory/compute 를 앞으로**. 아카이브가 그 축으로
-#: 보존하는데(D-144) Analyst 는 크기(SOL<0.5ms)로 진단하고 있었다 — 진단과
-#: 보존이 다른 축을 보면 가설이 아카이브가 지키는 것을 못 짚는다.
-#: 여덟 구간을 다 보여주는 것 자체는 정보이므로 유지한다.
+#: ★ 2026-09-08 (D-145): **memory/compute moved to the front**. The archive
+#: preserves along that axis (D-144) while the Analyst was diagnosing by
+#: size (SOL<0.5ms) — with diagnosis and preservation on different axes, a
+#: hypothesis cannot point at what the archive is protecting.
+#: Showing all eight bands is itself information, so that is kept.
 REGIMES: tuple[tuple[str, str], ...] = (
     ("memory-bound", "mem"),
     ("compute-bound", "comp"),
@@ -91,7 +99,8 @@ class Regime:
 
 @dataclass
 class Case:
-    """사례 하나. **선택 vs 최적을 나란히 보여주는 것이 핵심이다** (§12.1)."""
+    """One case. **Showing the pick and the optimum side by side is the
+    core** (§12.1)."""
 
     shape: tuple
     regime: str
@@ -102,14 +111,15 @@ class Case:
     noise_floor: float
     n_answers: int
     n_candidates: int
-    picked: dict              # config 축 + 피처값
+    picked: dict              # config axes + feature values
     optimum: dict
-    #: 상위 5개 실측 (config 요약, ms, 최적 대비 몇 σ)
+    #: The measured top 5 (config summary, ms, how many σ from the optimum)
     neighbors: list[tuple]
-    #: (피처명, 선택값, 최적값, 규칙에서 사용 중인가)
+    #: (feature name, picked value, optimum value, is the rule using it)
     feature_rows: list[tuple]
-    #: ★ 선택과 최적의 격차가 **노이즈 바닥의 몇 배**인가.
-    #: 1 미만이면 그 형상에서는 순위가 측정으로 존재하지 않는다 (§30.2).
+    #: ★ How many times the noise floor the gap between the pick and the
+    #: optimum is. Below 1, the ranking does not exist as a measurement on
+    #: that shape (§30.2).
     gap_sigma: float = float("nan")
 
 
@@ -131,12 +141,13 @@ class DiagnosticReport:
         return _render(self)
 
     def token_estimate(self) -> int:
-        """대략적 토큰 수. §12.2 의 예산은 ~5,500 이다."""
+        """A rough token count. §12.2's budget is ~5,500."""
         return len(self.render()) // 3
 
 
 # ---------------------------------------------------------------------------
-# 블록 1 — 하드웨어 사실 (§12.1). **기억에서 꺼내게 하면 틀린다**
+# Block 1 — the hardware facts (§12.1). **Recalled from memory it comes out
+# wrong**
 # ---------------------------------------------------------------------------
 def hardware_block(hw, noise) -> str:
     return textwrap.dedent(f"""\
@@ -168,18 +179,19 @@ def hardware_block(hw, noise) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 블록 3 — 체제별 분해. ★ 크기가 먼저다
+# Block 3 — the per-regime breakdown. ★ Size comes first
 # ---------------------------------------------------------------------------
 def _regime_masks(table: PerfTable, matrix: FeatureMatrix,
                   shapes) -> dict[str, np.ndarray]:
     import math
 
-    # ★ 체제는 (형상, 하드웨어)의 성질이지 **피처 목록의 성질이 아니다.**
-    #   전에는 `info.log_sol_ms` / `info.is_memory_bound` 를 읽었는데,
-    #   그것은 레지스트리에 그 두 피처가 있다는 가정이었다. F0/F1
-    #   레지스트리에는 없어서 리포트가 통째로 죽는다 (§30.9).
-    #   `regime_of` 가 `physical.py` 의 **함수**를 직접 부르므로 조건과
-    #   무관하고, 판정이 한 곳에 모인다 (원칙 2).
+    # ★ A regime is a property of (shape, hardware), **not a property of
+    #   the feature list.** This used to read `info.log_sol_ms` /
+    #   `info.is_memory_bound`, which assumed those two features were in the
+    #   registry. The F0/F1 registries do not have them, so the whole report
+    #   dies (§30.9). `regime_of` calls the **functions** in `physical.py`
+    #   directly, so it is condition-independent and the verdict lives in
+    #   one place (principle 2).
     from kernelrule.core.splits import regime_of
 
     small, mem, waves = [], [], []
@@ -214,7 +226,7 @@ def _regimes(ev: Evaluation, masks: dict, shapes) -> list[Regime]:
 
 
 # ---------------------------------------------------------------------------
-# 블록 4 — 사례. **다양성을 강제한다** (§12.1)
+# Block 4 — the cases. **Diversity is enforced** (§12.1)
 # ---------------------------------------------------------------------------
 _CASE_AXES = ("tile_m", "tile_n", "tile_k", "split_k", "split_k_mode",
               "ext_warp_m", "ext_warp_n", "ext_stages", "ext_swizzle_n",
@@ -231,13 +243,14 @@ def _cfg_summary(row: dict) -> str:
 
 
 def _sigma(t_pick: float, t_opt: float, noise) -> float:
-    """격차가 **노이즈 바닥의 몇 배**인가.
+    """How many times the noise floor the gap is.
 
-    한 숫자가 두 문제를 다 해결한다 — 눈금 동점도, 일반적인 해상도도.
-    LLM 이 "이 사례를 신경 써야 하나" 를 스스로 판단할 수 있다.
+    One number solves both problems — tick ties and general resolution
+    alike. The LLM can judge for itself whether to care about a case.
 
-    ⚠️ **사례 선정에는 쓰지 않는다.** 짧은 형상은 σ 가 작게 나오기 쉬운데
-    여지가 몰려 있는 곳이 거기다 (§30.5). 표시만 한다.
+    ⚠️ **It is not used to select cases.** Short shapes tend to give a small
+    σ, and that is exactly where the room is concentrated (§30.5). It is
+    only displayed.
     """
     denom = t_opt * float(noise.floor(t_opt))
     return (t_pick - t_opt) / denom if denom > 0 else float("inf")
@@ -251,8 +264,10 @@ def _make_case(table: PerfTable, matrix: FeatureMatrix, p: Problem,
     t = np.asarray(table.times_of(p))
     st = table.stats(p)
     pick = int(order[0])
-    # ★ "최적" 은 tie-break 의존이므로 **동점 중 결정론적 대표**를 쓰고,
-    #   주변 config 를 함께 보여 뾰족한지 넓은지 알게 한다 (§12.1).
+    # ★ "the optimum" depends on the tie-break, so a **deterministic
+    #   representative among the ties** is used, and the neighbouring configs
+    #   are shown alongside so it is clear whether it is sharp or broad
+    #   (§12.1).
     cand = table.candidates(p)
     best_mask = t <= st.best_ms * (1.0 + 1e-12)
     opt = int(np.flatnonzero(best_mask)[
@@ -265,8 +280,9 @@ def _make_case(table: PerfTable, matrix: FeatureMatrix, p: Problem,
         if not approx_equal(float(v[pick]), float(v[opt])):
             rows.append((name, float(v[pick]), float(v[opt])))
     rows.sort(key=lambda r: -abs(r[1] - r[2]) / (abs(r[2]) + 1e-9))
-    # ★ "항이 없다" 와 "항은 있는데 가중치가 틀렸다" 는 **다른 수정**이다.
-    #   전자는 추가, 후자는 조정. 규칙 소스의 AST 에서 판정한다.
+    # ★ "the term is missing" and "the term is there but the weight is
+    #   wrong" are **different fixes** — an addition versus an adjustment.
+    #   The verdict is made from the AST of the rule source.
     rows = [(n, a, b, n in used_features) for n, a, b in rows[:n_feats]]
 
     top5 = np.argsort(t, kind="mergesort")[:5]
@@ -296,15 +312,17 @@ def _make_case(table: PerfTable, matrix: FeatureMatrix, p: Problem,
 def _select_cases(table, matrix, order_of, ev, masks, shapes,
                   used_features: frozenset = frozenset(),
                   per_regime: int = 2, n_best: int = 2) -> list[Case]:
-    """체제마다 최악 n개 + **잘 맞춘 사례** 2개 (§12.1).
+    """The worst n per regime + 2 **well-matched cases** (§12.1).
 
-    "regret 상위 15개" 는 나쁜 선택이다 — 같은 실패 모드가 15번 반복되면
-    정보가 하나뿐이다. 그리고 **실패만 보여주면 잘 되던 것까지 망가뜨린다.**
+    "the top 15 by regret" is a bad choice — the same failure mode repeated
+    15 times carries only one piece of information. And **showing failures
+    only breaks what was working.**
     """
     r1 = ev.regret[:, 0]
     cases, used = [], set()
-    # ★ 같은 (선택, 최적) 쌍이 반복되면 사례가 여러 개여도 정보는 하나다.
-    #   §12.1 의 "다양성 강제" 는 체제만이 아니라 **실패 모드**에도 적용된다.
+    # ★ If the same (pick, optimum) pair repeats, several cases carry only
+    #   one piece of information. §12.1's "enforce diversity" applies not
+    #   only to regimes but to **failure modes**.
     seen_modes: set[tuple[str, str]] = set()
 
     def _mode(c: Case) -> tuple[str, str]:
@@ -322,9 +340,9 @@ def _select_cases(table, matrix, order_of, ev, masks, shapes,
             used.add(i)
             c = _make_case(table, matrix, shapes[i], order_of(shapes[i]),
                            float(r1[i]), name, "worst", used_features)
-            sig = _mode(c)          # `m` 은 위에서 마스크다. 섀도잉 금지
+            sig = _mode(c)     # `m` is the mask above. No shadowing
             if sig in seen_modes:
-                continue      # 같은 실패 모드다. 정보가 늘지 않는다
+                continue   # the same failure mode. It adds no information
             seen_modes.add(sig)
             cases.append(c)
     n_added = 0
@@ -335,7 +353,8 @@ def _select_cases(table, matrix, order_of, ev, masks, shapes,
         if i in used:
             continue
         c = _make_case(table, matrix, shapes[i], order_of(shapes[i]),
-                       float(r1[i]), "잘 맞춘 사례", "best", used_features)
+                       float(r1[i]), "a well-matched case", "best",
+                       used_features)
         sig = _mode(c)
         if sig in seen_modes:
             continue
@@ -347,7 +366,7 @@ def _select_cases(table, matrix, order_of, ev, masks, shapes,
 
 
 # ---------------------------------------------------------------------------
-# 조립
+# Assembly
 # ---------------------------------------------------------------------------
 def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
                  score_fn, weights, code: str, train: Split,
@@ -355,27 +374,31 @@ def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
                  failures: list[dict] | None = None,
                  hypotheses_applied: list[str] | None = None,
                  notes: list[str] | None = None) -> DiagnosticReport:
-    """★ `train` 은 **학습 분할만** 받는다 (§10.2, §12.3).
+    """★ `train` takes **the training split only** (§10.2, §12.3).
 
-    검증/최종 분할이 리포트에 들어가는 경로를 만들지 않는다. 프롬프트에
-    홀드아웃 점수를 넣을 수 있으면 결국 거기에 맞춰 튜닝하게 된다.
+    There is no path by which the validation or final split can enter the
+    report. If a holdout score can go into the prompt, it ends up being
+    tuned against.
     """
     if not isinstance(train, Split) or train.role != "train":
         raise SplitError(
-            "진단 리포트는 학습 분할만 받는다 (§10.2). 홀드아웃 점수가 "
-            "프롬프트에 들어가는 경로를 만들지 않는다.")
-    # ★ 전에는 여기가 자유 문자열 리스트였고 위 검사를 **완전히 우회했다**
-    #   — 첫 실제 실행의 블록 3.5 가 전수 표에서 계산됐다. §12.3 은 "점수"
-    #   만 막았고 집계가 빠져나갔다 (D-28).
+            "the diagnostic report takes the training split only (§10.2). "
+            "There is no path by which a holdout score enters the prompt.")
+    # ★ This used to be a list of free strings and **bypassed the check
+    #   above entirely** — block 3.5 of the first real run was computed on
+    #   the full table. §12.3 blocked only "scores" and aggregates slipped
+    #   through (D-28).
     if table_facts is not None and not isinstance(table_facts, TableFacts):
         raise SplitError(
-            "table_facts 는 TableFacts.compute(table, train) 로만 만든다 "
-            "(§12.3). 자유 문자열을 받으면 학습 분할 검사를 우회한다 — "
-            "집계도 홀드아웃을 넘지 않는다.")
+            "table_facts is built only through "
+            "TableFacts.compute(table, train) (§12.3). Accepting free "
+            "strings bypasses the training-split check — aggregates do not "
+            "cross the holdout either.")
 
     shapes = list(train.shapes)
-    # ★ 규칙 소스에서 `f.<이름>` 을 AST 로 뽑는다 (A-1 의 검사기 재사용).
-    #   "항이 없다" 와 "가중치가 틀렸다" 를 LLM 이 유추하지 않아도 되게 한다.
+    # ★ The `f.<name>`s are extracted from the rule source with the AST
+    #   (reusing A-1's checker). It saves the LLM from having to infer "the
+    #   term is missing" versus "the weight is wrong".
     from kernelrule.rules.checks import check_rule
 
     used = frozenset(check_rule(
@@ -398,7 +421,8 @@ def build_report(*, run_id: str, table: PerfTable, matrix: FeatureMatrix,
     overall.update(ev.stratified(1))
     overall["size_gap@1"] = ev.size_gap(1)
     overall["difficulty_gap@1"] = ev.difficulty_gap(1)
-    # ★ 아카이브 축(roofline)의 집계 (D-145). 요약이 이것부터 보여준다.
+    # ★ Aggregates on the archive axis (the roofline) (D-145). The summary
+    #   shows these first.
     import numpy as _np
     _m = _np.asarray(masks["mem"], dtype=bool)
     if _m.any() and not _m.all():

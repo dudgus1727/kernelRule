@@ -1,9 +1,12 @@
-"""★ 실행 트레이스 (D-133) — **로깅이 계산을 안 건드리는가**.
+"""★ The run trace (D-133) — **does the logging leave the computation
+alone**?
 
-지시문 §4 그대로다: 트레이스는 조건이 아니다. 켜고 끄고 돌려서 산출물이
-**같아야** 한다. 다르면 로깅이 무언가를 건드린 것이다.
+Exactly as the instruction §4 says: the trace is not a condition. Running it
+with the trace on and off, the artefacts **have to be the same**. If they
+differ, the logging touched something.
 
-MockLLM 으로 검사한다 — 결정론이라 **정확히 같아야** 하고 LLM 0회다.
+It is checked with MockLLM — it is deterministic, so it has to be **exactly**
+the same, and it costs 0 LLM calls.
 """
 from __future__ import annotations
 
@@ -19,7 +22,8 @@ from kernelrule.features import REGISTRY
 
 
 def _run(table, tmp_path: Path, *, trace: bool, rounds: int = 2):
-    """★ 같은 씨앗·같은 MockLLM 으로 켜고/끄고 (`synth_table` 은 conftest)."""
+    """★ The same seed and the same MockLLM, on and off (`synth_table` is in
+    conftest)."""
     m = FeatureMatrix(table, REGISTRY)
     sh = table.shapes()
     sp = SplitSet(train=Split("train", tuple(sh[:-2])),
@@ -37,18 +41,20 @@ def _run(table, tmp_path: Path, *, trace: bool, rounds: int = 2):
 
 
 def test_trace_does_not_change_the_result(synth_table, tmp_path):
-    """★ 켜고/끄고 돌려 **아카이브와 라운드 기록이 같은가**.
+    """★ Run it on and off — **are the archive and the round records the
+    same**?
 
-    같은 씨앗·같은 RNG·MockLLM 이면 정확히 같아야 한다. 다르면 로깅이
-    계산 경로에 부수 효과를 냈다는 뜻이다 (지시문 §4).
+    With the same seed, the same RNG and MockLLM it has to be exactly the
+    same. If it differs, the logging had a side effect on the computation
+    path (the instruction §4).
     """
     off = _run(synth_table, tmp_path, trace=False)
     on = _run(synth_table, tmp_path, trace=True)
     assert (off / "archive.jsonl").read_text() == \
         (on / "archive.jsonl").read_text()
 
-    # ★ `seconds` 는 벽시계라 두 실행이 다를 수밖에 없다 — 계산 결과가
-    #   아니다. 그것만 빼고 **나머지 전부**를 견준다.
+    # ★ `seconds` is the wall clock, so two runs cannot help differing — it is
+    #   not a computed result. Everything **but that** is compared.
     def rounds(d):
         return [{k: v for k, v in json.loads(x).items() if k != "seconds"}
                 for x in (d / "rounds.jsonl").read_text().splitlines()]
@@ -59,34 +65,38 @@ def test_trace_does_not_change_the_result(synth_table, tmp_path):
 
 
 def test_trace_first_line_is_self_sufficient(synth_table, tmp_path):
-    """★ 첫 줄만 읽어도 조건을 알 수 있는가 (지시문 §3-3)."""
+    """★ Can the condition be known from the first line alone (the
+    instruction §3-3)?"""
     d = _run(synth_table, tmp_path, trace=True)
     first = json.loads((d / "trace.jsonl").read_text().splitlines()[0])
     assert first["ev"] == "run_start"
     for k in ("commit", "config", "split", "n_train", "n_val", "features"):
         assert k in first, k
-    # config 전체 — `config.json` 과 **같은 것**이어야 한다 (원칙 2)
+    # The whole config — it has to be **the same thing** as `config.json`
+    # (principle 2)
     saved = json.loads((d / "config.json").read_text())
     assert first["config"]["loop"]["seed"] == saved["loop"]["seed"]
     assert first["config"]["rule_constraints"] == saved["rule_constraints"]
 
 
 def test_trace_records_the_order_and_the_failures(synth_table, tmp_path):
-    """★ 순서와 **실패**가 남는가 — 흩어진 파일이 못 하던 것이다."""
+    """★ Are the order and **the failures** kept — what the scattered files
+    could not do."""
     d = _run(synth_table, tmp_path, trace=True)
     evs = [json.loads(x)["ev"]
            for x in (d / "trace.jsonl").read_text().splitlines()]
     assert evs[0] == "run_start"
     assert evs.count("round_start") == evs.count("round_end") == 2
     assert "proposal" in evs and "scored" in evs and "archive" in evs
-    # 시간이 단조인가 — 한 파일에 시간순이라는 것이 이 형식의 요점이다
+    # Is the time monotone — being time-ordered in one file is the point of
+    # this format
     ts = [json.loads(x)["t"]
           for x in (d / "trace.jsonl").read_text().splitlines()]
     assert ts == sorted(ts)
 
 
 def test_trace_is_not_a_condition():
-    """★ `runset.KEYS` 에 들어가면 안 된다 (지시문 §8)."""
+    """★ It must not go into `runset.KEYS` (the instruction §8)."""
     from kernelrule.core.runset import KEYS
 
     assert "trace" not in KEYS

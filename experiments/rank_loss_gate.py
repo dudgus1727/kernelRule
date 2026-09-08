@@ -1,47 +1,54 @@
-"""★ 순위 손실 통과 조건 — 대리 손실이 목표와 어긋나는가. LLM 0회.
+"""★ The rank-loss pass condition — does the surrogate loss diverge from the
+objective? 0 LLM calls.
 
     python3 experiments/rank_loss_gate.py
 
-## 왜 순위 손실인가
+## Why a rank loss
 
-config 를 일부만 재면 `regret` 을 못 쓴다 — **최적을 모르기 때문이다.**
-
-```
-regret = 시간 / ★ 최적 시간      최적을 모르면 정의가 안 된다
-순위 손실 = 재본 것들끼리의 순서가 맞는가   ★ 최적을 몰라도 된다
-```
-
-**그러나 대리 손실은 목표와 어긋날 수 있다.** config 샘플링을 하기
-전에 그것부터 잰다. **여기서는 config 를 전수로 쓴다** — 샘플링 변수를
-섞으면 무엇이 원인인지 못 가른다.
+If only some of the configs are measured, `regret` cannot be used —
+**because the optimum is not known.**
 
 ```
-A) 순위 손실로 적합 -> ★ regret 으로 채점
-B) regret 으로 적합 -> regret 으로 채점    (지금 방식)
+regret = time / ★ the optimal time     undefined if the optimum is unknown
+rank loss = is the ordering among the ones measured right
+                                       ★ the optimum need not be known
 ```
 
-## 설계에서 지킨 것 셋
+**But a surrogate loss can diverge from the objective.** That is measured
+before any config sampling is done. **Here the configs are used
+exhaustively** — mixing in the sampling variable makes it impossible to tell
+what caused what.
 
 ```
-1 ★ 모든 쌍을 똑같이 세지 않는다
-    19,635개 중 15,000등과 16,000등의 순서는 의미가 없다.
-    양성은 **참 상위 K개**, 음성은 순위 구간별로 고르게 뽑는다
-
-2 ★ 노이즈 바닥 이내인 쌍은 뺀다
-    `NoiseModel.resolvable(t_i, t_j)` 가 그 판정을 한다.
-    안 빼면 잡음에 맞춘다 (5090 정답 집합 중앙 9개, 최대 724개)
-
-3 ★ 완화 온도를 튜닝하지 않는다 — T = 1 로 **고정**한다
-    점수는 w 에 대해 선형이므로 (s = Φw) w 를 c 배 하면 s 가 c 배다.
-    즉 T 는 w 의 크기와 **분리해서 식별되지 않는다.**
-    T 를 두는 것은 자유도를 늘리는 것이 아니라 중복시키는 것이다.
-    ★ 따라서 T=1 은 선택이 아니라 정규화다.
+A) fit with the rank loss -> ★ scored with regret
+B) fit with regret        -> scored with regret    (the current way)
 ```
 
-## 선형성
+## The three things the design keeps
 
-`s = Φ w` 를 쓰므로 **점수가 w 에 선형이어야 한다.** 구조마다 실제로
-확인하고(2w 에서 2s 가 나오는가), 아니면 그 구조를 빼고 그 사실을 적는다.
+```
+1 ★ not every pair is counted the same
+    Among 19,635, the ordering of the 15,000th and the 16,000th means
+    nothing. The positives are **the true top K** and the negatives are
+    drawn evenly across the rank bands
+
+2 ★ pairs within the noise floor are dropped
+    `NoiseModel.resolvable(t_i, t_j)` makes that judgement.
+    Without dropping them it fits the noise (the 5090's answer set is 9 at
+    the median and up to 724)
+
+3 ★ the relaxation temperature is not tuned — T is **fixed** at 1
+    The score is linear in w (s = Φw), so scaling w by c scales s by c.
+    That is, T **is not identified separately** from the magnitude of w.
+    Having a T does not add a degree of freedom, it duplicates one.
+    ★ So T=1 is a normalisation, not a choice.
+```
+
+## Linearity
+
+`s = Φ w` is used, so **the score has to be linear in w.** It is actually
+checked per structure (does 2w give 2s), and if not, that structure is
+dropped and the fact is written down.
 """
 
 from __future__ import annotations
@@ -65,9 +72,9 @@ from kernelrule.features import REGISTRY
 
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
 SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
-N_POS = 32          # 참 상위 K개
-N_NEG = 256         # 순위 구간별로 고르게
-TEMP = 1.0          # ★ 고정. 위 docstring 참고
+N_POS = 32          # the true top K
+N_NEG = 256         # evenly across the rank bands
+TEMP = 1.0          # ★ fixed. See the docstring above
 
 
 def _splits(table: PerfTable) -> SplitSet:
@@ -84,7 +91,8 @@ def _splits(table: PerfTable) -> SplitSet:
 
 
 def _phi(fn, matrix, table, p, n_w: int) -> np.ndarray:
-    """항별 값 행렬 Φ (후보 x 항). 단위 기저 가중치로 뽑는다."""
+    """The per-term value matrix Φ (candidates x terms). Drawn with unit basis
+    weights."""
     cand = table.candidates(p)
     cols = []
     for j in range(n_w):
@@ -96,7 +104,8 @@ def _phi(fn, matrix, table, p, n_w: int) -> np.ndarray:
 
 
 def _is_linear(phi: np.ndarray, fn, matrix, table, p, w: np.ndarray) -> bool:
-    """s = Φw 인가. 아니면 이 방법을 못 쓴다 — 조용히 넘기지 않는다."""
+    """Is s = Φw? If not, this method cannot be used — it is not passed over
+    silently."""
     cand = table.candidates(p)
     s = np.asarray(make_score_of(fn, matrix, w)(p, cand), dtype=np.float64)
     ok = np.isfinite(s) & np.isfinite(phi @ w)
@@ -108,21 +117,23 @@ def _is_linear(phi: np.ndarray, fn, matrix, table, p, w: np.ndarray) -> bool:
 
 
 def _pairs(table, p, rng) -> tuple[np.ndarray, np.ndarray]:
-    """(양성, 음성) 인덱스. **노이즈로 못 가르는 쌍은 뺀다.**"""
+    """(positive, negative) indices. **Pairs the noise cannot separate are
+    dropped.**"""
     t = table.times_of(p)
     order = np.argsort(t, kind="stable")
     pos = order[:N_POS]
     rest = order[N_POS:]
     if len(rest) == 0:
         return pos, rest
-    # 순위 구간별로 고르게 — 뒤쪽만 뽑으면 쉬운 쌍만 배운다
+    # Evenly across the rank bands — drawing only from the tail teaches only
+    # the easy pairs
     idx = np.unique(np.linspace(0, len(rest) - 1, N_NEG).astype(int))
     neg = rest[idx]
     return pos, neg
 
 
 def _pair_data(fn, matrix, table, shapes, n_w, rng):
-    """형상마다 Φ 부분행렬과 유효 쌍 마스크를 미리 만든다."""
+    """It pre-builds the Φ submatrix and the valid-pair mask per shape."""
     out = []
     for p in shapes:
         phi = _phi(fn, matrix, table, p, n_w)
@@ -130,7 +141,7 @@ def _pair_data(fn, matrix, table, shapes, n_w, rng):
         if len(neg) == 0:
             continue
         t = table.times_of(p)
-        # ★ 노이즈 바닥으로 가를 수 있는 쌍만
+        # ★ Only the pairs the noise floor can separate
         res = table.noise.resolvable(t[pos][:, None], t[neg][None, :])
         worse = t[neg][None, :] > t[pos][:, None]
         mask = res & worse
@@ -141,14 +152,15 @@ def _pair_data(fn, matrix, table, shapes, n_w, rng):
 
 
 def _rank_loss_and_grad(w, data):
-    """평균 로지스틱 쌍 손실과 기울기. s = Φw 이므로 해석적으로 나온다."""
+    """The mean logistic pair loss and its gradient. Since s = Φw it comes out
+    analytically."""
     tot, n = 0.0, 0
     g = np.zeros_like(w)
     for phi_p, phi_n, mask in data:
         sp = phi_p @ w
         sn = phi_n @ w
-        d = (sn[None, :] - sp[:, None]) / TEMP     # 양수여야 옳다
-        # log(1 + exp(-d)) — 안정적으로
+        d = (sn[None, :] - sp[:, None]) / TEMP     # it should be positive
+        # log(1 + exp(-d)) — stably
         loss = np.logaddexp(0.0, -d)
         sig = -1.0 / (1.0 + np.exp(d))             # d(loss)/d(d)
         m = mask.astype(np.float64)
@@ -182,14 +194,16 @@ def main() -> None:
     sp = _splits(B)
 
     print("=" * 78)
-    print("순위 손실 통과 조건 — 대리 손실이 목표와 어긋나는가")
+    print("the rank-loss pass condition — does the surrogate loss diverge "
+          "from the objective")
     print("=" * 78)
-    print(f"  5090 학습 {len(sp.train.shapes)} / 홀드아웃 "
-          f"{len(sp.val.shapes)}   ★ config 는 전수다")
-    print(f"  쌍: 양성 상위 {N_POS}, 음성 순위 구간별 {N_NEG}, "
-          f"노이즈로 못 가르는 쌍 제외, T = {TEMP} 고정\n")
-    print(f"  {'구조':26s} {'A) 순위손실':>12} {'B) regret':>11} "
-          f"{'A-B':>9}  선형")
+    print(f"  5090 training {len(sp.train.shapes)} / holdout "
+          f"{len(sp.val.shapes)}   ★ the configs are exhaustive")
+    print(f"  pairs: {N_POS} positives from the top, {N_NEG} negatives across "
+          f"the rank bands, pairs the noise cannot separate excluded, "
+          f"T = {TEMP} fixed\n")
+    print(f"  {'structure':26s} {'A) rank loss':>13} {'B) regret':>11} "
+          f"{'A-B':>9}  linear")
 
     rows = []
     for run in SRC_RUNS:
@@ -200,12 +214,13 @@ def main() -> None:
         w0 = np.asarray(e["w"], dtype=np.float64)
         n_w = len(w0)
 
-        # 선형성 확인 — 한 형상으로 충분하다 (구조는 형상과 무관하다)
+        # The linearity check — one shape is enough (the structure does not
+        # depend on the shape)
         p0 = sp.train.shapes[0]
         phi0 = _phi(fn, mB, B, p0, n_w)
         lin = _is_linear(phi0, fn, mB, B, p0, w0 * 1.7)
         if not lin:
-            print(f"  {run:26s} {'—':>12} {'—':>11} {'—':>9}  ★ 비선형")
+            print(f"  {run:26s} {'—':>13} {'—':>11} {'—':>9}  ★ non-linear")
             rows.append({"run": run, "linear": False})
             continue
 
@@ -218,13 +233,14 @@ def main() -> None:
                          method="L-BFGS-B",
                          options={"maxiter": 500, "maxfun": 2000})
             ws_a[nm] = r.x
-            # ★ B 팔은 정의상 regret 이다 (D-99). 명시한다 — 기본값이
-            #   rank 로 바뀌었으므로 안 밝히면 두 팔이 같아진다.
+            # ★ The B arm is regret by definition (D-99). It is stated —
+            #   the default changed to rank, so without saying it the two
+            #   arms become the same.
             ws_b[nm] = fit_weights(fn, mB, B, Split("train", tuple(g)), w0,
                                    max_evals=300, objective="regret").w
         va = _regret_on(fn, mB, B, list(sp.val.shapes), ws_a)
         vb = _regret_on(fn, mB, B, list(sp.val.shapes), ws_b)
-        print(f"  {run:26s} {va:12.4f} {vb:11.4f} {va - vb:+9.4f}  ✓")
+        print(f"  {run:26s} {va:13.4f} {vb:11.4f} {va - vb:+9.4f}  ✓")
         rows.append({"run": run, "linear": True, "rank_loss": va,
                      "regret": vb, "diff": va - vb})
 
@@ -237,16 +253,18 @@ def main() -> None:
             _, pv = wilcoxon(A_, Bv)
         except Exception:                                   # noqa: BLE001
             pv = float("nan")
-        print(f"\n  중앙  A) {np.median(A_):.4f}   B) {np.median(Bv):.4f}   "
-              f"차이 {np.median(A_) - np.median(Bv):+.4f}")
-        print(f"  ★ 대응 Wilcoxon 양측 p = {pv:.4f}  "
-              f"(A 가 나쁜 구조 {int(np.sum(A_ - Bv > 0))}/{len(ok)})")
-        print("  ★ 판정선(σ 상한, n=6 대응) 참고: 0.0516 — "
-              "sigma-5090.json")
+        print(f"\n  median  A) {np.median(A_):.4f}   B) {np.median(Bv):.4f}   "
+              f"difference {np.median(A_) - np.median(Bv):+.4f}")
+        print(f"  ★ paired Wilcoxon two-sided p = {pv:.4f}  "
+              f"(structures where A is worse: "
+              f"{int(np.sum(A_ - Bv > 0))}/{len(ok)})")
+        print("  ★ for reference, the decision line (σ upper bound, n=6 "
+              "paired): 0.0516 — sigma-5090.json")
     Path(a.out).write_text(json.dumps(
         {"bundle": G5090[0], "n_pos": N_POS, "n_neg": N_NEG, "temp": TEMP,
-         "note": ("config 전수. 샘플링 변수를 섞지 않았다. "
-                  "T 는 w 크기와 분리 식별되지 않으므로 1 로 고정"),
+         "note": ("the configs are exhaustive. The sampling variable was not "
+                  "mixed in. T is not identified separately from the "
+                  "magnitude of w, so it is fixed at 1"),
          "rows": rows}, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
 

@@ -1,14 +1,20 @@
-"""★ 체제 분할 축을 다시 고른다 — SOL 0.5 vs roofline vs 안 나눔. LLM 0회.
+"""★ Picking the regime split axis again — SOL 0.5 vs roofline vs no split.
+0 LLM calls.
 
     python3 experiments/regime_axis.py
 
-실험 계획서 `docs/artifacts/regime-axis-prereg.md`.
+The pre-registration is `docs/artifacts/regime-axis-prereg.md`.
 
-## 왜 다시 구현하나
+## Why it is reimplemented
 
-`canonical_score` 는 체제 이름 `("short","long")` 과 `regime_of(axis="size")`
-를 하드코딩한다. 축을 갈아 끼우려면 그 절차를 여기서 다시 만들어야 한다.
-**그래서 팔 ① 이 알려진 대표값과 같은지 먼저 확인한다** — 다르면 멈춘다.
+`canonical_score` hardcodes the regime names `("short","long")` and
+`regime_of(axis="size")`. Swapping the axis means rebuilding that procedure
+here. **So arm ① is first checked against the known representative value** —
+if it differs, it stops.
+
+⚠️ 2026-09-08 (D-146): **the arm labels stay in Korean.** They are the keys of
+`arms` in `regime-axis.json` and the row names of the document, and `docs/` is
+not translated.
 """
 
 from __future__ import annotations
@@ -38,11 +44,13 @@ from kernelrule.features.physical import is_memory_bound, log_sol_ms
 BUNDLE = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
 RUNS = [f"F3rw-p8-nan-s{i}" for i in range(6)]
 ROUND = 11
-#: 팔 ① 이 재현해야 하는 값 (D-140). 다르면 재구현이 틀린 것이다.
+#: The value arm ① has to reproduce (D-140). A difference means the
+#: reimplementation is wrong.
 KNOWN_ARM1 = 1.0886
-#: 판정선. **여기서 새로 정하지 않는다** (원칙 7).
+#: The decision line. **It is not set anew here** (principle 7).
 DELTA, BUFFER = 0.0516, 0.0589
-#: 체제당 학습 형상이 이보다 적으면 그 가중치를 믿기 어렵다.
+#: If a regime has fewer training shapes than this, its weights are hard to
+#: trust.
 MIN_PER_REGIME = 8
 
 
@@ -79,7 +87,8 @@ ARMS = [
 
 
 def score(code, w0, T, M, sp, reg_fn, names, max_evals=300):
-    """`canonical_score` 와 **같은 절차**, 체제 함수만 갈아 끼운다."""
+    """**The same procedure** as `canonical_score`, with only the regime
+    function swapped."""
     fn = compile_rule(code)
     train, val = list(sp.train.shapes), list(sp.val.shapes)
     per_shape, warns = {}, []
@@ -88,10 +97,10 @@ def score(code, w0, T, M, sp, reg_fn, names, max_evals=300):
         g_ho = [p for p in val if reg_fn(p, T.hw) == nm]
         if not g_tr:
             if g_ho:
-                warns.append(f"{nm}: 학습 0개인데 홀드아웃 {len(g_ho)}개")
+                warns.append(f"{nm}: 0 training but {len(g_ho)} holdout")
             continue
         if len(g_tr) < MIN_PER_REGIME:
-            warns.append(f"{nm}: 학습 {len(g_tr)}개 < {MIN_PER_REGIME}")
+            warns.append(f"{nm}: training {len(g_tr)} < {MIN_PER_REGIME}")
         fit = fit_weights(fn, M, T, Split("train", tuple(g_tr)), w0,
                           max_evals=max_evals, objective="regret",
                           warn_invariants=False)
@@ -101,7 +110,7 @@ def score(code, w0, T, M, sp, reg_fn, names, max_evals=300):
         for i, p in enumerate(e.shapes):
             per_shape[p] = float(e.regret[i, 0])
     if len(per_shape) < len(val):
-        warns.append(f"홀드아웃 {len(val)} 중 {len(per_shape)}개만 채점")
+        warns.append(f"only {len(per_shape)} of the {len(val)} holdout scored")
     return (geomean(np.array([per_shape[p] for p in val if p in per_shape])),
             per_shape, warns)
 
@@ -119,9 +128,11 @@ def main() -> None:
     out: dict = {"delta": DELTA, "buffer": BUFFER, "round": ROUND,
                  "runs": RUNS, "arms": {}}
     print("=" * 96)
-    print("체제 분할 축 — 같은 규칙 여섯, 가중치만 다시 (LLM 0회)")
+    print("the regime split axis — the same six rules, only the weights redone "
+          "(0 LLM calls)")
     print("=" * 96)
-    print(f"  {'팔':14s} {'중앙':>8s} {'범위':>19s} {'체제별 홀드아웃 수':>18s}")
+    print(f"  {'arm':14s} {'median':>8s} {'range':>19s} "
+          f"{'holdout per regime':>20s}")
 
     shape_reg = {}
     for lab, fnr, names in ARMS:
@@ -138,33 +149,36 @@ def main() -> None:
                             "holdout_counts": cnt, "warnings": sorted(allw),
                             "per_run_shape": per_run}
         print(f"  {lab:14s} {st.median(vals):8.4f} "
-              f"{min(vals):9.4f}~{max(vals):<9.4f} {str(cnt):>18s}"
+              f"{min(vals):9.4f}~{max(vals):<9.4f} {str(cnt):>20s}"
               + ("   ⚠️ " + "; ".join(sorted(allw)) if allw else ""))
 
     m1 = out["arms"]["① SOL 0.5"]["median"]
-    print(f"\n  ★ 재현 검증: 팔 ① 중앙 {m1:.4f}  vs  알려진 대표값 "
-          f"{KNOWN_ARM1:.4f}   차 {m1 - KNOWN_ARM1:+.4f}")
+    print(f"\n  ★ the reproduction check: arm ① median {m1:.4f}  vs  the known "
+          f"representative value {KNOWN_ARM1:.4f}   "
+          f"difference {m1 - KNOWN_ARM1:+.4f}")
     if not approx_equal(m1, KNOWN_ARM1, 5e-4):
-        print("  ⛔ 재현이 안 된다 — 재구현이 틀렸다. 다른 팔을 보고하지 않는다.")
+        print("  ⛔ it does not reproduce — the reimplementation is wrong. The "
+              "other arms are not reported.")
         Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
         raise SystemExit(1)
-    print("  ✅ 재현됨 — 다른 팔을 읽어도 된다")
+    print("  ✅ reproduced — the other arms can be read")
 
     print("\n" + "-" * 96)
-    print("  판정 (판정선 0.0516, 완충대 ~0.0589)")
+    print("  the verdict (the decision line 0.0516, the buffer band ~0.0589)")
     base = out["arms"]["① SOL 0.5"]["median"]
     for lab in ("② roofline", "③ 안 나눔", "①' SOL 0.25", "①'' SOL 1.0"):
         d = out["arms"][lab]["median"] - base
-        v = ("구분 불가" if abs(d) < DELTA else
-             "★ 판정선 근처 (판정 안 함)" if abs(d) < BUFFER else
-             ("★ ① 보다 좋다" if d < 0 else "★ ① 보다 나쁘다"))
-        print(f"  {lab:14s} ① 대비 {d:+.4f}   {v}")
+        v = ("indistinguishable" if abs(d) < DELTA else
+             "★ near the decision line (no verdict)" if abs(d) < BUFFER else
+             ("★ better than ①" if d < 0 else "★ worse than ①"))
+        print(f"  {lab:14s} vs ① {d:+.4f}   {v}")
 
-    # 체제별로 나눠서 — ② 의 구분으로 ②③ 을 본다
+    # Split per regime — ② and ③ are looked at through ②'s split
     print("\n" + "-" * 96)
-    print("  ★ roofline 구분으로 본 체제별 홀드아웃 regret (6실행 중앙)")
+    print("  ★ the per-regime holdout regret seen through the roofline split "
+          "(the median of 6 runs)")
     reg2 = shape_reg["② roofline"]
-    print(f"  {'팔':14s} {'mem':>9s} {'comp':>9s}")
+    print(f"  {'arm':14s} {'mem':>9s} {'comp':>9s}")
     for lab in ("① SOL 0.5", "② roofline", "③ 안 나눔"):
         cells = {}
         for nm in ("mem", "comp"):

@@ -1,28 +1,32 @@
-"""GBDT 랭커 — **학습 모델 상한** (§9, §30.6).
+"""GBDT ranker — **the ceiling of a learned model** (§9, §30.6).
 
-규칙이 못 담는 것이 얼마인지를 재는 자리다. 손규칙과 GBDT 사이의 격차가
-이 연구의 내용이므로, 이 값은 **낙관적일수록 정직하다** — GBDT 에 최대한
-유리하게 준다 (원시 컬럼 전부, 넉넉한 트리 수).
+This is where we measure how much a rule cannot hold. The gap between the
+hand rule and GBDT is the content of this research, so this number is
+**more honest the more optimistic it is** — give GBDT every advantage (all
+raw columns, plenty of trees).
 
-## 무엇을 학습하는가
+## What it learns
 
-목표값은 `log(t / t_best_of_shape)` — **형상 안의 상대 순위만** 배운다.
-절대 시간을 배우면 GPU 가 바뀔 때 전부 다시 배워야 하지만 무차원 량은
-전이된다 (§8.1).
+The target is `log(t / t_best_of_shape)` — **relative order within a shape
+only**. Learning absolute time means relearning everything when the GPU
+changes, whereas dimensionless quantities transfer (§8.1).
 
-## ★ 측정 시간과 그로부터 유도된 값은 피처에 넣지 않는다
+## ★ Measured times and anything derived from them are not features
 
-`load_for_ranking` 을 쓰므로 `ANSWER_COLS` 가 구조적으로 빠져 있다.
-`difficulty` / `distinct_time_frac` 도 거기 있다 — 배포 시점에 알 수 없는
-값이라 GBDT 에도 주지 않는다. 목표값에만 정답이 들어간다.
+It uses `load_for_ranking`, so `ANSWER_COLS` is structurally excluded.
+`difficulty` and `distinct_time_frac` are in there too — unknown at
+deployment time, so GBDT does not get them either. The answer enters only
+through the target.
 
-## 분할이 값을 크게 바꾼다
+## The split changes the number a lot
 
-    블록 (M > 2048)   홀드아웃 11형상   **주 지표.** 형상 일반화를 실제로 시험
-    형상 단위 5-fold  전 66형상         낙관적 상한. 사실상 보간이다
+    block (M > 2048)     11 held-out shapes   **primary.** Really tests
+                                              shape generalisation
+    shape-wise 5-fold    all 66 shapes        optimistic ceiling; effectively
+                                              interpolation
 
-5-fold 는 M=1024 가 학습에, M=1000 이 검증에 들어간다. 두 값의 격차가
-**형상 일반화가 얼마나 어려운가**의 척도다. 둘 다 보고한다.
+In 5-fold, M=1024 is in training and M=1000 in validation. The gap between
+the two numbers measures **how hard shape generalisation is**. Report both.
 """
 
 from __future__ import annotations
@@ -37,7 +41,7 @@ GBDT_PARAMS = dict(objective="regression", n_estimators=600,
                    subsample=0.8, subsample_freq=1, colsample_bytree=0.8,
                    reg_lambda=1.0, n_jobs=8, verbose=-1, random_state=0)
 
-#: 피처에서 뺄 것. 식별자와 상수 메타데이터.
+#: Excluded from features: identifiers and constant metadata.
 _DROP = {"kernel_id", "arch", "dtype", "acc_dtype", "layout_a", "layout_b",
          "layout_c", "split_k_mode", "pipeline_kind", "ext_swizzle_type",
          "workspace_dtype", "partials_dtype", "env_hash", "bundle_id",
@@ -58,7 +62,7 @@ def build_xy(table, shapes=None):
         ys.append(np.log(t / best))
         groups.append(np.full(len(df), gi, dtype=np.int64))
     X = pd.concat(frames, ignore_index=True)
-    # 범주형은 코드로, 나머지는 수치로. 문자열 식별자는 버린다.
+    # Categoricals as codes, the rest numeric. String identifiers are dropped.
     for c in list(X.columns):
         if c in _DROP:
             if str(X[c].dtype) == "category" or X[c].dtype == object:
@@ -83,11 +87,11 @@ def _fit(Xtr, ytr):
 
 
 def fit_predict_block(table, holdout_pred, **kw):
-    """블록 분할. `holdout_pred(Problem) -> bool` 이 홀드아웃을 정한다."""
+    """Block split. `holdout_pred(Problem) -> bool` decides the holdout."""
     X, y, g, cols, shapes = build_xy(table)
     held = np.asarray([holdout_pred(p) for p in shapes])
     if not held.any() or held.all():
-        raise ValueError("블록 분할이 한쪽을 비웠다 (§26.4).")
+        raise ValueError("the block split emptied one side (§26.4).")
     mask_tr = ~held[g]
     m = _fit(X[mask_tr], y[mask_tr])
     pred = np.full(len(y), np.nan)
@@ -98,7 +102,8 @@ def fit_predict_block(table, holdout_pred, **kw):
 
 
 def fit_predict_kfold(table, n_folds: int = 5, seed: int = 0, **kw):
-    """형상 단위 k-fold. **낙관적 상한**이다 (사실상 보간)."""
+    """Shape-wise k-fold. An **optimistic ceiling** (effectively
+    interpolation)."""
     X, y, g, cols, shapes = build_xy(table)
     rng = np.random.default_rng(seed)
     fold = rng.permutation(len(shapes)) % n_folds
@@ -115,7 +120,8 @@ def fit_predict_kfold(table, n_folds: int = 5, seed: int = 0, **kw):
 
 
 def order_fn_from_scores(pred: np.ndarray, g: np.ndarray, shapes):
-    """형상별 예측 점수 -> `order_fn`. **tie-break 는 config 정체성만** (§30.7)."""
+    """Per-shape predicted scores -> `order_fn`. **The tie-break uses config
+    identity only** (§30.7)."""
     by_shape = {}
     for gi, p in enumerate(shapes):
         by_shape[p.key] = pred[g == gi]
@@ -123,8 +129,10 @@ def order_fn_from_scores(pred: np.ndarray, g: np.ndarray, shapes):
     def order_fn(p, cand):
         s = by_shape[p.key]
         if not np.all(np.isfinite(s)):
-            # 학습에 쓰인 형상은 예측이 없다. 채점 대상에서 빼야 한다.
-            raise ValueError(f"{p.key}: 예측이 없다 (학습 형상이다)")
+            # Shapes used in training have no prediction. They must be
+            # excluded from scoring.
+            raise ValueError(f"{p.key}: no prediction (it is a training "
+                             "shape)")
         return cand.order_by(s)
 
     return order_fn

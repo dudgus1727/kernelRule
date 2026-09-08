@@ -1,15 +1,16 @@
-"""★ 벽을 낮추는 셋 — A(k 스윕) · B(곱 항) · C(λ 스윕). LLM 0회.
+"""★ The three that try to lower the wall — A (the k sweep) · B (the product
+term) · C (the λ sweep). 0 LLM calls.
 
     python3 experiments/wall_report.py
 
-실험 계획서 `docs/artifacts/wall-prereg.md`.
+The pre-registration is `docs/artifacts/wall-prereg.md`.
 
-⚠️ **전부 홀드아웃 20형상.** 계열 간 비교는 **k 를 100 으로 고정**한
-tau 로 한다 — 실행마다 다른 k 로 재면 "무엇이 나아졌나" 가 아니라
-"무엇을 쟀나" 가 달라진다 (원칙 4). 그 실행의 k 로 잰 값은 §A2 에
-따로 놓는다.
+⚠️ **Everything is on the 20 holdout shapes.** The comparison between
+families is done with tau at **k fixed to 100** — measuring each run at its
+own k changes "what was measured" instead of "what got better" (principle 4).
+The value measured at that run's own k is put separately in §A2.
 
-보조 함수는 `two_stage.py` 것을 쓴다 (원칙 2).
+The helper functions come from `two_stage.py` (principle 2).
 """
 
 from __future__ import annotations
@@ -33,13 +34,14 @@ from kernelrule.core.weights import _Problem, make_score_of
 from kernelrule.features import REGISTRY
 from kernelrule.rules.checks import _numeric_literals
 
-#: (태그, 라벨, k, λ, 곱힌트). `rankevo` 는 k=100 λ=0 기존 실행이다.
+#: (tag, label, k, λ, product hint). `rankevo` is the existing run at
+#: k=100 λ=0.
 ARMS = [
-    ("rankevo", "k=100 (기존)", 100, 0.0, False),
+    ("rankevo", "k=100 (existing)", 100, 0.0, False),
     ("k010", "k=10", 10, 0.0, False),
     ("k020", "k=20", 20, 0.0, False),
     ("k050", "k=50", 50, 0.0, False),
-    ("prod", "곱 항 명시", 100, 0.0, True),
+    ("prod", "product stated", 100, 0.0, True),
     ("lam03", "λ=0.3", 100, 0.3, False),
     ("lam10", "λ=1", 100, 1.0, False),
     ("lam30", "λ=3", 100, 3.0, False),
@@ -76,7 +78,8 @@ def _n_terms(code: str) -> int:
 
 
 def _prod_pairs(code: str) -> list[tuple]:
-    """`f.* x f.*` 곱. **가중치가 낀 곱은 빼고** 피처끼리만 센다."""
+    """The `f.* x f.*` products. **Products with a weight in them are left
+    out** — only feature-to-feature ones are counted."""
     def has_w(x):
         return any(isinstance(m, ast.Name) and m.id == "w"
                    for m in ast.walk(x))
@@ -90,10 +93,28 @@ def _prod_pairs(code: str) -> list[tuple]:
         if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Mult):
             a, b = fs(n.left), fs(n.right)
             if a and b and not has_w(n.left) and not has_w(n.right):
-                # ★ 두 쪽을 **따로** 남긴다. 합집합으로 접으면 제곱
-                #   (`f.a * f.a`) 과 곱이 구별되지 않는다.
+                # ★ The two sides are kept **separately**. Folding them into
+                #   a union makes a square (`f.a * f.a`) indistinguishable
+                #   from a product.
                 out.append((tuple(sorted(a)), tuple(sorted(b))))
     return out
+
+
+def _prompt_k(text: str) -> str:
+    """The `k` the system prompt states, read from the saved prompt.
+
+    ⚠️ 2026-09-08 (D-146): the prompts became English, but **the Korean form
+    is still matched** — the prompts saved with the old runs are in Korean
+    and this reads those artefacts.
+    """
+    for w in text.split("\n"):
+        if "config " in w and "개" in w:               # the old Korean prompt
+            return "k=" + w.split("config ")[1].split("개")[0]
+        if "fastest configs" in w:                    # the English prompt
+            head = w.split("fastest configs")[0].split()
+            if head:
+                return "k=" + head[-2 if head[-1] == "genuinely" else -1]
+    return "?"
 
 
 def _configs(code, w, table, matrix, shapes) -> int:
@@ -123,20 +144,19 @@ def main() -> None:
     best = {t: [_best(d) for d in dirs[t]] for t, *_ in ARMS}
     out: dict = {"n_holdout": len(hold)}
 
-    # ------------------------------------------------------ §0 조건 확인
+    # -------------------------------------------- §0 checking the conditions
     print("=" * 86)
-    print("§0  조건이 실제로 걸렸나 — 산출물에서 읽는다 (D-105/D-107)")
+    print("§0  did the condition actually take — read from the artefacts "
+          "(D-105/D-107)")
     print("=" * 86)
-    print(f"  {'':14s} {'k':>5} {'λ':>5} {'곱힌트':>7}   시스템 프롬프트가 말하는 k")
+    print(f"  {'':14s} {'k':>5} {'λ':>5} {'prod':>6}   "
+          f"what the system prompt says k is")
     for t, lab, k, lam, ph in ARMS:
         c = json.loads((dirs[t][0] / "config.json").read_text())
         got_k = c["loop"].get("rank_top_k", 100)
         got_l = c["loop"].get("rank_lambda", 0.0)
         f = dirs[t][0] / "llm_calls" / "_system-rule_editor.md"
-        says = "(기록 없음)" if not f.exists() else (
-            "k=" + next((w.split("config ")[1].split("개")[0]
-                         for w in f.read_text().split("\n")
-                         if "config " in w and "개" in w), "?"))
+        says = "(not recorded)" if not f.exists() else _prompt_k(f.read_text())
         ok = "✅" if (got_k == k and approx_equal(got_l, lam)) else "⛔"
         print(f"  {lab:14s} {got_k:5d} {got_l:5.1f} {str(ph):>7}   {says}  {ok}")
         out.setdefault("cond", {})[t] = {"k": got_k, "lambda": got_l,
@@ -145,8 +165,9 @@ def main() -> None:
     prob100 = _Problem(M, T, sp.train.shapes, 1)
     prob100.build_pairs(T, 100)
 
-    # ★ 적합은 (팔, 목적함수) 마다 **한 번만** 한다. `rankevo` 는 A·B·C
-    #   셋에 다 나와서 캐시가 없으면 같은 적합을 여러 번 돌린다.
+    # ★ The fit is done **once only** per (arm, objective). `rankevo` appears
+    #   in all three of A·B·C, and without a cache the same fit would run
+    #   several times.
     fits: dict = {}
 
     def measure(tag: str, obj: str, top_n: int = 100) -> list[tuple]:
@@ -168,32 +189,34 @@ def main() -> None:
     def block(tags, title, top_n=100, objs=("regret", "rank")):
         print(f"\n{'=' * 86}\n{title}\n{'=' * 86}")
         fl = floor(top_n)
-        for obj, head in (("regret", "★ regret 재적합 — 판정선이 걸린 칸"),
-                          ("rank", "순위 적합 (그 팔의 k·λ 로 맞춘다)")):
+        for obj, head in (("regret", ("★ regret refit — the cell the "
+                                      "decision line is on")),
+                          ("rank", "rank fit (fitted at that arm's k·λ)")):
             if obj not in objs:
                 continue
             print(f"\n  --- {head} ---")
-            print(f"  {'':14s} {'regret':>8} {f'상위{top_n} tau':>12} "
-                  f"{'전구간':>9}   (tau 범위)")
+            print(f"  {'':14s} {'regret':>8} {f'top-{top_n} tau':>13} "
+                  f"{'all':>9}   (tau range)")
             for t in tags:
                 v = np.array(measure(t, obj, top_n))
                 und = int(v[:, 3].sum())
                 print(f"  {A[t][0]:14s} {np.median(v[:, 0]):8.4f} "
                       f"{np.median(v[:, 1]):12.3f} {np.median(v[:, 2]):9.3f}"
                       f"   ({v[:, 1].min():+.3f}~{v[:, 1].max():+.3f})"
-                      + (f"  ⚠️ tau 정의 안 됨 {und}형상" if und else ""))
+                      + (f"  ⚠️ tau undefined in {und} shapes" if und else ""))
                 out.setdefault(f"{obj}@{top_n}", {})[t] = [list(x) for x in v]
-            print(f"  {'★ 무작위 바닥':14s} {fl[0]:8.4f} {fl[1]:12.3f} "
+            print(f"  {'★ random floor':14s} {fl[0]:8.4f} {fl[1]:12.3f} "
                   f"{fl[2]:9.3f}")
         out.setdefault("floor", {})[str(top_n)] = fl
 
-    block(A_ARMS, "A.  k 스윕 — 계열 간 비교는 k=100 고정으로 잰다")
+    block(A_ARMS, "A.  the k sweep — the between-family comparison is "
+                  "measured at k fixed to 100")
 
     print("\n" + "=" * 86)
-    print("A2.  그 실행의 k 로 잰 tau — ★ 바닥이 k 마다 다르다")
+    print("A2.  tau measured at that run's own k — ★ the floor differs per k")
     print("=" * 86)
-    print(f"  {'':14s} {'k':>4} {'상위k tau':>10} {'무작위 바닥':>11} "
-          f"{'바닥 위':>8}")
+    print(f"  {'':14s} {'k':>4} {'top-k tau':>11} {'random floor':>13} "
+          f"{'above floor':>12}")
     for t in A_ARMS:
         k = A[t][1]
         v = np.array(measure(t, "rank", k))
@@ -201,18 +224,19 @@ def main() -> None:
         und = int(v[:, 3].sum())
         print(f"  {A[t][0]:14s} {k:4d} {np.median(v[:, 1]):10.3f} "
               f"{f[1]:11.3f} {np.median(v[:, 1]) - f[1]:+8.3f}"
-              + (f"   ⚠️ 정의 안 되는 형상 {und}개 (점수가 상수)"
+              + (f"   ⚠️ {und} shapes undefined (the score is constant)"
                  if und else ""))
         out.setdefault("own_k", {})[t] = {
             "k": k, "tau": [x[1] for x in v], "floor": f[1],
             "undef": und}
 
-    block(B_ARMS, "B.  곱 항 — 명시하면 달라지나")
+    block(B_ARMS, "B.  the product term — does stating it change anything")
 
     print("\n" + "=" * 86)
-    print("B2.  곱 항이 실제로 쓰였나 — 아카이브 전체")
+    print("B2.  was the product term actually used — the whole archive")
     print("=" * 86)
-    print(f"  {'':14s} {'곱 쓴 규칙':>10} {'규칙당 곱':>10}   자주 나온 쌍")
+    print(f"  {'':14s} {'rules w/ prod':>14} {'prods per rule':>15}   "
+          f"the frequent pairs")
     for t in B_ARMS:
         arc = [e for d in dirs[t] for e in _rows(d, "archive.jsonl")]
         ps = [_prod_pairs(e["code"]) for e in arc]
@@ -228,13 +252,15 @@ def main() -> None:
             "pairs": {f"{'+'.join(x)} x {'+'.join(y)}": v
                       for (x, y), v in cnt.most_common(10)}}
 
-    block(C_ARMS, "C.  λ 스윕 — 파레토 곡선")
+    block(C_ARMS, "C.  the λ sweep — the Pareto curve")
 
     print("\n" + "=" * 86)
-    print("C2.  ★ 순수 rank_loss(k=100) — 계열 간 비교용으로 다시 계산")
+    print("C2.  ★ the pure rank_loss(k=100) — recomputed for the "
+          "between-family comparison")
     print("=" * 86)
-    print("  아카이브의 `rank_loss` 는 λ 가 섞인 값이라 나란히 못 놓는다.")
-    print(f"\n  {'':14s} {'순수 rank_loss':>14} {'학습 regret':>11}")
+    print("  the archive's `rank_loss` has λ mixed into it and cannot be put "
+          "side by side.")
+    print(f"\n  {'':14s} {'pure rank_loss':>15} {'train regret':>13}")
     for t in C_ARMS:
         rl, rg = [], []
         for e in best[t]:
@@ -244,12 +270,12 @@ def main() -> None:
         print(f"  {A[t][0]:14s} {np.median(rl):14.4f} {np.median(rg):11.4f}")
         out.setdefault("pure", {})[t] = {"rank_loss": rl, "regret": rg}
 
-    # ------------------------------------------------------ 공통
+    # ------------------------------------------------------ in common
     print("\n" + "=" * 86)
-    print("공통 — 항/노드/거부율/비용/축")
+    print("in common — terms/nodes/rejection rate/cost/axes")
     print("=" * 86)
-    print(f"  {'':14s} {'항':>4} {'노드':>6} {'예산소비':>8} {'거부율':>7} "
-          f"{'적합기':>7} {'config':>7} {'분':>7}")
+    print(f"  {'':14s} {'trm':>4} {'nodes':>6} {'budget':>8} {'rej':>7} "
+          f"{'fitter':>7} {'config':>7} {'min':>7}")
     for t, *_ in ARMS:
         arc = [e for d in dirs[t] for e in _rows(d, "archive.jsonl")]
         tm = [_n_terms(e["code"]) for e in arc]
@@ -275,7 +301,7 @@ def main() -> None:
             "reach": mv / max(1, sc), "n_config": nc, "minutes": secs / 60,
             "feats": [sorted(_feats(e["code"])) for e in best[t]]}
 
-    print(f"\n  ★ 상한 측정의 다섯 축 (/3 시드)\n    {'':14s} "
+    print(f"\n  ★ the ceiling measurement's five axes (/3 seeds)\n    {'':14s} "
           + " ".join(f"{n[:11]:>12s}" for n in WATCH))
     for t, *_ in ARMS:
         fs = [_feats(e["code"]) for e in best[t]]
@@ -284,7 +310,8 @@ def main() -> None:
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
-    print("  ⚠️ 3시드는 유의성을 못 낸다 — 범위 분리로 읽는다 (원칙 27)")
+    print("  ⚠️ 3 seeds cannot give significance — it is read by range "
+          "separation (principle 27)")
 
 
 if __name__ == "__main__":

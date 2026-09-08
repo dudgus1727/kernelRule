@@ -1,9 +1,10 @@
-"""★ 3-fold 구성을 **파일로 만든다** (D-144). LLM 0회 · GPU 0회.
+"""★ It **writes the 3-fold layout to a file** (D-144). 0 LLM calls · 0 GPU.
 
     python3 experiments/fold_plan.py
 
-fold 별 train/val 목록과 memory/compute 개수를 적는다. 실행 전에 구성이
-의도대로인지 사람이 볼 수 있어야 한다.
+It records the train/val list per fold and the memory/compute counts. A human
+has to be able to look at the layout before the run and see that it is what
+was intended.
 """
 
 from __future__ import annotations
@@ -18,7 +19,8 @@ from kernelrule.core.splits import regime_of, stratified_kfold
 from kernelrule.core.table import PerfTable
 
 BUNDLE = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
-#: ★ fold 를 만드는 난수. **진화 시드와 분리한다** (D-144).
+#: ★ The randomness that builds the folds. **It is kept separate from the
+#: evolution seed** (D-144).
 SPLIT_SEED = 12345
 
 
@@ -40,9 +42,10 @@ def main() -> None:
     shapes = [p for p in T.shapes() if aligned(p)]
     tot = Counter(regime_of(p, T.hw, axis="roofline") for p in shapes)
     print("=" * 84)
-    print(f"층별 {a.k}-fold — 분할 시드 {a.split_seed} (진화 시드와 분리)")
+    print(f"stratified {a.k}-fold — split seed {a.split_seed} (separate from "
+          f"the evolution seed)")
     print("=" * 84)
-    print(f"  정렬 8 형상 {len(shapes)}   {dict(tot)}")
+    print(f"  aligned-8 shapes {len(shapes)}   {dict(tot)}")
     folds = stratified_kfold(shapes, T.hw, k=a.k, seed=a.split_seed)
     out: dict = {"bundle": BUNDLE[0], "k": a.k, "split_seed": a.split_seed,
                  "n_shapes": len(shapes), "totals": dict(tot), "folds": []}
@@ -64,16 +67,19 @@ def main() -> None:
             "val": [[p.M, p.N, p.K] for p in sp.val.shapes],
             "train": [[p.M, p.N, p.K] for p in sp.train.shapes]})
 
-    # ★ fold 의 val 이 서로 겹치지 않는가 / 합집합이 전체인가
+    # ★ Are the folds' vals disjoint / is their union the whole set
     seen: Counter = Counter()
     for f in out["folds"]:
         for v in f["val"]:
             seen[tuple(v)] += 1
-    print(f"\n  ★ val 이 정확히 한 번씩 나오나: "
+    print(f"\n  ★ does each val appear exactly once: "
           f"{set(seen.values()) == {1} and len(seen) == len(shapes)}")
-    print("  ⚠️ 한계 — 세 fold 의 val 이 서로 다른 fold 의 **train** 에 있다.")
-    print("     그리고 우리가 61형상을 전부 봐 왔다. '완전히 새로운 형상' 이")
-    print("     아니므로 주장은 **'특정 분할에 의존하지 않는다'** 까지다.")
+    print("  ⚠️ a limit — each of the three folds' val is in another fold's "
+          "**train**.")
+    print("     And we have looked at all 61 shapes. They are not 'entirely "
+          "new shapes',")
+    print("     so the claim reaches only as far as **'it does not depend on "
+          "one particular split'**.")
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")
 

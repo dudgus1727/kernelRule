@@ -1,14 +1,20 @@
-"""★ 12라운드가 맞나 — **기록된 곡선만** 본다. LLM 0회.
+"""★ Is 12 rounds right — it looks at **the recorded curves only**. 0 LLM
+calls.
 
     python3 experiments/rounds_curve.py
 
-실험 계획서 `docs/artifacts/rounds-prereg.md`.
+The pre-registration is `docs/artifacts/rounds-prereg.md`.
 
-"조기 종료가 안 걸렸다" 는 "수렴했다" 가 아니다 — `patience=10` 에
-12라운드면 판정 창이 둘뿐이고, 새 셀이 하나만 생겨도 안 멈춘다.
+"early stopping did not trigger" is not "it converged" — with
+`patience=10` and 12 rounds there are only two decision windows, and it does
+not stop if even one new cell appears.
 
-★ 유의 문턱은 루프가 쓰는 것 그대로다 (`is_significant`). 새 기준을
-만들지 않는다 (원칙 2).
+★ The significance threshold is exactly the one the loop uses
+(`is_significant`). No new criterion is made (principle 2).
+
+⚠️ 2026-09-08 (D-146): **the verdict strings stay in Korean.** They are the
+three verdicts written down in `docs/artifacts/rounds-prereg.md` and stored
+in `rounds-curve.json`, and `docs/` is not translated.
 """
 
 from __future__ import annotations
@@ -29,20 +35,22 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import make_score_of
 from kernelrule.features import REGISTRY
 
-#: (새 태그, 옛 디렉토리 접두, 시드 수)
-#: (태그, 실행 디렉토리 접두, 시드 수). D-128 개명 뒤 둘이 같다.
+#: (tag, the run directory prefix, the number of seeds). After the D-128
+#: rename the two are the same.
 GROUPS = [("F3rw-p8", "F3rw-p8", 6),
           ("F1rw-p8", "F1rw-p8", 6),
           ("F2rw-p8", "F2rw-p8", 6)]
-#: 검토할 patience. **바꾸지 않는다** — "그랬다면 언제 멈췄을까" 만 본다.
+#: The patience values to review. **They are not changed** — it only looks at
+#: "when would it have stopped if it had been that".
 PATIENCES = (3, 5, 7, 10)
-#: 판정에 쓰는 "마지막 3라운드" (0부터 세는 파일의 round 필드)
+#: The "last 3 rounds" used for the decision (the round field of the file,
+#: counting from 0)
 LAST3 = (9, 10, 11)
 
 
 def _r(x) -> str:
-    """`None` 이면 '없음'. 라운드 번호는 0부터다."""
-    return "없음" if x is None else f"r{x}"
+    """'none' if `None`. Round numbers count from 0."""
+    return "none" if x is None else f"r{x}"
 
 
 def _rows(run: str) -> list[dict]:
@@ -51,11 +59,13 @@ def _rows(run: str) -> list[dict]:
 
 
 def _tol(run: str, T, M, hold) -> float | None:
-    """그 실행의 최종 최고 규칙으로 잰 **노이즈 문턱** (루프와 같은 경로).
+    """The **noise threshold** measured with that run's final best rule (the
+    same path as the loop).
 
-    ★ `None` 이면 **계산할 수 없었다** — F1/F2 실행의 규칙은 루프 안에서
-    만든 피처를 참조하는데 기본 레지스트리에 그 축이 없다. 다른 값으로
-    메우지 않는다 (원칙 2). 부르는 쪽이 근사임을 표시하고 쓴다.
+    ★ `None` means **it could not be computed** — an F1/F2 run's rule refers
+    to features made inside the loop, and the base registry does not have
+    those axes. It is not filled in with another value (principle 2). The
+    caller marks it as an approximation and uses it.
     """
     f = Path("runs") / run / "archive.jsonl"
     arc = [json.loads(x) for x in f.read_text().splitlines() if x.strip()]
@@ -72,13 +82,15 @@ def _tol(run: str, T, M, hold) -> float | None:
 
 def _stop_round(vals: list[float], n: int, thr: float,
                 cells: list[int]) -> int | None:
-    """`patience=n` 이면 **몇 번째 라운드 끝에** 멈췄을까 (루프의 공식).
+    """If `patience=n`, **at the end of which round** would it have stopped
+    (the loop's formula).
 
-    ★ 새 셀 조건도 그대로 쓴다 — 그것 때문에 안 멈추는 경우가 요점이다.
+    ★ The new-cell condition is used as it is too — the case where that stops
+    it from stopping is the whole point.
     """
     for end in range(n, len(vals)):
         improved = vals[end - n] - vals[end]
-        # 새 셀이 최근 n 라운드 안에 생겼나
+        # Did a new cell appear within the last n rounds
         new_cell = any(cells[i] > cells[i - 1]
                        for i in range(max(1, end - n + 1), end + 1))
         if abs(improved) > thr or new_cell:
@@ -101,7 +113,7 @@ def main() -> None:
 
     for tag, prefix, n_seeds in GROUPS:
         print("=" * 96)
-        print(f"{tag}  (구 {prefix})  — 시드 {n_seeds}")
+        print(f"{tag}  (dir {prefix})  — {n_seeds} seeds")
         print("=" * 96)
         g: dict = {}
         for i in range(n_seeds):
@@ -112,11 +124,13 @@ def main() -> None:
             thr = _tol(run, T, M, hold)
             approx = thr is None
             if approx:
-                # ★ F3 6시드가 **전부 같은 문턱**(0.0047)을 냈다 — 문턱은
-                #   규칙이 아니라 홀드아웃 형상이 정한다. 그 값을 빌려 쓰되
-                #   **근사라고 표시한다**. 판정은 F3 로만 한다 (실험 계획서 §2).
+                # ★ All 6 F3 seeds gave **the same threshold** (0.0047) — the
+                #   threshold is set by the holdout shapes, not by the rule.
+                #   That value is borrowed but **marked as an
+                #   approximation**. The judgement is made on F3 alone
+                #   (pre-registration §2).
                 thr = out.get("_f3_thr", float("nan"))
-            # 라운드마다의 개선 (양수 = 좋아졌다)
+            # The improvement per round (positive = it got better)
             d = [vals[k - 1] - vals[k] for k in range(1, len(vals))]
             any_imp = [k for k, x in enumerate(d, start=1) if x > 0]
             sig_imp = [k for k, x in enumerate(d, start=1) if x > thr]
@@ -132,39 +146,42 @@ def main() -> None:
                       "last_new_cell": (max(new_cell) if new_cell else None),
                       "sig_in_last3": [k for k in sig_imp if k in LAST3],
                       "stops": stops}
-            print(f"  {run:28s} 문턱 {thr:.4f}{'(근사)' if approx else '     '}  "
-                  f"마지막 개선 r{g[run]['last_any']}  "
-                  f"★ 마지막 **유의** 개선 "
+            print(f"  {run:28s} threshold {thr:.4f}"
+                  f"{'(approx)' if approx else '        '}  "
+                  f"last improvement r{g[run]['last_any']}  "
+                  f"★ last **significant** improvement "
                   f"{_r(g[run]['last_sig'])}  "
-                  f"마지막 새 셀 r{g[run]['last_new_cell']}  "
-                  f"멈춤(p3/p4/p10) "
+                  f"last new cell r{g[run]['last_new_cell']}  "
+                  f"stop(p3/p4/p10) "
                   + "/".join(str(stops[n]) if stops[n] is not None else "-"
                              for n in PATIENCES))
-            print(f"  {'':28s} 곡선 "
+            print(f"  {'':28s} curve "
                   + " ".join(f"{v:.4f}" for v in vals))
         out["groups"][tag] = g
 
         sig = [v["last_sig"] for v in g.values()]
         in3 = [r for r, v in g.items() if v["sig_in_last3"]]
-        print("\n  마지막 유의 개선 라운드: "
-              + ", ".join("없음" if s is None else f"r{s}" for s in sig))
-        print(f"  ★ 마지막 3라운드(r9·r10·r11)에 유의 개선이 있는 시드: "
+        print("\n  the last significant improvement round: "
+              + ", ".join("none" if s is None else f"r{s}" for s in sig))
+        print(f"  ★ seeds with a significant improvement in the last 3 "
+              f"rounds (r9·r10·r11): "
               f"{len(in3)}/{len(g)}  {in3}")
         cells_end = [v["last_new_cell"] for v in g.values()]
-        print("  마지막 새 셀 라운드: "
-              + ", ".join("없음" if c is None else f"r{c}" for c in cells_end))
+        print("  the last new-cell round: "
+              + ", ".join("none" if c is None else f"r{c}" for c in cells_end))
         print()
 
-    # ------------------------------------------------------------ 판정
+    # ------------------------------------------------------- the verdict
     main_g = out["groups"]["F3rw-p8"]
     in3 = [r for r, v in main_g.items() if v["sig_in_last3"]]
     late_cell = [r for r, v in main_g.items()
                  if v["last_new_cell"] is not None and v["last_new_cell"] >= 9]
-    # ------------------------------------------------ patience 고르기 (D-129)
+    # ------------------------------------------- picking patience (D-129)
     import statistics as _st
     print("=" * 96)
-    print("★ patience 별 — 가정 종료 라운드와 **놓칠 개선** "
-          "(실험 계획서 patience-prereg.md)")
+    print("★ per patience — the hypothetical stop round and **the "
+          "improvement that would be missed** "
+          "(the pre-registration patience-prereg.md)")
     print("=" * 96)
     pat: dict = {}
     for tag, g in out["groups"].items():
@@ -174,19 +191,22 @@ def main() -> None:
             for v in g.values():
                 e = v["stops"][n]
                 stops.append(e)
-                # ★ 그때 멈췄으면 잃었을 양. 끝까지 간 시드는 0 이다
+                # ★ How much would have been lost by stopping there. A seed
+                #   that ran to the end is 0
                 miss.append(0.0 if e is None else v["vals"][e] - v["vals"][-1])
             early = sum(1 for e in stops if e is not None)
             med, mx = _st.median(miss), max(miss)
             pat.setdefault(tag, {})[n] = {
                 "stops": stops, "miss": miss, "median": med, "max": mx,
                 "n_early": early}
-            print(f"    patience {n:2d}  종료 "
+            print(f"    patience {n:2d}  stop "
                   + " ".join("-" if e is None else f"r{e:<2d}" for e in stops)
-                  + f"   12 전 종료 {early}/{len(stops)}"
-                  + f"   ★ 놓칠 개선 중앙 {med:+.4f}  최대 {mx:+.4f}")
+                  + f"   stopped before 12: {early}/{len(stops)}"
+                  + f"   ★ improvement missed, median {med:+.4f}  "
+                    f"max {mx:+.4f}")
         cum = [v["vals"][6] - v["vals"][-1] for v in g.values()]
-        print(f"    ★ r6 -> r11 누적 개선  중앙 {_st.median(cum):+.4f}  "
+        print(f"    ★ r6 -> r11 cumulative improvement  median "
+              f"{_st.median(cum):+.4f}  "
               + " ".join(f"{c:+.4f}" for c in cum))
         pat[tag]["cum_r6_r11"] = cum
     out["patience"] = pat
@@ -195,31 +215,36 @@ def main() -> None:
     main = pat["F3rw-p8"]
     ok = [n for n in PATIENCES if main[n]["median"] < SIGMA]
     pick = min(ok) if ok else max(PATIENCES)
-    print(f"\n  ★ 고른 patience = {pick}  "
-          + (f"(놓칠 개선 중앙 {main[pick]['median']:+.4f} < σ {SIGMA})"
+    print(f"\n  ★ the chosen patience = {pick}  "
+          + (f"(the improvement missed, median {main[pick]['median']:+.4f} "
+             f"< σ {SIGMA})"
              if ok else
-             f"— ⚠️ 어느 값도 σ {SIGMA} 아래가 아니다. 큰 쪽으로 간다"))
+             f"— ⚠️ no value is below σ {SIGMA}. It goes to the larger one"))
     out["patience_pick"] = pick
 
     print()
     print("=" * 96)
-    print("★ 판정 — 실험 계획서 §2 의 셋 중에서")
+    print("★ the verdict — one of the three in pre-registration §2")
     print("=" * 96)
     if in3:
         verdict = "(나) 12 가 부족하다"
-        print(f"  ★ (나) — 마지막 3라운드에 유의 개선이 있는 시드 {in3}")
-        print("     -> 라운드 24 를 n=6 으로 재야 한다 (약 6,000호출 / 15시간)")
+        print(f"  ★ (나) — seeds with a significant improvement in the last "
+              f"3 rounds: {in3}")
+        print("     -> round 24 has to be measured at n=6 (about 6,000 calls "
+              "/ 15 hours)")
     elif late_cell:
         verdict = "(다) 애매하다 — 유의 개선은 끝났는데 새 셀이 늦게까지 생긴다"
-        print("  ★ (다) — 유의 개선은 r8 이하에서 끝났는데 새 셀이 "
-              f"r9 이후에도 생긴다: {late_cell}")
-        print("     -> patience 조정을 **검토**한다. ⚠️ 여기서 바꾸지 않는다 "
-              "(조건 변경이라 별도 실험 계획서)")
+        print("  ★ (다) — the significant improvements ended at r8 or "
+              f"earlier but new cells keep appearing after r9: {late_cell}")
+        print("     -> adjusting patience is **reviewed**. ⚠️ It is not "
+              "changed here (that is a condition change, so it needs its own "
+              "pre-registration)")
     else:
         verdict = "(가) 12 로 충분하다"
-        print("  ★ (가) — 6시드 전부 마지막 유의 개선이 r8 이하이고 "
-              "새 셀도 r9 이후 없다")
-        print("     -> 라운드는 축이 아니다. 각주에 곡선과 함께 적는다")
+        print("  ★ (가) — for all 6 seeds the last significant improvement "
+              "is at r8 or earlier and there is no new cell after r9 either")
+        print("     -> rounds are not an axis. It is written in a footnote "
+              "together with the curve")
     out["verdict"] = verdict
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"\n  -> {a.out}")

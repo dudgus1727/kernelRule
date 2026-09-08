@@ -1,33 +1,29 @@
-"""★ 실행 묶음의 **조건 동일성**을 검사한다 (D-120).
+"""★ Check that a set of runs shares **one condition** (D-120).
 
-## 왜
+## Why
 
-`transfer_29_5.TABLES["5090"]["runs"]` 가 여섯 실행을 (c) 로 묶었는데
-뒤 셋이 `human_guided` **손씨앗**이었다. "5090 표에서 처음부터" 가
-아닌 것이 (c) 에 섞여 있었고, 그 사실은 `chosen.json` 의 `source` 에
-**적혀 있었다.** 아무도 안 읽었다.
+`transfer_29_5.TABLES["5090"]["runs"]` grouped six runs as (c), but the last
+three used a `human_guided` **hand seed**. Something that was not "from
+scratch on the 5090 table" was mixed into (c), and that fact **was written
+down** in `chosen.json`'s `source`. Nobody read it.
 
-```
-D-113   arch_prompt 가 config.json 에 있었고 안 읽었다
-D-119   씨앗 source 가 chosen.json 에 있었고 안 읽었다
-★ 원칙 39 가 생긴 지 하루 만에 두 번째다
-```
+    D-113   arch_prompt was in config.json and went unread
+    D-119   the seed source was in chosen.json and went unread
+    ★ the second occurrence one day after principle 39 was written
 
-**그래서 검사로 만든다.** 묶음을 만드는 자리에서 부르면, 조건이 달라진
-묶음은 **실패한다** (§26.4).
+**So it becomes a check.** Called where the set is built, a set whose
+condition differs **fails** (§26.4).
 
-## 무엇을 보나
+## What is compared
 
-```
-씨앗       stage2 `chosen.json` 의 source + 코드 해시
-목적함수   objective / rank_top_k / rank_lambda
-형태       parameters / product_hint / power_hint
-하드웨어   arch_prompt 또는 hw_text 해시   ← D-113 이 여기였다
-분할·조건  split.kind / feature_condition / 모델
-```
+    seed         stage-2 `chosen.json` source + code hash
+    objective    objective / rank_top_k / rank_lambda
+    form         parameters / product_hint / power_hint
+    hardware     arch_prompt or hw_text hash   <- D-113 was here
+    split/cond   split.kind / feature_condition / model
 
-값이 **없는 것**(옛 실행)은 갈림으로 안 센다 — 없는 것과 다른 것은
-다르다. 다만 한쪽에만 있으면 그것은 갈림이다.
+A **missing** value (an older run) does not count as a divergence — missing
+and different are not the same. But present on one side only is a divergence.
 """
 
 from __future__ import annotations
@@ -41,35 +37,38 @@ __all__ = ["RunSetError", "run_condition", "assert_same_condition",
 
 ROOT = Path("runs")
 
-#: 비교할 조건 키. **여기 없는 것은 안 본다** — 늘릴 때 시험도 같이 는다.
+#: The condition keys compared. **What is not here is not looked at** — when
+#: this grows, the tests grow with it.
 KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
         "parameters", "product_hint", "power_hint", "hw", "split_kind",
         "feature_condition", "model", "fit_method", "fit_restarts")
 
-#: ★ 새로 생긴 키의 **옛 기본값** (D-123). 옛 실행의 `config.json` 에는
-#: 이 키가 없는데, 그때 코드가 하던 것이 이 값이다 — 그러므로 "없음" 을
-#: 이 값으로 메우는 것은 봐주기가 아니라 **사실을 채우는 것**이다.
-#: 새 키를 KEYS 에 넣을 때만 여기에 적는다. 값이 있는 실행끼리는
-#: 그대로 견준다.
+#: ★ The **old default** of a newly added key (D-123). Older runs have no
+#: such key in `config.json`, and this is what the code did back then — so
+#: filling "missing" with this value is not leniency but **stating the
+#: fact**. Add an entry here only when a new key goes into KEYS. Runs that do
+#: have a value are compared as they are.
 _OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4}
 
 
 class RunSetError(ValueError):
-    """묶음 안에서 조건이 달라졌다. **조용히 진행하지 않는다** (§26.4)."""
+    """The condition differs within the set. **Do not proceed silently**
+    (§26.4)."""
 
 
 def _campaign(run: str) -> str:
-    """`f1pipe-F3-tag-s0` -> `f1pipe-F3-tag`. 씨앗은 캠페인 단위다."""
+    """`f1pipe-F3-tag-s0` -> `f1pipe-F3-tag`. The seed is per campaign."""
     parts = run.rsplit("-s", 1)
     return parts[0] if len(parts) == 2 and parts[1].isdigit() else run
 
 
 def run_condition(run: str, root: Path | None = None) -> dict:
-    """한 실행의 조건. 없는 값은 `None` 이다."""
+    """One run's condition. A missing value is `None`."""
     r = (root or ROOT)
     cfg_p = r / run / "config.json"
     if not cfg_p.exists():
-        raise RunSetError(f"{cfg_p} 가 없다. 조건을 읽을 수 없다.")
+        raise RunSetError(f"{cfg_p} does not exist. Cannot read the "
+                          "condition.")
     c = json.loads(cfg_p.read_text())
     loop, llm = c.get("loop", {}), c.get("llm", {})
     rc = c.get("rule_constraints") or {}
@@ -80,8 +79,9 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         "objective": loop.get("objective"),
         "rank_top_k": loop.get("rank_top_k"),
         "rank_lambda": loop.get("rank_lambda"),
-        # ★ D-128 개명: `budget` -> `parameters`. 저장소의 옛 산출물은
-        #   변환했지만, 밖에서 받은 옛 실행이 있을 수 있어 둘 다 읽는다.
+        # ★ D-128 rename: `budget` -> `parameters`. The repository's old
+        #   artefacts were converted, but an old run may arrive from outside,
+        #   so both names are read.
         "parameters": (rc.get("parameters") if rc.get("parameters") is not None
                        else rc.get("budget")),
         "product_hint": llm.get("product_hint"),
@@ -90,8 +90,8 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         "split_kind": (c.get("split") or {}).get("kind"),
         "feature_condition": loop.get("feature_condition"),
         "model": llm.get("model") or llm.get("class"),
-        # ★ 적합기 (D-123). 옛 실행에는 키가 없고, 그때는 Nelder-Mead
-        #   4재시작뿐이었다 — `_OLD_DEFAULTS` 로 메운다.
+        # ★ The fitter (D-123). Older runs have no key, and back then it was
+        #   Nelder-Mead with 4 restarts only — filled from `_OLD_DEFAULTS`.
         "fit_method": loop.get(
             "fit_method", _OLD_DEFAULTS["fit_method"]),
         "fit_restarts": loop.get(
@@ -108,17 +108,17 @@ def run_condition(run: str, root: Path | None = None) -> dict:
 
 
 def condition_report(runs, root: Path | None = None) -> dict:
-    """키별로 **관측된 값들**. 하나면 같은 조건이다."""
+    """The **observed values** per key. One value means one condition."""
     conds = {r: run_condition(r, root) for r in runs}
     return {k: sorted({str(c[k]) for c in conds.values()}) for k in KEYS}
 
 
-def assert_same_condition(runs, *, keys=KEYS, label: str = "묶음",
+def assert_same_condition(runs, *, keys=KEYS, label: str = "the set",
                           root: Path | None = None) -> dict:
-    """묶음 안에서 조건이 하나인가. 아니면 **예외** (§26.4).
+    """Is the condition single within the set? If not, **raise** (§26.4).
 
-    ★ 묶음을 만드는 자리에서 불러라. 나중에 보면 "있었는데 안 봤다" 가
-    된다 (원칙 39).
+    ★ Call it where the set is built. Looking later turns into "it was there
+    and nobody looked" (principle 39).
     """
     runs = list(runs)
     if len(runs) < 2:
@@ -131,12 +131,14 @@ def assert_same_condition(runs, *, keys=KEYS, label: str = "묶음",
         if len(uniq) > 1:
             bad[k] = vals
     if bad:
-        lines = [f"{label} 안에서 조건이 달라졌다 ({len(bad)}개 키):"]
+        lines = [(f"the condition differs within {label} "
+                  f"({len(bad)} keys):")]
         for k, vals in bad.items():
             lines.append(f"  {k}:")
             for r, v in vals.items():
                 lines.append(f"    {r:34s} {v}")
-        lines.append("같은 조건이 아닌 실행을 한 묶음으로 집계하면 "
-                     "그 수치는 두 조건의 평균이다 (D-119).")
+        lines.append("aggregating runs of different conditions into one set "
+                     "makes that number the average of two conditions "
+                     "(D-119).")
         raise RunSetError("\n".join(lines))
     return {k: conds[runs[0]][k] for k in keys}
