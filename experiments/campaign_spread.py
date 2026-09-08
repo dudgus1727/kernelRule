@@ -28,15 +28,14 @@ ART = Path("docs/artifacts")
 #: ★ Everything is read from `round-curve-bests.json` — the curve rebuilt
 #: from `bests.jsonl` (D-139). The old files (`round-curve*.json`) are **kept
 #: as correction history** and are not read here.
-#: ⚠️ 2026-09-08 (D-146): **the campaign names stay in Korean.** They are the
-#: labels of `docs/artifacts/campaign-spread.md` and the keys of
-#: `campaign-spread.json`, and `docs/` is not translated — renaming them here
-#: would silently change what the document points at.
+#: ⚠️ 2026-09-08 (D-146): the names were translated together with
+#: `docs/artifacts/campaign-spread.md` and the keys of `campaign-spread.json`.
+#: The Korean originals are at commit `ee53b4d`.
 CURVES = "round-curve-bests.json"
 CAMPAIGNS = [
-    ("옛", CURVES, "F3rw-p8-old"),
+    ("old", CURVES, "F3rw-p8-old"),
     ("p3", CURVES, "F3rw-p8-p3"),
-    ("새24", CURVES, "F3rw-p8"),
+    ("new24", CURVES, "F3rw-p8"),
     ("nan", CURVES, "F3rw-p8-nan"),
 ]
 # The power coefficient: two-sided 0.05 + power 0.8 -> z(0.975) + z(0.8)
@@ -92,10 +91,10 @@ def main() -> None:
               + " ".join(f"{s[-2:]}:r{e}" for s, e in sorted(ends.items()))
               + f"   -> all alive to r{live[name]}")
 
-    # ★ p3 and 새24 are the only two campaigns with the same prompt and the
+    # ★ p3 and new24 are the only two campaigns with the same prompt and the
     #   same condition
-    r = min(live["p3"], live["새24"])
-    print(f"\n  ★ p3 and 새24 **have the same condition apart from "
+    r = min(live["p3"], live["new24"])
+    print(f"\n  ★ p3 and new24 **have the same condition apart from "
           f"patience**. They are compared at r{r}, where both are alive")
 
     print("\n" + "=" * 88)
@@ -103,14 +102,14 @@ def main() -> None:
           f"difference")
     print("=" * 88)
     vals = {}
-    for name in ("p3", "새24"):
+    for name in ("p3", "new24"):
         v = sorted(_at(c, r) for c in cur[name].values())
         vals[name] = v
         print(f"  {name:5s} n={len(v)}  " + " ".join(f"{x:.4f}" for x in v))
         print(f"        mean {st.mean(v):.4f}  median {st.median(v):.4f}"
               f"  σ(seed) {st.stdev(v):.4f}")
-    d_mean = st.mean(vals["새24"]) - st.mean(vals["p3"])
-    d_med = st.median(vals["새24"]) - st.median(vals["p3"])
+    d_mean = st.mean(vals["new24"]) - st.mean(vals["p3"])
+    d_med = st.median(vals["new24"]) - st.median(vals["p3"])
     sw = math.sqrt(sum(st.variance(v) for v in vals.values()) / 2)
     n = len(vals["p3"])
     se_within = sw * math.sqrt(2.0 / n)

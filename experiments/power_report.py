@@ -124,9 +124,9 @@ def main() -> None:
     # ⚠️ 2026-09-08 (D-146): **these two labels stay in Korean.** They are
     #    the row names of `docs/artifacts/power.md` and the keys of `head` in
     #    `power.json`, and `docs/` is not translated.
-    pick = {"지수 있음": [with_e[i] for i in
+    pick = {"with exponent": [with_e[i] for i in
                        rng.choice(len(with_e), N_HEAD, replace=False)],
-            "지수 없음": [without[i] for i in
+            "without exponent": [without[i] for i in
                        rng.choice(len(without), N_HEAD, replace=False)]}
     prob = _Problem(M, T, sp.train.shapes, 1)
     prob.build_pairs(T, 100)

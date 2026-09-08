@@ -1,114 +1,132 @@
-# ★ 적합기는 **범인이 아니다** — 1.0762 -> 1.0987 은 적합기 탓이 아니다
+# ★ The fitter is **not the culprit** — 1.0762 -> 1.0987 is not the fitter's fault
 
-> **재현**: `python3 experiments/fitter_regress.py` (약 6분, **LLM 0회**)
-> **실험 계획서**: [fitter-regress-prereg.md](fitter-regress-prereg.md)
-> **원자료**: `docs/artifacts/fitter-regress.json`
-> **표**: `datasets/rtx-a6000-sm_86-c63710df` (dev), 분할 `nk11008`
+> **Reproduce**: `python3 experiments/fitter_regress.py` (about 6 minutes,
+> **0 LLM calls**)
+> **Pre-registration**: [fitter-regress-prereg.md](fitter-regress-prereg.md)
+> **Raw data**: `docs/artifacts/fitter-regress.json`
+> **Table**: `datasets/rtx-a6000-sm_86-c63710df` (dev), split `nk11008`
 
-## 1. 무엇이 걸렸나
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
 
-D-124 에서 기준선을 다시 뽑았더니 방향이 반대였다.
+## 1. What got caught
+
+Re-taking the baseline in D-124 gave the opposite direction.
 
 ```
-옛 기준선 (Nelder-Mead 200/600, 6시드)   1.0762
-새 기준선 (CMA-ES 300/600, 3시드)        1.0987   0.0225 나쁘다
+the old baseline (Nelder-Mead 200/600, 6 seeds)   1.0762
+the new baseline (CMA-ES 300/600, 3 seeds)        1.0987   worse by 0.0225
 ```
 
-"CMA 가 학습을 더 잘 맞추는데 홀드아웃이 나빠진다 = 적합기가 과적합을
-만든다" 가 될 수 있었다. **변수를 적합기 하나로 줄여서 가른다.**
+It could have become "CMA fits the training better and the holdout gets worse
+= the fitter makes overfitting". **The variables are cut down to the fitter
+alone to tell them apart.**
 
-## 2. ★ 결과 — 같은 구조, 두 적합기
+## 2. ★ The result — the same structures, two fitters
 
-`arch24` 6구조를 두 적합기로 **다시 맞춰서** 홀드아웃을 잰다. 구조도
-씨앗도 예산도 분할도 같다.
+The 6 `arch24` structures are **refitted** with the two fitters and the
+holdout is measured. The structures, the seeds, the budget and the split are
+all the same.
 
-| 팔 | 학습 중앙 | 홀드아웃 중앙 | 격차 | 홀드아웃 범위 |
+| arm | training median | holdout median | gap | holdout range |
 |---|---:|---:|---:|---|
 | NM (nelder-mead/4) | 1.0495 | **1.0762** | +0.0186 | 1.0566~1.0919 |
 | CMA (cma/1) | 1.0485 | **1.0753** | +0.0135 | 1.0546~1.0919 |
 
 ```
-짝지은 차이 (CMA - NM, 양수 = CMA 가 나쁘다)
+the paired differences (CMA - NM, positive = CMA is worse)
   +0.0012  -0.0145  +0.0000  -0.0006  -0.0013  -0.0020
-  CMA 가 나쁜 구조 1/6   중앙 -0.0010
-  ★ 짝지은 Wilcoxon 단측 p = 0.9375 — 유의하지 않다
+  structures where CMA is worse 1/6   median -0.0010
+  ★ paired one-sided Wilcoxon p = 0.9375 — not significant
 ```
 
-**구분 불가다.** 오히려 CMA 쪽이 미세하게 좋다(중앙 -0.0010, σ 의 1/12).
+**They are indistinguishable.** If anything CMA is slightly better (median
+-0.0010, one twelfth of σ).
 
-★ **NM 팔이 `1.0762` 를 정확히 재현했다** — 발표된 최종 점수다. 측정
-경로가 멀쩡하다는 뜻이고(원칙 1), 그래서 이 비교를 믿는다.
+★ **The NM arm reproduced `1.0762` exactly** — the final score that was
+reported. That means the measurement path is sound (principle 1), and that is
+why this comparison is trusted.
 
-### 기전 가설도 안 선다
+### The mechanism hypothesis does not stand either
 
 ```
-학습에서 CMA 가 좋은 구조   3/6      (예상은 "거의 확실히 CMA")
-격차 차 중앙              -0.0008   (예상은 "CMA 가 더 벌어진다")
+structures where CMA is better in training   3/6      (expected "almost
+                                                       certainly CMA")
+median of the gap differences             -0.0008   (expected "CMA opens up
+                                                     more")
 ```
 
-**8차원에서는 CMA 가 학습을 더 잘 맞추지도 않는다.** D-123 이 잰 것은
-**16차원 도달률**이고, 8차원에서는 두 적합기가 사실상 같은 점을 찾는다
-(D-77 의 A8 도달률 100% 와 같은 얘기다).
+**In 8 dimensions CMA does not even fit the training better.** What D-123
+measured is the **16-dimensional reach**, and in 8 dimensions the two fitters
+find practically the same point (the same story as D-77's A8 reach of 100%).
 
-## 3. 그러면 0.0225 는 어디서 왔나
+## 3. Then where did the 0.0225 come from
 
-`rb08`(§3 의 예산 8 팔) 3구조도 같은 두 적합기로 쟀다.
+The 3 `rb08` structures (§3's budget-8 arm) were measured with the same two
+fitters.
 
-| | 학습 | 홀드아웃 | 홀드아웃 시드별 |
+| | training | holdout | holdout per seed |
 |---|---:|---:|---|
 | rb08 + NM | 1.0858 | 1.1146 | 1.1463 / 1.1146 / 1.0923 |
 | rb08 + CMA | 1.0836 | 1.0987 | 1.0926 / 1.1186 / 1.0987 |
 
-**어느 적합기로 재도 `rb08` 구조가 `arch24` 구조보다 나쁘다.**
+**Whichever fitter measures it, the `rb08` structures are worse than the
+`arch24` structures.**
 
 ```
-arch24 6시드   1.0566 1.0702 1.0719 1.0806 1.0844 1.0919
-rb08   3시드                                     1.0926 1.0987 1.1186
-★ rb08 세 시드가 arch24 여섯 시드 **전부보다** 나쁘다
+arch24 6 seeds   1.0566 1.0702 1.0719 1.0806 1.0844 1.0919
+rb08   3 seeds                                   1.0926 1.0987 1.1186
+★ the three rb08 seeds are worse than **all six** arch24 seeds
 ```
 
-**차이는 측정이 아니라 진화가 만든 구조에 있다.** 적합기가 아니다.
+**The difference is in the structures the evolution made, not in the
+measurement.** It is not the fitter.
 
-### 두 캠페인이 적합기만 다른 것이 아니다
-
-```
-같다   씨앗 코드 해시 d5ee6da8 · 피처 19개 · 모델 gpt-5.6-luna
-       분할 nk11008 · 12라운드 x 12제안 · 목적함수 regret · 예산 8
-다르다 적합 예산 200 -> 300 · 루프 안 적합기 NM/4 -> CMA/1
-       ★ 그리고 **그 사이에 바뀐 프롬프트 전부** — arch24 는 D-113·116·117
-         (hw 프롬프트를 번들에서 생성) 이전이고, D-117 의 가설 필드
-         허용 목록, D-78 리터럴 규칙 이후 판이 여러 번 바뀌었다
-```
-
-**그래서 `1.0762` 와 `1.0987` 은 애초에 나란히 놓을 수 없다** (원칙 4).
-D-124 가 예산 8 팔을 다시 뽑은 것이 옳았다 — 네 팔은 **같은 날 같은
-판**으로 돌았고, 그 안의 비교는 이 문제가 없다.
-
-## 4. 곁가지 — 시드 폭이 σ 보다 크다
-
-§3 네 팔의 시드별 값에서:
+### The two campaigns differ in more than the fitter
 
 ```
-rb08   1.0926 1.1186 1.0987   표준편차 0.0136
-rb16   1.0906 1.0964 1.0764              0.0103
-rprod  1.0944 1.0840 1.0794              0.0075
-rpow   1.0839 1.1063 1.0319   ★          0.0382
-                                 판정에 쓴 σ = 0.0124
+same        seed code hash d5ee6da8 · 19 features · model gpt-5.6-luna
+            split nk11008 · 12 rounds x 12 proposals · objective regret ·
+            budget 8
+different   fitting budget 200 -> 300 · in-loop fitter NM/4 -> CMA/1
+            ★ and **every prompt that changed in between** — arch24 is before
+              D-113·116·117 (generating the hw prompt from the bundle), and
+              the board changed several times after D-117's hypothesis-field
+              allow list and D-78's literal rule
 ```
 
-**지수 팔의 시드 폭이 σ 의 3배다.** 판정선 0.0516 은 σ=0.0124 로 만든
-값이므로, 그 팔에서는 **검정력이 실험 계획서가 가정한 것보다 낮다** —
-"구분 불가" 를 "차이가 없다" 로 읽으면 안 되는 이유가 하나 더 있다.
+**So `1.0762` and `1.0987` cannot be put side by side in the first place**
+(principle 4). D-124 was right to re-take the budget-8 arm — the four arms ran
+**on the same board on the same day**, and comparisons inside that set do not
+have this problem.
 
-## 5. 판정 — 실험 계획서 §3 의 셋째 갈래
+## 4. An aside — the seed range is wider than σ
+
+From the per-seed values of §3's four arms:
 
 ```
-★ 구분 불가 — 적합기가 과적합을 만들지 않는다
--> 예산 8 에서 NM 으로 되돌릴 이유가 없다
--> 4090 전이의 (b) 재적합은 **지금까지의 절차(NM)를 그대로** 쓴다
-   옛 전이 수치와 나란히 놓아야 하기 때문이다 (원칙 4)
--> 16차원이 필요할 때만 CMA (D-123 은 그대로 선다)
+rb08   1.0926 1.1186 1.0987   standard deviation 0.0136
+rb16   1.0906 1.0964 1.0764                      0.0103
+rprod  1.0944 1.0840 1.0794                      0.0075
+rpow   1.0839 1.1063 1.0319   ★                  0.0382
+                                 the σ used for the verdict = 0.0124
 ```
 
-⚠️ D-123 을 뒤집지 않는다. 거기는 **16차원 도달률**이고 여기는 **8차원
-일반화**다 — 둘 다 사실이다 (실험 계획서 §5 에 미리 적었다).
+**The exponent arm's seed range is 3x σ.** The decision line 0.0516 is a value
+made from σ=0.0124, so in that arm **the power is lower than the
+pre-registration assumed** — one more reason not to read "indistinguishable"
+as "there is no difference".
+
+## 5. The verdict — the third branch of the pre-registration's §3
+
+```
+★ indistinguishable — the fitter does not make overfitting
+-> there is no reason to go back to NM at budget 8
+-> the 4090 transfer's (b) refit uses **the procedure so far (NM) as it is**
+   because it has to be put beside the old transfer numbers (principle 4)
+-> CMA only when 16 dimensions are needed (D-123 stands as it is)
+```
+
+⚠️ This does not overturn D-123. That is about the **16-dimensional reach**
+and this is about **8-dimensional generalisation** — both are facts (written
+in advance in the pre-registration's §5).

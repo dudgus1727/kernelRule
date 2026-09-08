@@ -13,10 +13,12 @@ lines as they are.
 Only `_SUPERSEDED` is written by a human — "what corrected what" cannot be
 read automatically from the titles.
 
-⚠️ 2026-09-08 (D-146): **the strings that go into `docs/decisions.md`** (the
-BEGIN marker, the index heading and note, the `_SUPERSEDED` statuses) **stay
-in Korean** — `docs/` is not translated. Only what this file prints to the
-terminal is English.
+⚠️ 2026-09-08 (D-146): the strings this file **writes into
+`docs/decisions.md`** (the BEGIN marker, the index heading and note, the
+`_SUPERSEDED` statuses) were translated into English. The entry titles
+themselves are copied from the `## D-N` headers of the body, so they **stay
+Korean** — `docs/decisions.md` is the running record and it is not translated.
+The Korean originals of the generated strings are at commit `ee53b4d`.
 """
 
 from __future__ import annotations
@@ -27,18 +29,20 @@ import sys
 from pathlib import Path
 
 DOC = Path(__file__).resolve().parents[1] / "docs/decisions.md"
-BEGIN = "<!-- INDEX:BEGIN — experiments/decisions_index.py 가 만든다 -->"
+BEGIN = "<!-- INDEX:BEGIN — experiments/decisions_index.py builds it -->"
 END = "<!-- INDEX:END -->"
 
 #: ★ The corrected decisions. `D number -> (status, the D that corrected it)`.
 #: **Written by a human.**
 _SUPERSEDED: dict[int, tuple[str, str]] = {
-    77: ("부분 철회", "D-103 — 순위 경로에서는 도달률 100%"),
-    92: ("정정됨", "D-92 안의 정정 — 표본 단위가 틀렸다"),
-    102: ("철회", "D-103 — 2x2 를 채우니 상호작용이었다"),
-    105: ("조건 오류", "D-108 — 예산 실험은 네 번째에 유효했다"),
-    106: ("조건 오류", "D-108"),
-    107: ("조건 오류", "D-108"),
+    77: ("partly withdrawn", "D-103 — on the rank path the reach is 100%"),
+    92: ("corrected", ("the correction inside D-92 — the sample unit was "
+                       "wrong")),
+    102: ("withdrawn", "D-103 — filling in the 2x2 made it an interaction"),
+    105: ("condition error", ("D-108 — the budget experiment was valid on "
+                              "the fourth try")),
+    106: ("condition error", "D-108"),
+    107: ("condition error", "D-108"),
 }
 
 
@@ -65,9 +69,9 @@ def _slug(header: str) -> str:
 
 
 def build(text: str) -> str:
-    rows = ["", "## 색인", "",
-            "★ 이 블록은 **생성물이다** — `experiments/decisions_index.py`.",
-            "손으로 고치지 마라. D 를 추가하고 그 스크립트를 돌려라.", ""]
+    rows = ["", "## Index", "",
+            "★ This block is **generated** — `experiments/decisions_index.py`.",
+            "Do not edit it by hand. Add the D and run that script.", ""]
     for n, title, header in _entries(text):
         mark = ""
         if n in _SUPERSEDED:

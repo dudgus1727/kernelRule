@@ -181,13 +181,13 @@ def main() -> None:
 
     res: dict = {}
     for name, runs, by, obj in (
-            ("순위 구조 + 순위 가중치", RANK_RUNS, "rank", "rank"),
-            ("★ 순위 구조 + regret 가중치", RANK_RUNS, "rank", "regret"),
+            ("rank structure + rank weights", RANK_RUNS, "rank", "rank"),
+            ("★ rank structure + regret weights", RANK_RUNS, "rank", "regret"),
             # ★ The empty cells of the 2x2 (D-103). Saying "the weights hold
             #   it" from three cells was **a statement made from the diagonal
             #   alone**.
-            ("★ regret 구조 + 순위 가중치", REG_RUNS, "regret", "rank"),
-            ("regret 구조 + regret 가중치", REG_RUNS, "regret", "regret")):
+            ("★ regret structure + rank weights", REG_RUNS, "regret", "rank"),
+            ("regret structure + regret weights", REG_RUNS, "regret", "regret")):
         vals = []
         for run in runs:
             e = _best(run, by)
@@ -201,7 +201,7 @@ def main() -> None:
     out["A"] = {"rows": dict(res), "floor": fl,
                 "n_holdout": len(hold)}
 
-    mid = np.array(res["★ 순위 구조 + regret 가중치"])
+    mid = np.array(res["★ rank structure + regret weights"])
     r, t1 = float(np.median(mid[:, 0])), float(np.median(mid[:, 1]))
     print("\n  the verdict — the line nailed down in the pre-registration")
     print(f"    regret {r:.4f} / top-100 tau {t1:.3f}  ->  " + (
@@ -231,8 +231,8 @@ def main() -> None:
     print(f"  {'':34s} {'regret':>8} {'top-100 tau':>12} {'all':>10}")
 
     resB: dict = {}
-    for name, obj in (("(a) 완전 이식 (A6000 가중치)", None),
-                      ("★ (b) 재적합 (5090 순위 손실)", "rank")):
+    for name, obj in (("(a) full transplant (A6000 weights)", None),
+                      ("★ (b) refit (5090 rank loss)", "rank")):
         vals = []
         for run in RANK_RUNS:
             e = _best(run, "rank")

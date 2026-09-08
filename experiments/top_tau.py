@@ -177,17 +177,17 @@ def main() -> None:
     spA = _splits(A)
     # ★ Exactly the pre-registration condition (the training 41) — it
     #   continues from the earlier numbers
-    _one("A6000 학습 41형상 (사전 등록 조건)", A, mA,
+    _one("A6000 training 41 shapes (the pre-registration condition)", A, mA,
          list(spA.train.shapes), list(spA.train.shapes), out)
     # For comparison across tables — holdout against holdout
-    _one("A6000 홀드아웃 20형상", A, mA,
+    _one("A6000 holdout 20 shapes", A, mA,
          list(spA.train.shapes), list(spA.val.shapes), out)
 
     B = PerfTable.from_bundle(G5090[0], env_hash=G5090[1], ok_only=False)
     mB = FeatureMatrix(B, REGISTRY)
     spB = _splits(B)
     # ★ The (b) refit weights — fitted on the 5090 training split
-    _one("5090 홀드아웃 20형상 — (b) 재적합", B, mB,
+    _one("5090 holdout 20 shapes — (b) refit", B, mB,
          list(spB.train.shapes), list(spB.val.shapes), out)
 
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))

@@ -1,71 +1,86 @@
-# ★ 라운드별 최종 채점 곡선 — **24 도 수렴점이 아니다**
+# ★ The final-scoring curve by round — **24 is not a convergence point either**
 
-> **재현**: `python3 experiments/round_curve.py` (약 40분, **LLM 0회**)
-> **실험 계획서**: D-132 §2 — 판정선을 계산 전에 박았다
-> **원자료**: `round-curve.json`(옛) · `round-curve-new.json`(새)
+> **Reproduce**: `python3 experiments/round_curve.py` (about 40 minutes,
+> **0 LLM calls**)
+> **Pre-registration**: D-132 §2 — the decision line was pinned before the
+> computation
+> **Raw data**: `round-curve.json` (old) · `round-curve-new.json` (new)
 
-각 라운드까지의 아카이브에서 **학습 점수 최고**를 고르고, 체제별로 다시
-맞춰 홀드아웃 20형상에서 잰다 = **그 라운드에서 멈췄다면 보고했을 값**.
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
 
-## 1. 두 캠페인의 중앙 곡선
+From the archive up to each round the **best training score** is picked,
+refitted per regime and measured on the holdout of 20 shapes = **the value
+that would have been reported had it stopped at that round**.
+
+## 1. The median curves of the two campaigns
 
 ```
-옛 (12라운드, patience 10, 옛 프롬프트)
+old (12 rounds, patience 10, the old prompt)
 r0     r1     r2     r3     r4     r5     r6     r7     r8     r9    r10    r11
 1.0981 1.1011 1.1011 1.0981 1.0949 1.0949 1.0949 1.0919 1.0796 1.0796 1.0782 1.0762
-★ 끝값의 σ(0.0113) 안에 들어오는 라운드 = r8      마지막 4라운드 개선 +0.0156
+★ the round that comes inside the final value's σ (0.0113) = r8
+  improvement over the last 4 rounds +0.0156
 
-새 (24라운드, 조기 종료 없음, 새 프롬프트)
+new (24 rounds, no early stopping, the new prompt)
 r0     r1     r2     r3 ... r12    r13    r14    r15    r16 ...  r22    r23
 1.1258 1.1258 1.1221 1.1129   1.1121 1.1013 1.1013 1.1055 1.1055 … 1.0970 1.0787
-★ 끝값의 σ 안에 들어오는 라운드 = r23 (마지막)    마지막 4라운드 개선 +0.0183
+★ the round that comes inside the final value's σ = r23 (the last)
+  improvement over the last 4 rounds +0.0183
 ```
 
-## 2. 판정 — 실험 계획서의 둘째 갈래
+## 2. The verdict — the pre-registration's second branch
 
 ```
-"24 까지 계속 오른다  ★ 24 도 부족하다. 그 사실을 적는다"
+"it keeps rising to 24  ★ 24 is not enough either. That fact is written down"
 ```
 
-**두 캠페인 모두 마지막 라운드까지 오른다.** 끝값의 σ 안으로 들어오는
-지점이 옛것은 r8, 새것은 **r23** 이다.
+**Both campaigns rise to the last round.** The point that comes inside the
+final value's σ is r8 for the old one and **r23** for the new one.
 
-## 3. ⚠️ 그런데 **끝값은 서로 같다**
-
-```
-옛  12라운드 끝  1.0762
-새  24라운드 끝  1.0787      차이 +0.0025  (판정선 0.0305 의 8%)
-```
-
-**라운드를 두 배로 늘려도 최종 값이 안 좋아졌다.** 곡선은 "아직 오른다"
-고 말하는데 캠페인끼리 견주면 그 이득이 안 보인다.
+## 3. ⚠️ But **the final values are the same as each other**
 
 ```
-캠페인 **안**에서   r0 -> 끝   옛 +0.0218 · 새 +0.0471   ★ 오른다
-캠페인 **끼리**     끝 대 끝   +0.0025                   ★ 구분 불가
+old  end of 12 rounds  1.0762
+new  end of 24 rounds  1.0787      difference +0.0025  (8% of the decision
+                                   line 0.0305)
 ```
 
-시작점도 다르다 (r0 이 1.0981 대 1.1258) — **같은 씨앗인데도** 0라운드
-결과가 0.028 벌어진다. 캠페인 간 산포가 라운드 이득을 덮는다.
-
-★ 그래서 "몇 라운드가 필요한가" 의 답은 **"이 산포에서는 못 정한다"** 다.
-곡선 기준으로는 24 도 모자라고, 결과 기준으로는 12 로 충분하다.
-
-## 4. 무엇을 하면 답이 나오나
+**Doubling the rounds did not make the final value better.** The curve says
+"it is still rising", but compared campaign against campaign that gain is not
+visible.
 
 ```
-같은 캠페인에서 24 vs 12 를 견주는 것은 이미 했다 (곡선) — 오른다
-캠페인 간 산포를 줄이려면 시드를 늘려야 한다
-  판정선 0.0025 를 재려면 σ 0.0113 에서 ★ 시드 수백 개
--> 라운드 수는 **성능으로 정할 수 없다**. 비용으로 정해야 한다
+**within** a campaign   r0 -> end   old +0.0218 · new +0.0471   ★ it rises
+**between** campaigns   end vs end  +0.0025                     ★ indistinguishable
 ```
 
-## 5. 그래서 정한 것
+The starting points differ too (r0 is 1.0981 against 1.1258) — **with the same
+seed**, the 0-round results are 0.028 apart. The spread between campaigns
+covers the gain from rounds.
+
+★ So the answer to "how many rounds are needed" is **"it cannot be settled at
+this spread"**. By the curve 24 is not enough; by the result 12 is enough.
+
+## 4. What would produce an answer
 
 ```
-라운드 24 · 조기 종료 없음 을 유지한다
-근거   곡선이 마지막까지 오른다 (더 잘라야 할 이유가 없다)
-       끝값이 12 와 구분 불가지만 **나빠지지도 않는다**
-       비용은 실행당 약 470호출 (12라운드의 두 배)
-⚠️ "24 가 12 보다 낫다" 를 주장하지 않는다 — 그 차이는 못 잰다
+comparing 24 vs 12 within the same campaign has already been done (the curve)
+  — it rises
+reducing the spread between campaigns needs more seeds
+  measuring the decision line 0.0025 at σ 0.0113 needs ★ hundreds of seeds
+-> the number of rounds **cannot be settled by performance**. It has to be
+   settled by cost
+```
+
+## 5. So what was decided
+
+```
+24 rounds · no early stopping is kept
+grounds   the curve rises to the last round (no reason to cut it shorter)
+          the final value is indistinguishable from 12 but **does not get
+          worse either**
+          the cost is about 470 calls per run (twice that of 12 rounds)
+⚠️ it is not claimed that "24 is better than 12" — that difference cannot be
+   measured
 ```

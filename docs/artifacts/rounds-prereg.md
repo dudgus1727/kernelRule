@@ -1,81 +1,92 @@
-# 실험 계획서 — **12라운드가 맞나** (곡선부터, LLM 0회)
+# Pre-registration — **is 12 rounds right** (from the curves, 0 LLM calls)
 
-**계산 전에 쓴다.**
+**Written before the computation.**
 
-## 0. 왜 — "조기 종료가 안 걸렸다" 는 "수렴했다" 가 아니다
+> ⚠️ 2026-09-08 (D-146): translated into English. The criteria and the numbers
+> are unchanged; the Korean original is at commit `ee53b4d`.
+
+## 0. Why — "early stopping did not fire" is not "it converged"
 
 ```python
 def should_stop(self):          # loop.py, patience n = 10
     if len(self.rounds) < n + 1: return False, ""
     vals = [x.best_val_regret for x in self.rounds[-(n + 1):]]
     improved = vals[0] - vals[-1]
-    significant = is_significant(improved, ev)      # 노이즈 바닥과 견준다
+    significant = is_significant(improved, ev)      # compared to the noise floor
     new_cell_recent = archive.last_new_cell_round > len(self.rounds) - 1 - n
     if significant or new_cell_recent: return False, ""
 ```
 
 ```
-patience 10 인데 12라운드를 돈다
--> 판정이 11번째 라운드부터 시작하고, 그 창이 r0..r10 · r1..r11 둘뿐이다
--> 게다가 **새 셀이 하나라도 최근에 생기면 안 멈춘다**
-★ 조기 종료가 사실상 안 걸린다. 그래서 지금까지 12를 다 돈 것은
-  "수렴해서" 가 아니라 "멈출 기회가 없어서" 다
+patience is 10 and 12 rounds are run
+-> the judgement starts at the 11th round, and there are only two windows,
+   r0..r10 · r1..r11
+-> and **it does not stop if even one new cell appeared recently**
+★ early stopping effectively never fires. So running all 12 so far was not
+  "because it converged" but "because there was no chance to stop"
 ```
 
-## 1. 재는 것 — 기록된 곡선만 본다 (LLM 0회)
+## 1. What is measured — the recorded curves only (0 LLM calls)
 
 ```
-대상   F3rw-p8 (구 arch24) 6시드   ← 주
-       F1rw-p8 (구 F1-free-roofline) 6시드 · F2rw-p8 (구 F1-K-k1) 6시드  ← 조건 비교
-자료   runs/<run>/rounds.jsonl 의 best_val_regret / n_cells
-문턱   ★ 루프가 쓰는 것 그대로 — `is_significant(delta, ev)`,
-       `ev` 는 그 실행의 최종 아카이브 최고 규칙을 홀드아웃에서 채점한 것.
-       새 기준을 만들지 않는다 (원칙 2)
+targets   F3rw-p8 (formerly arch24), 6 seeds   ← the main one
+          F1rw-p8 (formerly F1-free-roofline), 6 seeds · F2rw-p8 (formerly
+          F1-K-k1), 6 seeds  ← the condition comparison
+data      best_val_regret / n_cells in runs/<run>/rounds.jsonl
+threshold ★ exactly what the loop uses — `is_significant(delta, ev)`, where
+          `ev` is that run's final archive-best rule scored on the holdout.
+          No new criterion is made (principle 2)
 ```
 
 ```
-라운드 번호는 파일의 `round` 필드 = **0부터**다 (r0..r11 이 12라운드).
-"마지막 3라운드" = r9 · r10 · r11
+The round number is the file's `round` field = **from 0** (r0..r11 is 12
+rounds).
+"the last 3 rounds" = r9 · r10 · r11
 ```
 
-내는 값:
+What is produced:
 
 ```
-1  시드별 best_val_regret 곡선
-2  마지막으로 **개선된** 라운드 (아무 크기나) — D-89 가 센 것
-3  마지막으로 **유의하게** 개선된 라운드 — 문턱 위로
-4  새 셀이 마지막으로 생긴 라운드 (n_cells 증가)
-5  patience 를 3·4·10 으로 뒀다면 **언제 멈췄을** 것인가 (같은 공식으로)
+1  the best_val_regret curve per seed
+2  the last round that **improved** (by any amount) — what D-89 counted
+3  the last round that improved **significantly** — above the threshold
+4  the last round a new cell appeared (n_cells increased)
+5  **when it would have stopped** with patience at 3·4·10 (by the same
+   formula)
 ```
 
-★ 2와 3을 나누는 것이 이 실험의 핵심이다 — D-89 의 "r7/r8/r9" 가
-어느 쪽인지 지금은 모른다.
+★ Separating 2 from 3 is the core of this experiment — which of the two
+D-89's "r7/r8/r9" was is not known right now.
 
-## 2. 판정 — 셋 중에서 고른다. **곡선을 보고 만들지 않는다**
-
-```
-(가) 6시드 전부 마지막 **유의** 개선이 r8 이하
-     ★ 12 로 충분하다. 라운드는 축이 아니다
-     -> 각주에 "12 에서 수렴했다" 를 곡선과 함께 적는다
-
-(나) 마지막 3라운드(r9·r10·r11)에서 **유의하게** 개선되는 시드가 있다
-     ★ 12 가 부족하다
-     -> 라운드 24 를 n=6 으로 재야 한다 (약 6,000 호출 / 15시간)
-
-(다) 애매하다 (예: 유의 개선은 일찍 끝나는데 새 셀이 끝까지 생긴다)
-     ★ patience 조정을 검토한다 (10 -> 3~4)
-     -> 그러면 라운드가 조건이 아니라 **산출물**이 된다
-     ⚠️ patience 변경 자체가 조건 변경이다 — **별도 실험 계획서**이 필요하고
-        여기서 바꾸지 않는다
-```
-
-**보조로 "아무 크기나 개선" 도 함께 낸다.** 판정은 **유의** 쪽으로만 한다.
-
-## 3. 하지 말 것
+## 2. The verdict — chosen from three. **Not made after looking at the curves**
 
 ```
-[ ] 새 유의 기준을 만들지 마라 — `is_significant` 그대로
-[ ] 곡선을 보고 판정선을 고치지 마라
-[ ] patience 를 이 실험에서 바꾸지 마라 (실험 계획서가 따로 필요하다)
-[ ] 시드 하나의 곡선으로 말하지 마라 — 6시드 전부를 낸다
+(a) all 6 seeds have their last **significant** improvement at r8 or earlier
+    ★ 12 is enough. Rounds are not an axis
+    -> a footnote records "it converged at 12" together with the curves
+
+(b) there are seeds that improve **significantly** in the last 3 rounds
+    (r9·r10·r11)
+    ★ 12 is not enough
+    -> round 24 has to be measured at n=6 (about 6,000 calls / 15 hours)
+
+(c) ambiguous (e.g. the significant improvements end early but new cells keep
+    appearing to the end)
+    ★ adjusting patience is reviewed (10 -> 3~4)
+    -> then rounds become **an artefact** rather than a condition
+    ⚠️ changing patience is itself a condition change — it needs **its own
+       pre-registration** and it is not changed here
+```
+
+**"improvement by any amount" is also reported, as a secondary.** The verdict
+is made on the **significant** side alone.
+
+## 3. What not to do
+
+```
+[ ] do not make a new significance criterion — `is_significant` as it is
+[ ] do not fix the decision line after looking at the curves
+[ ] do not change patience in this experiment (it needs its own
+    pre-registration)
+[ ] do not speak from one seed's curve — all 6 seeds are reported
 ```

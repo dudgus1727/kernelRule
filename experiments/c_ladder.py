@@ -153,9 +153,9 @@ def main() -> None:
 
     print(f"\n  the decision line delta = {DELTA} (the σ upper bound, the "
           f"value §29.5 already used)")
-    for a_, b_, name in (("5090sigma", "5090sigma-hw", "옛 -> 중간 (숫자)"),
+    for a_, b_, name in (("5090sigma", "5090sigma-hw", "old -> middle (the numbers)"),
                          ("5090sigma-hw", "5090sigma-hw2",
-                          "중간 -> 새 (경고 절)")):
+                          "middle -> new (the warnings section)")):
         d = med[a_] - med[b_]          # positive means it got better
         verdict = ("★ it is used" if d >= DELTA else
                    "★ indistinguishable" if abs(d) < DELTA

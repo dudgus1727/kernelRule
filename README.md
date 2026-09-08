@@ -51,7 +51,7 @@ experiments/README.md       the script ↔ artifact mapping
 ## The current state (2026-09-03, D-114 / principle 38)
 
 ★ **No number is written here.** The representative values live in exactly
-one place, the "★ 대표값 성능 수치" section of
+one place, the "★ The canonical performance numbers" section of
 [docs/artifacts/conclusion.md](docs/artifacts/conclusion.md) — putting them
 in two places makes them diverge (principle 2).
 
@@ -95,8 +95,8 @@ The statement that remains: **a linear combination of** this feature space
 cannot get the top-rank ordering right.
 ```
 
-For the details, see "★ 벽 — 여섯 방향에서 밀었고 안 움직였다" in
-`conclusion.md`.
+For the details, see "★ The wall — it was pushed from six directions and it
+did not move" in `conclusion.md`.
 
 ## The three documentation rules
 

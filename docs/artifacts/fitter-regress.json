@@ -19,7 +19,7 @@
    1
   ]
  ],
- "arch24 6구조": {
+ "arch24, 6 structures": {
   "rows": {
    "NM": {
     "hold": [
@@ -177,7 +177,7 @@
   "p_hold": 0.9375,
   "n_worse": 1
  },
- "rb08 3구조 (CMA 진화)": {
+ "rb08, 3 structures (CMA-evolved)": {
   "rows": {
    "NM": {
     "hold": [

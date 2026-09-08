@@ -1,127 +1,141 @@
-# 두 단계 목적함수 · 순위 규칙의 전이 (2026-09-01)
+# The two-stage objective · the transfer of a rank rule (2026-09-01)
 
-> **실험 계획서** [two-stage-prereg.md](two-stage-prereg.md) — 판정선을
-> 먼저 박았고 **안 바꿨다** · **LLM 0회**
-> **재현** `python3 experiments/two_stage.py`
-> **원자료** [two-stage.json](two-stage.json)
+> **Pre-registration** [two-stage-prereg.md](two-stage-prereg.md) — the
+> decision line was nailed down first and **was not changed** · **0 LLM calls**
+> **Reproduce** `python3 experiments/two_stage.py`
+> **Raw data** [two-stage.json](two-stage.json)
 
-⚠️ **전부 홀드아웃 20형상**이다. D-101 의 tau(학습 41형상, 0.389)와
-나란히 놓지 마라 (원칙 4).
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
 
----
-
-# A. 구조는 순위로, 가중치는 regret 으로 — ★ 안 된다
-
-```
-A6000 홀드아웃 20형상          regret   상위100 tau   전구간 tau
-순위 구조 + 순위 가중치          1.6364      0.353       0.320
-★ 순위 구조 + regret 가중치      1.1213    ★ 0.115       0.267
-regret 구조 + regret 가중치      1.0762      0.122       0.300
-★ 무작위 바닥 (20뽑기)           1.8753     -0.007       0.000
-```
-
-## 판정 — 실험 계획서선에 걸치지 않는다
-
-```
-regret 1.1213 / tau 0.115  ->  ★ 구분 불가
-  성공선          regret <= 1.10 이면서 tau >= 0.30
-  가중치가 지움    regret <= 1.10 인데 tau <= 0.15
-  구조가 안 맞음   regret >= 1.30
-```
-
-**두 선 사이에 떨어졌다.** `regret` 이 1.10 을 0.021 넘고 `tau` 는
-0.15 를 0.035 밑돈다. **판정선을 옮기지 않는다** — 실험 계획서대로
-"구분 불가" 다.
-
-## 그러나 방향은 분명하다
-
-```
-가중치를 regret 으로 바꾸는 순간 tau 가 0.353 -> 0.115 로 무너진다
-그리고 그 0.115 는 regret 진화 구조의 0.122 와 ★ 사실상 같다
-```
-
-**구조가 순위 능력을 거의 안 담고 있다.** 순위 진화가 만든 tau 0.353
-은 **가중치가 들고 있던 것**이고, 가중치를 바꾸면 사라진다.
-
-그리고 얻는 것도 없다.
-
-```
-regret   순위 구조 1.1213  vs  regret 구조 1.0762   ★ 순위 구조가 더 나쁘다
-tau      0.115             vs  0.122               ★ 차이 없다
-```
-
-**"구조는 순위로, 가중치는 regret 으로" 는 두 쪽 다 못 가져온다.**
-
-## ★ (2) 이어서 진화는 하지 않는다
-
-실험 계획서: *"regret >= 1.30 이면 구조가 안 맞는다 → (2) 가 필요하다."*
-`regret` 이 1.12 라 **그 갈래가 아니다.** 그리고 위 관측이 (2) 의
-전제를 깬다 — (2) 는 "구조는 쓸 만한데 가중치 단계가 필요하다" 를
-가정하는데, **구조가 순위 능력을 안 담고 있다.**
+⚠️ **Everything is on the holdout of 20 shapes.** Do not put it beside D-101's
+tau (the training 41 shapes, 0.389) (principle 4).
 
 ---
 
-# B. 순위 규칙의 전이 — ★ 상위권은 안 옮겨간다. 굵은 순위는 옮겨간다
+# A. The structure by rank, the weights by regret — ★ it does not work
 
 ```
-5090 홀드아웃 20형상            regret   상위100 tau   전구간 tau
-(a) 완전 이식 (A6000 가중치)     1.1311      0.111       0.388
-★ (b) 재적합 (5090 순위 손실)    1.1267    ★ 0.123       0.349
-★ 무작위 바닥 (20뽑기)           1.4217      0.001       0.000
+A6000 holdout 20 shapes             regret   top-100 tau   all-range tau
+rank structure + rank weights       1.6364      0.353          0.320
+★ rank structure + regret weights   1.1213    ★ 0.115          0.267
+regret structure + regret weights   1.0762      0.122          0.300
+★ random floor (20 draws)           1.8753     -0.007          0.000
 ```
 
-## 상위권 — 안 돌아온다
+## The verdict — it does not reach the pre-registered line
 
 ```
-A6000 홀드아웃 (순위 구조 + 순위 가중치)   0.353
-5090 (a) 완전 이식                       0.111
-5090 (b) ★ 5090 순위 손실로 재적합        0.123
+regret 1.1213 / tau 0.115  ->  ★ indistinguishable
+  success                  regret <= 1.10 and tau >= 0.30
+  the weights erase it     regret <= 1.10 but tau <= 0.15
+  the structure misfits    regret >= 1.30
 ```
 
-**5090 표에서 순위 손실로 다시 맞춰도 안 돌아온다.** (a) 와 (b) 가
-0.111 대 0.123 으로 거의 같다 — **재적합이 거의 아무것도 못 한다.**
+**It fell between the two lines.** `regret` is 0.021 over 1.10 and `tau` is
+0.035 under 0.15. **The decision line is not moved** — as pre-registered, it
+is "indistinguishable".
 
-이것은 D-100 이 `regret` 진화 규칙에서 본 것과 **같은 방향**이다.
-순위를 목표로 진화시켜도 그 능력은 5090 으로 안 옮겨간다.
-
-### ⚠️ 원인을 단정하지 않는다 — 실험 계획서에 미리 적었다
+## But the direction is clear
 
 ```
-5090 상위 100 의 시간 폭      ★ 1.2%   (A6000 6.6%)
-5090 상위 100 의 고유 시간값  ★ 5개    (A6000 24개)
+the moment the weights are changed to regret, tau collapses 0.353 -> 0.115
+and that 0.115 is ★ effectively the same as the regret-evolved structure's
+0.122
 ```
 
-**"못 배운다" 와 "배울 게 없다" 를 이 자료로 못 가른다.**
-쓸 수 있는 서술은 **"돌아오지 않았다. 다만 5090 상위권은 폭 1.2% 에
-고유값 5개라 배울 것 자체가 적다"** 까지다.
+**The structure holds almost none of the ranking ability.** The tau of 0.353
+the rank evolution produced was **held by the weights**, and it disappears
+when the weights change.
 
-## ★ 굵은 순위는 옮겨간다
-
-```
-전구간 tau   A6000 홀드아웃 0.320  ->  5090 (a) 0.388 / (b) 0.349
-```
-
-**떨어지지 않는다. 오히려 조금 높다.** 무작위 바닥이 0.000 이므로
-전이된 것이 맞다.
+And nothing is gained either.
 
 ```
-★ 굵은 순위는 구조에 실려 옮겨간다.
-★ 상위 100 안의 순서는 안 옮겨간다.
+regret   rank structure 1.1213  vs  regret structure 1.0762
+                                    ★ the rank structure is worse
+tau      0.115                  vs  0.122   ★ no difference
 ```
 
-D-100 이 "순위 능력이 전이 안 된다" 고 한 것을 **두 축으로 갈라야
-한다** — 전구간은 전이되고 상위권만 안 된다.
+**"the structure by rank, the weights by regret" gets neither side.**
+
+## ★ (2) evolving on from there is not done
+
+The pre-registration: *"if regret >= 1.30 the structure misfits → (2) is
+needed."* `regret` is 1.12, so **that is not the branch.** And the
+observation above breaks (2)'s premise — (2) assumes "the structure is usable
+but a weight stage is needed", whereas **the structure does not hold the
+ranking ability.**
 
 ---
 
-## 종합
+# B. The transfer of a rank rule — ★ the top ranks do not move. The coarse order does
 
 ```
-순위 손실로 진화하면 상위권 순위 능력이 생긴다        D-101, tau 0.353 (홀드아웃)
-★ 그 능력은 **가중치가 들고 있다**                   regret 로 재적합하면 0.115
-★ 그 능력은 **다른 GPU 로 안 옮겨간다**              5090 에서 0.111~0.123
-굵은 순위는 구조에 실리고 옮겨간다                    전구간 0.32 -> 0.35~0.39
+5090 holdout 20 shapes                regret   top-100 tau   all-range tau
+(a) full transplant (A6000 weights)   1.1311      0.111          0.388
+★ (b) refit (5090 rank loss)          1.1267    ★ 0.123          0.349
+★ random floor (20 draws)             1.4217      0.001          0.000
 ```
 
-**`top-1 선택기` 와 `성능 모델` 을 한 산출물로 합치는 길은 이 방향으로는
-안 열린다.** `conclusion.md` 의 "어느 쪽을 내세우나" 는 그대로 둔다.
+## The top ranks — they do not come back
+
+```
+A6000 holdout (rank structure + rank weights)   0.353
+5090 (a) full transplant                        0.111
+5090 (b) ★ refitted with the 5090 rank loss     0.123
+```
+
+**Refitting on the 5090 table with the rank loss does not bring it back.**
+(a) and (b) are 0.111 against 0.123, almost the same — **the refit does
+almost nothing.**
+
+This is **the same direction** as what D-100 saw with `regret`-evolved rules.
+Evolving with the ranking as the objective does not move that ability to the
+5090 either.
+
+### ⚠️ The cause is not asserted — it was written down in advance
+
+```
+the time span of the 5090's top 100        ★ 1.2%   (A6000 6.6%)
+distinct time values in the 5090's top 100 ★ 5      (A6000 24)
+```
+
+**"it cannot learn" and "there is nothing to learn" cannot be told apart from
+this data.** The usable statement reaches only as far as **"it did not come
+back. But the 5090's top ranks span 1.2% with 5 distinct values, so there is
+little to learn in the first place"**.
+
+## ★ The coarse order does move
+
+```
+all-range tau   A6000 holdout 0.320  ->  5090 (a) 0.388 / (b) 0.349
+```
+
+**It does not drop. It is slightly higher.** The random floor is 0.000, so it
+did transfer.
+
+```
+★ the coarse order rides on the structure and moves.
+★ the order inside the top 100 does not move.
+```
+
+D-100's "the ranking ability does not transfer" **has to be split along two
+axes** — the all-range order transfers and only the top ranks do not.
+
+---
+
+## Overall
+
+```
+evolving with the rank loss produces top-rank      D-101, tau 0.353 (holdout)
+ability
+★ that ability is **held by the weights**          refitting with regret
+                                                   gives 0.115
+★ that ability **does not move to another GPU**    0.111~0.123 on the 5090
+the coarse order rides on the structure and moves  all-range 0.32 ->
+                                                   0.35~0.39
+```
+
+**The road to merging `the top-1 selector` and `the performance model` into
+one artefact does not open in this direction.** The "which one do we put
+forward" of `conclusion.md` stays as it is.

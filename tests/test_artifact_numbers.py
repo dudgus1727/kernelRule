@@ -12,9 +12,9 @@ docs/artifacts/<name>.md     what a human reads
 **A value in the `.json` has to appear in the `.md` as it is, to three
 decimal places.**
 
-⚠️ 2026-09-08 (D-146): **the asserted strings stay in Korean.** They are the
-text of the `docs/` documents and of `conclusion.json`, and `docs/` is not
-translated.
+⚠️ 2026-09-08 (D-146): the asserted strings were translated together with
+`conclusion.md` and `conclusion.json`. The numbers are unchanged; the Korean
+originals are at commit `ee53b4d`.
 """
 from __future__ import annotations
 
@@ -81,10 +81,10 @@ def test_canonical_json_states_its_procedure():
             f"{key} has no procedure description")
     # The document has to know that the two procedures give different values
     assert d["canonical"]["ours_geomean"] != d["canonical_alt"]["median"]
-    assert "섞지 마라" in d["canonical_alt"]["_procedure"]
+    assert "Do not mix it" in d["canonical_alt"]["_procedure"]
 
 
 def test_dev_table_warning_is_present():
     """The mark saying the dev-table numbers are not reported externally."""
     d = json.loads((ART / "conclusion.json").read_text())
-    assert "대외 보고하지 마라" in d["_warning"]
+    assert "Do not report these numbers externally" in d["_warning"]

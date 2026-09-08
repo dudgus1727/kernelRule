@@ -51,15 +51,15 @@ CATASTROPHE = 1.15
 #: (label, the runs, the archive selection criterion, the weight-fitting
 #: objective, k, λ)
 ARMS: list[tuple] = [
-    ("regret 구조+regret w", [f"F3rw-p8-s{i}" for i in range(6)],
+    ("regret structure+regret w", [f"F3rw-p8-s{i}" for i in range(6)],
      "regret", "regret", 100, 0.0),
-    ("★ regret 구조+순위 w", [f"F3rw-p8-s{i}" for i in range(6)],
+    ("★ regret structure+rank w", [f"F3rw-p8-s{i}" for i in range(6)],
      "regret", "rank", 100, 0.0),
-    ("★ 순위 구조+regret w", [f"x-rank-rankevo-s{i}" for i in range(3)],
+    ("★ rank structure+regret w", [f"x-rank-rankevo-s{i}" for i in range(3)],
      "rank", "regret", 100, 0.0),
-    ("순위 구조+순위 w", [f"x-rank-rankevo-s{i}" for i in range(3)],
+    ("rank structure+rank w", [f"x-rank-rankevo-s{i}" for i in range(3)],
      "rank", "rank", 100, 0.0),
-    ("곱 항 (prod)", [f"x-rank-prod-s{i}" for i in range(3)],
+    ("product term (prod)", [f"x-rank-prod-s{i}" for i in range(3)],
      "rank", "rank", 100, 0.0),
     ("k=10", [f"x-rank-k010-s{i}" for i in range(3)], "rank", "rank",
      10, 0.0),
@@ -69,7 +69,7 @@ ARMS: list[tuple] = [
      50, 0.0),
     ("λ=1", [f"x-rank-lam10-s{i}" for i in range(3)], "rank", "rank",
      100, 1.0),
-    ("예산 16", [f"x-rank-b16b-s{i}" for i in range(3)], "rank", "rank",
+    ("budget 16", [f"x-rank-b16b-s{i}" for i in range(3)], "rank", "rank",
      100, 0.0),
 ]
 

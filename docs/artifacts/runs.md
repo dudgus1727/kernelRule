@@ -1,84 +1,101 @@
-# 실행 좌표 — **생성물이다**
+# The run coordinates — **it is a generated file**
 
-> ★ 이 표는 `experiments/runs_table.py` 가 만든다. **손으로 고치지 마라** —
-> `runs/*/config.json` 과 산출물 json 이 원본이고, 달라지면
-> `tests/test_docs.py` 가 잡는다 (`--check`).
+> ★ This table is built by `experiments/runs_table.py`. **Do not edit it by
+> hand** — `runs/*/config.json` and the artifact json are the source, and
+> `tests/test_docs.py` catches any divergence (`--check`).
 >
 > ```
-> python3 experiments/runs_table.py            # 다시 만든다
-> python3 experiments/runs_table.py --check    # 달라졌는지만 본다
+> python3 experiments/runs_table.py            # build it again
+> python3 experiments/runs_table.py --check    # only look at whether it diverged
 > ```
 >
-> ⚠️ **캠페인이 도는 중이면 `--check` 가 빨간 것이 정상이다** — 라운드마다
-> `config.json` 이 갱신되므로 표가 뒤처진다. 끝나고 다시 만들면 된다.
-> 이 검사가 잡으려는 것은 **손으로 고친 표**다.
+> ⚠️ 2026-09-08 (D-146): this document and the strings the script writes into
+> it were translated into English. Nothing but the language changed; the
+> Korean original is at commit `ee53b4d`. Old `## D-N` entries in
+> `docs/decisions.md` quote the old marks (`★ 미업로드`, `★갈림`) — those are
+> the record of what the table said at the time and they stay.
 >
-> ★ **2026-09-05 (D-137) 부터는 안 빨갛다** — `--check` 가 최근 30분 안에
-> `rounds.jsonl` 이 쓰인 태그의 **줄만** 빼고 비교한다 (`_live_tags`,
-> mtime 만 본다). 나머지 줄의 검사는 그대로 살아 있고, 건너뛴 태그를
-> 출력에 적는다.
+> ⚠️ **While a campaign is running it is normal for `--check` to be red** —
+> `config.json` is updated every round, so the table falls behind. Building it
+> again once it finishes is enough. What this check is for is **a table edited
+> by hand**.
+>
+> ★ **From 2026-09-05 (D-137) it is not red** — `--check` compares with the
+> **rows** of the tags whose `rounds.jsonl` was written within the last 30
+> minutes left out (`_live_tags`, it looks only at mtime). The check on the
+> other rows stays alive, and the skipped tags are printed.
 
-## 태그 규칙 (D-128)
+## The tag rule (D-128)
 
 ```
-<피처><씨앗>-p<파라미터>[-<표현력>][-<실험명>]
+<features><seed rule>-p<parameters>[-<expressiveness>][-<experiment name>]
 
-F3rw-p8        F3 라이브러리 · RuleWriter 씨앗 · 파라미터 8 · 기본
-F3rw-p16       파라미터 16
-F3rw-p8-prod   곱 힌트          F3rw-p8-pow   지수 힌트
-F3hg-p8-d75-a  human_guided 씨앗
-★ 표(GPU)·계승·코드 판은 태그에 안 넣는다 — config.json 이 갖는다
-★ `x-` 로 시작하는 디렉토리는 **폐기**다 (순위 손실 계열 · 조건 오류).
-   지우지 않고 이름으로 표시했고, 이 표에는 안 들어간다
+F3rw-p8        the F3 library · the RuleWriter seed · parameters 8 · default
+F3rw-p16       parameters 16
+F3rw-p8-prod   the product hint    F3rw-p8-pow   the exponent hint
+F3hg-p8-d75-a  the human_guided seed
+★ The table (GPU), the inheritance and the code version do not go in the tag
+  — config.json holds them
+★ A directory starting with `x-` is **discarded** (the rank-loss line · a
+  condition error). It was not deleted, it is marked by name, and it does not
+  go into this table
 ```
 
-<!-- RUNS:BEGIN — experiments/runs_table.py 가 만든다 -->
+<!-- RUNS:BEGIN — experiments/runs_table.py builds it -->
 
-| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | 라운드 | 표 | 커밋 | 트레이스 | 최종 점수 | 출처 | 상태 |
+| tag | seeds | features | seed rule | parameters | expressiveness | fitter | rounds | table | commit | trace | final score | source | status |
 |---|--:|---|---|--:|---|---|---|---|---|---|--:|---|---|
-| `F1rw-p8` | 6 | 16/? | rule_writer-try09 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1195 | conclusion.json | |
-| `F2rw-p8` | 6 | 17/? | rule_writer-try01 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1288 | conclusion.json | |
-| `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
-| `F3hg-p8-d75-b` | 6 | 19/F3 | human_guided | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
-| `F3rw-p16` | 3 | 19/F3 | rule_writer-try05 | 16 | 기본 | cma/1/300 | 12 | a6000 | `?` | — | 1.0906 | expressive-regret.json | |
-| `F3rw-p8` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 24 | a6000 | `?` | — | 1.0787 | canon-p8.json | 결함 있는 코드로 돈 캠페인 — `__import__` 로 제안 2% 가 버려졌다 (D-135). 대표값은 `F3rw-p8-nan` 이다 |
-| `F3rw-p8-4090` | 3 | 19/F3 | rule_writer-try00 | 8 | 기본 | nelder-mead/4/200 | 12 | 4090 | `?` | — | 1.0493 | sigma-4090.json | |
-| `F3rw-p8-5090` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | 5090 | `?` | — | 1.0611 | c-ladder.json | |
-| `F3rw-p8-abl-analyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
-| `F3rw-p8-abl-noanalyst` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
-| `F3rw-p8-abl-shuffled` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
-| `F3rw-p8-cma` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | cma/1/300 | 12 | a6000 | `?` | — | 1.0987 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다 |
-| `F3rw-p8-cross` | 3 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
-| `F3rw-p8-d75` | 6 | 21/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
-| `F3rw-p8-nan` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 24 | a6000 | `21aee74·4803a1b·cdd9cc1` | trace-F3rw-p8-nan-cdd9cc1 | 1.0886 | round-curve-bests.json | ★ 지금 대표값 — `-nan` 은 `compile_rule` 의 np.errstate 방어(D-135) 를 뜻한다. 그 전 캠페인은 `F3rw-p8` 이다. ★ 최종 점수는 **r11 에서 읽는다** (라운드 12, D-140) — 캠페인은 24까지 돌았다. 커밋이 갈린 것은 캠페인 도중 문서 커밋 때문이고 `kernelrule/`·`prompts/` 는 어느 쌍에서도 안 바뀌었다 (확인함, D-137) |
-| `F3rw-p8-old` | 6 | 19/? | rule_writer-try05 | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.0762 | conclusion.json | ⛔ 폐기 — 옛 대표값 — 옛 프롬프트·라운드12·patience10 (D-129) |
-| `F3rw-p8-p3` | 6 | 19/F3 | rule_writer-try05 | 8 | 기본 | nelder-mead/4/200 | 5~6~7 | a6000 | `?` | — | — | — | patience 3 으로 r4~r6 에서 멈춘 캠페인 (D-131) |
-| `F3rw-p8-pow` | 3 | 19/F3 | rule_writer-try05 | 8 | 지수 | cma/1/300 | 12 | a6000 | `?` | — | 1.0839 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
-| `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | 곱 | cma/1/300 | 12 | a6000 | `?` | — | 1.0840 | expressive-regret.json | ⛔ 폐기 — p8 인데 CMA. 재측정 대상 |
-| `luna` | 3 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
-| `lunaNAMES` | 6 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
-| `verify` | 2 | 19/? | ? | ? | 기본 | nelder-mead/4/200 | 6 | a6000 | `?` | — | — | — | |
+| `D146r` | 1 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 1 | a6000 | `ee53b4d` | ★ not uploaded | — | — | |
+| `F1rw-p8` | 6 | 16/? | rule_writer-try09 | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1195 | conclusion.json | |
+| `F2rw-p8` | 6 | 17/? | rule_writer-try01 | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1288 | conclusion.json | |
+| `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | default | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
+| `F3hg-p8-d75-b` | 6 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
+| `F3rw-p16` | 3 | 19/F3 | rule_writer-try05 | 16 | default | cma/1/300 | 12 | a6000 | `?` | — | 1.0906 | expressive-regret.json | |
+| `F3rw-p8` | 6 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 24 | a6000 | `?` | — | 1.0787 | canon-p8.json | a campaign that ran on faulty code — 2% of the proposals were thrown away by `__import__` (D-135). The canonical value is `F3rw-p8-nan` |
+| `F3rw-p8-4090` | 3 | 19/F3 | rule_writer-try00 | 8 | default | nelder-mead/4/200 | 12 | 4090 | `?` | — | 1.0493 | sigma-4090.json | |
+| `F3rw-p8-5090` | 3 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 12 | 5090 | `?` | — | 1.0611 | c-ladder.json | |
+| `F3rw-p8-abl-analyst` | 3 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-abl-noanalyst` | 3 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-abl-shuffled` | 3 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-cma` | 3 | 19/F3 | rule_writer-try05 | 8 | default | cma/1/300 | 12 | a6000 | `?` | — | 1.0987 | expressive-regret.json | ⛔ retired — p8 and yet CMA — the current rule (fitter_for) does not produce it |
+| `F3rw-p8-cross` | 3 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-d75` | 6 | 21/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |
+| `F3rw-p8-nan` | 6 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 24 | a6000 | `21aee74·4803a1b·cdd9cc1` | trace-F3rw-p8-nan-cdd9cc1 | 1.0886 | round-curve-bests.json | ★ the current canonical value — `-nan` means the np.errstate guard in `compile_rule` (D-135). The campaign before it is `F3rw-p8`. ★ The final score is **read at r11** (round 12, D-140) — the campaign ran to 24. The commits differ because of a docs commit in the middle of the campaign, and `kernelrule/`·`prompts/` did not change in any of the pairs (checked, D-137) |
+| `F3rw-p8-old` | 6 | 19/? | rule_writer-try05 | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.0762 | conclusion.json | ⛔ retired — the old canonical value — the old prompt·12 rounds·patience 10 (D-129) |
+| `F3rw-p8-p3` | 6 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 5~6~7 | a6000 | `?` | — | — | — | a campaign stopped at r4~r6 by patience 3 (D-131) |
+| `F3rw-p8-pow` | 3 | 19/F3 | rule_writer-try05 | 8 | pow | cma/1/300 | 12 | a6000 | `?` | — | 1.0839 | expressive-regret.json | ⛔ retired — p8 and yet CMA. To be re-measured |
+| `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | prod | cma/1/300 | 12 | a6000 | `?` | — | 1.0840 | expressive-regret.json | ⛔ retired — p8 and yet CMA. To be re-measured |
+| `luna` | 3 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `lunaNAMES` | 6 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `verify` | 2 | 19/? | ? | ? | default | nelder-mead/4/200 | 6 | a6000 | `?` | — | — | — | |
 
 <!-- RUNS:END -->
 
-## 각주
+## Footnotes
 
 ```
-★ n=6 이 표준이다. n=3 인 실행은 원리적으로 판정이 약하다
-  (3대3 에서 "안 겹침" 의 최소 p = 0.10) — 재측정 대상
-목적함수      regret@1 (D-128 이후 진화 경로는 이것뿐이다)
-분할          nk11008 — 학습/홀드아웃 20. 표마다 학습 수가 다르다
-모델          gpt-5.6-luna 고정
-적합기        파라미터 8 -> nelder-mead/4/200,  16 -> cma/1/300 (D-128)
-              ⚠️ 표시가 붙은 줄은 **그 규칙과 다르게 돈 옛 실행**이다
-최종 점수        체제별 재적합 -> 홀드아웃. **출처 열의 json 에서 읽는다**
-★ 라운드 12 는 검증 안 된 값이다 — D-127 판정은 "(나) 부족하다" 이고,
-  부족한 양(0.0055~0.0060)이 시드 폭 σ(0.0124)보다 작다
-피처 열       `n_features`/`feature_condition`. `?` 는 그 키가 없던 시절이다
-씨앗 열       `chosen.json` 의 source. `?` 는 파일이 없는 옛 실행
+★ n=6 is the standard. A run at n=3 is weak in principle
+  (3 against 3 gives a minimum p of 0.10 for "they do not overlap") — to be
+  re-measured
+objective       regret@1 (since D-128 this is the only evolution path)
+split           nk11008 — training/holdout 20. The training count differs per
+                table
+model           fixed at gpt-5.6-luna
+fitter          parameters 8 -> nelder-mead/4/200,  16 -> cma/1/300 (D-128)
+                ⚠️ a marked row is **an old run that ran off that rule**
+final score     refit per regime -> the holdout. **It is read from the json in
+                the source column**
+★ 12 rounds is an unverified value — D-127's verdict is "(b) it is not
+  enough", and the shortfall (0.0055~0.0060) is smaller than the seed range σ
+  (0.0124)
+features column `n_features`/`feature_condition`. `?` is from the days that
+                key did not exist
+seed rule column the source in `chosen.json`. `?` is an old run with no such
+                file
 ```
 
-## 아직 최종 점수가 빈 줄
+## The rows whose final score is still empty
 
-`—` 는 **그 태그의 최종 점수를 담은 산출물 json 이 아직 없다**는 뜻이다.
-숫자를 여기 손으로 적지 않는다 — 재측정하고 산출물을 만들면 채워진다.
+`—` means **there is not yet an artifact json holding that tag's final
+score**. The number is not written in here by hand — re-measure it, produce
+the artefact, and it fills in.

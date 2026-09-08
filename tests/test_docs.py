@@ -28,7 +28,7 @@ def test_canonical_numbers_live_in_one_place():
 
     root = Path(__file__).resolve().parents[1]
     concl = (root / "docs/artifacts/conclusion.md").read_text()
-    assert "이 절이 **대표값이다**" in concl
+    assert "This section is **the canonical one**" in concl
     readme = (root / "README.md").read_text()
     for n in ("1.0650", "1.0737", "1.0762", "1.0797"):
         assert n not in readme, (
@@ -55,7 +55,7 @@ def test_runs_table_is_not_stale():
 def test_trace_column_flags_missing_release(tmp_path, monkeypatch):
     """★ If there is a trace but no release, the table says so (D-138).
 
-    The `트레이스` column of `runs.md` reads **only** the ledger
+    The `trace` column of `runs.md` reads **only** the ledger
     (`trace-releases.json`) — calling `gh` would put the test on the network
     (principle 2).
     """
@@ -79,7 +79,7 @@ def test_trace_column_flags_missing_release(tmp_path, monkeypatch):
     man.write_text(json.dumps({"ZZfake-p8": {"release": "trace-ZZ-abc1234"}}))
     assert rt._trace("ZZfake-p8", ["ZZfake-p8-s0"]) == "trace-ZZ-abc1234"
 
-    # With no trace it is blank — not "★ 미업로드"
+    # With no trace it is blank — not "★ not uploaded"
     (run / "trace.jsonl").unlink()
     assert rt._trace("ZZfake-p8", ["ZZfake-p8-s0"]) == ""
 

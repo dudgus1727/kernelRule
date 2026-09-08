@@ -80,7 +80,7 @@ def _one(p, hw):
 ARMS = [
     ("① SOL 0.5",  _sol(0.5),  ("short", "long")),
     ("② roofline", _roof,      ("mem", "comp")),
-    ("③ 안 나눔",   _one,       ("all",)),
+    ("③ no split",   _one,       ("all",)),
     ("①' SOL 0.25", _sol(0.25), ("short", "long")),
     ("①'' SOL 1.0", _sol(1.0),  ("short", "long")),
 ]
@@ -166,7 +166,7 @@ def main() -> None:
     print("\n" + "-" * 96)
     print("  the verdict (the decision line 0.0516, the buffer band ~0.0589)")
     base = out["arms"]["① SOL 0.5"]["median"]
-    for lab in ("② roofline", "③ 안 나눔", "①' SOL 0.25", "①'' SOL 1.0"):
+    for lab in ("② roofline", "③ no split", "①' SOL 0.25", "①'' SOL 1.0"):
         d = out["arms"][lab]["median"] - base
         v = ("indistinguishable" if abs(d) < DELTA else
              "★ near the decision line (no verdict)" if abs(d) < BUFFER else
@@ -179,7 +179,7 @@ def main() -> None:
           "(the median of 6 runs)")
     reg2 = shape_reg["② roofline"]
     print(f"  {'arm':14s} {'mem':>9s} {'comp':>9s}")
-    for lab in ("① SOL 0.5", "② roofline", "③ 안 나눔"):
+    for lab in ("① SOL 0.5", "② roofline", "③ no split"):
         cells = {}
         for nm in ("mem", "comp"):
             per = []

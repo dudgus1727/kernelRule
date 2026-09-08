@@ -49,34 +49,43 @@ OUT = Path("runs")
 #: `docs/artifacts/rerun-preregistration.md`.
 #:   `tests/test_rerun_prereg.py` checks that the two do not diverge.
 #:
-#: ⚠️ 2026-09-08 (D-146): **the values stay in Korean.** They are a frozen
-#: record mirroring a `docs/` document, and `docs/` is not translated —
-#: translating here would break the doc-code equality the test enforces.
+#: ⚠️ 2026-09-08 (D-146): the values were translated into English together
+#: with the document. It is a frozen record, so nothing was deleted — the
+#: Korean original is at commit `ee53b4d`.
 PREREG = {
-    "purpose": ("오염 없는 상태의 값을 얻는 것. **벤더를 이기는 것이 "
-                "아니다.**"),
-    "expected": ("★ 벤더와 구분 불가. D-53 계산상 6시드로 가릴 수 있는 "
-                 "차이는 0.03 이상이고 현재 추정 격차는 0.02 근처다. "
-                 "'구분 불가' 가 나와도 실패가 아니다."),
+    "purpose": ("to obtain a value from an uncontaminated state. **It is not "
+                "to beat the vendor.**"),
+    "expected": ("★ indistinguishable from the vendor. By the D-53 "
+                 "calculation the difference 6 seeds can tell apart is 0.03 "
+                 "or more and the currently estimated gap is around 0.02. "
+                 "Getting 'indistinguishable' is not a failure."),
     "n_seeds": 6,
     "rounds": 12,
     "n_rules_per_round": 12,
     "feature_detail": "full",
     "split_kind": "nk11008",
-    "not_doing": ["A/B 비교 — 이미 결론이 났다 (D-53/54)",
-                  "삭제한 값과의 비교 — 비교할 대상이 없어야 한다",
-                  "시드 골라 쓰기 — 전부 쓰거나 전부 안 쓴다 (D-50)"],
-    "primary_metric": ("각 형상에서 6실행의 **중앙값** vs 벤더, 형상 20개 "
-                       "부호검정. 분산이 한 번만 든다"),
-    "secondary_metric": "실행 6개의 부호검정 (p 하한 0.031)",
-    "gate": "도달률(무작위 4000점, regret@1). 단일 조건이라 12/12 예상",
+    "not_doing": [
+        "an A/B comparison — the conclusion is already in (D-53/54)",
+        ("a comparison with a deleted value — there must be nothing to "
+         "compare against"),
+        "cherry-picking seeds — all of them are used or none (D-50)"],
+    "primary_metric": ("the **median** of the 6 runs at each shape vs the "
+                       "vendor, a sign test over the 20 shapes. The variance "
+                       "enters once"),
+    "secondary_metric": ("a sign test over the 6 runs (p lower bound 0.031)"),
+    "gate": ("the reach rate (4000 random points, regret@1). It is a single "
+             "condition, so 12/12 is expected"),
     "on_gate_failure": {
-        "1건": "기록하고 진행. ★ 그 실행을 결과에서 빼지 말 것 (D-50)",
-        "2건 이상": "멈추고 보고. (나) regret@3 대리 손실 재검토",
-        "격차 0.03 초과": "건수와 무관하게 멈춤"},
-    "on_partial": ("6시드 중 일부만 끝나면 끝난 것만으로 보고하되 "
-                   "'설계는 6시드였다' 를 명시한다. 시드를 고르지 않는다"),
-    "abort": ["LLMUnreachable 즉시", "3실행 연속 아카이브가 비면"],
+        "1 failure": ("record it and continue. ★ Do not take that run out of "
+                      "the results (D-50)"),
+        "2 or more": ("stop and report. (b) reconsider the regret@3 surrogate "
+                      "loss"),
+        "gap over 0.03": "stop regardless of the count"},
+    "on_partial": ("if only some of the 6 seeds finish, report on what "
+                   "finished but state explicitly that 'the design was 6 "
+                   "seeds'. Seeds are not cherry-picked"),
+    "abort": ["LLMUnreachable immediately",
+              "3 runs in a row with an empty archive"],
 }
 
 #: The cost cap. It is **the per-run maximum of the existing 6 luna runs

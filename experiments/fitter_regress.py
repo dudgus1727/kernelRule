@@ -44,10 +44,10 @@ from kernelrule.features import REGISTRY
 
 #: The main target — the 6 regret-evolved structures. **The same six** D-77
 #: and D-123 used.
-MAIN = ("arch24 6구조", [f"F3rw-p8-s{i}" for i in range(6)])
+MAIN = ("arch24, 6 structures", [f"F3rw-p8-s{i}" for i in range(6)])
 #: Secondary — the budget-8 arm of §3. Structures evolved with CMA. They are
 #: looked at **separately**.
-SIDE = ("rb08 3구조 (CMA 진화)", [f"F3rw-p8-cma-s{i}" for i in range(3)])
+SIDE = ("rb08, 3 structures (CMA-evolved)", [f"F3rw-p8-cma-s{i}" for i in range(3)])
 
 ARMS = [("NM", "nelder-mead", 4), ("CMA", "cma", 1)]
 REPORT_KS = (1, 10, 50, 100)

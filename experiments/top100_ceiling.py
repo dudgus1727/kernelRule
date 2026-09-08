@@ -173,8 +173,8 @@ def main() -> None:
     a = ap.parse_args()
     warnings.simplefilter("ignore")
     out: dict = {}
-    for lbl, (d, h) in (("A6000 학습 41형상", A6000),
-                        ("5090 학습 41형상", G5090)):
+    for lbl, (d, h) in (("A6000 training 41 shapes", A6000),
+                        ("5090 training 41 shapes", G5090)):
         T = PerfTable.from_bundle(d, env_hash=h, ok_only=False)
         M = FeatureMatrix(T, REGISTRY)
         _report(lbl, T, M, list(_splits(T).train.shapes), out)

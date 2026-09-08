@@ -9,10 +9,12 @@ The conditions are read from `config.json` and the final scores **from the
 artifacts json**. No number is written into this file — writing one makes it
 diverge (the same way as `decisions_index.py`).
 
-⚠️ The strings that go **into `docs/artifacts/runs.md`** (the table header,
-the note and retirement texts, the status marks) stay in Korean — `docs/` is
-not translated (D-146). Only what this file prints to the terminal is
-English.
+⚠️ 2026-09-08 (D-146): the strings that go **into `docs/artifacts/runs.md`**
+(the table header, the note and retirement texts, the status marks) were
+translated together with the document. Nothing but the language changed; the
+Korean originals are at commit `ee53b4d`. Old `## D-N` entries in
+`docs/decisions.md` quote the old marks (`★ 미업로드`, `★갈림`) — those stay,
+they are the record of what the table said at the time.
 
 ## The tag rule (D-128 §1-7)
 
@@ -34,7 +36,7 @@ if it changes the result then it is a condition.
 ```
 a code change that changes the result   ★ it is attached to the tag
                                         (like `-nan`)
-any other change                        by commit only — ★ the `커밋`
+any other change                        by commit only — ★ the `commit`
                                         column of this table
 ```
 
@@ -57,7 +59,7 @@ from kernelrule.rules.checks import fitter_for
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
 OUT = ROOT / "docs" / "artifacts" / "runs.md"
-BEGIN = "<!-- RUNS:BEGIN — experiments/runs_table.py 가 만든다 -->"
+BEGIN = "<!-- RUNS:BEGIN — experiments/runs_table.py builds it -->"
 END = "<!-- RUNS:END -->"
 
 #: **Where in which artefact** the final score is. The value is not written
@@ -90,16 +92,17 @@ CANON: dict[str, tuple[str, tuple, str]] = {
 #: Tags that are not retired but need an explanation. They go into the status
 #: column as they are.
 NOTES = {
-    "F3rw-p8-nan": "★ 지금 대표값 — `-nan` 은 `compile_rule` 의 "
-                   "np.errstate 방어(D-135) 를 뜻한다. 그 전 캠페인은 "
-                   "`F3rw-p8` 이다. ★ 최종 점수는 **r11 에서 읽는다** "
-                   "(라운드 12, D-140) — 캠페인은 24까지 돌았다. "
-                   "커밋이 갈린 것은 캠페인 도중 문서 "
-                   "커밋 때문이고 `kernelrule/`·`prompts/` 는 어느 쌍에서도 "
-                   "안 바뀌었다 (확인함, D-137)",
-    "F3rw-p8": "결함 있는 코드로 돈 캠페인 — `__import__` 로 제안 2% 가 "
-               "버려졌다 (D-135). 대표값은 `F3rw-p8-nan` 이다",
-    "F3rw-p8-p3": "patience 3 으로 r4~r6 에서 멈춘 캠페인 (D-131)",
+    "F3rw-p8-nan": "★ the current canonical value — `-nan` means the "
+                   "np.errstate guard in `compile_rule` (D-135). The "
+                   "campaign before it is `F3rw-p8`. ★ The final score is "
+                   "**read at r11** (round 12, D-140) — the campaign ran to "
+                   "24. The commits differ because of a docs commit in the "
+                   "middle of the campaign, and `kernelrule/`·`prompts/` did "
+                   "not change in any of the pairs (checked, D-137)",
+    "F3rw-p8": "a campaign that ran on faulty code — 2% of the proposals "
+               "were thrown away by `__import__` (D-135). The canonical "
+               "value is `F3rw-p8-nan`",
+    "F3rw-p8-p3": "a campaign stopped at r4~r6 by patience 3 (D-131)",
 }
 #: The prefixes dropped from the table. **They are not deleted** — they are
 #: only marked by name.
@@ -107,10 +110,12 @@ DROP = ("x-",)
 #: ★ The retired (to be re-measured) tags and the reason. They **stay in the
 #: table as a status** (D-129 §3-2).
 RETIRED = {
-    "F3rw-p8-cma": "p8 인데 CMA — 지금 규칙(fitter_for)으로는 안 나온다",
-    "F3rw-p8-prod": "p8 인데 CMA. 재측정 대상",
-    "F3rw-p8-pow": "p8 인데 CMA. 재측정 대상",
-    "F3rw-p8-old": "옛 대표값 — 옛 프롬프트·라운드12·patience10 (D-129)",
+    "F3rw-p8-cma": "p8 and yet CMA — the current rule (fitter_for) does "
+                   "not produce it",
+    "F3rw-p8-prod": "p8 and yet CMA. To be re-measured",
+    "F3rw-p8-pow": "p8 and yet CMA. To be re-measured",
+    "F3rw-p8-old": "the old canonical value — the old prompt·12 "
+                   "rounds·patience 10 (D-129)",
 }
 
 
@@ -174,7 +179,7 @@ def _commit(runs: list[str]) -> str:
 LIVE_SECONDS = 1800
 #: The release ledger. `trace_release.py --upload` writes it (D-138).
 TRACE_MANIFEST = ROOT / "docs" / "artifacts" / "trace-releases.json"
-MISSING = "★ 미업로드"
+MISSING = "★ not uploaded"
 
 
 def _trace(tag: str, runs: list[str]) -> str:
@@ -223,7 +228,7 @@ def _rows() -> list[dict]:
             table says so**."""
             vals = {str(c[key]) for c in _c}
             if len(vals) > 1:
-                return "★갈림"
+                return "★split"
             v = vals.pop()
             # ★ What is absent is `?`. It is not filled in by guessing
             #   (principle 39).
@@ -242,12 +247,13 @@ def _rows() -> list[dict]:
             "condition": one("feature_condition"),
             "seed": one("seed_source").split(" (")[0],
             "parameters": one("parameters"),
-            "hint": ("곱" if one("product_hint") == "True" else "")
-                    + ("지수" if one("power_hint") == "True" else "") or "기본",
+            "hint": ("prod" if one("product_hint") == "True" else "")
+                    + ("pow" if one("power_hint") == "True" else "")
+                    or "default",
             "fitter": f"{one('fit_method')}/{one('fit_restarts')}/"
                       f"{cfg['loop'].get('max_evals', '?')}",
             # ★ Is this run off the §1-6 rule (nelder-mead when p<=8)
-            "off_rule": (one("parameters") not in ("?", "★갈림")
+            "off_rule": (one("parameters") not in ("?", "★split")
                          and one("fit_method") != fitter_for(
                              int(one("parameters")))["fit_method"]),
             "rounds": "~".join(map(str, nr)),
@@ -262,8 +268,9 @@ def _rows() -> list[dict]:
 
 def render() -> str:
     rows = _rows()
-    head = ("| 태그 | 시드 | 피처 | 씨앗 | 파라미터 | 표현력 | 적합기 | "
-            "라운드 | 표 | 커밋 | 트레이스 | 최종 점수 | 출처 | 상태 |")
+    head = ("| tag | seeds | features | seed rule | parameters | "
+            "expressiveness | fitter | rounds | table | commit | trace | "
+            "final score | source | status |")
     L = [BEGIN, "", head,
          "|---|--:|---|---|--:|---|---|---|---|---|---|--:|---|---|"]
     for r in rows:
@@ -273,8 +280,8 @@ def render() -> str:
             f" {r['rounds']} | {r['gpu']} | `{r['commit']}` |"
             f" {r['trace'] or '—'} |"
             f" {r['canon'] or '—'} | {r['canon_src'] or '—'} |"
-            + (f" ⛔ 폐기 — {r['retired']}" if r["retired"]
-               else " ⚠️ 적합기 규칙 밖" if r["off_rule"] else "")
+            + (f" ⛔ retired — {r['retired']}" if r["retired"]
+               else " ⚠️ outside the fitter rule" if r["off_rule"] else "")
             + ((" · " if (r["retired"] or r["off_rule"]) else " ")
                + r["note"] if r["note"] else "") + " |")
     L += ["", END]

@@ -1,131 +1,147 @@
-# (c) 재생성 사다리 — hw 의 **어느 부분**이 쓰이나
+# The (c) regrow ladder — **which part** of hw is used
 
-실험 계획서 [c-rerun-prereg.md](c-rerun-prereg.md) ·
-[c-rerun3-prereg.md](c-rerun3-prereg.md). 숫자 산출 **LLM 0회**.
+The pre-registrations are [c-rerun-prereg.md](c-rerun-prereg.md) ·
+[c-rerun3-prereg.md](c-rerun3-prereg.md). Producing the numbers took **0 LLM
+calls**.
 
 ```
 python3 experiments/c_ladder.py      # -> docs/artifacts/c-ladder.json
 ```
 
-각 단이 **하나씩만** 다르다. 5090 표, 공통 53형상, 분할 `nk11008`,
-3시드 x 12라운드, 예산 8, 모델 `gpt-5.6-luna`. regret 은 `sigma_5090.py`
-와 **같은 절차**(최종 채점)다 — 옛 (c) 의 값이 그 절차에서 나왔다.
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
+
+Each rung differs in **exactly one** thing. The 5090 table, the 53 common
+shapes, the split `nk11008`, 3 seeds x 12 rounds, budget 8, the model
+`gpt-5.6-luna`. The regret comes from **the same procedure** as
+`sigma_5090.py` (the final scoring) — the old (c)'s value came out of that
+procedure.
 
 ---
 
-## 0. ⚠️ 먼저 — 기록된 (c) `1.0485` 는 **두 씨앗을 섞은 값**이다
+## 0. ⚠️ First — the recorded (c) `1.0485` is **a value mixing two seeds**
 
-`transfer_29_5.TABLES["5090"]["runs"]` 가 여섯 실행을 (c) 로 묶는다.
-뒤 셋(`5090sigma-b-s*`)의 `chosen.json` 을 열어 보니:
-
-```
-5090sigma-s*     source = rule_writer-try03    ★ (c) 의 정의 — 5090 에서 처음부터
-5090sigma-b-s*   source = physics_seeded       ★ **손씨앗**이다
-```
-
-`physics_seeded` 는 사람이 A6000 을 보며 쓴 씨앗이다. **"5090 표에서
-처음부터" 가 아니다.** §29.5 의 (c) 1.0485 는 두 조건을 평균한 값이다.
+`transfer_29_5.TABLES["5090"]["runs"]` bundles six runs as (c). Opening the
+`chosen.json` of the last three (`5090sigma-b-s*`):
 
 ```
-RuleWriter 씨앗 3시드   1.0416  (1.0315~1.0625)   ← (c) 의 정의
-손씨앗 3시드            1.0506  (1.0463~1.0663)
-합친 여섯의 중앙         1.0485                    ← 기록된 값
+5090sigma-s*     source = rule_writer-try03    ★ the definition of (c) — from
+                                                 scratch on the 5090
+5090sigma-b-s*   source = physics_seeded       ★ **the hand seed**
 ```
 
-**사다리의 첫 단은 1.0416 을 쓴다.** 기록된 1.0485 는 지우지 않는다 —
-어떻게 나온 값인지 여기 적는다 (문서 규칙 2).
+`physics_seeded` is a seed a human wrote while looking at the A6000. **It is
+not "from scratch on the 5090 table".** §29.5's (c) 1.0485 is an average over
+two conditions.
+
+```
+RuleWriter seed, 3 seeds   1.0416  (1.0315~1.0625)   ← the definition of (c)
+the hand seed, 3 seeds     1.0506  (1.0463~1.0663)
+the median of the six      1.0485                    ← the recorded value
+```
+
+**The ladder's first rung uses 1.0416.** The recorded 1.0485 is not deleted —
+how it came about is written down here (documentation rule 2).
 
 ---
 
-## 1. 사다리 — 판정은 **둘 다 구분 불가**
+## 1. The ladder — the verdict is **indistinguishable on both steps**
 
 ```
-                            중앙        범위
-옛 (c)   숫자A6000·경고A6000  1.0416   1.0315~1.0625
-중간(c)  숫자5090 ·경고A6000  1.0384   1.0346~1.0422
-새 (c)   숫자5090 ·경고5090   1.0611   1.0422~1.0761
-손씨앗 (사다리 밖)            1.0506   1.0463~1.0663
+                                        median      range
+old (c)     numbers A6000 · warnings A6000  1.0416   1.0315~1.0625
+middle (c)  numbers 5090  · warnings A6000  1.0384   1.0346~1.0422
+new (c)     numbers 5090  · warnings 5090   1.0611   1.0422~1.0761
+the hand seed (outside the ladder)          1.0506   1.0463~1.0663
 ```
 
-판정선 **delta = 0.0516** (σ 상한, §29.5 가 이미 쓴 값).
+The decision line is **delta = 0.0516** (the σ upper bound, the value §29.5
+already used).
 
 ```
-옛 -> 중간 (숫자)      1.0416 -> 1.0384   +0.0032   ★ 구분 불가
-중간 -> 새 (경고 절)    1.0384 -> 1.0611   -0.0227   ★ 구분 불가
+old -> middle (the numbers)             1.0416 -> 1.0384   +0.0032   ★ indistinguishable
+middle -> new (the warnings section)    1.0384 -> 1.0611   -0.0227   ★ indistinguishable
 ```
 
-### 실험 계획서의 판정 경로를 그대로 따라가면
+### Following the pre-registration's decision path as written
 
 ```
-중간 -> 새 가 구분 불가   -> 경고 절은 안 쓰인다
-그러면 옛 -> 중간 이 가른다
-옛 -> 중간 도 구분 불가   -> ★ hw 산문 전체가 안 쓰인다.
-                            table_facts 가 지배한다
+middle -> new is indistinguishable   -> the warnings section is not used
+then old -> middle is what decides
+old -> middle is indistinguishable too  -> ★ the whole hw prose is not used.
+                                           table_facts dominates
 ```
 
-⚠️ **한 가지 유보.** 새 (c) 가 **나빠진** 쪽이고(−0.0227), 범위가
-`1.0346~1.0422` 대 `1.0422~1.0761` 로 **한 점에서만 닿는다.** 판정선
-아래이므로 "구분 불가" 지만, "차이가 없다" 와 "못 가른다" 는 다르다.
-3시드로는 여기까지다.
+⚠️ **One reservation.** The new (c) is the side that got **worse** (−0.0227),
+and the ranges `1.0346~1.0422` against `1.0422~1.0761` **touch at a single
+point.** It is under the decision line so it is "indistinguishable", but
+"there is no difference" and "we cannot tell them apart" are different
+things. With 3 seeds this is as far as it goes.
 
 ---
 
-## 2. tau — 경고가 사라져도 상위권이 **안 오른다**
+## 2. tau — the top ranks **do not rise** when the warnings go
 
 ```
-                          상위100 tau   노이즈 인식   전구간
-옛 (c)   숫자A6000·경고A6000     0.104       0.104     0.330
-중간(c)  숫자5090 ·경고A6000      0.078       0.071     0.352
-새 (c)   숫자5090 ·경고5090      0.097       0.091     0.229
+                                          top-100 tau   noise-aware   all-range
+old (c)     numbers A6000 · warnings A6000     0.104        0.104        0.330
+middle (c)  numbers 5090  · warnings A6000     0.078        0.071        0.352
+new (c)     numbers 5090  · warnings 5090      0.097        0.091        0.229
 ```
 
-★ **D-100 의 "순위 능력이 전이 안 된다" 는 hw 탓이 아니다.** "짧은
-형상을 포기하라" 는 경고를 지워도 상위100 tau 가 0.08~0.10 에 머문다.
+★ **D-100's "the ranking ability does not transfer" is not hw's fault.**
+Erasing the warning that says "give up on the short shapes" leaves the
+top-100 tau at 0.08~0.10.
 
-⚠️ 이 tau 들은 **regret 재적합 가중치**에서 나온 값이다 (최종 채점 경로).
-D-118 의 벽 그림과 같은 칸이다 — regret 팔의 tau 는 원래 0.1 근처다.
+⚠️ These taus come from **the regret-refitted weights** (the final scoring
+path). It is the same cell as D-118's picture of the wall — the regret arm's
+tau is around 0.1 to begin with.
 
 ---
 
-## 3. 씨앗 구조 — `log_sol_ms` 분기는 **안 돌아왔다**
+## 3. The seed structure — the `log_sol_ms` branch **did not come back**
 
 ```
-                          형상 길이로 가르는 후보   채택 씨앗   축 수
-옛 (c)   숫자A6000·경고A6000        2/10          ★ 있다    9~12
-중간(c)  숫자5090 ·경고A6000         0/10            없다    9~11
-새 (c)   숫자5090 ·경고5090          0/10            없다    8~12
+                                          candidates splitting   in the      axes
+                                          by shape length        chosen seed
+old (c)     numbers A6000 · warnings A6000        2/10           ★ present   9~12
+middle (c)  numbers 5090  · warnings A6000        0/10             absent    9~11
+new (c)     numbers 5090  · warnings 5090         0/10             absent    8~12
 ```
 
-**숫자를 5090 으로 바꾼 것만으로 0/10 이 됐고, 경고 절까지 바꿔도
-0/10 이 유지된다.** hw 산문이 **씨앗의 형태**에는 닿는다 — 그런데
-그것이 12라운드 뒤의 성능으로는 안 넘어온다.
+**Changing the numbers to the 5090 alone made it 0/10, and changing the
+warnings section too keeps it at 0/10.** The hw prose does reach **the seed's
+form** — but that does not carry over into the performance after 12 rounds.
 
-⚠️ n=10 이라 2/10 vs 0/10 은 Fisher p = 0.474 다. **방향까지만.**
+⚠️ n=10, so 2/10 vs 0/10 is Fisher p = 0.474. **Direction only.**
 
 ---
 
-## 4. 그래서
+## 4. So
 
 ```
-★ hw 산문은 씨앗의 **형태**를 바꾼다 (log_sol_ms 분기 2/10 -> 0/10)
-★ 그런데 12라운드 뒤의 **성능**은 안 바뀐다 (셋 다 구분 불가)
--> 진화가 매 라운드 보는 `table_facts` 가 지배한다
+★ the hw prose changes the seed's **form** (the log_sol_ms branch 2/10 -> 0/10)
+★ but the **performance** after 12 rounds does not change (all three
+  indistinguishable)
+-> the `table_facts` the evolution sees every round dominates
 ```
 
-§29.5 의 결론 **(b) ≈ (c)** 는 유지된다. (b) 재적합 1.0539 와 세 (c)
-팔(1.0384~1.0611)이 전부 판정선 안이다.
+§29.5's conclusion **(b) ≈ (c)** holds. The (b) refit 1.0539 and the three
+(c) arms (1.0384~1.0611) are all inside the decision line.
 
-**옛 (c) 의 조건 오류는 결과를 안 바꿨다.** 그러나 그것은 사후에 안
-것이고, 조건이 틀린 채로 며칠이 지난 것은 그대로 기록에 남는다
-(D-113, 원칙 39).
+**The old (c)'s condition error did not change the result.** But that was
+known only afterwards, and the fact that the condition was wrong for days
+stays in the record (D-113, principle 39).
 
 ---
 
-## 5. 실험 계획서의 예상과 대조
+## 5. Against the pre-registration's expectations
 
 ```
-예상 (c-rerun3 §5)   중간 -> 새는 구분 불가일 것이다      ✓ 맞았다
-                    씨앗의 형상 길이 분기는 볼 만하다     ✓ 0/10 유지
-                    tau 가 오르면 예상 밖이다            ✓ 안 올랐다
-예상 (c-rerun §6)    구분 불가일 것이다                  ✓ 맞았다
+expected (c-rerun3 §5)   middle -> new will be indistinguishable   ✓ correct
+                         the seed's shape-length branch is worth   ✓ 0/10 held
+                         looking at
+                         a rise in tau would be unexpected         ✓ it did
+                                                                     not rise
+expected (c-rerun §6)    it will be indistinguishable              ✓ correct
 ```

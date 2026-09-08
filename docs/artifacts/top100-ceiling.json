@@ -1,5 +1,5 @@
 {
- "A6000 학습 41형상": {
+ "A6000 training 41 shapes": {
   "n_shapes": 41,
   "top_n": 100,
   "span_median": 0.06597934420128371,
@@ -117,7 +117,7 @@
   "n_const_features": 4,
   "n_flat_features": 5
  },
- "5090 학습 41형상": {
+ "5090 training 41 shapes": {
   "n_shapes": 41,
   "top_n": 100,
   "span_median": 0.011857682502294464,

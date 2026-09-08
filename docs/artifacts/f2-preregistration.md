@@ -1,144 +1,183 @@
-# F1-K 실험 계획서 — ★ 실행 **전**에 박는다
+# The F1-K pre-registration — ★ nailed down **before** the run
 
-> **상태**: 등록 확정 (2026-08-27). **LLM 호출 0회 상태에서 작성**
-> **재현**: `python3 experiments/f1_pipeline.py F1-K --categorize --per-category 3 --tag k1`
-> **모델**: `gpt-5.6-luna` / responses / medium — `DEFAULT_MODEL` 고정 (D-45, 원칙 25)
-> **표**: `datasets/rtx-a6000-sm_86-c63710df` (dev, 수치 대외 보고 금지)
+> **Status**: registered (2026-08-27). **Written with 0 LLM calls made**
+> **Reproduce**: `python3 experiments/f1_pipeline.py F1-K --categorize --per-category 3 --tag k1`
+> **Model**: `gpt-5.6-luna` / responses / medium — pinned by `DEFAULT_MODEL` (D-45, principle 25)
+> **Table**: `datasets/rtx-a6000-sm_86-c63710df` (dev, its numbers must not be reported externally)
 
-**결과를 보고 기준을 정하면 오염이다** (D-50). 여기 먼저 적는다.
-이 문서의 값은 `experiments/f1_pipeline.py` 의 `F1K_PREREG` 와 **같아야
-하고**, `tests/test_f1k_prereg.py` 가 그것을 고정한다.
+> ⚠️ 2026-09-08 (D-146): this document was translated into English. It is a
+> frozen pre-registration, so **nothing was deleted** — the Korean original
+> is at commit `ee53b4d`
+> (`git show ee53b4d:docs/artifacts/f2-preregistration.md`). The numbers, the
+> criteria and the structure are unchanged; only the language is.
 
-## ★ 왜 "실행 직전" 이 아니라 지금인가
+**Setting the criteria after seeing the results is contamination** (D-50). So
+they are written here first. The values in this document have to be **the
+same** as `F1K_PREREG` in `experiments/f1_pipeline.py`, and
+`tests/test_f1k_prereg.py` pins that down.
+
+## ★ Why now, and not "just before the run"
 
 ```
-지금 쓴다      배관 결과만 보고 쓴다. 실행 결과는 모른다
-실행 직전 쓴다  ★ 배관을 만들며 "이러면 잘 되겠는데" 라는 감이 생겼다
-               그 감이 기준에 스며든다
+writing now         it is written from the plumbing result alone. The run
+                    result is unknown
+writing just before ★ while building the plumbing a feel for "this ought to
+the run             work" has formed. That feel seeps into the criteria
 ```
 
-**실행 직전이 오히려 더 위험하다.** 배관 확인(`--dry-run`)이 끝난 지금,
-LLM 을 한 번도 안 부른 상태에서 박는다.
+**Just before the run is the more dangerous moment.** Now that the plumbing
+check (`--dry-run`) is done, and with the LLM not called even once, it is
+nailed down.
 
 ---
 
-## 1. 설계
+## 1. The design
 
 ```
-조건            F1-K
-시작 라이브러리   공개 지식 5개 (known5.py — physical.py 의 정리본)
-영역            고정 7개 (prompts/areas.md). --recategorize 안 씀
-생성            영역당 3~4회 = 21~28 제안
-그 뒤           Architect 10회 -> 씨앗 -> 진화 6시드 x 12라운드
-모델            DEFAULT_MODEL 고정
+condition        F1-K
+start library    the 5 public facts (known5.py — the tidied form of
+                 physical.py)
+areas            a fixed 7 (prompts/areas.md). --recategorize is not used
+generation       3~4 per area = 21~28 proposals
+after that       Architect 10 calls -> a seed -> evolution, 6 seeds x 12
+                 rounds
+model            pinned by DEFAULT_MODEL
 ```
 
-**F1 과 같은 것:** 표를 안 본다 / `p`·`hw`·`cfg` 만 / 정적 검사와 §8.3
-검증을 그대로 통과 / 최종 채점 절차 / 구조 홀드아웃 nk11008.
+**The same as F1:** it does not see the table / only `p`·`hw`·`cfg` / it
+passes the static checks and the §8.3 validation as they are / the final
+scoring procedure / the structural holdout nk11008.
 
-**F1 과 다른 것 — 둘이고, 분리하지 않는다:**
-
-```
-1. 시작 라이브러리 0개 -> 5개
-2. 예시가 무관 도메인 -> 실제 피처(코드까지)
-```
-
-**둘 다 "공개 지식을 준다" 의 일부**이므로 한 변수로 다룬다.
-D-31(두 변수를 동시에 바꾸지 마라)의 예외이고, 그 이유를 여기 적어 둔다.
-**"어느 쪽 덕인가" 는 이 실험으로 못 가른다.**
-
-## 2. 목적과 예상
+**Different from F1 — there are two, and they are not separated:**
 
 ```
-목적   "알려진 축을 주면 새 축을 더 만드나. 그리고 라이브러리가 좋아지나"
-
-예상   새 축 개수가 F1 보다 많다 (재발견에 예산을 안 쓰므로)
-       ★ 진화 성능이 F3 를 따라잡을지는 모른다. 못 따라잡아도 실패가 아니다
-       ★ F1 보다 나을지도 모른다 — 그것도 예상이 아니라 열린 질문이다
+1. the start library goes 0 -> 5
+2. the example goes from an unrelated domain -> a real feature (code and all)
 ```
 
-**시드 폭(σ 0.0274) 때문에 조건 간 0.02급 차이는 못 가린다** (D-53).
-성능이 비슷하면 **"구분 불가" 가 정직한 서술**이다.
+**Both are part of "public knowledge is given"**, so they are treated as one
+variable. It is an exception to D-31 (do not change two variables at once)
+and the reason is written down here. **"Which of the two did it" cannot be
+separated by this experiment.**
 
-## 3. 주 지표
-
-```
-새 축 개수와 그 상관    사람 24개 대비. 엄격(sp·pe 둘 다 >0.95) / 단조
-진화 후 구조 홀드아웃   F1 과 **같은 최종 채점 절차** (형상마다 6실행 중앙값)
-```
-
-## 4. 관찰 (성능 아님)
+## 2. The purpose and what is expected
 
 ```
-영역별 채택/거부 분포
-  ★ "메모리 트래픽" 영역 산출물이 roofline 축과 겹치는가
-    -> 영역 매핑에서 두 축을 접었는데 (§30.18) 실제로 같은지 확인한다
-physics_coverage       사람 24개의 물리를 얼마나 덮나
-만든 축 중 사람이 안 만든 것 — 물리적으로 타당한가 (정성)
-rationale 에 출처가 붙는가 — 예시의 습관이 전달되는가
-shape_level 로 판정되는 것이 몇 개인가
+purpose   "given known axes, does it make more new ones. And does the
+          library get better"
+
+expected  the number of new axes is larger than F1's (no budget is spent on
+          rediscovery)
+          ★ whether the evolution performance catches up with F3 is not
+            known. Not catching up is not a failure
+          ★ it may also be better than F1 — that too is an open question,
+            not an expectation
 ```
 
-## 5. ★ 판정 기준이 **아닌** 것
+**Because of the seed spread (σ 0.0274), a difference of the 0.02 class
+between conditions cannot be told apart** (D-53). If the performance is
+similar, **"indistinguishable" is the honest description**.
+
+## 3. The main metrics
 
 ```
-재발견 개수   5개를 줬으니 재발견할 것이 줄어드는 게 당연하다.
-             이것으로 조건을 평가하지 않는다
+the number of new axes and their correlation   against the human 24. Strict
+                                               (sp and pe both >0.95) /
+                                               monotone
+the structural holdout after evolution         **the same final scoring
+                                               procedure** as F1 (the median
+                                               of 6 runs per shape)
 ```
 
-## 6. 실패 시 행동
+## 4. Observations (not performance)
 
 ```
-영역 하나가 3회 연속 거부   건너뛰고 skipped_categories 에 기록. 진행
-채택이 절반 미만            멈추고 ★ 거부 사유 분포부터 본다 (아래)
-Architect 10회 전부 거부    멈추고 보고 (§30.9.6 과 같다)
-진화 중 3실행 연속 빈 아카이브  멈춤
+the acceptance/refusal distribution per area
+  ★ does the "memory traffic" area's output overlap the roofline axis
+    -> the area mapping folded the two axes together (§30.18); it is checked
+       whether they really are the same
+physics_coverage       how much of the human 24's physics it covers
+among the axes made, the ones a human did not make — are they physically
+sound (qualitative)
+does the rationale carry a source — does the example's habit get through
+how many are judged to be shape_level
 ```
 
-### 왜 "절반" 인가 — 품질 판정이 아니라 낭비 방지다
+## 5. ★ What is **not** a criterion
 
 ```
-80%   정상
-50%   이상하지만 결과는 나온다
-20%   ★ 검사기나 프롬프트가 깨졌다. 21제안에 4개면 라이브러리가 안 된다
+the number of rediscoveries   five were given, so of course there is less to
+                              rediscover. The condition is not evaluated by
+                              this
 ```
 
-**절반은 "실험이 성립하는 최소 요건" 이지 F1 실측(80%) 대비로 조인 것이
-아니다.** F1-K 는 다섯을 줬으니 **중복 거부가 늘 수 있고 그것은 정상
-동작**이다. 70% 로 잡았으면 정상인데 멈췄을 것이다.
-
-### ★ 멈춘 뒤의 행동 — 원칙 1 순서로 의심한다
+## 6. What to do on failure
 
 ```
-거부 사유 분포를 먼저 본다
-  중복 다수        정상. 다섯을 줬으니 예상된다. 계속할지 판단
-  §8.3 검증 실패 다수  검사기나 필드 문제 (D-37 / D-38 부류)
-  스키마 실패 다수   프롬프트 문제
+one area refused 3 times in a row   skip it and record it in
+                                    skipped_categories. Continue
+acceptance under half               stop and ★ look at the refusal-reason
+                                    distribution first (below)
+all 10 Architect calls refused      stop and report (the same as §30.9.6)
+3 runs in a row with an empty        stop
+archive during evolution
 ```
 
-**인프라 -> 검사기 -> 피험자 순서다** (원칙 8). F1 에서 채택 3/20 이
-나왔을 때 원인이 **검증기 결함 둘**이었다 — LLM 이 아니었다.
-
-⚠️ 이 절은 **기준을 바꾸는 것이 아니라 멈춘 뒤의 행동을 명시**하는
-것이다. 임계값(절반)은 그대로다. **LLM 을 부르기 전에 추가했다.**
-
-## 7. 안 하는 것
+### Why "half" — it is not a quality judgement but waste prevention
 
 ```
-나머지 19개를 넣지 않는다 — 그것은 F3 조건이다
---recategorize 를 쓰지 않는다 — 고정 일곱을 쓴다
-F1 결과(21개 라이브러리, 12실행)를 지우지 않는다 — 비교 대상이다
-모델을 바꾸지 않는다 (D-45, 원칙 25)
-결과를 보고 프롬프트를 고치지 않는다 (§12.3d)
+80%   normal
+50%   odd, but a result still comes out
+20%   ★ the checker or the prompt is broken. 4 out of 21 proposals gives no
+      library
 ```
 
-## 8. 비용 상한
+**Half is "the minimum for the experiment to hold", not a level tightened
+against F1's measurement (80%).** F1-K was given five, so **duplicate
+refusals can rise and that is normal behaviour**. Setting it at 70% would
+have stopped a normal run.
 
-F1 실측에서 추정한다.
+### ★ What to do after stopping — suspect in principle-1 order
 
 ```
-1단계   ~24호출  (영역 7 x 3, 거부 여유)      F1 실측 20~22호출 / 40~45분
-2단계   ~30호출  (Architect 10 + 재시도)      F1 실측 11호출
-3단계   ~936호출 (6시드 x 12라운드)           F1 실측 936호출
-합계    ~990호출.  벽시계 3~4시간
+look at the refusal-reason distribution first
+  mostly duplicates          normal. Five were given, so it is expected.
+                             Judge whether to continue
+mostly §8.3 validation fails  a checker or field problem (the D-37 / D-38
+                             family)
+mostly schema fails          a prompt problem
+```
+
+**The order is infrastructure -> checker -> subject** (principle 8). When F1
+gave 3/20 acceptances, the cause was **two validator defects** — it was not
+the LLM.
+
+⚠️ This section **does not change the criteria; it states what to do after
+stopping**. The threshold (half) is unchanged. **It was added before the LLM
+was called.**
+
+## 7. What is not done
+
+```
+the remaining 19 are not put in — that is the F3 condition
+--recategorize is not used — the fixed seven are used
+the F1 results (the 21-feature library, 12 runs) are not deleted — they are
+what it is compared against
+the model is not changed (D-45, principle 25)
+the prompt is not fixed after seeing the results (§12.3d)
+```
+
+## 8. The cost cap
+
+Estimated from the F1 measurement.
+
+```
+stage 1   ~24 calls  (7 areas x 3, plus room for refusals)   F1 measured
+                                                             20~22 calls /
+                                                             40~45 min
+stage 2   ~30 calls  (Architect 10 + retries)                F1 measured 11
+                                                             calls
+stage 3   ~936 calls (6 seeds x 12 rounds)                   F1 measured 936
+                                                             calls
+total     ~990 calls.  3~4 hours of wall clock
 ```

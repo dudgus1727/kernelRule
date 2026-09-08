@@ -1,278 +1,319 @@
-# 재실행 실험 계획서 — ★ 실행 **전**에 박는다
+# The re-run pre-registration — ★ nailed down **before** the run
 
-> **상태**: 등록 확정 (2026-08-26). 검증 실행 전
-> **재현**: `python3 experiments/rerun.py --verify` (짧은 검증)
->          `python3 experiments/rerun.py` (본 실행)
-> **모델**: `gpt-5.6-luna` / responses / `reasoning_effort=medium`
-> **표**: `datasets/rtx-a6000-sm_86-c63710df` (dev, 수치 대외 보고 금지)
+> **Status**: registered (2026-08-26). Before the verification run
+> **Reproduce**: `python3 experiments/rerun.py --verify` (the short verification)
+>          `python3 experiments/rerun.py` (the real run)
+> **Model**: `gpt-5.6-luna` / responses / `reasoning_effort=medium`
+> **Table**: `datasets/rtx-a6000-sm_86-c63710df` (dev, its numbers must not be reported externally)
 
-**결과를 보고 기준을 정하면 오염이다** (D-50). 여기 먼저 적는다.
-이 문서의 기준은 `experiments/rerun.py` 의 `PREREG` 딕셔너리와 **같은
-내용이어야 하고**, 테스트가 그것을 고정한다.
+> ⚠️ 2026-09-08 (D-146): this document was translated into English. It is a
+> frozen pre-registration plus its results, so **nothing was deleted** — the
+> Korean original is at commit `ee53b4d`
+> (`git show ee53b4d:docs/artifacts/rerun-preregistration.md`). Every number,
+> criterion and verdict is unchanged; only the language is.
 
----
-
-## 0. 왜 재실행하나
-
-12실행 전부가 **절반이 적합 없이 채점된** 상태에서 진화했다 (D-54).
-채점이 틀렸으면 그 위의 선택 — 부모 선택, 아카이브 갱신, 조기 종료 —
-이 전부 틀렸다. 다듬기 전후로 규칙 순위가 바뀌는 것도 확인했다
-(Kendall tau 중앙 0.875, 최고 규칙 11/12, D-57).
-
-```
-재적합은 최종 산출물만 고친다. 진화 궤적은 못 되돌린다.  (원칙 13)
-```
-
-## 1. 설계
-
-```
-규모     단일 조건 6시드 x 12라운드 x 12제안
-조건     feature_detail = "full" (피처 설명 있음)
-상태     다듬기 켜짐(강화판, D-59) + 불변식 경고(D-54) + 도달률 자기보고
-모델     gpt-5.6-luna / responses / medium — 고정 (D-52)
-분할     구조 홀드아웃 nk11008 (기존과 같다 — 분할을 바꾸면 비교가 끊긴다)
-```
-
-**★ 안 하는 것**
-
-```
-A/B 비교              이미 결론이 났다 (시드 폭 안, 구분 불가; D-53/54)
-삭제한 값과의 비교      비교할 대상이 없어야 한다
-시드 골라 쓰기         전부 쓰거나 전부 안 쓴다 (D-40/D-46/D-50)
-```
-
-A/B 를 빼는 이유는 **"이미 결론이 났으니까"** 이지 "거기서 적합기가
-실패하니까" 가 아니다. 순서가 반대면 그것도 오염이다 (원칙 18).
-
-## 2. ★ 목적과 예상 결과
-
-```
-목적    "오염 없는 상태의 값을 얻는 것"
-        ★ 벤더를 이기는 것이 아니다
-
-산출물  구조 홀드아웃 중앙값 + 사분위 + 체제별 분해
-        -> 이것이 이 저장소의 **대표값 성능 수치**가 된다
-```
-
-**★ 예상 결과: 벤더와 구분 불가.**
-
-```
-D-53 계산상 6시드로 가릴 수 있는 차이는 0.03 이상이다.
-현재 추정 격차는 0.02 근처다.
-따라서 "구분 불가" 가 예상되고, 그것이 나와도 실패가 아니다.
-```
-
-예상을 미리 적는 것이 **사후 합리화를 막는다.** "생각보다 좋았다" 도
-"생각보다 나빴다" 도 이 줄과 대조해서만 말할 수 있다.
-
-## 3. ★ 벤더 비교는 형상별을 주 지표로
-
-```
-보조 지표   실행 6개의 부호검정
-            p 하한 0.031. 5/6 이면 p=0.22 로 아무것도 못 말한다
-
-★ 주 지표   각 형상에서 6실행의 중앙값 vs 벤더
-            형상 20개 부호검정 -> p 하한 ~1e-6
-            분산이 한 번만 든다 (실행 간 분산이 중앙값으로 흡수)
-```
-
-형상별이 §30.4 의 "geomean 은 소수 형상이 끈다" 문제도 피한다.
-**둘 다 보고하되 형상별이 주 지표다.**
-
-## 4. ★ 적합기 통과 조건과 실패 시 행동
-
-통과 조건: 도달률(무작위 4000점, regret@1). **단일 조건이므로 12/12 예상**
-(D-60 에서 A 조건 12/12 = 100%).
-
-```
-1건 실패        기록하고 진행
-                ★ 그 실행을 결과에서 빼지 말 것 — 빼면 선택 편향이다 (D-50)
-2건 이상        멈추고 보고. (나) regret@3 대리 손실 재검토
-격차 0.03 초과   건수와 무관하게 멈춤
-```
-
-**실패한 실행을 결과에서 빼는 것이 가장 위험하다.**
-
-## 5. ★ 비용 상한과 중단 조건
-
-크레딧 소진을 두 번 겪었다 (D-43).
-
-```
-비용 상한    예상 호출·토큰을 먼저 계산해 config.json 에 기록한다
-             `Budget` 이 그 값으로 설정되고, 넘으면 예외다
-
-중단 조건    LLMUnreachable 즉시 중단 (구현됨)
-             3실행 연속 아카이브가 비면 멈춘다
-
-부분 완주    6시드 중 4개만 끝나면 **4개로 보고하되
-             "설계는 6시드였다" 를 명시**한다
-             ★ 시드를 골라 쓰지 않는다
-```
-
-## 6. 검증 실행 (본 실행 전)
-
-```
-python3 experiments/rerun.py --verify      # 1~2실행 x 6라운드
-```
-
-여기서 볼 것은 성능이 아니라 **장치가 도는가** 다.
-
-```
-[ ] 적합기 도달률이 12/12 나오는가 (검증 실행 규모에 맞춰 n/n)
-[ ] 불변식 경고가 실제로 발화하는가
-[ ] 라운드 요약에 적합이동이 뜨는가
-[ ] config.json 에 실험 계획서 값이 그대로 들어가는가
-[ ] 중간에 죽여도 산출물이 남는가
-```
-
-**검증 실행 결과는 대표값 수치가 아니다.** 6라운드짜리이고 본 실행과
-합치지 않는다.
+**Setting the criteria after seeing the results is contamination** (D-50). So
+they are written here first. The criteria in this document have to be **the
+same content** as the `PREREG` dictionary in `experiments/rerun.py`, and a
+test pins that down.
 
 ---
 
-## 검증 실행 결과 (2026-08-26)
+## 0. Why it is re-run
 
-재현: `python3 experiments/rerun.py --verify`
-그다음 `python3 experiments/fitter_movement.py verify-s0 verify-s1`
-
-**★ 이 수치는 대표값이 아니다.** 2실행 x 6라운드짜리이고 본 실행과 합치지
-않는다. 여기서 볼 것은 성능이 아니라 **장치가 도는가** 다.
-
-### 체크리스트
+All 12 runs evolved in a state where **half of them were scored without a
+fit** (D-54). If the scoring was wrong, then everything chosen on top of it —
+parent selection, archive updates, early stopping — was wrong too. The rule
+ranking was also confirmed to change before and after the polish (Kendall tau
+median 0.875, the best rule 11/12, D-57).
 
 ```
-[x] 적합기 도달률          4/4 = 100.0%   통과
-[x] 불변식 경고 발화        59건 — 음수 가중치 / 100배 폭주 / 평가 상한
-[x] 라운드 요약의 적합이동   12/12, 9/12, 12/12, 7/8, 8/9, 8/10 ...
-[x] config.json 에 조건     feature_detail 이 llm 블록에 기록된다
-                           ★ 이제 조건이 추측이 아니다 (D-60)
-[x] prereg.json            실험 계획서 값이 산출물에 그대로
-[x] 중간에 죽여도 남는가     RoundLoop 이 finally 로 dump (D-33) + SIGTERM 핸들러
+Refitting fixes only the final artefact. The evolutionary trajectory cannot
+be undone.  (principle 13)
 ```
 
-### 적합기가 확실히 달라졌다
+## 1. The design
 
 ```
-              전(12실행)   검증 실행
-적합 이동률    45.8%       라운드당 7/8 ~ 12/12
-도달률        83.3%       4/4 = 100.0%
+scale       one condition, 6 seeds x 12 rounds x 12 proposals
+condition   feature_detail = "full" (the feature descriptions are given)
+state       the polish on (the strengthened form, D-59) + the invariant
+            warnings (D-54) + the self-reported reach rate
+model       gpt-5.6-luna / responses / medium — pinned (D-52)
+split       the structural holdout nk11008 (the same as before — changing the
+            split breaks the comparison)
 ```
 
-라운드 요약에 `적합이동 12/12` 가 뜨는 것이 가장 큰 차이다. 전에는 절반이
-초기값 그대로였는데 **아무도 몰랐다** (D-54).
-
-### 불변식 경고가 실제로 무엇을 잡았나
+**★ What is not done**
 
 ```
-음수 가중치            피처는 전부 "클수록 나쁨" 이라 음수는 구조 오류다
-가중치 100배 폭주       초기값에서 두 자릿수 배 이상 벗어났다
-평가 상한에 닿음        항상 뜬다 — 경고가 아니라 상태다 (원칙 11)
+an A/B comparison            the conclusion is already in (inside the seed
+                             spread, indistinguishable; D-53/54)
+a comparison with a deleted   there must be nothing to compare against
+value
+cherry-picking seeds          all of them are used or none (D-40/D-46/D-50)
 ```
 
-앞의 둘은 **판별력이 있다** — 일부 후보에서만 뜬다. 세 번째는 전부에서
-뜨므로 신호가 아니고, 그 사실은 D-55 에 기록돼 있다.
+The reason A/B is excluded is **"because the conclusion is already in"**, not
+"because the fitter fails there". The other order would be contamination too
+(principle 18).
 
-### 비용 실측
-
-```
-2실행 x 6라운드   호출 154   1,695초 (28분)
--> 본 실행 6실행 x 12라운드 추정: 호출 ~930, 3~4시간
-   비용 상한 1,395 호출 안이다
-```
-
-### 남은 것
+## 2. ★ The purpose and the expected result
 
 ```
-성능 수치는 보지 않는다 — 검증 실행이고 대표값이 아니다.
-본 실행 전에 §2 삭제 범위를 실행한다.
+purpose    "to obtain a value from an uncontaminated state"
+           ★ it is not to beat the vendor
+
+artefact   the structural-holdout median + quartiles + the per-regime
+           decomposition
+           -> this becomes this repository's **representative performance
+              numbers**
+```
+
+**★ The expected result: indistinguishable from the vendor.**
+
+```
+By the D-53 calculation, the difference 6 seeds can tell apart is 0.03 or
+more.
+The currently estimated gap is around 0.02.
+So "indistinguishable" is expected, and getting it is not a failure.
+```
+
+Writing the expectation down in advance **blocks rationalising afterwards.**
+Both "it was better than expected" and "it was worse than expected" can only
+be said against this line.
+
+## 3. ★ For the vendor comparison, per shape is the main metric
+
+```
+secondary metric  a sign test over the 6 runs
+                  the p lower bound is 0.031. At 5/6 it is p=0.22 and says
+                  nothing
+
+★ main metric     the median of the 6 runs at each shape vs the vendor
+                  a sign test over the 20 shapes -> a p lower bound of ~1e-6
+                  the variance enters once (the between-run variance is
+                  absorbed by the median)
+```
+
+Per shape also avoids §30.4's problem that "the geomean is dragged by a few
+shapes". **Both are reported, and per shape is the main metric.**
+
+## 4. ★ The fitter pass condition and what to do on failure
+
+The pass condition: the reach rate (4000 random points, regret@1). **It is a
+single condition, so 12/12 is expected** (in D-60 condition A gave 12/12 =
+100%).
+
+```
+1 failure          record it and continue
+                   ★ do not take that run out of the results — taking it out
+                     is selection bias (D-50)
+2 or more          stop and report. (b) reconsider the regret@3 surrogate loss
+gap over 0.03      stop regardless of the count
+```
+
+**Taking a failed run out of the results is the most dangerous thing.**
+
+## 5. ★ The cost cap and the abort conditions
+
+The credit has been used up twice (D-43).
+
+```
+cost cap        the expected calls and tokens are computed first and recorded
+                in config.json
+                `Budget` is set from those values, and going over raises
+
+abort           LLMUnreachable aborts immediately (implemented)
+                3 runs in a row with an empty archive stops it
+
+partial run     if only 4 of the 6 seeds finish, **report on the 4 but state
+                explicitly that "the design was 6 seeds"**
+                ★ seeds are not cherry-picked
+```
+
+## 6. The verification run (before the real run)
+
+```
+python3 experiments/rerun.py --verify      # 1~2 runs x 6 rounds
+```
+
+What is looked at here is not the performance but **whether the machinery
+runs**.
+
+```
+[ ] does the fitter reach rate come out 12/12 (n/n, scaled to the
+    verification run)
+[ ] do the invariant warnings actually fire
+[ ] does the fit movement appear in the round summary
+[ ] do the pre-registration values go into config.json as they are
+[ ] do the artefacts survive being killed mid-run
+```
+
+**A verification-run result is not a representative number.** It is 6 rounds
+and it is not pooled with the real run.
+
+---
+
+## The verification-run result (2026-08-26)
+
+Reproduce: `python3 experiments/rerun.py --verify`
+then `python3 experiments/fitter_movement.py verify-s0 verify-s1`
+
+**★ These numbers are not representative.** It is 2 runs x 6 rounds and it is
+not pooled with the real run. What is looked at here is not the performance
+but **whether the machinery runs**.
+
+### The checklist
+
+```
+[x] the fitter reach rate       4/4 = 100.0%   pass
+[x] invariant warnings fired    59 of them — negative weights / a 100x
+                                blow-up / the evaluation cap
+[x] fit movement in the round   12/12, 9/12, 12/12, 7/8, 8/9, 8/10 ...
+    summary
+[x] the condition in            feature_detail is recorded in the llm block
+    config.json                 ★ the condition is no longer a guess (D-60)
+[x] prereg.json                 the pre-registration values are in the
+                                artefact as they are
+[x] survives being killed       RoundLoop dumps in a finally (D-33) + a
+                                SIGTERM handler
+```
+
+### The fitter is definitely different
+
+```
+                     before (12 runs)   the verification run
+fit movement rate    45.8%              7/8 ~ 12/12 per round
+reach rate           83.3%              4/4 = 100.0%
+```
+
+The biggest difference is `fit moved 12/12` appearing in the round summary.
+Before, half of them stayed at the initial values and **nobody knew** (D-54).
+
+### What the invariant warnings actually caught
+
+```
+negative weights        every feature is "larger is worse", so a negative is
+                        a structural error
+a 100x weight blow-up   it went two orders of magnitude away from the initial
+                        value
+hitting the evaluation  it always fires — it is a state, not a warning
+cap                     (principle 11)
+```
+
+The first two **discriminate** — they fire on some candidates only. The third
+fires on all of them, so it is not a signal, and that fact is recorded in
+D-55.
+
+### The measured cost
+
+```
+2 runs x 6 rounds   154 calls   1,695 s (28 min)
+-> estimate for the real run, 6 runs x 12 rounds: ~930 calls, 3~4 hours
+   that is inside the cost cap of 1,395 calls
+```
+
+### What remains
+
+```
+The performance numbers are not looked at — it is a verification run and not
+representative.
+The §2 deletion scope is carried out before the real run.
 ```
 
 ---
 
-## ★ 본 실행 결과 — 사람 팔이 그 조건이었다 (2026-08-27)
+## ★ The real-run result — the human arm was that condition (2026-08-27)
 
-재현: `python3 experiments/f1_pipeline.py F3 --stage 3 --seed-source architect
---tag arch24 --n-seeds 6 --rounds 12` 그리고
+Reproduce: `python3 experiments/f1_pipeline.py F3 --stage 3 --seed-source architect
+--tag arch24 --n-seeds 6 --rounds 12` and then
 `python3 experiments/vendor_compare.py`,
 `python3 experiments/fitter_movement.py f1pipe-F3-arch24-s{0..5}`
 
-**F1 대조군으로 돌린 "사람 24개" 팔이 이 실험 계획서의 조건과 같다.**
-따로 재실행하지 않았다 — 조건을 대조해서 확인했다.
+**The "human 24" arm run as the F1 control has the same condition as this
+pre-registration.** It was not re-run separately — the conditions were
+checked against each other.
 
-| | 실험 계획서 | 실제 (사람 팔) | |
+| | the pre-registration | actual (the human arm) | |
 |---|---|---|---|
-| 시드 수 | 6 | 6 | ✅ |
-| 라운드 | 12 | 12 | ✅ |
-| 라운드당 제안 | 12 | 12 | ✅ |
+| seeds | 6 | 6 | ✅ |
+| rounds | 12 | 12 | ✅ |
+| proposals per round | 12 | 12 | ✅ |
 | `feature_detail` | full | full | ✅ |
-| 분할 | nk11008 | nk11008 | ✅ |
-| 모델 | gpt-5.6-luna | gpt-5.6-luna | ✅ |
-| 엔드포인트 | responses | responses | ✅ |
+| split | nk11008 | nk11008 | ✅ |
+| model | gpt-5.6-luna | gpt-5.6-luna | ✅ |
+| endpoint | responses | responses | ✅ |
 | reasoning | medium | medium | ✅ |
-| **씨앗** | **미명시** | `architect-try05` | ★ |
+| **the seed** | **not stated** | `architect-try05` | ★ |
 
-**8/8 이 일치하고 씨앗만 실험 계획서에 없었다.** 실험 계획서를 쓸 때
-`physics_seeded` 를 암묵 가정했는데 적지 않았다 — **명세의 빈틈**이다.
-씨앗 효과는 "최종 결과를 정하지 않는다" 로 이미 측정됐으므로
-(D-54 조사) `physics_seeded` 씨앗으로 6시드를 더 돌리지 않는다.
+**8/8 match and only the seed was missing from the pre-registration.** When
+the pre-registration was written `physics_seeded` was tacitly assumed but not
+written down — **a gap in the specification**. The seed effect was already
+measured as "it does not decide the final result" (the D-54 investigation),
+so 6 more seeds are not run with the `physics_seeded` seed.
 
-### 적합기 통과 조건 — 통과
-
-```
-★ 도달률 12/12 = 100.0%   (무작위 4000점, regret@1)
-이동률   다듬기 끔 41.7% / 켬 66.7%  (진단용)
-```
-
-실험 계획서에 적은 실패 정책(1건 기록·2건 중단·격차 0.03 초과 중단)이 발동할
-일이 없었다.
-
-### ★ 주 지표 — 형상별 벤더 비교
+### The fitter pass condition — passed
 
 ```
-구조 홀드아웃 20형상   벤더 geomean 1.0737
+★ reach rate 12/12 = 100.0%   (4000 random points, regret@1)
+movement rate   polish off 41.7% / on 66.7%  (diagnostic)
 ```
 
-| | 이김/짐/동점 | 부호검정 p | 우리 geomean | 벤더 |
+The failure policy written in the pre-registration (record 1, stop at 2, stop
+when the gap exceeds 0.03) never had occasion to fire.
+
+### ★ The main metric — the per-shape vendor comparison
+
+```
+the structural holdout, 20 shapes   vendor geomean 1.0737
+```
+
+| | win/loss/tie | sign test p | our geomean | vendor |
 |---|---|---:|---:|---:|
-| **형상별 (주)** | 9 / 11 / 0 | **0.824** | **1.0650** | 1.0737 |
-| 실행별 (보조) | 3 / 6 | 1.000 | — | — |
+| **per shape (main)** | 9 / 11 / 0 | **0.824** | **1.0650** | 1.0737 |
+| per run (secondary) | 3 / 6 | 1.000 | — | — |
 
-**벤더와 구분 불가다.** 실험 계획서에 적은 예상 그대로다.
+**Indistinguishable from the vendor.** Exactly the expectation written in the
+pre-registration.
 
-> ★ 벤더와 구분 불가. D-53 계산상 6시드로 가릴 수 있는 차이는 0.03
-> 이상이고 현재 추정 격차는 0.02 근처다. '구분 불가' 가 나와도 실패가
-> 아니다.
+> ★ Indistinguishable from the vendor. By the D-53 calculation the difference
+> 6 seeds can tell apart is 0.03 or more and the currently estimated gap is
+> around 0.02. Getting "indistinguishable" is not a failure.
 
-geomean 은 우리가 0.0087 낮지만 **형상별로는 9:11 로 달라지지 않는다.**
-소수 형상이 geomean 을 끄는 §30.4 의 상황이다 — **형상별이 주 지표인
-이유가 여기서 드러난다.**
+Our geomean is 0.0087 lower, but **per shape it does not move: 9:11.** It is
+§30.4's situation where a few shapes drag the geomean — **this is where the
+reason per shape is the main metric shows itself.**
 
-### ★ 체제별 분해 — 방향이 나뉜다
+### ★ The per-regime decomposition — the direction splits
 
-| 체제 | 형상 | 우리 | 벤더 | 이김/짐 | p |
+| regime | shapes | ours | vendor | win/loss | p |
 |---|---:|---:|---:|---:|---:|
-| 빠른 (SOL<0.5ms) | 12 | **1.0660** | 1.0994 | 8/4 | 0.388 |
-| 느린 (SOL≥0.5ms) | 8 | 1.0635 | **1.0363** | 1/7 | 0.070 |
+| fast (SOL<0.5ms) | 12 | **1.0660** | 1.0994 | 8/4 | 0.388 |
+| slow (SOL≥0.5ms) | 8 | 1.0635 | **1.0363** | 1/7 | 0.070 |
 
-**빠른 형상에서 우리가 낫고 느린 형상에서 벤더가 낫다.** 둘 다 유의
-수준에 못 미치지만 느린 쪽 p=0.070 이 경계다. §30.5("크기가 먼저다")와
-방향이 맞는다 — 짧은 커널일수록 벤더 휴리스틱이 놓치는 것이 많다.
+**We are better on the fast shapes and the vendor is better on the slow
+ones.** Neither reaches significance, but the slow side's p=0.070 is on the
+line. The direction agrees with §30.5 ("size comes first") — the shorter the
+kernel, the more the vendor heuristic misses.
 
-**"빠른 체제에서 벤더를 이긴다" 는 말할 수 없다** — 8/12 는 p=0.388 이다.
-말할 수 있는 것은 **"빠른 쪽에서 이기고 느린 쪽에서 지는 방향이 있다"**
-까지다.
+**"We beat the vendor on the fast regime" cannot be said** — 8/12 is p=0.388.
+What can be said reaches only as far as **"there is a direction of winning on
+the fast side and losing on the slow side"**.
 
-### 대표값 성능 수치
+### The representative performance numbers
 
 ```
-이 저장소의 대표값 (구조 홀드아웃 20형상, 형상별 6실행 중앙값)
-  우리   geomean 1.0650
-  벤더   geomean 1.0737
-  판정   ★ 구분 불가 (형상별 부호검정 p = 0.824)
+this repository's representative values (the structural holdout of 20 shapes,
+the median of 6 runs per shape)
+  ours     geomean 1.0650
+  vendor   geomean 1.0737
+  verdict  ★ indistinguishable (per-shape sign test p = 0.824)
 
-per-run 최종 채점 (다른 절차 — 섞지 말 것)
-  중앙 1.0762   사분위 [1.0706, 1.0834]   시드 폭 σ 0.0124
+the per-run final scoring (a different procedure — do not mix them)
+  median 1.0762   quartiles [1.0706, 1.0834]   seed spread σ 0.0124
 ```
 
-⚠️ **두 수치는 절차가 다르다** (원칙 4). 위는 "형상마다 6실행 중앙값 ->
-geomean", 아래는 "실행마다 geomean -> 6실행의 중앙값". 나란히 놓지 마라.
+⚠️ **The two numbers come from different procedures** (principle 4). The
+first is "the median of 6 runs per shape -> geomean", the second is "a
+geomean per run -> the median of the 6 runs". Do not put them side by side.

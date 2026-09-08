@@ -1,96 +1,109 @@
-# 가중치를 **지수 자리**에 — 형태 (b)
+# The weight **in the exponent slot** — form (b)
 
-실험 계획서 [power-prereg.md](power-prereg.md). 숫자 산출 **LLM 0회**.
+The pre-registration is [power-prereg.md](power-prereg.md). Producing the
+numbers took **0 LLM calls**.
 
 ```
 python3 experiments/power_report.py     # -> docs/artifacts/power.json
 ```
 
-3시드 x 12라운드, 예산 8, k=100, λ=0, 같은 씨앗, 모델 `gpt-5.6-luna`.
-기준선은 `rankevo` — **같은 조건, 힌트만 없다.**
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
+
+3 seeds x 12 rounds, budget 8, k=100, λ=0, the same seed rule, the model
+`gpt-5.6-luna`. The baseline is `rankevo` — **the same condition, only
+without the hint.**
 
 ---
 
-## 1. 형태를 실제로 썼나
+## 1. Was the form actually used
 
 ```
-                  제안                아카이브        적합된 지수
-기준선 (힌트 없음)    0/432 ( 0.0%)     0/38 ( 0.0%)
-지수 자리 명시      78/432 (18.1%)     1/26 ( 3.8%)   [0.355]  |w-1| 0.645
+                        proposals          archive        the fitted exponent
+baseline (no hint)      0/432 ( 0.0%)     0/38 ( 0.0%)
+exponent slot stated   78/432 (18.1%)     1/26 ( 3.8%)   [0.355]  |w-1| 0.645
 ```
 
-★ **기준선에서는 432제안 중 0개다.** 검사기는 원래 이 형태를 안 막았는데
-(D-110 과 같은 자리) **아무도 안 썼다.** 말해 주니 18% 가 됐다.
+★ **In the baseline it is 0 out of 432 proposals.** The checker never blocked
+this form (the same spot as D-110) and **nobody used it.** Told about it, it
+became 18%.
 
-★ **그런데 아카이브에는 3.8% 만 남는다.** 그리고 살아남은 하나의 지수는
-**0.355** 다 — 1 에서 0.645 만큼 떨어져 있으니, 남았을 때는 그 자유도를
-실제로 썼다.
+★ **But only 3.8% survive into the archive.** And the one exponent that
+survived is **0.355** — 0.645 away from 1, so when it did survive it really
+used that degree of freedom.
 
-⚠️ 프롬프트 예시를 한 번 고쳤다. 처음에는 `np.power(f.a, w[3]) * w[4]`
-하나뿐이라 "예산 둘" 로 읽혔고 부모가 8항이라 같은 프롬프트의 "예산이
-찼습니다" 와 부딪혔다 — **1라운드 실측 0/12.** `f.a * w[i]` 를
-`np.power(f.a, w[i])` 로 **바꾸면 예산이 안 는다**를 앞세우자 1/12 이
-됐다. 본 실행은 고친 프롬프트로 돌았다 (power-prereg.md §5).
+⚠️ The prompt example was fixed once. At first it was only
+`np.power(f.a, w[3]) * w[4]`, which read as "two budget units", and since the
+parent had 8 terms it collided with the same prompt's "the budget is full" —
+**round 1 measured 0/12.** Once "**changing** `f.a * w[i]` **into**
+`np.power(f.a, w[i])` **does not increase the budget**" was put in front, it
+became 1/12. The real run used the fixed prompt (power-prereg.md §5).
 
-## 2. ★ 시도했는데 진 것인가
+## 2. ★ Was it tried and lost
 
-"제안 18% / 아카이브 3.8%" 는 두 가지로 읽힌다 — **시도했는데 졌다** 와
-**형태와 무관하게 나쁜 제안이었다.** 갈라야 한다. 같은 실행의 제안에서
-각 20개씩 무작위로 뽑아 **같은 절차로** 맞췄다.
-
-```
-            학습 순위손실   홀드아웃 regret    항    (순위손실 범위)
-지수 있음        1.1814        1.8113     8    0.390~2.583
-지수 없음        1.0333        1.8046     8    0.350~2.399
-```
-
-**지수 항이 있는 제안이 학습 순위 손실에서 더 나쁘다** (1.18 vs 1.03).
-홀드아웃 regret 은 같다. 범위가 크게 겹치므로 "지수가 해롭다" 고까지는
-못 하지만, **채택이 안 된 이유가 형태 때문이 아니라 그냥 더 나빠서**임은
-말할 수 있다. 시도됐고, 겨뤘고, 졌다.
-
-## 3. 최종 지표 — 홀드아웃 20형상, 3시드 중앙
-
-### ★ regret 재적합 — 판정선이 걸린 칸
+"18% of proposals / 3.8% of the archive" reads two ways — **it was tried and
+lost** and **it was a bad proposal regardless of the form.** They have to be
+separated. 20 were drawn at random from each side of the same run's proposals
+and fitted **by the same procedure**.
 
 ```
-                  regret   상위100 tau     전구간   (tau 범위)
-기준선             1.1213       0.115      0.267   -0.021~+0.155
-지수 자리 명시      1.1293       0.055      0.318   -0.020~+0.057
-★ 무작위 바닥      1.8753      -0.007      0.000
+                    train rank loss   holdout regret   terms   (rank-loss range)
+with exponent              1.1814           1.8113       8     0.390~2.583
+without exponent           1.0333           1.8046       8     0.350~2.399
 ```
 
-### 순위 적합
+**Proposals with an exponent term are worse on the training rank loss** (1.18
+vs 1.03). The holdout regret is the same. The ranges overlap heavily, so it
+cannot be said that "the exponent is harmful", but it can be said that **they
+were not accepted not because of the form but because they were simply
+worse.** It was tried, it competed, and it lost.
+
+## 3. The final metric — the holdout of 20 shapes, the median of 3 seeds
+
+### ★ The regret refit — the cell the decision line is on
 
 ```
-                  regret   상위100 tau     전구간
-기준선             1.6364       0.353      0.320
-지수 자리 명시      1.5714       0.362      0.500   ★ 전구간이 가장 높다
-★ 무작위 바닥      1.8753      -0.007      0.000
+                        regret   top-100 tau   all-range   (tau range)
+baseline                1.1213       0.115       0.267     -0.021~+0.155
+exponent slot stated    1.1293       0.055       0.318     -0.020~+0.057
+★ random floor          1.8753      -0.007       0.000
 ```
 
-## 4. 판정 (실험 계획서 §7)
+### The rank fit
 
 ```
-tau >= 0.20 이면서 regret <= 1.15   -> 벽이 낮아졌다
-실제  tau +0.055 / regret 1.1293   -> ★ 벽은 형태의 문제가 아니다
+                        regret   top-100 tau   all-range
+baseline                1.6364       0.353       0.320
+exponent slot stated    1.5714       0.362       0.500   ★ the highest
+                                                          all-range yet
+★ random floor          1.8753      -0.007       0.000
 ```
 
-★ **그리고 "지수가 1 에서 벗어나는가" 도 답이 있다.** 살아남은 지수는
-0.355 로 확실히 벗어난다. 즉 **"형태를 줬는데 안 썼다" 가 아니다** —
-18% 가 썼고, 쓴 것들이 겨뤄서 졌다. 이쪽이 더 강한 음성이다.
-
-곁가지: 순위 적합에서 **전구간 tau 가 0.320 -> 0.500** 으로 지금까지
-중 가장 높다 (시드 범위 +0.359~+0.391 로 좁다). 지수는 **전 구간의
-모양**을 잘 만든다. 그런데 상위 100 과 1등에서는 안 나타난다.
-
-## 5. 공통
+## 4. The verdict (pre-registration §7)
 
 ```
-              항   거부율   적합기 도달     분
-기준선          8    1.4%    100.0%    95.3
-지수 자리 명시    8    3.7%    100.0%    72.0
+tau >= 0.20 and regret <= 1.15   -> the wall got lower
+actual  tau +0.055 / regret 1.1293   -> ★ the wall is not a problem of the
+                                          form
 ```
 
-거부율 3.7% — 새로 넣은 지수 가드가 정상 제안을 막지 않는다. 중단
-조건 넷 다 안 걸렸다.
+★ **And "does the exponent move away from 1" has an answer too.** The
+surviving exponent is 0.355, clearly away from it. That is, **it is not "the
+form was given and not used"** — 18% used it, and the ones that used it
+competed and lost. That is the stronger negative.
+
+An aside: in the rank fit the **all-range tau goes 0.320 -> 0.500**, the
+highest so far (the seed range +0.359~+0.391 is narrow). The exponent shapes
+**the whole-range form** well. But it does not show up in the top 100 or at
+first place.
+
+## 5. In common
+
+```
+                      terms   rej rate   fitter reach    min
+baseline                8       1.4%      100.0%        95.3
+exponent slot stated    8       3.7%      100.0%        72.0
+```
+
+A rejection rate of 3.7% — the newly added exponent guard does not block
+normal proposals. None of the four abort conditions fired.

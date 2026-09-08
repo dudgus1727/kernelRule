@@ -1,111 +1,127 @@
-# 체제 분할 축 — **어느 축으로 나눠도, 안 나눠도 구분 불가다**
+# The regime split axis — **whichever axis it splits on, or none, it is indistinguishable**
 
-> **재현**: `python3 experiments/regime_axis.py` (LLM **0회** · GPU 0회)
-> **실험 계획서**: [regime-axis-prereg.md](regime-axis-prereg.md)
-> **원자료**: `regime-axis.json`
-> 규칙: 대표값 실행 여섯의 **r11** 산출물 (D-140). 구조는 안 건드렸다.
+> **Reproduce**: `python3 experiments/regime_axis.py` (**0** LLM calls · 0 GPU)
+> **Pre-registration**: [regime-axis-prereg.md](regime-axis-prereg.md)
+> **Raw data**: `regime-axis.json`
+> The rules: the **r11** artefacts of the six representative runs (D-140).
+> The structures were not touched.
 
-## 0. ★ 재현 검증부터
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
 
-`canonical_score` 가 체제 이름과 축을 하드코딩해서 그 절차를 실험
-스크립트에서 다시 구현했다. 그래서 먼저:
+## 0. ★ Start with the reproduction check
+
+`canonical_score` hardcodes the regime names and the axis, so that procedure
+was reimplemented in the experiment script. So first:
 
 ```
-팔 ① (SOL 0.5) 6실행 중앙   1.0886
-알려진 대표값                1.0886   ★ 차 +0.0000
--> 재구현이 맞다. 다른 팔을 읽어도 된다
+arm ① (SOL 0.5), the median of 6 runs   1.0886
+the known representative value          1.0886   ★ difference +0.0000
+-> the reimplementation is right. The other arms may be read
 ```
 
-## 1. 다섯 팔 (홀드아웃 20형상, 6실행)
+## 1. The five arms (the holdout of 20 shapes, 6 runs)
 
-| 팔 | 중앙 | 범위 | σ | 체제별 홀드아웃 수 | ① 대비 | 판정 |
+| arm | median | range | σ | holdout per regime | vs ① | verdict |
 |---|---:|---|---:|---|---:|---|
-| **① SOL 0.5** | **1.0886** | 1.0677~1.1662 | 0.0364 | short 12 / long 8 | — | (기준) |
-| ② roofline | 1.1074 | 1.0636~1.1884 | 0.0429 | mem 8 / comp 12 | +0.0188 | 구분 불가 |
-| ③ 안 나눔 | 1.1054 | 1.0855~1.1884 | 0.0374 | all 20 | +0.0167 | 구분 불가 |
-| ①' SOL 0.25 | 1.0948 | 1.0744~1.1614 | 0.0306 | short 10 / long 10 | +0.0061 | 구분 불가 |
-| ①'' SOL 1.0 | 1.0888 | 1.0614~1.1734 | 0.0396 | short 14 / long 6 | +0.0002 | 구분 불가 |
+| **① SOL 0.5** | **1.0886** | 1.0677~1.1662 | 0.0364 | short 12 / long 8 | — | (the baseline) |
+| ② roofline | 1.1074 | 1.0636~1.1884 | 0.0429 | mem 8 / comp 12 | +0.0188 | indistinguishable |
+| ③ no split | 1.1054 | 1.0855~1.1884 | 0.0374 | all 20 | +0.0167 | indistinguishable |
+| ①' SOL 0.25 | 1.0948 | 1.0744~1.1614 | 0.0306 | short 10 / long 10 | +0.0061 | indistinguishable |
+| ①'' SOL 1.0 | 1.0888 | 1.0614~1.1734 | 0.0396 | short 14 / long 6 | +0.0002 | indistinguishable |
 
-⚠️ `①'' SOL 1.0` 은 **학습 long 이 7개로 `MIN_PER_REGIME`(8) 미만**이다 —
-그 체제의 가중치는 믿기 어렵다 (계획서에 미리 적었다).
+⚠️ `①'' SOL 1.0` has **7 long shapes in training, under `MIN_PER_REGIME`
+(8)** — that regime's weights are hard to trust (written down in advance in
+the pre-registration).
 
-**넷 다 판정선 0.0516 안이다. 완충대(0.0589)도 안 건드린다.**
+**All four are inside the decision line of 0.0516. They do not touch the
+buffer band (0.0589) either.**
 
-### 1-1. 짝 비교 — ⚠️ 사전 등록에 없다
+### 1-1. The paired comparison — ⚠️ not in the pre-registration
 
-다섯 팔이 **같은 규칙 여섯**을 쓰므로 짝지을 수 있다. 사전 등록은 비대응
-판정선(0.0516)만 정했으므로 **이것은 관측이다.**
+The five arms use **the same six rules**, so they can be paired. The
+pre-registration set only the unpaired decision line (0.0516), so **this is
+an observation.**
 
 ```
-② - ①    평균 +0.0090  중앙 +0.0070   ①보다 나쁜 실행 3/6   p = 1.000
-③ - ①    평균 +0.0139  중앙 +0.0162   4/6                  p = 0.688
-①'- ①    평균 -0.0021  중앙 +0.0011   3/6                  p = 1.000
-①''- ①   평균 -0.0039  중앙 -0.0032   2/6                  p = 1.000
-③ - ②    평균 +0.0049  중앙 +0.0000   2/6                  p = 1.000
+② - ①    mean +0.0090  median +0.0070   runs worse than ① 3/6   p = 1.000
+③ - ①    mean +0.0139  median +0.0162   4/6                     p = 0.688
+①'- ①    mean -0.0021  median +0.0011   3/6                     p = 1.000
+①''- ①   mean -0.0039  median -0.0032   2/6                     p = 1.000
+③ - ②    mean +0.0049  median +0.0000   2/6                     p = 1.000
 ```
 
-**짝으로 봐도 아무것도 안 갈린다** (짝 판정선 0.0305 에도 한참 못 미친다).
+**Even paired, nothing separates** (it does not come close to the paired
+decision line of 0.0305 either).
 
-## 2. 경계 민감도 — **0.5 는 칼날이 아니다**
+## 2. Boundary sensitivity — **0.5 is not a knife edge**
 
 ```
 SOL 0.25   1.0948   (+0.0061)
 SOL 0.5    1.0886
 SOL 1.0    1.0888   (+0.0002)
-★ 경계를 4배 움직여도 0.006 안에서 논다
+★ moving the boundary by a factor of 4 keeps it inside 0.006
 ```
 
-**"0.5 를 왜 골랐나" 의 답이 "골라도 안 골라도 같다" 가 됐다.** 방어가
-되는 게 아니라 **질문이 무의미해진 것이다.**
+**The answer to "why was 0.5 chosen" became "it is the same whether it is
+chosen or not".** That is not a defence — **the question became
+meaningless.**
 
-## 3. ★ 안 나누면 어느 쪽이 무너지나
+## 3. ★ Which side collapses when it is not split
 
-roofline 구분으로 본 체제별 홀드아웃 regret (6실행 중앙):
+The per-regime holdout regret seen through the roofline split (the median of
+6 runs):
 
-| 팔 | mem (8형상) | comp (12형상) |
+| arm | mem (8 shapes) | comp (12 shapes) |
 |---|---:|---:|
 | ① SOL 0.5 | 1.0596 | **1.1146** |
 | ② roofline | 1.0590 | 1.1433 |
-| ③ 안 나눔 | 1.0562 | **1.1558** |
+| ③ no split | 1.0562 | **1.1558** |
 
 ```
-mem 쪽    1.0562 ~ 1.0596 — ★ 세 팔이 사실상 같다
-comp 쪽   1.1146 -> 1.1558  ★ 안 나누면 0.041 나빠진다 (판정선 안이지만 방향이 있다)
+the mem side    1.0562 ~ 1.0596 — ★ the three arms are effectively the same
+the comp side   1.1146 -> 1.1558  ★ not splitting is 0.041 worse (inside the
+                                    decision line, but there is a direction)
 ```
 
-★ **나누는 것이 사는 자리는 comp 쪽뿐이고, 그것도 판정선 안이다.**
+★ **The only place splitting earns its keep is the comp side, and even that
+is inside the decision line.**
 
-⚠️ 그리고 **② 는 mem/comp 로 나눴는데도 comp 쪽이 ① 보다 나쁘다**
-(1.1433 vs 1.1146). "그 축으로 나누면 그 축에서 좋아진다" 가 아니다.
+⚠️ And **② splits on mem/comp and is still worse than ① on the comp side**
+(1.1433 vs 1.1146). It is not "splitting on that axis makes that axis
+better".
 
-## 4. ⚠️ 사전 등록의 두 갈래가 **동시에 켜졌다**
+## 4. ⚠️ Two branches of the pre-registration fired **at the same time**
 
-계획서 §3 은 이렇게 적혀 있었다:
-
-```
-② 와 ① 이 구분 불가       ★ 그래도 ② 로 바꾼다 (설명이 쉬우니까)
-③ 이 ①·② 와 구분 불가    ★ 나눌 이유가 없다. 설계에서 뺀다
-```
-
-**둘 다 켜졌고 둘은 다른 결론이다.** 계획서가 그 경우를 안 정했다 —
-**그 사실을 적는다.**
-
-### 읽는 법
+§3 of the pre-registration read:
 
 ```
-③ 이 더 강한 진술이다
-  "나누는 것과 안 나누는 것이 구분 불가" 이면
-  **어느 축으로 나눌지는 애초에 물을 필요가 없는 질문**이 된다
-  ② 로 바꾸자는 선호는 "나누기는 한다" 를 전제로 한 것이었다
+② and ① indistinguishable        ★ switch to ② anyway (it is easier to
+                                   explain)
+③ indistinguishable from ①·②     ★ there is no reason to split. Take it out
+                                   of the design
 ```
 
-## 5. 남는 진술
+**Both fired and the two conclusions differ.** The pre-registration did not
+settle that case — **that fact is written down.**
+
+### How to read it
 
 ```
-★ 다섯 팔 전부 구분 불가 (비대응·짝 둘 다)
-★ 경계 민감도 없음 — SOL 0.25/0.5/1.0 이 0.006 안
-★ 나누는 것이 사는 자리는 comp 쪽 0.041 뿐이고 그것도 판정선 안
-★ 사전 등록의 두 갈래가 충돌했다 — ③ 이 더 강한 진술이다
-⚠️ n=6 이고 σ 가 0.031~0.043 이다. "차이가 없다" 가 아니라
-   **"이 표본으로는 못 가른다"** 다
+③ is the stronger statement
+  if "splitting and not splitting are indistinguishable",
+  then **which axis to split on is a question that need not be asked at all**
+  the preference for switching to ② presupposed "we do split"
+```
+
+## 5. What remains
+
+```
+★ all five arms indistinguishable (unpaired and paired alike)
+★ no boundary sensitivity — SOL 0.25/0.5/1.0 within 0.006
+★ the only place splitting earns its keep is the comp side's 0.041, and even
+  that is inside the decision line
+★ two branches of the pre-registration collided — ③ is the stronger statement
+⚠️ n=6 and σ is 0.031~0.043. It is not "there is no difference" but
+   **"this sample cannot tell them apart"**
 ```

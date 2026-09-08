@@ -90,15 +90,17 @@ OUT = Path("runs")
 #: before a run, the feel picked up while building the plumbing seeps into
 #: the criteria (D-50).
 #:
-#: ⚠️ 2026-09-08 (D-146): **the values stay in Korean.** They are a frozen
-#: record mirroring a `docs/` document, and `docs/` is not translated —
-#: translating here would break the doc-code equality the test enforces.
+#: ⚠️ 2026-09-08 (D-146): the values were translated into English together
+#: with the document. It is a frozen record, so nothing was deleted — the
+#: Korean original is at commit `ee53b4d`.
 F2_PREREG = {
-    "purpose": ("알려진 축을 주면 새 축을 더 만드나. 그리고 라이브러리가 "
-                "좋아지나"),
-    "expected": ("새 축 개수가 F1 보다 많다 (재발견에 예산을 안 쓰므로). "
-                 "★ 진화 성능이 F3 를 따라잡을지는 모른다. 못 따라잡아도 "
-                 "실패가 아니다. F1 보다 나을지도 열린 질문이다."),
+    "purpose": ("given known axes, does it make more new ones. And does the "
+                "library get better"),
+    "expected": ("the number of new axes is larger than F1's (no budget is "
+                 "spent on rediscovery). ★ Whether the evolution performance "
+                 "catches up with F3 is not known. Not catching up is not a "
+                 "failure. Whether it is better than F1 is an open question "
+                 "too."),
     "start_library": 5,
     "areas": 7,
     "per_category": 3,
@@ -109,34 +111,43 @@ F2_PREREG = {
     "n_architect": 10,
     "n_seeds": 6,
     "rounds": 12,
-    "primary_metrics": ["새 축 개수와 사람 24개 대비 상관",
-                        "진화 후 구조 홀드아웃 (F1 과 같은 최종 채점 절차)"],
-    "not_a_criterion": ("재발견 개수 — 5개를 줬으니 줄어드는 게 당연하다. "
-                        "이것으로 조건을 평가하지 않는다"),
-    "two_variables": ("시작 5개 + GPU 예시. **분리하지 않는다** — 둘 다 "
-                      "'공개 지식을 준다' 의 일부다. D-31 의 예외이고 "
-                      "'어느 쪽 덕인가' 는 이 실험으로 못 가른다"),
+    "primary_metrics": [
+        "the number of new axes and their correlation against the human 24",
+        ("the structural holdout after evolution (the same final scoring "
+         "procedure as F1)")],
+    "not_a_criterion": ("the number of rediscoveries — five were given, so of "
+                        "course it drops. The condition is not evaluated by "
+                        "this"),
+    "two_variables": ("the start 5 + the GPU example. **They are not "
+                      "separated** — both are part of 'public knowledge is "
+                      "given'. It is an exception to D-31, and 'which of the "
+                      "two did it' cannot be separated by this experiment"),
     "on_failure": {
-        "영역 3회 연속 거부": "건너뛰고 기록. 진행",
-        "채택 절반 미만": ("멈추고 ★ 거부 사유 분포부터 본다 — 중복 다수면 "
-                          "정상(다섯을 줬다), §8.3 실패 다수면 검사기·필드 "
-                          "문제, 스키마 실패 다수면 프롬프트 문제. "
-                          "인프라 -> 검사기 -> 피험자 순서다 (원칙 8)"),
-        "RuleWriter 전부 거부": "멈추고 보고",
-        "3실행 연속 빈 아카이브": "멈춤"},
-    "not_doing": ["나머지 19개를 넣지 않는다 — F3 조건이다",
-                  "--recategorize 를 쓰지 않는다 — 고정 일곱",
-                  "F1 결과를 지우지 않는다 — 비교 대상이다",
-                  "모델을 바꾸지 않는다 (D-45, 원칙 25)",
-                  "결과를 보고 프롬프트를 고치지 않는다 (§12.3d)"],
-    "threshold_rationale": ("절반은 '실험이 성립하는 최소 요건' 이지 F1 "
-                            "실측(80%) 대비로 조인 것이 아니다. F2 는 "
-                            "다섯을 줬으니 중복 거부가 늘 수 있고 그것은 "
-                            "정상 동작이다"),
+        "an area refused 3 times in a row": "skip it and record it. Continue",
+        "acceptance under half": (
+            "stop and ★ look at the refusal-reason distribution first — "
+            "mostly duplicates is normal (five were given), mostly §8.3 "
+            "failures is a checker or field problem, mostly schema failures "
+            "is a prompt problem. The order is infrastructure -> checker -> "
+            "subject (principle 8)"),
+        "all RuleWriter calls refused": "stop and report",
+        "3 runs in a row with an empty archive": "stop"},
+    "not_doing": [
+        "the remaining 19 are not put in — that is the F3 condition",
+        "--recategorize is not used — the fixed seven",
+        ("the F1 results are not deleted — they are what it is compared "
+         "against"),
+        "the model is not changed (D-45, principle 25)",
+        "the prompt is not fixed after seeing the results (§12.3d)"],
+    "threshold_rationale": ("half is 'the minimum for the experiment to hold', "
+                            "not a level tightened against F1's measurement "
+                            "(80%). F2 was given five, so duplicate refusals "
+                            "can rise and that is normal behaviour"),
     "budget_calls": 990,
-    "discrimination_note": ("시드 폭 sigma=0.0274 때문에 조건 간 0.02급 "
-                            "차이는 못 가린다 (D-53). 비슷하면 '구분 불가' "
-                            "가 정직한 서술이다"),
+    "discrimination_note": ("because of the seed spread sigma=0.0274, a "
+                            "difference of the 0.02 class between conditions "
+                            "cannot be told apart (D-53). If they are similar, "
+                            "'indistinguishable' is the honest description"),
 }
 
 #: The range for how many areas the LLM partitions into. **A human does not

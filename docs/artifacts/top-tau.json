@@ -1,5 +1,5 @@
 {
- "A6000 학습 41형상 (사전 등록 조건)": {
+ "A6000 training 41 shapes (the pre-registration condition)": {
   "rows": {
    "f1pipe-F3-arch24-s0": {
     "1": [
@@ -99,7 +99,7 @@
   "n_shapes": 41,
   "uniq_median": 24
  },
- "A6000 홀드아웃 20형상": {
+ "A6000 holdout 20 shapes": {
   "rows": {
    "f1pipe-F3-arch24-s0": {
     "1": [
@@ -199,7 +199,7 @@
   "n_shapes": 20,
   "uniq_median": 34
  },
- "5090 홀드아웃 20형상 — (b) 재적합": {
+ "5090 holdout 20 shapes — (b) refit": {
   "rows": {
    "f1pipe-F3-arch24-s0": {
     "1": [

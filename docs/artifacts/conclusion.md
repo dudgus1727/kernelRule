@@ -1,726 +1,841 @@
-# 결론 — 벤더와 구분 불가. 라이브러리가 결과를 정한다
+# The conclusion — indistinguishable from the vendor. The library decides the result
 
-> **상태**: 대표값
-> **갱신** 2026-09-03 · 순위 축이 닫혔다 (D-104~D-112).
-> ★ **위에서부터 순서대로 읽으면 된다** (2026-09-03 에 순서를 바로잡았다).
-> 정정 이력은 **맨 아래 두 절**이다 — 지금 값이 아니다.
+> **Status**: canonical
+> **Updated** 2026-09-03 · the rank axis is closed (D-104~D-112).
+> ★ **Read it straight down from the top** (the order was put right on
+> 2026-09-03). The correction history is **the last two sections** — those are
+> not the current values.
 >
 > ```
-> 대표값 수치 -> 두 산출물 -> 살아남은 결과 -> 벽 -> 남은 여지
-> -> 비교 표 / 체제 / 배포 가능 -> F1 -> 열려 있는 질문 -> 미구현
-> -> ★ 정정 이력 (맨 아래)
+> the canonical numbers -> the two artefacts -> the results that survived ->
+> the wall -> the room that is left -> the comparison table / the regimes /
+> shippable -> F1 -> the open questions -> what is not implemented
+> -> ★ the correction history (at the very bottom)
 > ```
+>
+> ⚠️ 2026-09-08 (D-146): this document was translated into English. The
+> numbers, the verdicts and the correction history are unchanged; the Korean
+> original is at commit `ee53b4d`. The reproduction command in the canonical
+> section keeps its arm label verbatim — it is what produced the committed
+> json's key.
 
-이 문서는 확정이 아니라 **재현 절차가 붙은 것만** 모은 것이다.
+This document is not a set of certainties — it collects **only what has a
+reproduction procedure attached**.
 
-## ★ 무엇을 만든 것인가 — "휴리스틱" 이 아니라 **순위만 맞추는 비용 모델**
+## ★ What was built — not a "heuristic" but **a cost model that only gets the ranking right**
 
 ```
-구조   ★ 물리량의 가중합 — analytical 비용 모델이다
-계수   ★ 물리에서 유도하지 않고 표에서 맞춘다 — 학습이다
-목표   ★ 절대 시간이 아니라 **순위**. argmin 만 맞으면 된다
+the structure   ★ a weighted sum of physical quantities — it is an analytical
+                cost model
+the coefficients ★ not derived from physics but fitted on the table — it is
+                learning
+the goal        ★ not absolute time but **the ranking**. Getting the argmin
+                right is enough
 ```
 
-**구조는 analytical 모델이고 계수는 학습이다. 다만 절대 시간을 맞추지
-않고 순위만 맞추므로 예측 모델보다 제약이 약하다.**
+**The structure is an analytical model and the coefficients are learned. Only,
+it does not fit absolute time but only the ranking, so it is less constrained
+than a prediction model.**
 
-그리고 그 사실이 §29 의 벽과 이어진다 — 순위만 맞추면 되니까 **top-1 은
-맞추면서 전체 순서는 못 맞추는** 상태가 가능하고, 실제로 그렇다
-(참 상위 100 안의 tau 0.141). "성능 모델" 로 읽으면 안 되는 이유가 이것이다.
+And that fact connects to §29's wall — because only the ranking has to be
+right, a state where **top-1 is right while the whole order is wrong** is
+possible, and that is what happens (tau inside the true top 100 is 0.141).
+That is the reason it must not be read as a "performance model".
 
-⚠️ 선택 비용도 그 성격을 따른다 — 규칙 **평가**는 15,000 config 에
-297 µs 지만, 지금 파이썬 구현의 피처 계산까지 넣으면 13 ms 다
-([select-cost.md](select-cost.md)).
+⚠️ The selection cost follows the same character — **evaluating** the rule is
+297 µs for 15,000 configs, but with the feature computation of the current
+Python implementation it is 13 ms ([select-cost.md](select-cost.md)).
 
-> ## ★ 2026-09-01 — 무엇을 만든 것인지가 정해졌다: **top-1 선택기**
+> ## ★ 2026-09-01 — what was built got settled: **a top-1 selector**
 >
-> 축퇴 확인([degeneracy.md](degeneracy.md), 실험 계획서대로)에서 나왔다.
+> It came out of the degeneracy check ([degeneracy.md](degeneracy.md),
+> following the pre-registration).
 >
 > ```
-> 축퇴는 아니다   41형상에 config 중앙 14.5종, 정적 top-1 과 겹치는 형상 0개
->                전 구간 tau 0.30~0.56 대 무작위 0.00
-> ★ 그러나       참 상위 100 안의 tau 는 0.141 (분해능 통제 후 0.096) 뿐이고,
->                순위 능력이 전이에서 무작위 대비 16배 -> 4배로 떨어진다.
->                ★ 가중치를 다시 맞춰도 안 돌아온다 (4 -> 4.6배)
+> it is not degenerate   a median of 14.5 distinct configs over 41 shapes, 0
+>                        shapes overlapping with static top-1
+>                        all-range tau 0.30~0.56 against random 0.00
+> ★ but              tau inside the true top 100 is only 0.141 (0.096 after
+>                    controlling for resolution), and the ranking ability
+>                    drops from 16x random to 4x under transfer.
+>                    ★ Refitting the weights does not bring it back
+>                    (4 -> 4.6x)
 > ```
 >
-> **그래서 이 산출물은 "성능 모델" 이 아니라 `top-1 선택기` 다.**
-> 이 문서 안에서 "물리를 배웠다 / 실행시간을 설명한다" 로 읽히는 서술은
-> 그 범위로 좁혀 읽어야 한다.
+> **So this artefact is not a "performance model" but a `top-1 selector`.**
+> Any description inside this document that reads as "it learned physics /
+> it explains runtime" has to be read narrowed to that scope.
 >
-> ★ **주장은 줄지 않는다.** top-1 선택기로서
-> 벤더와 대등하고(9승 11패, p = 0.824 — ⚠️ **2026-09-06 에 대표값이
-> 바뀌었다: 8승 11패 1무, p = 0.648.** 아래 대표값 절 참고), µs 안에 돌고,
-> **구조가 다른 GPU 로 전이된다** — (b) 재적합이 (c) 재생성과 구별되지
-> 않고 LLM 호출이 0회다 (D-98). 그것이 이 프로젝트의 가장 강한 결과다.
+> ★ **The claim does not shrink.** As a top-1 selector it is on a par with the
+> vendor (9 wins 11 losses, p = 0.824 — ⚠️ **the canonical value changed on
+> 2026-09-06: 8 wins 11 losses 1 tie, p = 0.648.** See the canonical section
+> below), it runs inside µs, and **the structure transfers to a GPU of a
+> different architecture** — (b) refit is indistinguishable from (c)
+> regeneration and it takes 0 LLM calls (D-98). That is this project's
+> strongest result.
 
-> ## ★ 2026-09-01 (2) — **목적함수가 산출물의 성격을 정한다**
+> ## ★ 2026-09-01 (2) — **the objective decides the character of the artefact**
 >
-> 같은 파이프라인 · 같은 피처 · 같은 씨앗에서 **목적함수만 바꿔**
-> 성격이 다른 두 산출물이 나왔다 (D-101).
->
-> ```
->                    무엇으로 진화      regret     상위100 tau
-> ★ top-1 선택기      regret            1.049        0.141
-> ★ 성능 모델         상위 100 순위 손실  1.47       ★ 0.389
-> ```
->
-> **둘은 같은 것의 좋고 나쁨이 아니라 다른 물건이다.**
->
-> ### "물리를 배웠다" 를 조건부로 되찾는다
+> From the same pipeline · the same features · the same seed, **changing only
+> the objective** produced two artefacts of different character (D-101).
 >
 > ```
-> ⛔ 못 쓴다   "우리 규칙이 물리를 배웠다"
-> ★ 쓴다      "순위 손실로 진화시키면 **실행시간 순서를 설명하는**
->              규칙이 나온다. 다만 top-1 선택에는 못 쓴다 (regret 1.47)"
+>                        evolved with        regret     top-100 tau
+> ★ the top-1 selector   regret              1.049        0.141
+> ★ the performance model the top-100 rank loss  1.47    ★ 0.389
 > ```
 >
-> 근거가 하나 더 있다 — 상한 측정이 "상위 100 안에서 크게 변한다" 고
-> 지목한 다섯 축(`split_k_cost` `sm_idle_cost` `waves`
-> `pipeline_warmup_frac` `tail_waste`)을 **진화가 실제로 골랐다**
+> **The two are not a better and a worse version of one thing — they are
+> different objects.**
+>
+> ### "it learned physics" is taken back, conditionally
+>
+> ```
+> ⛔ cannot be used   "our rule learned physics"
+> ★ can be used      "evolving it with the rank loss produces a rule that
+>                     **explains the order of runtimes**. Only, it cannot be
+>                     used for top-1 selection (regret 1.47)"
+> ```
+>
+> There is one more piece of ground — the five axes the ceiling measurement
+> pointed at as "what varies a lot inside the top 100"
+> (`split_k_cost` `sm_idle_cost` `waves` `pipeline_warmup_frac` `tail_waste`)
+> are the ones **the evolution actually picked**
 > ([ranking-ceiling.md](ranking-ceiling.md) §3).
 >
-> ### 어느 쪽을 내세우나
+> ### Which one is put forward
 >
 > ```
-> 실무 주장 (벤더 대등 · µs · 전이)   ★ top-1 선택기 쪽
-> 해석 주장 (물리를 표현한다)          ★ 순위 쪽
+> the practical claim (on a par with the vendor · µs · transfer)
+>                                        ★ the top-1 selector side
+> the interpretive claim (it represents physics)   ★ the rank side
 > ```
 >
-> **한 산출물로 둘 다 주장하지 않는다.** 둘을 합치려는 시도는
-> [two-stage-prereg.md](two-stage-prereg.md) 가 잰다.
+> **Both are not claimed for one artefact.** The attempt to join the two is
+> measured by [two-stage-prereg.md](two-stage-prereg.md).
 >
-> ⚠️ 3시드이고 tau 는 **학습 41형상**에서 잰 값이다. 홀드아웃 값은
-> 그 실험 계획서의 A 에서 새로 낸다 — 지금 나란히 놓지 마라 (원칙 4).
+> ⚠️ It is 3 seeds and the tau is measured on the **training 41 shapes**. The
+> holdout value comes fresh out of that pre-registration's A — do not put them
+> side by side now (principle 4).
 
 ---
 
-> ## ⚠️ 이 실행의 블록 3.5 는 오염된 상태였다 (2026-08-21 확인, D-28)
+> ## ⚠️ Block 3.5 of this run was in a contaminated state (confirmed 2026-08-21, D-28)
 >
-> 진단 리포트에 주입한 `table_facts` 가 **66형상 전수 / a888 61형상**에서
-> 계산된 문장이었다. 검증·최종 분할의 집계가 프롬프트에 들어갔다.
-> §12.3 이 "홀드아웃 점수" 만 막았고 집계가 빠져나갔다.
+> The `table_facts` injected into the diagnostic report were sentences
+> computed over **all 66 shapes / 61 shapes for a888**. Aggregates of the
+> validation and final splits went into the prompt. §12.3 blocked only the
+> "holdout score" and the aggregates slipped through.
 >
-> **재실행하지 않는다.** LLM 이 그 정보를 얼마나 썼는지는 알 수 없으므로
-> **이 실행의 검증 점수 해석에는 유보가 붙는다.** 학습 점수와 구조 관련
-> 관찰은 영향이 적고, 검증/최종 분할 대비 일반화 주장은 약해진다.
+> **It is not re-run.** How much of that information the LLM used cannot be
+> known, so **a reservation is attached to the interpretation of this run's
+> validation score.** The training score and the structure-related
+> observations are little affected, and the generalisation claim against the
+> validation/final splits gets weaker.
 >
-> 우회 경로는 `report/table_facts.py` 로 막았다 — 이후 실행은 학습
-> 분할에서만 계산한다.
+> The bypass path was closed in `report/table_facts.py` — later runs compute
+> from the training split only.
 
-## ★ 대표값 성능 수치 (2026-08-27 확정, D-69)
+## ★ The canonical performance numbers (settled 2026-08-27, D-69)
 
-**새 세션은 여기서 시작하라.**
+**A new session starts here.**
 
-> ### ★ 이 절이 **대표값이다** (2026-09-03)
+> ### ★ This section is **the canonical one** (2026-09-03)
 >
-> 다른 문서에도 성능 수치가 있는데 **전부 다른 절차의 값**이다. 틀린
-> 것이 아니라 절차가 달라서, 어느 것이 대표값인지 다 읽어야 알 수 있었다.
-> **이제 대표값은 여기 하나다** (원칙 2).
+> Other documents have performance numbers too and **they are all values of a
+> different procedure**. They are not wrong, the procedures differ, and one
+> had to read all of them to know which was canonical. **Now the canonical
+> value is this one place** (principle 2).
 >
 > ```
-> ★ 2026-09-06 갱신 (D-140) — 대표값 실행이 F3rw-p8-nan 으로 바뀌었다
-> 1.0827   ★ 대표값 — 형상마다 6실행 중앙 -> geomean, 구조 홀드아웃 20형상
-> 1.0737   ★ 대표값 — 같은 절차의 벤더 (안 바뀐다)
-> 1.0886   실행마다 geomean -> 6실행 중앙   (같은 실행, 다른 집계)
+> ★ updated 2026-09-06 (D-140) — the canonical run changed to F3rw-p8-nan
+> 1.0827   ★ canonical — the median of 6 runs per shape -> geomean, the
+>          structure holdout of 20 shapes
+> 1.0737   ★ canonical — the vendor under the same procedure (it does not
+>          change)
+> 1.0886   geomean per run -> the median of 6 runs   (the same run, a
+>          different aggregation)
 >
-> ⚠️ 아래는 **옛 대표값**이다 (F3rw-p8-old). 지우지 않는다
-> 1.0650   옛 — 형상마다 6실행 중앙 -> geomean
-> 1.0762   옛 — 실행마다 geomean -> 6실행 중앙   (같은 실행, 다른 집계)
-> 1.0797   design.md §30 — dev 표 / 다른 분할 / 다른 시점
-> 1.0757   design.md §29 — 구조 홀드아웃 초기값
-> 1.0680   principles.md §? — physics_seeded 가 아니라는 예시
+> ⚠️ Below are the **old canonical values** (F3rw-p8-old). They are not deleted
+> 1.0650   old — the median of 6 runs per shape -> geomean
+> 1.0762   old — geomean per run -> the median of 6 runs   (the same run, a
+>          different aggregation)
+> 1.0797   design.md §30 — the dev table / a different split / a different
+>          point in time
+> 1.0757   design.md §29 — the initial structure-holdout value
+> 1.0680   principles.md §? — the example that it is not physics_seeded
 > ```
 >
-> **다른 문서의 값을 이 표와 나란히 놓지 마라** (원칙 4 / 문서 규칙 3).
-> 그 값들은 지우지 않는다 — 그때의 절차를 기록한 것이다.
+> **Do not put a value from another document beside this table** (principle 4
+> / documentation rule 3). Those values are not deleted — they record the
+> procedure of their time.
 
-### 어떻게 얻었나
+### How it was obtained
 
 ```
-고친 적합기 (도달률 12/12 = 100%, 무작위 4000점) + 정리된 프롬프트 (-64%)
-단일 조건(피처 설명 있음) 6시드 x 12라운드 x 12제안
+the fixed fitter (reach 12/12 = 100%, 4000 random points) + the tidied prompt
+(-64%)
+a single condition (with feature descriptions) 6 seeds x 12 rounds x 12
+proposals
 gpt-5.6-luna / responses / medium
-씨앗: Architect(사람 24개, A 조건, try05)
-구조 홀드아웃 nk11008 (20형상)
+seed: Architect (the 24 human ones, condition A, try05)
+the structure holdout nk11008 (20 shapes)
 ```
 
-실험 계획서는 `rerun-preregistration.md`. 조건 8/8 이 일치한다.
+The pre-registration is `rerun-preregistration.md`. 8/8 of the conditions
+match.
 
-**단일 조건이라 통과 조건을 넘었다.** A/B 를 섞었을 때는 도달률이 0.833
-(20/24) 로 미달이었고, 실패 4건이 전부 "피처 설명 없음" 쪽에 몰려
-있었다 (D-60).
+**It passed the gate because it is a single condition.** With A/B mixed the
+reach was 0.833 (20/24), below the bar, and all 4 failures were on the "no
+feature descriptions" side (D-60).
 
-### 주 지표 — 형상별 벤더 비교
+### The main metric — the per-shape vendor comparison
 
-| 대표값 실행 | 이김/짐/동점 | 부호검정 p | 우리 | 벤더 |
+| canonical run | win/loss/tie | sign-test p | ours | vendor |
 |---|---|---:|---:|---:|
-| ★ **F3rw-p8-nan r11 (지금)** | 8 / 11 / 1 | **0.648** | **1.0827** | 1.0737 |
-| F3rw-p8-nan r23 (참고) | 11 / 9 / 0 | 0.824 | 1.0791 | 1.0737 |
-| ⚠️ F3rw-p8-old (옛 대표값) | 9 / 11 / 0 | 0.824 | 1.0650 | 1.0737 |
+| ★ **F3rw-p8-nan r11 (now)** | 8 / 11 / 1 | **0.648** | **1.0827** | 1.0737 |
+| F3rw-p8-nan r23 (for reference) | 11 / 9 / 0 | 0.824 | 1.0791 | 1.0737 |
+| ⚠️ F3rw-p8-old (the old canonical) | 9 / 11 / 0 | 0.824 | 1.0650 | 1.0737 |
 
-보조 (실행별): 지금 1/6 (p=0.219) · 옛 3/6 (p=1.000)
+Secondary (per run): now 1/6 (p=0.219) · old 3/6 (p=1.000)
 
 ```
-★ 벤더와 구분 불가 — ★ 대표값이 바뀌어도 그대로다 (p 0.648~0.824).
-  실험 계획서에 "구분 불가가 예상되고 그것이 나와도 실패가 아니다" 라고
-  미리 적었다 — 사후 합리화가 아니다.
+★ indistinguishable from the vendor — ★ that holds even though the canonical
+  value changed (p 0.648~0.824). The pre-registration says in advance that
+  "indistinguishable is expected and getting it is not a failure" — this is
+  not rationalising after the fact.
 
-⚠️ 그러나 **geomean 의 부호는 뒤집혔다**
-   옛   우리 1.0650  <  벤더 1.0737   (우리가 낫다)
-   지금 우리 1.0827  >  벤더 1.0737   (벤더가 낫다)
-   -> "구분 불가" 는 유지되지만 "geomean 에서 앞선다" 는 못 쓴다
+⚠️ But **the sign of the geomean flipped**
+   old   ours 1.0650  <  vendor 1.0737   (we are better)
+   now   ours 1.0827  >  vendor 1.0737   (the vendor is better)
+   -> "indistinguishable" holds but "we lead on the geomean" cannot be used
 ```
 
-> **재현**: `python3 experiments/vendor_compare.py --arm
+> **Reproduce**: `python3 experiments/vendor_compare.py --arm
 > "이름=F3rw-p8-nan-s" --round 11 --out docs/artifacts/vendor-nan-r11.json`
-> 원자료 `vendor-nan.json` · `vendor-nan-r11.json` · 전문
+> (the arm label is kept verbatim — it is the key in the committed json)
+> Raw data `vendor-nan.json` · `vendor-nan-r11.json` · the full text
 > [canon-nan.md](canon-nan.md) · [D-140](../decisions.md)
 
-### 체제별 — 방향이 나뉜다
+### By regime — the direction splits
 
-★ 지금 대표값 (F3rw-p8-nan r11):
+★ The current canonical value (F3rw-p8-nan r11):
 
-| 체제 | 형상 | 우리 | 벤더 | 이김/짐 | p |
+| regime | shapes | ours | vendor | win/loss | p |
 |---|---:|---:|---:|---:|---:|
-| 빠른 (SOL<0.5ms) | 12 | **1.0932** | 1.0994 | 7/4 | 0.549 |
-| 느린 (SOL≥0.5ms) | 8 | 1.0673 | **1.0363** | 1/7 | 0.070 |
+| fast (SOL<0.5ms) | 12 | **1.0932** | 1.0994 | 7/4 | 0.549 |
+| slow (SOL≥0.5ms) | 8 | 1.0673 | **1.0363** | 1/7 | 0.070 |
 
-⚠️ 옛 대표값 (F3rw-p8-old) — 지우지 않는다:
+⚠️ The old canonical value (F3rw-p8-old) — it is not deleted:
 
-| 체제 | 형상 | 우리 | 벤더 | 이김/짐 | p |
+| regime | shapes | ours | vendor | win/loss | p |
 |---|---:|---:|---:|---:|---:|
-| 빠른 (SOL<0.5ms) | 12 | **1.0660** | 1.0994 | 8/4 | 0.388 |
-| 느린 (SOL≥0.5ms) | 8 | 1.0635 | **1.0363** | 1/7 | 0.070 |
+| fast (SOL<0.5ms) | 12 | **1.0660** | 1.0994 | 8/4 | 0.388 |
+| slow (SOL≥0.5ms) | 8 | 1.0635 | **1.0363** | 1/7 | 0.070 |
 
-**"빠른 체제에서 벤더를 이긴다" 고 쓸 수 없다** — 8/12 는 p=0.388 이다.
-말할 수 있는 것은 **방향이 있다** 까지다. 그리고 **우리가 지는 쪽(느린,
-p=0.070)이 더 유의에 가깝다.** 느린 체제는 여지 자체가 1.5% 다 (§9.2b).
+**"We beat the vendor in the fast regime" cannot be written** — 8/12 is
+p=0.388. What can be said goes as far as **there is a direction**. And **the
+side where we lose (slow, p=0.070) is the closer one to significance.** The
+slow regime has only 1.5% of room in it (§9.2b).
 
-### ⚠️ 절차가 다른 두 수치를 섞지 마라 (원칙 4)
+### ⚠️ Do not mix two numbers from different procedures (principle 4)
 
 ```
-형상마다 6실행 중앙값 -> geomean       1.0650   ★ 주 지표
-실행마다 geomean -> 6실행의 중앙값      1.0762   (사분위 [1.0706, 1.0834])
+the median of 6 runs per shape -> geomean       1.0650   ★ the main metric
+geomean per run -> the median of the 6 runs     1.0762   (quartiles [1.0706,
+                                                          1.0834])
 ```
 
-둘 다 정당하고 다른 절차다. 나란히 놓지 않는다.
+Both are legitimate and they are different procedures. They are not put side
+by side.
 
 ---
 
-## ★ 헤드라인 — 성능이 아니라 비용 대비다
+## ★ The headline — it is not performance, it is performance per cost
 
-통과 조건은 단일 임계값이 아니라 **표**다 (§9.2c). 한 칸만 보고 "넘었다/못
-넘었다" 를 말하지 않는다.
+The gate is not a single threshold but **a table** (§9.2c). "Passed / did not
+pass" is not said from one cell.
 
-| | 제작 비용 | regret@1 (구조 홀드아웃) | 런타임 |
+| | build cost | regret@1 (structure holdout) | runtime |
 |---|---|---:|---|
-| 무작위 config | 0 | 1.671 | µs |
-| 정적 top-1 | 분 | 1.115 | µs |
-| **kernelRule** | **LLM 약 1시간** | **1.0650** (형상별 절차) | µs |
-| GBDT | 시간 (★ 전이 실패) | 1.019 | ms |
-| 벤더 (nearest) | **사람 수년, 팀 단위** (추정) | **1.0737** | µs |
+| a random config | 0 | 1.671 | µs |
+| static top-1 | minutes | 1.115 | µs |
+| **kernelRule** | **about 1 hour of LLM** | **1.0650** (the per-shape procedure) | µs |
+| GBDT | hours (★ transfer fails) | 1.019 | ms |
+| the vendor (nearest) | **years of people, a team** (estimated) | **1.0737** | µs |
 
-### ⚠️ 비용 열에 안 들어간 것
-
-```
-셌다     LLM 호출 5,019 (탐색) / ~2,830 (재현)
-안 셌다  kernelTab 측정 48시간 / 피처 24개 정의 /
-        파이프라인 15,000줄 / Claude Code 세션 수십 회
-```
-
-**"하룻밤" 은 파이프라인과 피처가 이미 있을 때 새 규칙 하나를 만드는
-비용**이다. 그리고 **벤더의 "수년" 은 우리가 잰 값이 아니라 추정**이며,
-새 아키텍처를 하나 더하는 **갱신** 비용은 수년이 아니다. 이 표로 배수를
-계산하면 안 된다 (`cost.md`).
-
-### 주장의 형태
+### ⚠️ What is not in the cost column
 
 ```
-"벤더보다 정확하다"   가 아니라
-"새 하드웨어에 벤더 휴리스틱이 성숙하기 전 **공백기를 메운다**" (§16.3)
+counted       5,019 LLM calls (exploration) / ~2,830 (reproduction)
+not counted   48 hours of kernelTab measurement / defining 24 features /
+              15,000 lines of pipeline / dozens of Claude Code sessions
 ```
 
-⚠️ **1.0650 과 1.0737 을 "이겼다" 로 읽지 마라.** 형상별 부호검정이
-9:11, p=0.824 로 **구분 불가**다 (D-69). geomean 차이는 소수 형상이
-끄는 것이다 (§30.4).
+**"Overnight" is the cost of making one new rule when the pipeline and the
+features already exist.** And **the vendor's "years" is not a value we
+measured, it is an estimate**, and the cost of **updating** it with one more
+architecture is not years. Do not compute a ratio out of this table
+(`cost.md`).
+
+### The shape of the claim
+
+```
+not   "more accurate than the vendor"
+but   "it **fills the gap** before the vendor heuristic matures on new
+       hardware" (§16.3)
+```
+
+⚠️ **Do not read 1.0650 and 1.0737 as "we won".** The per-shape sign test is
+9:11, p=0.824 — **indistinguishable** (D-69). The geomean difference is pulled
+by a few shapes (§30.4).
 
 ---
 
-> ## ⚠️ 성능 수치의 출처 문제 (2026-08-26)
+> ## ⚠️ The provenance problem of the performance numbers (2026-08-26)
 >
-> 아래 표들의 상당수가 **`gpt-5.4`** 에서 나왔다. 그 모델은 Architect 대조를
-> 만들면서 **지시 없이 도입된 것**이고, 그 위에 여러 실험이 쌓였다 (D-52).
+> A good many of the tables below came out of **`gpt-5.4`**. That model **was
+> introduced without instruction** while making the Architect control, and
+> several experiments piled up on top of it (D-52).
 >
-> **지시된 모델은 `gpt-5.6-luna` 다.** `luna` 로 재현된 것만 결론에 쓴다.
-> `gpt-5.4` 결과는 지우지 않되 **결론의 근거로 인용하지 않는다.**
+> **The instructed model is `gpt-5.6-luna`.** Only what is reproduced on
+> `luna` is used in the conclusion. The `gpt-5.4` results are not deleted but
+> **they are not cited as grounds for the conclusion.**
 >
-> **`gpt-5.4` 실행은 `runs/` 에서 삭제했다** — 그 수치는 재현할 수 없고,
-> 관련 artifact 는 배지에 그렇게 표시했다.
+> **The `gpt-5.4` runs were deleted from `runs/`** — those numbers cannot be
+> reproduced, and the related artefacts are marked that way in their badge.
 >
-> 현재 `luna` 6시드로 확정된 것:
+> What is settled on `luna` with 6 seeds right now:
 > ```
-> 구조 홀드아웃  중앙 1.1019  폭 0.0805  표준편차 0.0274
-> 빠른 체제      벤더를 이긴 시드 2/6, 부호검정 p = 1.000
-> 거부율        0.8%  라운드당 100초  출력 19k
+> the structure holdout  median 1.1019  range 0.0805  standard deviation 0.0274
+> the fast regime        seeds that beat the vendor 2/6, sign test p = 1.000
+> the rejection rate     0.8%  100 seconds per round  output 19k
 > ```
-> **성능 주장은 아직 없다.** 중앙값이 벤더(1.0737)보다 나쁘다.
+> **There is no performance claim yet.** The median is worse than the vendor's
+> (1.0737).
 
-> ## ⚠️ 아래 표는 시드 하나짜리 값이다 (2026-08-23 확인)
+> ## ⚠️ The table below is a single-seed value (confirmed 2026-08-23)
 >
-> 같은 조건을 10시드로 돌리면 구조 홀드아웃이 **1.0518 ~ 1.1496 (폭
-> 0.0977)** 에 퍼진다. **아래의 어떤 비교도 그 폭보다 작으면 "구분 불가"
-> 다** (D-40).
+> Running the same condition with 10 seeds spreads the structure holdout over
+> **1.0518 ~ 1.1496 (a range of 0.0977)**. **Any comparison below that is
+> smaller than that range is "indistinguishable"** (D-40).
 >
-> | 비교 | 차이 | 폭 대비 |
+> | comparison | difference | against the range |
 > |---|---:|---|
-> | 피처 설명 유무 | 0.058 | 60% — 유일하게 살아남는다 |
-> | Architect 씨앗 | 0.022 | 1/4 |
-> | 새 축 A/B | 0.016 | 1/6 |
-> | "벤더와 대등" | — | 시드 하나였다 |
+> | with / without feature descriptions | 0.058 | 60% — the only one that survives |
+> | the Architect seed | 0.022 | 1/4 |
+> | the new axes A/B | 0.016 | 1/6 |
+> | "on a par with the vendor" | — | it was a single seed |
 >
-> **이 저장소는 아직 벤더(구조 홀드아웃 1.0737)를 넘지 못했다.** 10시드
-> 중앙이 1.0872 이고, 시드 선택 절차를 새 묶음에서 재확인하니 1.0865 였다.
+> **This repository has not yet passed the vendor (structure holdout
+> 1.0737).** The median of 10 seeds is 1.0872, and re-checking the seed
+> selection procedure on a new bundle gave 1.0865.
 >
-> ### 폭을 넘어 살아남은 결과
+> ### The results that survived the range
 >
-> | 결과 | 왜 유효한가 |
+> | result | why it is valid |
 > |---|---|
-> | **피처 설명 효과 0.058** | 폭 0.0977 의 60% |
-> | **F1 재발견 7~9/24** | ★ 성능이 아니라 **관찰**이라 시드 폭과 무관 |
-> | **F1 새 축 10개, 8/10 이 규칙에 쓰임** | 위와 같음 |
-> | **`split_k_io_amplification` 이 새 정보** | 상관 0.30~0.46. 결정론적 계산 |
-> | **`has_spill` 항 하나가 1.1637 → 3.1841** | 결정론적. 항 절제 |
-> | **정적 top-1 / 벤더 / GBDT 기준선** | LLM 무관 |
+> | **the feature-description effect 0.058** | 60% of the range 0.0977 |
+> | **F1 rediscovery 7~9/24** | ★ an **observation**, not performance, so it is unrelated to the seed range |
+> | **10 new F1 axes, 8/10 used in a rule** | the same as above |
+> | **`split_k_io_amplification` is new information** | correlation 0.30~0.46. A deterministic computation |
+> | **one `has_spill` term takes 1.1637 → 3.1841** | deterministic. Term ablation |
+> | **the static top-1 / vendor / GBDT baselines** | nothing to do with the LLM |
 >
-> ### 폭에 묻힌 것
+> ### What is buried in the range
 >
-> | 결과 | 차이 | 폭 대비 |
+> | result | difference | against the range |
 > |---|---:|---|
-> | Architect 씨앗이 해롭다 | 0.022 | 1/4 |
-> | 새 축 A/B | 0.016 | 1/6 |
-> | "벤더와 대등" | — | 시드 하나 |
+> | the Architect seed is harmful | 0.022 | 1/4 |
+> | the new axes A/B | 0.016 | 1/6 |
+> | "on a par with the vendor" | — | a single seed |
 >
-> **"살아남은 것은 설명 효과 하나" 는 부정확했다** — 시드 폭은 **진화
-> 실행의 성능 지표**에만 걸린다. 재발견 수·상관·항 절제처럼 **결정론적
-> 계산**이나 **관찰**은 그 영향을 받지 않는다.
+> **"The only thing that survived is the description effect" was inaccurate**
+> — the seed range applies only to **the performance metrics of an evolution
+> run**. A **deterministic computation** or an **observation**, like the
+> rediscovery count, the correlations or the term ablation, is not affected
+> by it.
 
-## ★ 살아남은 결과 (2026-08-27)
-
-```
-✅ 대표값 성능           벤더와 구분 불가 (형상별 9:11, p=0.824)     D-69
-✅ 체제 방향           빠른에서 이기고 느린에서 진다 (둘 다 유의 미달)  D-69
-✅ F1 라이브러리로 규칙이 세워진다                                D-68
-✅ F1 이 사람 24개를 못 따라잡는다 (+0.0433, p=0.002)             D-68
-✅ 폭이 진화로 좁혀진다 (4.4배 -> 1.42배)                        D-68
-✅ 프롬프트 개편이 재발견을 0 -> 6 으로 올린다                     D-63
-✅ LLM 이 물리를 7영역으로 나누고 세 번 안정적이다                  D-63
-✅ 판별 한계 0.03 (시드 폭 σ=0.0274)                            D-53
-✅ 적합기 도달률 100% (단일 조건)                                D-60, D-61
-⚠️ ★ 그러나 **재적합 도달률은 8차원에서 0.75** — 무작위 출발점으로
-   다시 적합하면 3/12 는 더 좋은 곳을 찾는다 (격차 최대 0.0110).
-   **0.011 미만의 차이는 적합기 출발점 잡음일 수 있다.**       D-77
-❌ ★ **16차원에서는 무너진다** — 재적합 도달률 0.42, 격차 최대
-   0.0462. 예산 8 vs 16 실험을 시작하지 않고 적합기를 먼저 고친다  D-77
-✅ expected_range 누출 없음 (21/21 선언 그대로)                   D-71
-
-❌ 무효   "빠른 체제 6중 5" (gpt-5.4, 원본 삭제)
-❌ 무효   피처 설명 효과 0.058 (gpt-5.4). luna 에서 0.016, p=1.000
-❌ 무효   F1 재발견 7~9/24 (gpt-5.4). 모델 의존이고 프롬프트 의존이다
-❌ 무효   Architect A 조건 1.1942 (프롬프트에 모순이 있던 상태, §30.10.2b)
-```
-
-### 비용
+## ★ The results that survived (2026-08-27)
 
 ```
-탐색   33실행    LLM 호출 약 5,019
-재현   18실행    LLM 호출 약 2,830 + F1 파이프라인 1,872 + Architect 21
+✅ the canonical performance   indistinguishable from the vendor (per shape
+                              9:11, p=0.824)                            D-69
+✅ the regime direction        we win in fast and lose in slow (neither
+                              significant)                              D-69
+✅ a rule gets built out of the F1 library                              D-68
+✅ F1 does not catch up with the 24 human ones (+0.0433, p=0.002)       D-68
+✅ the range is narrowed by evolution (4.4x -> 1.42x)                   D-68
+✅ the prompt rewrite raises rediscovery from 0 to 6                    D-63
+✅ the LLM divides physics into 7 areas and is stable across three times D-63
+✅ the discrimination limit 0.03 (seed range σ=0.0274)                  D-53
+✅ the fitter reach 100% (a single condition)                     D-60, D-61
+⚠️ ★ but **the refit reach is 0.75 in 8 dimensions** — refitting from random
+   starting points finds a better place 3/12 of the time (a gap of up to
+   0.0110). **A difference under 0.011 can be fitter starting-point noise.**
+                                                                        D-77
+❌ ★ **it collapses in 16 dimensions** — refit reach 0.42, a gap of up to
+   0.0462. The budget 8 vs 16 experiment is not started; the fitter is fixed
+   first                                                                D-77
+✅ no expected_range leak (21/21 exactly as declared)                   D-71
+
+❌ invalid   "5 out of 6 in the fast regime" (gpt-5.4, the original deleted)
+❌ invalid   the feature-description effect 0.058 (gpt-5.4). On luna it is
+             0.016, p=1.000
+❌ invalid   F1 rediscovery 7~9/24 (gpt-5.4). It depends on the model and on
+             the prompt
+❌ invalid   Architect condition A 1.1942 (the state where the prompt had a
+             contradiction in it, §30.10.2b)
+```
+
+### The cost
+
+```
+exploration     33 runs    about 5,019 LLM calls
+reproduction    18 runs    about 2,830 LLM calls + 1,872 for the F1 pipeline
+                           + 21 for Architect
 ```
 
 ---
 
-## ★ 벽 — 여섯 방향에서 밀었고 안 움직였다 (2026-09-03)
+## ★ The wall — it was pushed from six directions and it did not move (2026-09-03)
 
-순위 손실 축의 결론이다. **이것 자체가 결과다.**
+This is the conclusion of the rank-loss axis. **That itself is a result.**
 
-### 벽이 무엇인가
+### What the wall is
 
 ```
-regret 이 1.11~1.13 인 규칙은 상위100 tau 가 0 근처
-tau 가 0.33~0.37 인 규칙은 regret 이 1.59~1.69
+a rule whose regret is 1.11~1.13 has a top-100 tau near 0
+a rule whose tau is 0.33~0.37 has a regret of 1.59~1.69
 ```
 
-같은 구조라도 **가중치를 어느 목적함수로 맞추느냐**가 tau 를 0.02 와
-0.37 로 가른다 (D-103). 하나의 가중치 벡터가 "1등 고르기" 와 "상위권
-순서" 를 동시에 못 만든다.
+Even with the same structure, **which objective the weights are fitted with**
+splits the tau into 0.02 and 0.37 (D-103). One weight vector cannot make
+"picking first place" and "the order of the top" at the same time.
 
-### 여섯 번 밀었다
+### It was pushed six times
 
-| 방향 | 무엇을 바꿨나 | 결과 |
+| direction | what was changed | result |
 |---|---|---|
-| 구조 | `regret` 진화 vs 순위 진화 | 축 자카드 **1.000** — 같은 축을 쓴다 |
-| 예산 | 항 예산 8 vs 16 | 구분 불가. 항 8->13 으로 늘어도 (D-108) |
-| 순서 | `rank->regret` / `regret->rank` | 둘 다 벽 그대로 (D-104) |
-| 표현력 | 피처 곱 | **원래 되던 것**. 명시하니 66->88% 인데 벽은 그대로 (D-110) |
-| 목표 정의 | `k` 10~100 / `λ` 0~3 | k 좁히면 오히려 나쁘고, λ 는 직선 (D-109/D-111) |
-| 형태 | 가중치를 **지수 자리**에 | 제안 18% 가 썼고 **겨뤄서 졌다** (D-112) |
+| structure | `regret` evolution vs rank evolution | axis Jaccard **1.000** — they use the same axes |
+| budget | term budget 8 vs 16 | indistinguishable. Even with the terms growing 8->13 (D-108) |
+| order | `rank->regret` / `regret->rank` | the wall is the same in both (D-104) |
+| expressiveness | feature products | **it already worked**. Stating it takes 66->88% but the wall is the same (D-110) |
+| the goal's definition | `k` 10~100 / `λ` 0~3 | narrowing k is worse if anything, and λ is a straight line (D-109/D-111) |
+| form | the weight **in the exponent slot** | 18% of the proposals used it and **it competed and lost** (D-112) |
 
-★ 마지막 둘이 중요하다. **"안 해봐서 모른다" 가 아니다** — 곱은
-검사기가 원래 안 막았고 규칙 59% 가 이미 쓰고 있었으며, 지수는
-말해 주니 18% 가 시도했고 학습 목적함수에서부터 더 나빴다.
+★ The last two matter. **It is not "we do not know because we did not try"**
+— the product was never blocked by the checker and 59% of the rules were
+already using it, and once told about the exponent 18% tried it and it was
+worse from the training objective onward.
 
-### ★ 그 여섯 중 표현력 셋을 **regret 경로에서 다시 쟀다** (D-124)
+### ★ Three of those six, the expressiveness ones, were **re-measured on the regret path** (D-124)
 
-위 표의 예산·곱·지수는 **전부 순위 손실 경로**다. 그 목적함수가 틀린
-것으로 밝혀졌으니(D-118·D-121) 결론이 틀린 목적함수 위에 있었다.
-적합기를 먼저 풀고(D-123 — CMA-ES) regret@1 경로에서 셋을 다시 돌렸다.
-
-```
-                기준선 1.0987   (예산 8, CMA 300/600, 3시드)
-예산 16          1.0906   +0.0081   구분 불가
-곱 힌트           1.0840   +0.0147   구분 불가
-지수 힌트          1.0839   +0.0148   구분 불가      판정선 0.0516
-★ 셋 다 구분 불가 — regret 경로에서도 표현력은 벽을 못 낮춘다
-```
-
-⚠️ 기준선이 `1.0762` 이 아니다. 적합기가 달라 나란히 못 놓는다
-(원칙 4) — 그래서 예산 8 팔을 같은 조건으로 다시 뽑았다.
-
-★ 다만 **regret@k 에서는 달라진다**: 지수 팔이 k=10/50/100 에서, 예산 16
-팔이 k=10/50 에서 기준선과 시드 범위가 **안 겹친다**. 판정선이 사전
-등록에 없고 3대3 에 12칸을 본 관측이라 **판정으로 쓰지 않는다**.
-표현력은 "1등 고르기" 가 아니라 **상위 영역**에서 일하는 것으로 보인다.
-
-★ 지수 형태는 regret 경로에서 **살아남는다** — 아카이브 잔존
-3.8%(순위) -> **62.5%**(regret). D-112 의 "겨뤄서 졌다" 는 그
-목적함수에서의 결론이었다.
-
-### 그래서 남은 진술
+The budget, the product and the exponent above are **all on the rank-loss
+path**. That objective turned out to be the wrong one (D-118·D-121), so the
+conclusion was standing on a wrong objective. The fitter was resolved first
+(D-123 — CMA-ES) and the three were re-run on the regret@1 path.
 
 ```
-★ 우리 피처 공간의 **선형 결합으로는** 실행시간의 상위권 순서를
-   충분히 잘 예측하지 못한다
+                the baseline 1.0987   (budget 8, CMA 300/600, 3 seeds)
+budget 16        1.0906   +0.0081   indistinguishable
+the product hint 1.0840   +0.0147   indistinguishable
+the exponent hint 1.0839  +0.0148   indistinguishable   decision line 0.0516
+★ all three indistinguishable — on the regret path too, expressiveness cannot
+  lower the wall
 ```
 
-이것이 GBDT 와의 격차와 **같은 얘기**다:
+⚠️ The baseline is not `1.0762`. The fitter differs so they cannot be put side
+by side (principle 4) — that is why the budget-8 arm was re-taken under the
+same condition.
+
+★ Only, **in `regret@k` it does change**: the exponent arm at k=10/50/100 and
+the budget-16 arm at k=10/50 have seed ranges that **do not overlap** with the
+baseline. The decision line was not in the pre-registration and this is an
+observation over 12 cells at 3 against 3, so **it is not used as a verdict**.
+Expressiveness appears to work in **the top region** rather than in "picking
+first place".
+
+★ The exponent form **survives** on the regret path — archive survival 3.8%
+(rank) -> **62.5%** (regret). D-112's "it competed and lost" was a conclusion
+under that objective.
+
+### So the statement that remains
 
 ```
-우리(사람 팔)   1.0762
-GBDT           1.019     ★ 학습이 도달 가능한 상한
-격차            0.0572    시드 폭 σ 0.0124 의 4.6배
+★ **a linear combination of** our feature space does not predict the order of
+   the top runtimes well enough
 ```
 
-GBDT 는 같은 피처를 쓰면서 **비선형 상호작용을 자유롭게** 쓴다. 우리가
-넓힌 것(항 수·노드 수·곱·지수)은 전부 "항 하나의 모양" 이고, 여전히
-**항들의 합**이다. 벽과 GBDT 격차는 한 가지의 두 표현으로 읽는다.
-
-⚠️ **읽기의 한계.** 이것은 "선형 결합이 원리적으로 불가능하다" 가
-아니라 **"여섯 방향으로 밀었고 3시드에서 안 움직였다"** 다. 각 실험은
-3시드라 개별로는 유의성이 없고, 판정은 **범위 분리**로만 했다.
-
-### ★ 벽의 정확한 진술 (2026-09-03, D-118)
+This is **the same story** as the gap to GBDT:
 
 ```
-regret 규칙   좋은 영역을 찾는다. ★ 그 안의 순서는 못 매긴다
-순위 규칙     순서는 매긴다.      ★ 어느 영역이 좋은지 모른다
+ours (the human arm)   1.0762
+GBDT                   1.019     ★ the ceiling learning can reach
+the gap                0.0572    4.6x the seed range σ 0.0124
 ```
 
-순위 규칙은 **참 상위 100 을 주면 그 안의 순서를 매긴다**(노이즈 인식
-tau 0.410). 그런데 **자기가 상위 100 을 고르면 틀린 것을 고른다**
-(regret@100 = 1.536, 무작위 바닥 2.378). 국소적으로는 맞고 전역적으로는
-틀리다.
+GBDT uses the same features while using **non-linear interactions freely**.
+What we widened (the number of terms, the number of nodes, products,
+exponents) is all "the shape of one term", and it is still **a sum of terms**.
+The wall and the GBDT gap are read as two expressions of one thing.
 
-지표 셋이 같은 방향을 가리킨다 — 옛 tau / 노이즈 인식 tau / `regret@k`.
-**벽은 지표 하나의 인공물이 아니다** ([regret-at-k.md](regret-at-k.md)).
+⚠️ **The limit of the reading.** This is not "a linear combination is
+impossible in principle" but **"it was pushed in six directions and it did not
+move at 3 seeds"**. Each experiment is 3 seeds so none is individually
+significant, and the verdicts were made **only by range separation**.
 
-⚠️ 그 확인 과정에서 **옛 `tau` 의 실제 결함**이 나왔다: 노이즈로 못
-가르는 쌍(홀드아웃 상위 100 의 47.2%)을 채점하고 있었다. 같은 실험의
-학습(순위 손실)은 그 쌍을 뺐다. 값은 전부 올랐지만(+0.019~+0.106)
-**팔의 순서는 안 바뀐다.**
-
-### 곁가지 — 벽은 "상위권" 쪽이다
-
-지수 자리를 열었을 때 **전구간 tau 가 0.320 -> 0.500** 으로 지금까지
-중 가장 높았다 (D-112). 전 구간의 모양은 더 잘 만드는데 상위 100 과
-1등에서는 안 나타난다. **못 맞추는 것은 전 구간이 아니라 상위권이다.**
-
-### 안 해본 것 (`pending_fixes` 11)
-
-체제를 셋 이상으로 나누는 것 — 형상마다 가중치 벡터가 **하나**라는
-것 자체를 깨는 유일한 남은 방향이다. 파라미터가 2배가 되고 형상
-41개에 가중치 32개면 비율이 나쁘다 (D-98 의 재적합 표본 요구도 커진다).
-**새 실험 계획서가 필요하다.**
-
-## ★ 남은 여지 — 노릴 것은 조건 간 차이가 아니다
+### ★ The exact statement of the wall (2026-09-03, D-118)
 
 ```
-우리(사람 팔)   1.0762
-GBDT           1.019    ★ 학습이 도달 가능한 상한
-격차            0.0572   시드 폭 σ 0.0124 의 4.6배 — 가릴 수 있다
+the regret rule   finds a good region. ★ It cannot order what is inside it
+the rank rule     orders things.       ★ It does not know which region is good
 ```
 
-**조건 간 0.02급은 못 가리지만**(D-53) **GBDT 격차는 다르다.**
-"성능 개선은 무리다" 로 미끄러지지 않는다.
+The rank rule **orders the true top 100 when it is given** (noise-aware tau
+0.410). But **when it picks the top 100 itself it picks the wrong ones**
+(regret@100 = 1.536, the random floor 2.378). It is right locally and wrong
+globally.
 
-## 1. ★ 유일하게 비교 가능한 표
+Three metrics point the same way — the old tau / the noise-aware tau /
+`regret@k`. **The wall is not an artefact of one metric**
+([regret-at-k.md](regret-at-k.md)).
 
-**절차** SOL 2분할(대리 지표) → 체제마다 가중치 따로 적합 → 체제별 평가 후
-61형상 결합. 홀드아웃은 각 체제 안에서 SOL 순 3개마다 1개(19형상).
-**재현** `python3 experiments/rescore_canonical.py`
+⚠️ In the course of that check **a real defect of the old `tau`** came out: it
+was scoring pairs the noise cannot separate (47.2% of the holdout top 100).
+The training side of the same experiment (the rank loss) dropped those pairs.
+All the values rose (+0.019~+0.106) but **the order of the arms does not
+change.**
 
-| | 표본내 61 | 홀드아웃 19 | 홀드아웃 유의성 vs 벤더 |
+### An aside — the wall is on the "top" side
+
+When the exponent slot was opened, **the all-range tau went 0.320 -> 0.500**,
+the highest so far (D-112). It makes the whole-range shape better while
+nothing shows up in the top 100 or at first place. **What cannot be got right
+is not the whole range but the top.**
+
+### What was not tried (`pending_fixes` 11)
+
+Splitting the regimes into three or more — the only remaining direction that
+breaks the very fact that there is **one** weight vector per shape. The
+parameters double, and 32 weights for 41 shapes is a bad ratio (D-98's refit
+sample requirement grows too). **A new pre-registration is needed.**
+
+## ★ The room that is left — what to aim at is not the difference between conditions
+
+```
+ours (the human arm)   1.0762
+GBDT                   1.019    ★ the ceiling learning can reach
+the gap                0.0572   4.6x the seed range σ 0.0124 — it can be told
+                                apart
+```
+
+**A difference of order 0.02 between conditions cannot be told apart** (D-53)
+**but the GBDT gap is different.** It does not slide into "improving
+performance is hopeless".
+
+## 1. ★ The only comparable table
+
+**Procedure** a 2-way SOL split (a proxy metric) → fit the weights separately
+per regime → evaluate per regime and combine over the 61 shapes. The holdout
+is 1 in every 3 in SOL order inside each regime (19 shapes).
+**Reproduce** `python3 experiments/rescore_canonical.py`
+
+| | in-sample 61 | holdout 19 | holdout significance vs the vendor |
 |---|---:|---:|---|
-| **`evolved`** (첫 실행) | **1.0652** | **1.0628** | **11승 7패 1무** |
-| **벤더 nearest** ★통과 조건 | 1.0797 | 1.0864 | — |
-| Architect B (`gpt-5.4`) | 1.1564 | 1.1600 | 7승 11패 1무 |
-| `physics_seeded` | 1.1637 | 1.1652 | 6승 11패 2무 |
-| Architect A (`gpt-5.4`) | 1.1780 | 1.1961 | 7승 11패 1무 |
-| Architect A (`gpt-5.4-mini`) | 1.4797 | 2.1317 | 3승 16패 0무 |
+| **`evolved`** (the first run) | **1.0652** | **1.0628** | **11 wins 7 losses 1 tie** |
+| **the vendor, nearest** ★the gate | 1.0797 | 1.0864 | — |
+| Architect B (`gpt-5.4`) | 1.1564 | 1.1600 | 7 wins 11 losses 1 tie |
+| `physics_seeded` | 1.1637 | 1.1652 | 6 wins 11 losses 2 ties |
+| Architect A (`gpt-5.4`) | 1.1780 | 1.1961 | 7 wins 11 losses 1 tie |
+| Architect A (`gpt-5.4-mini`) | 1.4797 | 2.1317 | 3 wins 16 losses 0 ties |
 
-**진화 규칙만 벤더를 이긴다.** 한 번에 쓴 구조는 전부 1.15~1.20 이다.
+**Only the evolved rule beats the vendor.** Every structure written in one go
+is 1.15~1.20.
 
-> ⚠️ `evolved` 는 **오염된 블록 3.5** 로 만들어졌다 (D-28). 그 이득이
-> 얼마인지는 `experiments/seed_ablation.py` 가 가른다 — 정화 리포트로
-> 다시 돌린 값이 나오기 전까지 1.0652 에는 유보가 붙는다.
+> ⚠️ `evolved` was made with **the contaminated block 3.5** (D-28). How much
+> that gained is what `experiments/seed_ablation.py` separates — until the
+> value re-run with the cleaned report exists, a reservation is attached to
+> 1.0652.
 
-### 그 밖의 확인 사항
+### The other things confirmed
 
-**표 없이 구조는 나온다.** Architect A(`gpt-5.4`)가 표에서 나온 문장을
-하나도 안 보고 `physics_seeded` 급(1.1780 vs 1.1637)을 냈다.
+**A structure comes out without the table.** Architect A (`gpt-5.4`) produced
+something at the `physics_seeded` level (1.1780 vs 1.1637) without seeing a
+single sentence that came from the table.
 
-**모델이 결정적이다.** 같은 A 조건에서 `mini` 는 1.4797, `gpt-5.4` 는
-1.1780 이다. `mini` 만 봤으면 "A 조건은 불가능하다" 로 갈 뻔했다.
+**The model is decisive.** Under the same condition A, `mini` gives 1.4797 and
+`gpt-5.4` gives 1.1780. Had only `mini` been seen, it would nearly have gone
+to "condition A is impossible".
 
-**표는 최고점이 아니라 분산을 산다.** A→B 로 최고 0.029, 중앙 0.302,
-최악 0.598 개선 (`artifacts/architect-gate.md`).
+**The table buys variance, not the best score.** From A to B the best improves
+by 0.029, the median by 0.302 and the worst by 0.598
+(`artifacts/architect-gate.md`).
 
-## 2. 느린 체제는 시험대가 아니다
+## 2. The slow regime is not a testbed
 
-여지가 **1.5%** 뿐이다. 정적 top-1(1.0145)이 벤더(1.0439)·`evolved`
-(1.1174)·`physics_seeded`(1.1137)를 전부 이기고, GBDT(1.0056)만 그보다
-낫다. **어떤 규칙 기반 방법도 고정 config 를 못 이기는 체제다.**
+There is only **1.5%** of room. Static top-1 (1.0145) beats the vendor
+(1.0439), `evolved` (1.1174) and `physics_seeded` (1.1137) all, and only GBDT
+(1.0056) is better than that. **It is a regime where no rule-based method can
+beat a fixed config.**
 
-→ 여기서 나온 "전이 실패" 는 구조의 성질이 아니라 **시험대의 성질**일 수
-있다. 느린 체제 ≥30형상 전에는 §29.5 (b) 를 판정할 수 없다.
+→ The "transfer failure" that came out of here may be a property of **the
+testbed** rather than of the structure. §29.5 (b) cannot be judged before
+there are ≥30 shapes in the slow regime.
 (`artifacts/regime-diagnosis.md`, `artifacts/structure-transfer.md`)
 
 ---
 
-## 3. 체제 특화 항은 원인이 아니다
+## 3. The regime-specific terms are not the cause
 
-`is_two_stage` / `pipeline_warmup_frac` / `log_mainloop_iters` 를 제거해도
-회복하지 않고(1.1137→1.1137 등), 추가해도 망가지지 않는다(빠른 체제
-1.1889→**1.1276** 으로 오히려 개선). **양방향 모두 인과를 부정했다.**
+Removing `is_two_stage` / `pipeline_warmup_frac` / `log_mainloop_iters` does
+not recover it (1.1137→1.1137 and so on), and adding them does not break it
+(the fast regime goes 1.1889→**1.1276**, an improvement if anything).
+**Both directions denied the causation.**
 
-그리고 `physics_seeded` 도 `pipeline_warmup_frac` 을 쓴다 — 전제부터
-성립하지 않았다. (`artifacts/structure-transfer.md`)
-
----
-
-## 4. ★ 위 숫자들은 배포 가능하다 — 오라클이 아니다
-
-체제 경계는 **SOL 대리 지표**로 정의돼 있다 (`core/splits.py::regime_of`).
-`t_best` 기준과 61형상 전부에서 일치했다.
-
-**단, 100% 는 이 표의 운이다.** `t_best/SOL` 중앙값이 1.140 이라 위험 띠
-`SOL ∈ [438, 500] us` 안에 형상이 둘 있고, 그 `t_best` 는 497.7us 와
-496.6us — 경계에서 **3us** 다. (`experiments/proxy_dispatch.py`)
-
-**그리고 `evolved` 는 애초에 디스패치가 필요 없다** — 단일 규칙이 모든
-형상에 적용된다. 1.0850 은 체제 판정과 무관한 숫자다.
+And `physics_seeded` uses `pipeline_warmup_frac` too — the premise did not
+hold in the first place. (`artifacts/structure-transfer.md`)
 
 ---
 
-## ★ F1 계열 — LLM 이 피처까지 만들면 (D-63, D-68, D-74)
+## 4. ★ The numbers above are shippable — it is not an oracle
 
-> ⚠️ **잠정이다.** 이 결과들은 파이프라인의 **1단계(FeatureWriter)만
-> 개선한 상태**에서 나왔다. 2단계(Architect)와 3단계(Analyst +
-> Optimizer)는 프롬프트만 정리했고 **구조는 그대로다.**
+The regime boundary is defined by **the SOL proxy metric**
+(`core/splits.py::regime_of`). It agreed with the `t_best` criterion on all 61
+shapes.
+
+**But 100% is this table's luck.** The median of `t_best/SOL` is 1.140, so
+there are two shapes inside the danger band `SOL ∈ [438, 500] us`, and their
+`t_best` values are 497.7us and 496.6us — **3us** from the boundary.
+(`experiments/proxy_dispatch.py`)
+
+**And `evolved` needs no dispatch to begin with** — a single rule applies to
+every shape. 1.0850 is a number independent of the regime decision.
+
+---
+
+## ★ The F1 line — when the LLM makes the features too (D-63, D-68, D-74)
+
+> ⚠️ **This is provisional.** These results came out with only **stage 1
+> (FeatureWriter) improved** in the pipeline. Stage 2 (Architect) and stage 3
+> (Analyst + Optimizer) only had their prompts tidied and **their structure is
+> unchanged.**
 >
-> **성능을 만드는 곳은 3단계**이고 거기서 한 것이 사실상 없다.
-> 아래는 **라이브러리 축의 결론**이지 성능 축의 결론이 아니다.
+> **The place that makes performance is stage 3** and effectively nothing was
+> done there. What is below is **a conclusion on the library axis**, not on the
+> performance axis.
 
 ```
-✅ 라이브러리로 규칙을 세울 수 있다     거부 0건, 12실행 완주
-❌ 사람 24개를 못 따라잡는다            +0.0433, p=0.002 (시드 폭 0.0274 초과)
+✅ a rule can be built out of the library     0 refusals, 12 runs finished
+❌ it does not catch up with the 24 human ones  +0.0433, p=0.002 (over the
+                                                seed range 0.0274)
 ```
 
-| | F1 21개 | 사람 24개 |
+| | F1's 21 | the 24 human ones |
 |---|---:|---:|
-| 구조 홀드아웃 중앙 | 1.1195 | 1.0762 |
-| 사분위 | [1.1108, 1.1328] | [1.0706, 1.0834] |
-| 시드 폭 σ | 0.0177 | 0.0124 |
-| 표본내-홀드아웃 격차 | +0.0290 | +0.0267 |
+| structure holdout median | 1.1195 | 1.0762 |
+| quartiles | [1.1108, 1.1328] | [1.0706, 1.0834] |
+| seed range σ | 0.0177 | 0.0124 |
+| in-sample-to-holdout gap | +0.0290 | +0.0267 |
 
-**일반화 격차가 같다 → 과적합이 아니라 출발점이 낮다.**
+**The generalisation gaps are the same → it is not overfitting, the starting
+point is lower.**
 
-### F1-K — 공개 지식 다섯을 주면 (D-74)
+### F1-K — when the five public facts are given (D-74)
 
-| | 시작 | 생성 | **라이브러리** | 새 축 | **씨앗 항** | 홀드아웃 중앙 | σ |
+| | start | generated | **library** | new axes | **seed terms** | holdout median | σ |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | F1 | 0 | 21 | **21** | 7 | 8 | 1.1195 | 0.0177 |
 | **F1-K** | 5 | 13 | **18** | **9** | **7** | 1.1288 | 0.0140 |
 
-F1-K 사분위 [1.1227, 1.1400], 전 단계 합계 967호출 (실험 계획서 상한 990 안).
-| 사람 24개 | 24 | 0 | **24** | — | 8 | **1.0762** | 0.0124 |
+F1-K quartiles [1.1227, 1.1400], 967 calls over all the stages (inside the
+pre-registration's ceiling of 990).
+| the 24 human ones | 24 | 0 | **24** | — | 8 | **1.0762** | 0.0124 |
 
 ```
-F1-K vs F1      +0.0093   p = 0.589   ★ 구분 불가
-F1-K vs 사람24   +0.0526   p = 0.002
+F1-K vs F1            +0.0093   p = 0.589   ★ indistinguishable
+F1-K vs the 24 human  +0.0526   p = 0.002
 ```
 
-**새 축은 늘었고(7→9, 비율 44%→75%) 성능은 안 늘었다.**
+**The new axes went up (7→9, the ratio 44%→75%) and the performance did
+not.**
 
-⚠️ **라이브러리 크기가 다르다** (18 / 21 / 24). "F1-K 가 작아서 진
-것인가" 는 이 자료로 못 가른다 — **결론 문장에 이 교락을 함께 적는다.**
-
-```
-폭이 진화로 좁혀진다   2단계(Architect 10회) 4.4배 -> 3단계(진화) 1.42배
-                     초기 선택의 운을 진화가 상당 부분 흡수한다
-```
-
-### 프롬프트 개편이 F1 의 최대 변수였다
+⚠️ **The library sizes differ** (18 / 21 / 24). "Did F1-K lose because it is
+smaller" cannot be separated with this data — **that confound is written into
+the conclusion sentence.**
 
 ```
-(가) 옛 프롬프트 + 자유    엄격 재발견 0/24
-(나) 새 프롬프트 + 자유    엄격 재발견 6/22   ★
-(다) 새 프롬프트 + 영역별   엄격 재발견 3/22
+the range is narrowed by evolution   stage 2 (Architect, 10 calls) 4.4x ->
+                                     stage 3 (evolution) 1.42x
+                                     evolution absorbs a good part of the luck
+                                     of the initial choice
 ```
 
-편중은 **생성 전략이 아니라 프롬프트 탓**이었다 (D-63, 원칙 21).
+### The prompt rewrite was F1's biggest variable
+
+```
+(a) the old prompt + free       strict rediscovery 0/24
+(b) the new prompt + free       strict rediscovery 6/22   ★
+(c) the new prompt + per area   strict rediscovery 3/22
+```
+
+The skew was **the prompt's fault, not the generation strategy's** (D-63,
+principle 21).
 
 ---
 
-## 5. 열려 있는 질문
+## 5. The open questions
 
-**피처를 누가 만드는가.** 지금 파이프라인의 LLM 은 `physical.py` 의 52개
-중 8개를 고르는 일만 한다. `tail_waste` 를 **정의하는 것**이 물리를
-이해하는 일이고 그 단계는 이미 끝나 있다. `evolved` 가 `physics_seeded`
-를 못 이긴 것이 당연할 수 있다 — 같은 재료인데 한쪽은 왜 그 재료가
-있는지 안다. §11.4 Instrumenter 는 **미구현**이다.
+**Who makes the features.** The LLM in the current pipeline only does the job
+of picking 8 out of the 52 in `physical.py`. **Defining** `tail_waste` is the
+part that is understanding physics and that stage is already finished. It may
+be natural that `evolved` did not beat `physics_seeded` — the material is the
+same but one side knows why that material is there. §11.4's Instrumenter is
+**not implemented**.
 
-**표 없이 구조를 만들 수 있는가** (Architect A 조건). 전이가 성립하려면
-새 아키텍처에서 표 없이 구조가 나와야 한다. 미구현.
+**Can a structure be made without the table** (Architect condition A). For
+transfer to hold, a structure has to come out on new hardware without the
+table. Not implemented.
 
 ---
 
-## ★ 3단계가 아직 안 고쳐졌다
+## ★ Stage 3 is still not fixed
 
 ```
-1단계  FeatureWriter        프롬프트 개편 / 영역 고정 / 알려진 5개 — 많이 고쳤다
-2단계  Architect            거의 안 건드렸다. 규칙 예시가 자리표시자뿐이다
-3단계  Analyst + Optimizer  프롬프트만 정리. 구조는 그대로
+stage 1  FeatureWriter        the prompt rewrite / fixed areas / the 5 known
+                              ones — much was fixed
+stage 2  Architect            barely touched. The rule examples are only
+                              placeholders
+stage 3  Analyst + Optimizer  only the prompts were tidied. The structure is
+                              unchanged
 ```
 
-### Analyst 의 요구 303건이 버려지고 있다 (`analyst-requests.md`)
+### 303 of the Analyst's requests are being thrown away (`analyst-requests.md`)
 
 ```
-가설 1,655건 중 needs_new_feature 채워진 것 303건 (18.3%)
-loop.py 에 그 필드를 읽는 코드가 없다
+of 1,655 hypotheses, 303 have needs_new_feature filled in (18.3%)
+there is no code in loop.py that reads that field
 ```
 
-요구 상위 넷(245건)은 **이미 있는 필드로 표현 가능하다** — wave/CTA
-절대량, L2 재사용 이득, 파이프라인 계열, split-K 이득.
-`warp_*`/`swizzle`(28건)만 `cfg.ext` 라 의도적으로 금지된다 (§4.3).
+The top four requests (245 of them) **can be expressed with fields that
+already exist** — the absolute wave/CTA counts, the L2 reuse gain, the
+pipeline family, the split-K gain. Only `warp_*`/`swizzle` (28) are
+deliberately forbidden because they are `cfg.ext` (§4.3).
 
-### 우선순위
-
-```
-Critic 구현        physics_seeded 가 물리 오류 지적 3회로 1.758 -> 1.172
-                  ★ 항별 물리 설명이 GBDT 와의 차이를 눈에 보이게 만든다
-§16.1 ablation    Analyst 가 호출의 8% 인데 기여하는지 모른다
-라운드 24         12 가 충분한지 안 봤다
-Analyst -> FeatureWriter 경로
-```
-
-## 검증 경로 (완료)
+### The priorities
 
 ```
-4-1  결과 JSON 화             .md/.json 일치 테스트
-4-2  KERNELRULE_UNSEAL       최종 분할 봉인 (아직 안 열었다)
-4-3  시드 선택 순서            chosen.json 에 증거 기록
-4-4  expected_range 출처      누출 없음 (21/21)
+implement Critic     physics_seeded went 1.758 -> 1.172 with 3 rounds of
+                     physics-error comments
+                     ★ a per-term physical explanation makes the difference
+                     from GBDT visible
+§16.1 ablation       the Analyst is 8% of the calls and we do not know whether
+                     it contributes
+24 rounds            whether 12 is enough has not been looked at
+the Analyst -> FeatureWriter path
 ```
 
-### 미룬 것
+## The verification path (done)
 
 ```
-이진형 영역 요청 (luna)   F1 의 한계를 더 파는 것
-4090 전이                하드웨어 확보 대기
-Critic 구현              산출물을 **설명하는** 도구. regret 도구가 아니다
-최종 분할 개봉            전부 끝난 뒤 딱 한 번
+4-1  results turned into JSON      the .md/.json agreement test
+4-2  KERNELRULE_UNSEAL             the final split is sealed (not opened yet)
+4-3  the seed selection order      the evidence is recorded in chosen.json
+4-4  the provenance of expected_range   no leak (21/21)
 ```
 
-### 하지 말 것
+### What was deferred
 
 ```
-⛔ 모델·엔드포인트·추론강도를 지시 없이 바꾸지 마라 (D-52, 원칙 25)
-⛔ 0.03 미만 차이를 "개선" 으로 보고하지 마라 (D-53)
-⛔ 구조 홀드아웃 점수를 보고 프롬프트를 고치지 마라 (§12.3d)
-⛔ gpt-5.4 산출물을 결론의 근거로 인용하지 마라
-⛔ 1.0650 과 1.0762 를 나란히 놓지 마라 — 절차가 다르다 (원칙 4)
-⛔ "1호출이니 싸다" 로 다른 모델을 끼워넣지 마라 (원칙 25)
-```
-## 0. ★ 정정 — 대비를 두 번 잘못 세웠다
-
-> ⚠️ **여기부터는 정정 이력이다. 지금 값이 아니다.** 문서 규칙 2 — 틀린 값을 지우지 않는다.
-
-### 1차 정정 (용어)
-
-```
-잘못:  사람 구조는 전이되고 LLM 구조는 안 된다
+a binary-shape area request (luna)   digging further into F1's limits
+the 4090 transfer                    waiting for the hardware
+implementing Critic                  a tool that **explains** the artefact.
+                                     Not a regret tool
+opening the final split              exactly once, after everything is done
 ```
 
-`rules/handwritten.py` 라는 이름이 "사람 대 LLM" 이라는 대비를 만들었다.
-그 규칙도 Claude Code 가 물리 문서를 읽고 한 번에 쓴 것이다. 이름을 고쳤다
-— `physics_seeded` / `evolved` (`docs/glossary.md`).
-
-### 2차 정정 (숫자) — 이쪽이 더 크다
+### What not to do
 
 ```
-잘못:  물리에 맞춘 구조는 전이되고 점수에 맞춘 구조는 안 된다
-맞음:  ★ 진화 구조가 가장 강하다. physics_seeded 는 벤더에 진다
+⛔ do not change the model · the endpoint · the reasoning effort without
+   instruction (D-52, principle 25)
+⛔ do not report a difference under 0.03 as an "improvement" (D-53)
+⛔ do not look at the structure-holdout score and fix the prompt (§12.3d)
+⛔ do not cite a gpt-5.4 artefact as grounds for the conclusion
+⛔ do not put 1.0650 and 1.0762 side by side — the procedures differ
+   (principle 4)
+⛔ do not slip another model in on "it is one call so it is cheap"
+   (principle 25)
+```
+## 0. ★ A correction — the contrast was set up wrong twice
+
+> ⚠️ **From here down is the correction history. These are not the current
+> values.** Documentation rule 2 — a wrong value is not deleted.
+
+### The first correction (the terms)
+
+```
+wrong:  the human structure transfers and the LLM structure does not
 ```
 
-1차 정정 뒤에도 대비 자체는 살려 뒀는데, **그 대비를 지탱하던 숫자가
-다른 규칙의 것이었다.** `physics_seeded 체제별 재적합 = 1.0680` 으로
-인용된 값은 최종 채점 절차에서 `evolved` 의 값(1.0652)이고, 같은 절차의
-`physics_seeded` 는 **1.1637** 로 벤더(1.0797)에 진다.
+The name `rules/handwritten.py` created a "human vs LLM" contrast. That rule
+too was written in one go by Claude Code reading the physics document. The
+names were fixed — `physics_seeded` / `evolved` (`docs/glossary.md`).
 
-**공통 원인은 재현 절차 없이 인용된 통과 조건 숫자다** (§30.8b). 두 번 같은
-실수가 났다. 그래서 이 문서는 이제 **절차가 붙은 표 하나만** 결론으로
-쓰고, 나머지 서술은 정정 이력으로 내린다.
+### The second correction (the numbers) — this one is bigger
 
-> ## ★ 성능 숫자는 검증 가능하다 (2026-08-26)
+```
+wrong:  a structure fitted to physics transfers and one fitted to the score
+        does not
+right:  ★ the evolved structure is the strongest. physics_seeded loses to the
+        vendor
+```
+
+Even after the first correction the contrast itself was kept alive, but **the
+number holding that contrast up belonged to a different rule.** The value
+cited as `physics_seeded refit per regime = 1.0680` is, under the final
+scoring procedure, `evolved`'s value (1.0652), and `physics_seeded` under the
+same procedure is **1.1637**, losing to the vendor (1.0797).
+
+**The common cause is a gate number cited without a reproduction procedure**
+(§30.8b). The same mistake happened twice. So this document now uses **only
+one table with a procedure attached** as the conclusion, and the remaining
+descriptions are moved down into the correction history.
+
+> ## ★ The performance numbers are verifiable (2026-08-26)
 >
-> 최종 규칙과 **적합된 가중치**를 커밋했다 — `docs/artifacts/rules/`.
+> The final rules and **the fitted weights** were committed —
+> `docs/artifacts/rules/`.
 >
 > ```
-> python3 experiments/verify_rules.py      # 12개 전부 일치, 몇 초
+> python3 experiments/verify_rules.py      # all 12 match, a few seconds
 > ```
 >
-> `runs/` 는 `.gitignore` 라 저장소에 없다. 이 명령은 그것을 안 읽고
-> **커밋된 규칙만으로** 구조 홀드아웃을 다시 계산해 `index.json` 과
-> 대조한다. **LLM 실행은 재현 불가지만 채점은 결정론적이다** (§24.4b) —
-> 성능 주장의 절반이 이렇게 검증된다.
+> `runs/` is in `.gitignore` so it is not in the repository. This command does
+> not read it — it recomputes the structure holdout **from the committed rules
+> alone** and checks against `index.json`. **The LLM runs cannot be reproduced
+> but the scoring is deterministic** (§24.4b) — half of the performance claim
+> is verified this way.
 
-## 정정 이력 (문서 규칙 2 — 틀린 값을 지우지 않는다)
+## The correction history (documentation rule 2 — a wrong value is not deleted)
 
-> ⚠️ **여기부터는 정정 이력이다. 지금 값이 아니다.** 문서 규칙 2 — 틀린 값을 지우지 않는다.
+> ⚠️ **From here down is the correction history. These are not the current
+> values.** Documentation rule 2 — a wrong value is not deleted.
 
-| 시점 | 틀린 것 | 맞는 것 |
+| when | what was wrong | what is right |
 |---|---|---|
-| ~2026-08-20 | 정적 top-1 = 1.394 | 1.115 (덮개 산물이었다) |
-| ~2026-08-20 | 벤더 = 1.088 / 매핑 79% | 1.080 / 92.9% (status 필터) |
-| 2026-08-21 | "사람 구조 vs LLM 구조" | 둘 다 LLM. 물리 vs 점수 |
-| 2026-08-21 | "짧은/긴 형상" | 빠른/느린 체제 (SOL 기준, 차원 아님) |
-| 2026-08-21 | "물리 구조는 전이되고 점수 구조는 안 된다" | 반대다. `evolved` 1.0652 < `physics_seeded` 1.1637 |
-| 2026-08-21 | "`physics_seeded` 체제별 재적합 1.0680, 벤더에 6승 0패" | 그 값은 `evolved` 의 것 |
-| 2026-08-21 | "통과 조건을 넘은 유일한 방법이 사람 구조 + 재적합" | `physics_seeded` 는 통과 조건을 넘은 적이 없다 |
+| ~2026-08-20 | static top-1 = 1.394 | 1.115 (it was an artefact of the cover) |
+| ~2026-08-20 | the vendor = 1.088 / mapping 79% | 1.080 / 92.9% (the status filter) |
+| 2026-08-21 | "the human structure vs the LLM structure" | both are LLM. Physics vs score |
+| 2026-08-21 | "short/long shapes" | the fast/slow regime (by SOL, not by dimension) |
+| 2026-08-21 | "the physics structure transfers and the score structure does not" | it is the opposite. `evolved` 1.0652 < `physics_seeded` 1.1637 |
+| 2026-08-21 | "`physics_seeded` refit per regime 1.0680, 6 wins 0 losses against the vendor" | that value is `evolved`'s |
+| 2026-08-21 | "the only method that passed the gate is the human structure + refit" | `physics_seeded` has never passed the gate |
 
-작업 지시에 근거로 제시됐으나 **이 저장소의 어떤 실행에도 없는 값들:**
-`1.0325`, `1.1957`, `1.2151`, `1.2116`, `1.2130`, `55%→5.6%`, `균형 1.1387`.
-출처가 확인되면 해당 절을 다시 쓴다.
+**Values presented as grounds in the work instructions that are in no run of
+this repository:**
+`1.0325`, `1.1957`, `1.2151`, `1.2116`, `1.2130`, `55%→5.6%`,
+`balanced 1.1387`. If a source is confirmed, the relevant section is
+rewritten.
 
 ---
-

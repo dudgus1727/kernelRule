@@ -1,91 +1,100 @@
-# 상위권 순위 능력 — 분해능을 통제하고 다시 (2026-09-01)
+# Top-rank ordering ability — with the resolution controlled (2026-09-01)
 
-> **왜** `degeneracy.md` 의 상위권 tau 0.141 은 실험 계획서 판정선
-> (`>=0.30 매긴다 / <=0.10 못 매긴다`)에서 **"가운데"** 인데 내가
-> "못 매긴다" 로 썼다. 그리고 분해능 교락이 있었다.
-> **재현** `python3 experiments/top_tau.py` · LLM 0회
-> **원자료** [top-tau.json](top-tau.json)
+> **Why** `degeneracy.md`'s top-rank tau of 0.141 is **"in between"** on the
+> pre-registered decision line (`>=0.30 it ranks / <=0.10 it cannot`), but I
+> wrote it down as "it cannot". And there was a resolution confound.
+> **Reproduce** `python3 experiments/top_tau.py` · 0 LLM calls
+> **Raw data** [top-tau.json](top-tau.json)
 
-## 통제
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
 
-참 상위 100 의 **고유 시간값이 N 개 이상**인 형상에서만 tau-b 를 낸다.
-남은 형상 수와 **같은 부분집합의 무작위 바닥**(20뽑기)을 함께 낸다.
+## The control
 
-## 결과 — ★ 통제하면 **내려간다**
+tau-b is computed only on the shapes whose true top 100 has **N or more
+distinct time values**. The number of shapes left and **the random floor of
+that same subset** (20 draws) are reported alongside.
 
-```
-A6000 학습 41형상 (실험 계획서 조건)
-구조          통제없음   고유>=30   고유>=50
-s0             -0.106    -0.153    -0.153
-s1              0.145     0.040     0.016
-s2             -0.118    -0.167    -0.181
-s3              0.150     0.177     0.253
-s4              0.213     0.290     0.351
-s5              0.138     0.152     0.153
-★ 무작위 바닥    0.002    -0.002    -0.012
-남은 형상          40        17         5
-★ 6구조 중앙    0.141     0.096     0.084
-```
+## The result — ★ controlling makes it **go down**
 
 ```
-A6000 홀드아웃 20형상   중앙  0.122  ->  0.121  ->  0.067  (20/12/5형상)
-5090  홀드아웃 20형상   중앙  0.075  ->   ★ 통제 불가 (남은 형상 0)
+A6000 training 41 shapes (the pre-registration condition)
+structure      no control   uniq>=30   uniq>=50
+s0                -0.106     -0.153     -0.153
+s1                 0.145      0.040      0.016
+s2                -0.118     -0.167     -0.181
+s3                 0.150      0.177      0.253
+s4                 0.213      0.290      0.351
+s5                 0.138      0.152      0.153
+★ random floor     0.002     -0.002     -0.012
+shapes left           40         17          5
+★ median of the 6  0.141      0.096      0.084
 ```
 
-**분해능 탓이 아니었다.** 통제하면 오르는 것이 아니라 **내려간다.**
-
-⚠️ 다만 통제하면 표본이 40 → 17 → 5형상으로 줄어든다. `>=50` 의 중앙값은
-**5형상**의 것이라 불안정하다.
-
-⚠️ **구조마다 부호가 달라진다.** `s0`(-0.153)과 `s2`(-0.181)는 상위권을
-**거꾸로** 매기고 `s4`(+0.290)는 제대로 매긴다. "규칙이 상위권을
-매긴다/못 매긴다" 를 6구조 하나로 말할 수 없다.
-
-## ★ 5090 이 교락이 덜할 거라는 전제가 틀렸다
-
 ```
-                 눈금     최적 중앙   상위100 폭        고유 시간값
-A6000        1024.00 ns   353.28 µs   32.3 µs = 31.5칸      34
-5090           16.00 ns   185.34 µs    4.1 µs = ★ 256칸      5
+A6000 holdout 20 shapes   median  0.122  ->  0.121  ->  0.067  (20/12/5 shapes)
+5090  holdout 20 shapes   median  0.075  ->   ★ cannot be controlled (0 shapes left)
 ```
 
-**5090 의 상위 100 은 눈금 256칸에 걸쳐 있는데 고유값이 5개뿐이다.**
-분해능이 남아도는데도 값이 5단계로 뭉친다 — **양자화가 아니라 성능이
-실제로 겹치는 것**이다.
+**It was not the resolution.** Controlling for it does not raise the value,
+it **lowers** it.
 
-A6000 은 반대다. 34개 고유값이 31.5칸 안에 있다 — **눈금 한 칸마다
-값이 하나꼴로, 분해능 한계에 붙어 있다.**
+⚠️ But controlling shrinks the sample from 40 → 17 → 5 shapes. The median at
+`>=50` is over **5 shapes** and is unstable.
 
-```
-★ 두 표에서 "상위권이 뭉치는" 이유가 다르다.
-  A6000  분해능 한계
-  5090   ★ 성능이 실제로 구별되지 않는다
-```
+⚠️ **The sign differs per structure.** `s0` (-0.153) and `s2` (-0.181) order
+the top ranks **backwards** while `s4` (+0.290) orders them correctly. "The
+rule can / cannot rank the top" cannot be said of the 6 structures as one.
 
-그래서 5090 에서는 `>=30` 조건을 만족하는 형상이 **하나도 없다.**
-통제 자체가 불가능하다.
-
-## 판정 — 실험 계획서선에 대면
+## ★ The premise that the 5090 has less confound was wrong
 
 ```
-통제 없음   0.141 (A6000 학습41)   -> 실험 계획서의 "가운데"
-★ 통제 후   0.096 / 0.084          -> "못 매긴다 (<=0.10)"
-5090        0.075                  -> "못 매긴다", 단 통제 불가
+                 tick        best median   top-100 span         distinct times
+A6000        1024.00 ns      353.28 µs     32.3 µs = 31.5 ticks       34
+5090           16.00 ns      185.34 µs      4.1 µs = ★ 256 ticks       5
 ```
 
-**통제 후에는 "못 매긴다" 쪽이다.** 그러나 근거가 처음 생각과 다르다 —
-분해능을 걷어냈더니 좋아진 것이 아니라 나빠졌다. 그리고 표본이 5~17
-형상이고 구조마다 부호가 달라진다.
+**The 5090's top 100 spans 256 ticks and yet has only 5 distinct values.**
+The resolution is more than enough and the values still clump into 5 levels —
+**it is not quantisation, the performances genuinely overlap.**
 
-### ★ 그래서 서술을 이렇게 쓴다
+The A6000 is the opposite. 34 distinct values inside 31.5 ticks — **about one
+value per tick, right up against the resolution limit.**
 
 ```
-쓸 수 있다   "상위 100 안에서는 순위를 거의 못 매긴다.
-             무작위 바닥(0.00)보다 조금 높을 뿐이고 구조마다 부호가 달라진다"
-★ 못 쓴다    "분해능 때문에 못 매긴다"  — 통제해도 안 오른다
-★ 못 쓴다    "6구조가 일관되게 못 매긴다" — s4 는 0.29~0.35 다
+★ The reason "the top ranks clump" differs between the two tables.
+  A6000  the resolution limit
+  5090   ★ the performances genuinely cannot be told apart
 ```
 
-전 구간 tau(0.30~0.56, 무작위 0.00)와 함께 읽으면 그림이 맞는다 —
-**규칙은 거친 눈금에서는 순위를 매기고 상위권에서는 거의 못 매긴다.**
-그것이 `top-1 선택기` 라는 서술과 일관된다 (D-100).
+So on the 5090 **not one shape** meets the `>=30` condition. The control
+itself is impossible.
+
+## The verdict — against the pre-registered line
+
+```
+no control   0.141 (A6000 training 41)   -> the pre-registration's "in between"
+★ controlled 0.096 / 0.084               -> "it cannot rank (<=0.10)"
+5090         0.075                       -> "it cannot rank", but the control
+                                            is impossible
+```
+
+**After the control it is on the "cannot rank" side.** But the ground differs
+from the first thought — taking the resolution out did not improve it, it
+made it worse. And the sample is 5~17 shapes with the sign differing per
+structure.
+
+### ★ So the statement is written like this
+
+```
+can be said   "inside the top 100 it can hardly rank at all.
+              It is only slightly above the random floor (0.00) and the sign
+              differs per structure"
+★ cannot say  "it cannot rank because of the resolution"  — controlling does
+              not raise it
+★ cannot say  "the 6 structures consistently cannot rank" — s4 is 0.29~0.35
+```
+
+Read together with the all-range tau (0.30~0.56, random 0.00) the picture
+holds — **the rule ranks on a coarse scale and can hardly rank at the top.**
+That is consistent with the description `a top-1 selector` (D-100).

@@ -12,9 +12,10 @@ not stop if even one new cell appears.
 ★ The significance threshold is exactly the one the loop uses
 (`is_significant`). No new criterion is made (principle 2).
 
-⚠️ 2026-09-08 (D-146): **the verdict strings stay in Korean.** They are the
-three verdicts written down in `docs/artifacts/rounds-prereg.md` and stored
-in `rounds-curve.json`, and `docs/` is not translated.
+⚠️ 2026-09-08 (D-146): the three verdict strings were translated together
+with `docs/artifacts/rounds-prereg.md` and the `verdict` field of
+`rounds-curve.json`. The branches and the numbers are unchanged; the Korean
+originals are at commit `ee53b4d`.
 """
 
 from __future__ import annotations
@@ -227,21 +228,21 @@ def main() -> None:
     print("★ the verdict — one of the three in pre-registration §2")
     print("=" * 96)
     if in3:
-        verdict = "(나) 12 가 부족하다"
-        print(f"  ★ (나) — seeds with a significant improvement in the last "
+        verdict = "(b) 12 is not enough"
+        print(f"  ★ (b) — seeds with a significant improvement in the last "
               f"3 rounds: {in3}")
         print("     -> round 24 has to be measured at n=6 (about 6,000 calls "
               "/ 15 hours)")
     elif late_cell:
-        verdict = "(다) 애매하다 — 유의 개선은 끝났는데 새 셀이 늦게까지 생긴다"
-        print("  ★ (다) — the significant improvements ended at r8 or "
+        verdict = "(c) ambiguous — the significant improvements ended but new cells keep appearing late"
+        print("  ★ (c) — the significant improvements ended at r8 or "
               f"earlier but new cells keep appearing after r9: {late_cell}")
         print("     -> adjusting patience is **reviewed**. ⚠️ It is not "
               "changed here (that is a condition change, so it needs its own "
               "pre-registration)")
     else:
-        verdict = "(가) 12 로 충분하다"
-        print("  ★ (가) — for all 6 seeds the last significant improvement "
+        verdict = "(a) 12 is enough"
+        print("  ★ (a) — for all 6 seeds the last significant improvement "
               "is at r8 or earlier and there is no new cell after r9 either")
         print("     -> rounds are not an axis. It is written in a footnote "
               "together with the curve")

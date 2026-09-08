@@ -1,170 +1,187 @@
-# `regret@k` — 벽은 지표가 만든 것이 아니다
+# `regret@k` — the wall was not made by the metric
 
-실험 계획서 [regret-at-k-prereg.md](regret-at-k-prereg.md). **LLM 0회.**
+The pre-registration is [regret-at-k-prereg.md](regret-at-k-prereg.md).
+**0 LLM calls.**
 
 ```
 python3 experiments/regret_at_k.py     # -> docs/artifacts/regret-at-k.json
 ```
 
-전부 A6000 홀드아웃 20형상. 시드별로 내고 **중앙과 범위**.
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
+
+Everything is on the A6000 holdout of 20 shapes. Reported per seed, as **the
+median and the range**.
 
 ---
 
-## 1. ★ 의심은 사실이었다 — `tau` 는 노이즈를 안 본다
+## 1. ★ The suspicion was true — `tau` does not look at the noise
 
-`kendalltau` 를 부르는 자리를 전수 확인했다 (`two_stage._measure`,
-`rank_evo_report`, `top_tau`, `degeneracy`). **전부 `time_ms` 를 그대로
-넘긴다.** `variant="b"` 는 시간이 **정확히 같을 때만** 동률로 본다.
+Every place that calls `kendalltau` was checked exhaustively
+(`two_stage._measure`, `rank_evo_report`, `top_tau`, `degeneracy`). **All of
+them pass `time_ms` as it is.** `variant="b"` treats values as tied **only
+when the times are exactly equal**.
 
 ```
-상위 100 안의 쌍 99,000
-  노이즈로 못 가르는 쌍   46,679 (47.2%)
-  tau-b 가 동률로 보는 쌍 14,628 (14.8%)   ← 시간이 정확히 같은 것만
-★ 차이 32.4% 가 **없는 순서를 채점당한다**
+pairs within the top 100: 99,000
+  pairs the noise cannot separate   46,679 (47.2%)
+  pairs tau-b treats as tied        14,628 (14.8%)   ← only exactly equal times
+★ the difference, 32.4%, **gets scored on an order that does not exist**
 ```
 
-순위 손실은 그 쌍을 **뺀다**(`NoiseModel.resolvable`). `tau` 는 안 뺐다.
-**같은 실험 안에서 학습과 평가가 다른 기준을 썼다.**
+The rank loss **drops** those pairs (`NoiseModel.resolvable`). `tau` did not.
+**Inside one experiment, training and evaluation used different criteria.**
 
-⚠️ 지시문의 "143,550 중 101,046 (70%)" 은 **학습 41형상** 값이다.
-홀드아웃 20형상에서는 47.2% 다. 나란히 놓지 않는다 (원칙 4).
+⚠️ The instruction's "101,046 of 143,550 (70%)" is a **training-41-shape**
+figure. On the holdout of 20 shapes it is 47.2%. They are not put side by side
+(principle 4).
 
 ---
 
-## 2. 그런데 벽은 그대로다 — 판정은 **(다)**
+## 2. But the wall is unchanged — the verdict is **(c)**
 
 ```
-                       k=1    k=3    k=5   k=10   k=20   k=50  k=100
-regret 구조+regret w   1.076  1.066  1.072  1.075  1.084  1.099  1.106
-★ 순위 구조+regret w    1.121  1.113  1.115  1.118  1.126  1.142  1.166
-★ regret 구조+순위 w    1.528  1.458  1.451  1.448  1.472  1.488  1.496
-순위 구조+순위 w         1.636  1.580  1.566  1.543  1.568  1.545  1.536
-★ 무작위 바닥           1.715  1.945  2.066  2.268  2.339  2.370  2.378
+                                     k=1    k=3    k=5   k=10   k=20   k=50  k=100
+regret structure+regret w           1.076  1.066  1.072  1.075  1.084  1.099  1.106
+★ rank structure+regret w           1.121  1.113  1.115  1.118  1.126  1.142  1.166
+★ regret structure+rank w           1.528  1.458  1.451  1.448  1.472  1.488  1.496
+rank structure+rank w               1.636  1.580  1.566  1.543  1.568  1.545  1.536
+★ random floor                      1.715  1.945  2.066  2.268  2.339  2.370  2.378
 ```
 
-### 시드 범위가 **어느 k 에서도 안 겹친다**
+### The seed ranges **do not overlap at any k**
 
-실험 계획서의 판정 기준은 시드 범위였다.
-
-```
-   k   regret 팔 범위          순위 팔 범위           간격
-   1   1.0566~1.0919      1.1800~1.7047      +0.0880
-   3   1.0549~1.0927      1.1497~1.6718      +0.0569
-   5   1.0518~1.1038      1.1328~1.6298      +0.0290
-  10   1.0657~1.1162      1.1468~1.6433      +0.0306
-  20   1.0671~1.1138      1.1601~1.5806      +0.0463
-  50   1.0690~1.1469      1.1526~1.5691      +0.0058   ← 가장 가깝다
- 100   1.0795~1.1774      1.2146~1.5572      +0.0372
-```
-
-**(다) 두 곡선이 k>=10 에서도 달라진다.** 벽이 실재한다. 지금 결론 유지.
-
-⚠️ k=50 의 간격이 +0.0058 로 거의 닿는다. "확실히 달라진다" 가 아니라
-**"겹치지 않는다"** 까지가 말할 수 있는 것이다.
-
-### 무작위 바닥이 k 와 함께 **커진다**
+The pre-registered criterion was the seed range.
 
 ```
-바닥   1.715 -> 2.378   (k=1 -> 100)
-규칙   전부 평평하거나 좋아진다
+   k   the regret arm's range   the rank arm's range   the gap
+   1   1.0566~1.0919            1.1800~1.7047          +0.0880
+   3   1.0549~1.0927            1.1497~1.6718          +0.0569
+   5   1.0518~1.1038            1.1328~1.6298          +0.0290
+  10   1.0657~1.1162            1.1468~1.6433          +0.0306
+  20   1.0671~1.1138            1.1601~1.5806          +0.0463
+  50   1.0690~1.1469            1.1526~1.5691          +0.0058   ← the closest
+ 100   1.0795~1.1774            1.2146~1.5572          +0.0372
 ```
 
-`regret@k` 는 k 가 커진다고 쉬워지는 지표가 아니다 — 오히려 무작위는
-더 나빠진다. **두 계열의 격차가 k 와 무관하게 유지되는 것이 결과다.**
+**(c) the two curves stay apart even at k>=10.** The wall is real. The
+current conclusion holds.
+
+⚠️ At k=50 the gap of +0.0058 almost touches. What can be said is not "they
+are definitely different" but **"they do not overlap"**.
+
+### The random floor **grows** with k
+
+```
+the floor   1.715 -> 2.378   (k=1 -> 100)
+the rules   all flat or better
+```
+
+`regret@k` is not a metric that gets easier as k grows — random gets worse.
+**The result is that the gap between the two families holds regardless of k.**
 
 ---
 
-## 3. (나)는 **기각** — 파국이 몇 형상에 몰린 것이 아니다
+## 3. (b) is **rejected** — the catastrophes are not concentrated in a few shapes
 
 ```
-                       파국(>1.15) 형상 (중앙/20)   시드 범위   합집합
-regret 구조+regret w              2.5              1~ 5        8
-★ 순위 구조+regret w               5.0              5~ 7        9
-★ regret 구조+순위 w              12.5              5~20       20
-순위 구조+순위 w                    14.0             12~18       20
-곱 항 (prod)                     14.0             13~16       20
-k=10                           15.0             14~16       16
-k=20                           14.0             14~16       16
-k=50                           17.0             16~17       17
-λ=1                            13.0             12~15       15
-예산 16                          13.0             12~14       15
+                                catastrophic (>1.15) shapes   seed range   union
+                                (median/20)
+regret structure+regret w                2.5                    1~ 5         8
+★ rank structure+regret w                5.0                    5~ 7         9
+★ regret structure+rank w               12.5                    5~20        20
+rank structure+rank w                   14.0                   12~18        20
+product term (prod)                     14.0                   13~16        20
+k=10                                    15.0                   14~16        16
+k=20                                    14.0                   14~16        16
+k=50                                    17.0                   16~17        17
+λ=1                                     13.0                   12~15        15
+budget 16                               13.0                   12~14        15
 
-★ 모든 팔에서 파국인 형상 7개 / 어느 팔에서든 파국인 형상 20개
+★ shapes catastrophic in every arm: 7 / shapes catastrophic in any arm: 20
 ```
 
-**순위 가중치 팔은 20형상 중 12~18개가 파국이다.** "몇 형상에 몰려
-있다" 가 아니라 **대부분의 형상에서 1등을 못 고른다.** geomean 이 몇
-형상에 끌린 것이라는 의심은 기각된다.
+**The rank-weight arms are catastrophic on 12~18 of the 20 shapes.** It is
+not "concentrated in a few shapes" but **failing to pick first place on most
+of them.** The suspicion that the geomean was dragged by a few shapes is
+rejected.
 
 ---
 
-## 4. (b) 노이즈 인식 `tau` — 다 오르지만 **순서는 안 바뀐다**
+## 4. (b) The noise-aware `tau` — everything rises but **the order does not change**
 
-참 순위에서 노이즈 바닥 이내를 동률로 묶고 다시 쟀다. 묶는 법은 시간
-오름차순 단일 연결 — `NoiseModel.resolvable` 을 그대로 쓴다 (원칙 2).
+The true ranks were tied together within the noise floor and re-measured. The
+grouping is single linkage in ascending time — `NoiseModel.resolvable` is used
+as it is (principle 2).
 
 ```
-                       옛 tau   노이즈 인식     차이
-regret 구조+regret w    0.122      0.158    +0.036
-★ 순위 구조+regret w     0.115      0.134    +0.019
-★ regret 구조+순위 w     0.203      0.291    +0.089
-순위 구조+순위 w          0.353      0.410    +0.057
-곱 항 (prod)           0.370      0.427    +0.057
-k=20                  0.235      0.341    +0.106
-k=50                  0.327      0.393    +0.065
-λ=1                   0.290      0.377    +0.087
-예산 16                 0.364      0.432    +0.068
+                                old tau   noise-aware   difference
+regret structure+regret w        0.122       0.158       +0.036
+★ rank structure+regret w        0.115       0.134       +0.019
+★ regret structure+rank w        0.203       0.291       +0.089
+rank structure+rank w            0.353       0.410       +0.057
+product term (prod)              0.370       0.427       +0.057
+k=20                             0.235       0.341       +0.106
+k=50                             0.327       0.393       +0.065
+λ=1                              0.290       0.377       +0.087
+budget 16                        0.364       0.432       +0.068
 ```
 
-**전부 오른다** (+0.019 ~ +0.106) — §1 의 직접 증거다. 노이즈 안의
-순서를 채점하던 것이 tau 를 눌러 왔다.
+**Everything rises** (+0.019 ~ +0.106) — direct evidence for §1. Scoring the
+order inside the noise had been holding tau down.
 
-★ **그런데 팔의 순서가 안 바뀐다.** regret 가중치 팔 0.13~0.16,
-순위 가중치 팔 0.38~0.43. **벽은 고친 지표에서도 그대로다.**
+★ **But the order of the arms does not change.** The regret-weight arms are
+0.13~0.16 and the rank-weight arms 0.38~0.43. **The wall is there in the
+fixed metric too.**
 
-⚠️ 옛 tau 값을 지우지 않는다 — 나란히 남긴다 (문서 규칙 2).
+⚠️ The old tau values are not deleted — they are kept alongside (documentation
+rule 2).
 
 ---
 
-## 5. 곁가지 — 구조가 아니라 **가중치**다 (D-103 재확인)
+## 5. An aside — it is the **weights**, not the structure (D-103 reconfirmed)
 
 ```
-★ 순위 구조 + regret 가중치   regret@k 1.121 ~ 1.166
-   regret 구조 + regret 가중치        1.076 ~ 1.106
+★ rank structure + regret weights   regret@k 1.121 ~ 1.166
+   regret structure + regret weights        1.076 ~ 1.106
 ```
 
-순위 손실로 진화한 **구조**에 regret 가중치를 붙이면 regret 팔에 거의
-따라붙는다 (모든 k 에서 간격 0.045~0.060). **구조가 망가진 것이
-아니다** — 가중치 하나가 두 순서를 동시에 못 만든다는 D-103 의 결론이
-`regret@k` 에서도 같다.
+Putting regret weights on a **structure** evolved with the rank loss brings it
+almost up to the regret arm (a gap of 0.045~0.060 at every k). **The structure
+is not broken** — D-103's conclusion that one set of weights cannot make both
+orders at once holds in `regret@k` too.
 
 ---
 
-## 6. 무엇이 바뀌었나
+## 6. What changed
 
 ```
-바뀐 것   ★ tau 가 노이즈를 안 봤다는 사실이 확정됐고 값이 다 올랐다
-         지표를 고른 방식에 문제가 있었다 (§7)
-안 바뀐 것 ★ 벽. 두 계열이 어느 k 에서도 안 겹치고, 노이즈 인식 tau
-         에서도 순서가 같고, 파국이 몇 형상에 몰린 것도 아니다
+changed      ★ it is now settled that tau did not look at the noise, and every
+             value rose
+             there was a problem in how the metric was chosen (§7)
+unchanged    ★ the wall. The two families do not overlap at any k, the order
+             is the same under the noise-aware tau, and the catastrophes are
+             not concentrated in a few shapes
 ```
 
-여섯 방향 실험의 결론은 유지된다. **"tau 가 안 움직였다" 는 사실이었고,
-`regret@k` 는 그것을 다른 지표로 확인했다.**
+The conclusion of the six-direction experiment holds. **"tau did not move" was
+a fact, and `regret@k` confirmed it with a different metric.**
 
 ---
 
-## 7. ★ 지표를 고른 방식이 틀렸다
+## 7. ★ The way the metric was chosen was wrong
 
-순위 손실 실험의 판정선을 `tau` 로 잡은 것은 설계 때다. 사용자가 처음
-물은 것은 **"regret 규칙이 성능 경향을 보여주나"** 였는데, 그것이
-**"순서를 정확히 맞추나"** 로 바뀌었다.
+Setting the rank-loss experiment's decision line on `tau` happened at design
+time. What the user first asked was **"does the regret rule show the
+performance trend"**, and that turned into **"does it get the order exactly
+right"**.
 
 ```
-알고 싶은 것   상위권에서 성능 경향을 보여주나
-쓴 지표       tau — 상위권 **순서**를 정확히 맞추나
-★ 무엇을 알고 싶은가로 돌아가지 않고 **있는 지표**를 썼다
+what we want to know   does it show the performance trend at the top
+the metric used        tau — does it get the top **order** exactly right
+★ instead of going back to what we want to know, **the metric that existed**
+  was used
 ```
 
-결론이 안 바뀐 것은 운이다. `regret@k` 를 처음부터 썼으면 §4 의 노이즈
-문제도 같이 안 생겼다.
+That the conclusion did not change is luck. Had `regret@k` been used from the
+start, the noise problem of §4 would not have arisen either.

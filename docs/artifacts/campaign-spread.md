@@ -1,71 +1,79 @@
-# 캠페인 산포 — **시드 산포보다 크지 않다** (그리고 D-135 §5 를 정정한다)
+# Campaign spread — **it is not larger than the seed spread** (and this corrects D-135 §5)
 
-> **재현**: `python3 experiments/campaign_spread.py` (LLM **0회**)
-> 곡선 원자료: `round-curve.json` · `round-curve-p3.json` ·
-> `round-curve-new.json` (전부 `experiments/round_curve.py` 가 만든 것)
-> **원자료**: `campaign-spread.json`
+> **Reproduce**: `python3 experiments/campaign_spread.py` (**0** LLM calls)
+> The curves' raw data: `round-curve.json` · `round-curve-p3.json` ·
+> `round-curve-new.json` (all made by `experiments/round_curve.py`)
+> **Raw data**: `campaign-spread.json`
 
-## 0. 왜 쟀나
+> ⚠️ 2026-09-08 (D-146): translated into English. The numbers and the verdicts
+> are unchanged; the Korean original is at commit `ee53b4d`.
 
-판정선 `delta = 0.0516` 은 **한 캠페인 안의 시드 폭** σ 로 만든 값이다.
-그런데 우리가 판정에 쓰는 비교의 상당수는 **다른 캠페인끼리**다 (표현력
-셋, hw 사다리, 전이 (b)vs(c), F1/F2/F3). 캠페인 효과가 따로 있으면 그
-성분은 **시드를 늘려도 안 줄어든다** — 판정선의 바닥이다.
+## 0. Why it was measured
 
-## 1. ⚠️ 먼저, 앞서 쓴 0.0185 는 **틀린 자리에서 읽은 값이다**
+The decision line `delta = 0.0516` is a value made from the **seed spread
+inside one campaign**, σ. But a good many of the comparisons we decide on are
+**between different campaigns** (the expressiveness set, the hw ladder, the
+transfer (b) vs (c), F1/F2/F3). If there is a separate campaign effect, that
+component **does not shrink when seeds are added** — it is the floor of the
+decision line.
 
-D-135 §5 는 "같은 프롬프트를 쓴 두 캠페인이 r5 에서 0.0185 벌어진다"
-고 적었다. **그 r5 에서 한쪽(p3)은 이미 일부 시드가 멈춰 있었다.**
+## 1. ⚠️ First, the 0.0185 written earlier is **a value read at the wrong place**
 
-```
-p3 시드별 마지막 라운드   s0:r6 s1:r5 s2:r4 s3:r6 s4:r6 s5:r5
-                        ★ 전원이 살아 있는 마지막 라운드는 r4 다
-```
-
-멈춘 시드는 곡선이 **마지막 값에 고정**되고 도는 쪽만 나아진다. 그 차이는
-캠페인 산포가 아니라 **"한쪽이 그만뒀다"** 는 사실이다.
-
-**옛 값은 지운다는 뜻이 아니다** — 0.0185 는 위와 같은 이유로 **캠페인
-산포의 추정치로 쓸 수 없다**는 것이 정정이다.
-
-## 2. 전원이 살아 있는 라운드에서 다시
+D-135 §5 wrote "two campaigns using the same prompt are 0.0185 apart at r5".
+**At that r5 one side (p3) already had some seeds stopped.**
 
 ```
-라운드      옛(옛 프롬프트·12r)   p3(새 프롬프트)    새24(새 프롬프트·24r)
-            평균  중앙   σ        평균  중앙   σ        평균  중앙   σ
-r4        1.0943 1.0949 .0117  1.1054 1.1052 .0109  1.1144 1.1129 .0188
-r5        1.0943 1.0949 .0117    — 일부 종료        1.1144 1.1129 .0188
-r11       1.0759 1.0762 .0124    — 일부 종료        1.1141 1.1121 .0187
-r23         — 종료(12r)          — 일부 종료        1.0734 1.0787 .0141
+p3 last round per seed   s0:r6 s1:r5 s2:r4 s3:r6 s4:r6 s5:r5
+                         ★ the last round where everyone is alive is r4
 ```
 
-### ★ 같은 조건 두 캠페인 (p3 ↔ 새24, r4)
+A stopped seed's curve is **pinned at its last value** while only the running
+side improves. That difference is not campaign spread but the fact that
+**one side quit**.
 
-`p3` 와 `새24` 는 **`patience` 말고 설정이 전부 같다** (config 를 평탄화해
-비교했다 — 다른 항목은 `loop.patience` 하나뿐이다). 그리고 멈추기 전
-라운드에서는 `patience` 가 아무 일도 안 한다.
+**This does not mean the old value is deleted** — the correction is that, for
+the reason above, 0.0185 **cannot be used as an estimate of the campaign
+spread**.
 
-```
-p3    1.0922 1.0967 1.0989 1.1115 1.1138 1.1193   평균 1.1054  σ 0.0109
-새24   1.0922 1.1006 1.1019 1.1240 1.1277 1.1401   평균 1.1144  σ 0.0188
-
-캠페인 차 (평균)                        +0.0090
-시드 산포만으로 기대되는 차의 표준편차     0.0089
-★ 실측 / 기대 = 1.0배
-```
-
-**두 캠페인의 차이가 시드 산포만으로 예측되는 폭과 정확히 같다.**
-캠페인 성분의 점추정은 `σ(캠페인) = 0.0011` — 사실상 0 이다.
-
-## 3. 그래서 판정선은 **안 바뀐다**
+## 2. Again, at a round where everyone is alive
 
 ```
-지금 판정선 (시드 σ 상한 0.0319 · n=6 · 비대응)   0.0516
-캠페인 성분을 넣으면 (점추정)                     0.0518
-시드를 무한히 늘려도 남는 바닥                     0.0044
+round     old (old prompt·12r)   p3 (new prompt)      new24 (new prompt·24r)
+          mean   median   σ      mean   median   σ     mean   median   σ
+r4      1.0943 1.0949 .0117   1.1054 1.1052 .0109   1.1144 1.1129 .0188
+r5      1.0943 1.0949 .0117    — some finished       1.1144 1.1129 .0188
+r11     1.0759 1.0762 .0124    — some finished       1.1141 1.1121 .0187
+r23      — finished (12r)      — some finished       1.0734 1.0787 .0141
 ```
 
-| n | 시드만 | 캠페인 성분 포함 |
+### ★ Two campaigns under the same condition (p3 ↔ new24, r4)
+
+`p3` and `new24` **have every setting the same except `patience`** (the
+configs were flattened and compared — the only other item is
+`loop.patience`). And before it stops, `patience` does nothing.
+
+```
+p3     1.0922 1.0967 1.0989 1.1115 1.1138 1.1193   mean 1.1054  σ 0.0109
+new24  1.0922 1.1006 1.1019 1.1240 1.1277 1.1401   mean 1.1144  σ 0.0188
+
+the campaign difference (mean)                          +0.0090
+the standard deviation expected from the seed spread     0.0089
+★ measured / expected = 1.0x
+```
+
+**The difference between the two campaigns is exactly the width predicted by
+the seed spread alone.** The point estimate of the campaign component is
+`σ(campaign) = 0.0011` — effectively 0.
+
+## 3. So the decision line **does not change**
+
+```
+the current decision line (seed σ upper bound 0.0319 · n=6 · unpaired)   0.0516
+with the campaign component added (point estimate)                       0.0518
+the floor that remains however far seeds are increased                   0.0044
+```
+
+| n | seeds only | with the campaign component |
 |---:|---:|---:|
 | 3 | 0.0730 | 0.0731 |
 | 6 | **0.0516** | **0.0518** |
@@ -73,48 +81,57 @@ p3    1.0922 1.0967 1.0989 1.1115 1.1138 1.1193   평균 1.1054  σ 0.0109
 | 24 | 0.0258 | 0.0262 |
 | 96 | 0.0129 | 0.0136 |
 
-**지난 "구분 불가" 판정들을 다시 볼 필요가 없다.** 판정선이 0.0002 움직인다.
+**The past "indistinguishable" verdicts do not need to be revisited.** The
+decision line moves by 0.0002.
 
-## 4. ⚠️ 이 추정으로 말할 수 없는 것
-
-```
-같은 조건 캠페인 쌍   1개   -> 자유도 1
-σ(캠페인) 95% 상한    0.1437   ★ 실측의 16배 — 상한으로 못 쓴다
-```
-
-**말할 수 있는 것**: 실측 차가 시드 산포만으로 기대되는 폭과 같다.
-**말할 수 없는 것**: 캠페인 성분이 작다는 **보장**.
-
-재려면 같은 조건 캠페인이 **3개 이상** 필요하다 (자유도 2+). 지금 그럴
-값이 있는지는 별개 문제다 — 캠페인 하나가 LLM 5,600회다.
-
-## 5. ★ 그런데 다른 것이 보인다 — 옛 캠페인이 **모든 맞춘 라운드에서 앞선다**
+## 4. ⚠️ What this estimate cannot say
 
 ```
-r4    옛 1.0949  <  p3 1.1052  <  새24 1.1129
-r5    옛 1.0949  <              새24 1.1129
-r11   옛 1.0762  <              새24 1.1121
+campaign pairs under the same condition   1     -> 1 degree of freedom
+σ(campaign) 95% upper bound               0.1437   ★ 16x the measured value —
+                                                     it cannot be used as a bound
 ```
 
-부호가 세 번 다 같고, r11 에서는 **0.0359** 다 — 판정선 0.0516 안이라
-**구분 불가**지만 점추정은 0 이 아니다.
+**What can be said**: the measured difference equals the width expected from
+the seed spread alone.
+**What cannot be said**: a **guarantee** that the campaign component is small.
+
+Measuring it needs **3 or more** campaigns under the same condition (2+
+degrees of freedom). Whether that is worth doing now is a separate question —
+one campaign is 5,600 LLM calls.
+
+## 5. ★ But something else shows up — the old campaign **leads at every matched round**
 
 ```
-D-131 이 적은 "프롬프트 효과 -0.0005"
-  ★ 옛(r5) 대 p3(각자 멈춘 r4~r6) — **라운드가 안 맞은 비교**였다
-  ★ 라운드를 맞추면 r4 에서 옛이 0.0103 앞선다
+r4    old 1.0949  <  p3 1.1052  <  new24 1.1129
+r5    old 1.0949  <                new24 1.1129
+r11   old 1.0762  <                new24 1.1121
 ```
 
-**두 캠페인이 배달한 값은 같다** (옛 r11 에서 1.0762, 새24 r23 에서
-1.0787, 차 +0.0025). 다만 **새 프롬프트는 같은 곳에 가는 데 라운드를
-두 배 썼다.** 이것은 관측이지 판정이 아니다 — 사전 등록에 없었고
-캠페인 쌍이 하나다. **다음 재측정에서 볼 자리로 적어 둔다.**
-
-## 6. 남는 진술
+The sign is the same all three times, and at r11 it is **0.0359** — inside the
+decision line 0.0516 so **indistinguishable**, but the point estimate is not 0.
 
 ```
-★ 판정선 0.0516 은 그대로 쓴다 (캠페인 성분 점추정 0.0011)
-★ 캠페인끼리 비교해도 지금 판정선이 맞다 — 지난 판정 재검토 불필요
-⚠️ 단 그것은 **쌍 하나**에서 나온 점추정이다
-★ 옛 프롬프트가 맞춘 라운드마다 앞선다 (구분 불가, 부호 3/3) — 관측
+the "prompt effect -0.0005" D-131 wrote
+  ★ old (r5) against p3 (r4~r6, wherever each stopped) — **a comparison with
+    the rounds not matched**
+  ★ matching the rounds, old leads by 0.0103 at r4
+```
+
+**The value the two campaigns delivered is the same** (1.0762 at old's r11,
+1.0787 at new24's r23, a difference of +0.0025). Only, **the new prompt spent
+twice the rounds getting to the same place.** This is an observation, not a
+verdict — it was not in the pre-registration and there is one campaign pair.
+**It is written down as a place to look at in the next re-measurement.**
+
+## 6. The statements that remain
+
+```
+★ the decision line 0.0516 is used as it is (campaign component point
+  estimate 0.0011)
+★ the current decision line is right for comparisons between campaigns too —
+  no need to revisit past verdicts
+⚠️ but that is a point estimate out of **one pair**
+★ the old prompt leads at every matched round (indistinguishable, sign 3/3)
+  — an observation
 ```

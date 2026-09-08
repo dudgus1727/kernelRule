@@ -155,9 +155,9 @@ def main() -> None:
     print("=" * 80)
     rows = {}
     for lab, pairs in (
-            ("regret 안", list(combinations(range(len(F["regret"])), 2))),
-            ("순위 안", list(combinations(range(len(F["rank"])), 2))),
-            ("★ 계열 사이", None)):
+            ("within regret", list(combinations(range(len(F["regret"])), 2))),
+            ("within rank", list(combinations(range(len(F["rank"])), 2))),
+            ("★ between families", None)):
         if pairs is None:
             ps = [(F["regret"][i], F["rank"][j]) for i, j
                   in product(range(len(F["regret"])), range(len(F["rank"])))]
@@ -180,7 +180,7 @@ def main() -> None:
     print("the verdict — the line nailed down in the instruction (union <= 8 "
           "means it is not the budget's fault)")
     print("=" * 80)
-    u = rows["★ 계열 사이"]["union"]
+    u = rows["★ between families"]["union"]
     med, n_le = float(np.median(u)), sum(1 for x in u if x <= 8)
     print(f"  the between-family axis union, median {med:.1f}  "
           f"({n_le}/{len(u)} pairs are 8 or under)")
