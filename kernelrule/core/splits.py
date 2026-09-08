@@ -41,6 +41,7 @@ from typing import Literal
 from kernelrule.core.types import Problem
 
 __all__ = ["Split", "SplitSet", "SplitError", "by_predicate",
+           "stratified_kfold",
            "split_by_M_range", "split_by_K_range", "split_by_alignment",
            "split_by_size", "split_by_waves", "SPLITS",
            "RegimeBalance", "regime_of", "check_balance", "describe",
@@ -163,6 +164,56 @@ def by_predicate(shapes: Sequence[Problem],
         test=(Split("test", out[n_val:], name=f"{name}:test")
               if out[n_val:] else None),
         kind=name)
+
+
+def stratified_kfold(shapes: Sequence[Problem], hw, *, k: int = 3,
+                     seed: int = 0, fold: int | None = None,
+                     name: str = "kfold") -> list[SplitSet]:
+    """★ memory/compute 비율을 유지한 무작위 k-fold (D-144).
+
+    ## 왜 층별인가
+
+    그냥 무작위로 나누면 fold 마다 구성이 흔들린다.
+
+    ```
+    61 shape 중  memory 20 / compute 41   (t_memory > t_compute)
+    무작위로 20개를 뽑으면 memory 가 2개인 fold 가 나올 수 있다
+    -> ★ 그 fold 의 val 은 사실상 compute 만 재는 것이 된다
+    ```
+
+    그래서 층마다 따로 섞어 k 등분하고, fold `i` 의 val 은 각 층의 조각
+    `i` 를 합친 것이다. val 크기가 ±1 인 것은 감수한다.
+
+    ## ★ 분할 시드와 진화 시드를 분리한다
+
+    `seed` 는 **fold 를 만드는 난수**다. 루프의 `cfg.seed` 와 같은 값을
+    넣지 마라 — 둘이 얽히면 "분할이 달라서" 와 "진화가 달라서" 를 못 가른다.
+    """
+    if k < 2:
+        raise SplitError(f"k={k} 로는 fold 를 못 만든다")
+    import numpy as np
+
+    strata: dict[str, list] = {}
+    for p in shapes:
+        strata.setdefault(regime_of(p, hw, axis="roofline"), []).append(p)
+    rng = np.random.default_rng(seed)
+    chunks: dict[str, list[list]] = {}
+    for nm, group in sorted(strata.items()):
+        g = [group[i] for i in rng.permutation(len(group))]
+        # ★ 앞쪽 조각이 하나 더 크다 (7/7/6). 나머지를 버리지 않는다.
+        chunks[nm] = [g[i::k] for i in range(k)]
+    out: list[SplitSet] = []
+    for i in range(k):
+        val = tuple(p for nm in sorted(chunks) for p in chunks[nm][i])
+        vk = {p.key for p in val}
+        train = tuple(p for p in shapes if p.key not in vk)
+        if not train or not val:
+            raise SplitError(f"fold {i} 가 한쪽을 비웠다 (§26.4)")
+        out.append(SplitSet(
+            train=Split("train", train, name=f"{name}{i}:train"),
+            val=Split("val", val, name=f"{name}{i}:val"),
+            kind=f"{name}{i}-seed{seed}"))
+    return out if fold is None else [out[fold]]
 
 
 # ---------------------------------------------------------------------------

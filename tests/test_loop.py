@@ -5,24 +5,31 @@ import numpy as np
 import pytest
 
 from kernelrule.agents.mock import MockLLM
-from kernelrule.core.archive import CELL_AXES, Archive, Elite
+from kernelrule.core.archive import (
+    CELL_AXIS_NAMES,
+    N_QUANTILES,
+    Archive,
+    Elite,
+)
 from kernelrule.core.loop import LoopConfig, RoundLoop
 from kernelrule.core.splits import Split, SplitSet
 
 
-def _elite(regret=1.2, short=1.2, long=1.2, n=100, rnd=0, rid="r1"):
+def _elite(regret=1.2, short=1.2, long=1.2, n=100, rnd=0, rid="r1",
+           allv=None):
     return Elite(rule_id=rid, code="x", w=[1.0], regret=regret,
-                 short_objective=short, long_objective=long, code_len=n, round=rnd)
+                 mem_objective=short, comp_objective=long,
+                 all_objective=(regret if allv is None else allv),
+                 code_len=n, round=rnd)
 
 
 # ---------------------------------------------------------------------------
 # 아카이브
 # ---------------------------------------------------------------------------
-def test_cell_axes_are_64_cells():
-    n = 1
-    for edges in CELL_AXES.values():
-        n *= len(edges) - 1
-    assert n == 64
+def test_cell_axes_are_27_cells():
+    """★ 3x3x3 = 27 칸 (D-144). 옛 값은 4x4x4 = 64 였다."""
+    assert len(CELL_AXIS_NAMES) == 3
+    assert N_QUANTILES ** len(CELL_AXIS_NAMES) == 27
 
 
 def test_specialist_survives_even_with_bad_overall():
@@ -36,23 +43,30 @@ def test_specialist_survives_even_with_bad_overall():
 
 
 def test_noise_tolerance_blocks_meaningless_updates():
-    """"조금 좋아졌다" 로 갱신하면 아카이브가 노이즈를 축적한다 (§13.4)."""
+    """"조금 좋아졌다" 로 **전역 최고**를 갱신하면 노이즈를 축적한다 (§13.4).
+
+    ⚠️ 2026-09-08 (D-144): 칸이 동적 3분위가 되면서 "빈 리스트" 로는 못
+    본다 — 후보가 둘이면 3분위가 둘을 **다른 칸**에 넣으므로 `new_cell`
+    이 정당하게 잡힌다. 이 시험이 지키려는 것은 **`best` 갱신**이다.
+    """
     a = Archive(noise_tol=0.01)
     a.consider(_elite(regret=1.20, rid="a"))
-    assert a.consider(_elite(regret=1.195, rid="b")) == []
+    assert "best" not in a.consider(_elite(regret=1.195, rid="b"))
+    assert a.best.rule_id == "a"
     assert "best" in a.consider(_elite(regret=1.15, rid="c"))
 
 
 def test_parent_mix_is_exploit_explore_cross():
-    """6 착실 / 3 탐색 / 3 교차 (§13.3)."""
+    """★ 제안 6 = exploit 3 / explore 2 / cross 1 (D-144). 옛 값은 12=6/3/3."""
     a = Archive()
-    for i in range(6):
+    for i in range(9):
         a.consider(_elite(regret=1.3 - 0.01 * i, short=1.0 + 0.05 * i,
-                          long=1.0 + 0.02 * i, n=50 + 30 * i, rid=f"r{i}"))
-    kinds = [k for k, _ in a.parents(12, np.random.default_rng(0))]
-    assert kinds.count("exploit") == 6
-    assert kinds.count("explore") == 3
-    assert kinds.count("cross") == 3
+                          long=1.0 + 0.02 * i, allv=1.2 - 0.01 * i,
+                          n=50 + 30 * i, rid=f"r{i}"))
+    kinds = [k for k, _ in a.parents(6, np.random.default_rng(0))]
+    assert kinds.count("exploit") == 3
+    assert kinds.count("explore") == 2
+    assert kinds.count("cross") == 1
 
 
 def test_new_cell_round_is_tracked():
@@ -166,19 +180,21 @@ def test_early_stop_uses_the_validation_split(loop):
     assert "self.splits.train" not in src
 
 
-def test_early_stop_needs_both_conditions(loop):
-    """점수가 멈춰도 새 셀이 나오면 계속 돈다 (§14.3)."""
+def test_early_stop_path_is_sealed(loop):
+    """★ 조기 종료 경로가 **봉인**됐다 (D-144).
+
+    옛 구현은 `best_val_regret` 을 읽었다 — 검증 분할이 종료 판정에
+    들어가는 경로다. `patience=0` 이라 안 돌았지만 **누가 켜면 그 순간
+    시험이 오염된다.** 그래서 켜면 에러다.
+
+    옛 시험은 "점수가 멈춰도 새 셀이 나오면 계속 돈다 (§14.3)" 였다.
+    """
+    loop.run(1, verbose=False)
+    assert loop.cfg.patience == 0
+    assert loop.should_stop() == (False, "")
     loop.cfg.patience = 2
-    loop.run(3, verbose=False)
-    # 새 셀이 최근에 나왔으면 멈추지 않는다
-    loop.archive.last_new_cell_round = len(loop.rounds) - 1
-    for r in loop.rounds:
-        r.best_val_regret = 1.2
-    stop, _ = loop.should_stop()
-    assert not stop, "새 셀이 나왔는데 멈췄다"
-    loop.archive.last_new_cell_round = -1
-    stop, why = loop.should_stop()
-    assert stop and "새 셀도 없다" in why
+    with pytest.raises(ValueError, match="봉인"):
+        loop.should_stop()
 
 
 def test_duplicate_code_is_not_rescored(loop):
@@ -223,7 +239,8 @@ def test_val_blowup_is_reported_not_hidden(loop):
     bad = Elite(rule_id="bad",
                 code="def score(f, p, hw, w):\n"
                      "    return f.waves * w[0]\n", w=[1.0], regret=1.0,
-                short_objective=1.0, long_objective=1.0, code_len=10, round=0,
+                mem_objective=1.0, comp_objective=1.0, all_objective=1.0,
+                code_len=10, round=0,
                 # ★ 기본 채택 기준이 rank 다 (D-101). 없으면 아카이브가
                 #   **거부한다** — 조용히 regret 으로 안 떨어진다
                 rank_loss=0.5,
@@ -301,11 +318,16 @@ def test_balance_check_is_strictable():
         check_balance(Split("train", tuple(tiny)), hw, strict=True)
 
 
-def test_cell_axes_use_size_regimes():
-    """★ 셀 축이 크기 체제다 — mem/comp 가 아니다 (§10.1, §30.5)."""
-    from kernelrule.core.archive import CELL_AXES
+def test_cell_axes_use_roofline_regimes():
+    """★ 셀 축이 **roofline** 이다 (D-144).
 
-    assert set(CELL_AXES) == {"code_len", "short_objective", "long_objective"}
+    옛 축은 `code_len` + 크기 체제(SOL<0.5ms)였다. D-143 이 그 문턱을
+    방어할 수 없음을 보였고, D-144 가 축을 갈았다.
+    """
+    from kernelrule.core.archive import CELL_AXIS_NAMES
+
+    assert set(CELL_AXIS_NAMES) == {"mem_objective", "comp_objective",
+                                    "all_objective"}
 
 
 def test_regime_gap_is_exposed():
@@ -324,12 +346,13 @@ def test_loop_warns_when_train_has_one_regime(synth_table, tmp_path):
     sh = list(synth_table.shapes())
     import math
 
-    from kernelrule.core.splits import _DUMMY_CFG
-    from kernelrule.features.physical import log_sol_ms
-    short = [p for p in sh if log_sol_ms(p, synth_table.hw, _DUMMY_CFG)
-             < math.log2(0.5)]
+    from kernelrule.core.splits import regime_of
+    # ★ 셀 축이 roofline 이 됐다 (D-144) — 경고도 그 축으로 본다.
+    del math
+    short = [p for p in sh
+             if regime_of(p, synth_table.hw, axis="roofline") == "mem"]
     if len(short) < 2 or len(short) == len(sh):
-        pytest.skip("합성 격자에 두 체제가 다 있어야 이 시험이 성립한다")
+        pytest.skip("합성 격자에 두 구간이 다 있어야 이 시험이 성립한다")
     splits = SplitSet(train=Split("train", tuple(short)),
                       val=Split("val", tuple(p for p in sh
                                               if p not in short)))
@@ -337,7 +360,7 @@ def test_loop_warns_when_train_has_one_regime(synth_table, tmp_path):
     cfg = LoopConfig(run_id="one", n_rules_per_round=2, max_rounds=1,
                      max_evals=20, sandbox_first_seen=False,
                      out_dir=str(tmp_path))
-    with pytest.warns(UserWarning, match="한 크기 체제"):
+    with pytest.warns(UserWarning, match="한 roofline 구간"):
         RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
                   llm=llm)
 
@@ -667,8 +690,8 @@ def _parallel_pair(synth_table, tmp_path, workers: int):
     lp.seed(*_SEED_RULE)
     r = lp.run_round()
     elites = sorted(lp.archive.cells.values(), key=lambda e: e.rule_id)
-    return r, [(e.rule_id, e.code, tuple(e.w), e.regret, e.short_objective,
-                e.long_objective, e.val_regret) for e in elites]
+    return r, [(e.rule_id, e.code, tuple(e.w), e.regret, e.mem_objective,
+                e.comp_objective, e.val_regret) for e in elites]
 
 
 def test_parallel_matches_sequential(synth_table, tmp_path):

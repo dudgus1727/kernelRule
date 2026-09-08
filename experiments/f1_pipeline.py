@@ -176,18 +176,41 @@ ARCH_RETRIES = 3
 # ---------------------------------------------------------------------------
 
 
-def _splits(table: PerfTable) -> SplitSet:
-    """구조 분할 — 11008 레이어를 통째로 홀드아웃. 기존 실행과 같다 (§10.1)."""
+def _aligned_shapes(table: PerfTable) -> list:
     def aligned(p) -> bool:
         d = table.frame_for(p)
         return bool((d.align_a == 8).all() and (d.align_b == 8).all()
                     and (d.align_c == 8).all())
 
-    shapes = [p for p in table.shapes() if aligned(p)]
-    held = [p for p in shapes if 11008 in (p.N, p.K)]
-    s = SplitSet(train=Split("train", tuple(p for p in shapes
-                                            if p not in held)),
-                 val=Split("val", tuple(held)), kind="nk11008")
+    return [p for p in table.shapes() if aligned(p)]
+
+
+def _splits(table: PerfTable, *, fold: int | None = None,
+            split_seed: int = 12345, k: int = 3) -> SplitSet:
+    """분할. 기본은 **구조 분할**(11008 레이어를 통째로 홀드아웃, §10.1).
+
+    ★ `fold` 를 주면 **층별 무작위 k-fold** 다 (D-144). 두 분할이 묻는 것이
+    다르다:
+
+    ```
+    k-fold   "분할을 바꿔도 결과가 같은가"     — 무작위라 M·N·K 가 양쪽에 섞인다
+    11008    "본 적 없는 차원값에서도 되는가"  — 한 값을 통째로 뺀다
+    ```
+
+    ⚠️ `split_seed` 는 **fold 를 만드는 난수**다. 루프의 진화 시드와
+    분리해야 "분할이 달라서" 와 "진화가 달라서" 를 가를 수 있다.
+    """
+    shapes = _aligned_shapes(table)
+    if fold is not None:
+        from kernelrule.core.splits import stratified_kfold
+
+        s = stratified_kfold(shapes, table.hw, k=k, seed=split_seed,
+                             fold=fold)[0]
+    else:
+        held = [p for p in shapes if 11008 in (p.N, p.K)]
+        s = SplitSet(train=Split("train", tuple(p for p in shapes
+                                                if p not in held)),
+                     val=Split("val", tuple(held)), kind="nk11008")
     check_balance(s.train, table.hw)
     return s
 
@@ -640,7 +663,8 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
 def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
     return RoundLoop(
         cfg=LoopConfig(run_id=run_id, max_rounds=a.rounds,
-                       n_rules_per_round=12, seed=a.seed,
+                       # ★ 제안 수는 LoopConfig 기본값(6)을 쓴다 (D-144)
+                       seed=a.seed,
                        max_new_features_per_round=getattr(
                            a, "max_new_features", 0),
                        feature_condition=a.condition,
@@ -665,7 +689,8 @@ def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
         llm = _make_llm(a, registry=reg, budget=budget, table=table)
         loop = RoundLoop(
             cfg=LoopConfig(run_id=run_id, max_rounds=a.rounds,
-                           n_rules_per_round=12, seed=100 + a.seed + s,
+                           # ★ 제안 수는 LoopConfig 기본값(6) (D-144)
+                           seed=100 + a.seed + s,
                            max_new_features_per_round=a.max_new_features,
                            feature_condition=a.condition,
                            use_analyst=not a.no_analyst,
@@ -818,6 +843,13 @@ def main() -> None:
                          "에 같이 실린다")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--seed", type=int, default=0)
+    # ★ 분할 (D-144). `--fold` 를 주면 층별 3-fold, 안 주면 구조 분할이다.
+    ap.add_argument("--fold", type=int, default=None,
+                    help="층별 k-fold 의 몇 번째 fold 인가 (0..k-1). "
+                         "안 주면 구조 분할(11008)")
+    ap.add_argument("--folds", type=int, default=3, help="k-fold 의 k")
+    ap.add_argument("--split-seed", type=int, default=12345,
+                    help="★ fold 를 만드는 난수. **진화 시드와 분리한다**")
     ap.add_argument("--tag", default=None,
                     help="★ 산출물 디렉토리 **이름 그대로** (D-128 태그 규칙: "
                          "<피처><씨앗>-p<파라미터>[-<표현력>][-<실험명>], "
@@ -871,7 +903,9 @@ def main() -> None:
 
     table = PerfTable.from_bundle(a.bundle, env_hash=a.env_hash,
                                   ok_only=False)
-    splits = _splits(table)
+    splits = _splits(table, fold=getattr(a, "fold", None),
+                     split_seed=getattr(a, "split_seed", 12345),
+                     k=getattr(a, "folds", 3))
     base = _base_registry(a.condition)
 
     print("=" * 78)
@@ -879,7 +913,7 @@ def main() -> None:
           + ("  ★ DRY RUN (LLM 0회)" if a.dry_run else ""))
     print("=" * 78)
     print(f"  출발 레지스트리 {base.name!r}: {len(base._items)}개")
-    print(f"  학습 {len(splits.train.shapes)} / 구조 홀드아웃 "
+    print(f"  분할 {splits.kind}  학습 {len(splits.train.shapes)} / 홀드아웃 "
           f"{len(splits.val.shapes)}")
     print(f"  산출물 {d}\n")
 

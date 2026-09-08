@@ -410,6 +410,43 @@ def log_sol_ms(p: Problem, hw: Hardware, cfg: Config) -> float:
     return math.log2(max(1e-6, t_c, t_m))
 
 
+# ---------------------------------------------------------------------------
+# ★ 2026-09-08 (D-144) — 분기에 쓸 형상 수준 값 넷을 더한다.
+#   지금까지 넷뿐이라(`is_memory_bound` · `roofline_ratio` · `log_sol_ms` ·
+#   `arith_intensity`) 모델이 체제를 찾을 재료가 부족했다.
+#   ★ 전부 **형상만으로** 정해진다 — config 가 안 들어간다.
+# ---------------------------------------------------------------------------
+@shape_feature(unit="log2 flop", expected_range=(0.0, 80.0),
+               direction="neutral")
+def log_flops(p: Problem, hw: Hardware, cfg: Config) -> float:
+    """log2(2·M·N·K). 문제의 절대 크기."""
+    return math.log2(max(1.0, 2.0 * p.M * p.N * p.K))
+
+
+@shape_feature(expected_range=(-30.0, 30.0), direction="neutral")
+def aspect_MN(p: Problem, hw: Hardware, cfg: Config) -> float:
+    """log2(M/N). 형상이 얼마나 길쭉한가. 0 이면 정사각."""
+    return math.log2(max(1.0, float(p.M)) / max(1.0, float(p.N)))
+
+
+@shape_feature(expected_range=(0.0, 1e5), direction="neutral")
+def reuse_ratio(p: Problem, hw: Hardware, cfg: Config) -> float:
+    """M·N·K / (M·K + K·N + M·N). 자료 재사용의 크기.
+
+    `arith_intensity` 와 형태가 닮았지만 **dtype 바이트가 안 들어간다** —
+    순수 형상 량이다.
+    """
+    return (float(p.M) * p.N * p.K
+            / max(1.0, float(p.M) * p.K + float(p.K) * p.N
+                  + float(p.M) * p.N))
+
+
+@shape_feature(unit="log2", expected_range=(0.0, 30.0), direction="neutral")
+def log_min_dim(p: Problem, hw: Hardware, cfg: Config) -> float:
+    """log2(min(M,N,K)). 가장 짧은 축 — skinny 형상을 가른다."""
+    return math.log2(max(1.0, float(min(p.M, p.N, p.K))))
+
+
 @shape_feature(expected_range=(0.0, 1.0), direction="neutral")
 def can_use_cp_async(p: Problem, hw: Hardware, cfg: Config) -> float:
     """alignment 가 cp.async 를 허용하는가. 0 이면 stages=2 만 가능하다.

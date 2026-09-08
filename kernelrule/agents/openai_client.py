@@ -749,16 +749,23 @@ class OpenAILLM:
         #   "버려도 된다" 는 선택지이고 "버리고 넣어라" 는 지시다.
         #   예산이 `role/_rules.md`(시스템)에만 있으면 긴 컨텍스트에서 희석된다.
         n_terms = int(kw.get("parent_n_terms") or 0)
+        # ★ 예산은 **경로별**이다 (D-144). 남은 자리는 가장 무거운 경로로 센다.
+        n_path = int(kw.get("parent_path_params") or 0)
         n_w = len(parent.w0) if parent else 0
         # ★ `checks.PARAMETERS` 을 직접 읽으면 `parameters` 을 무시한다
         #   (D-105). 유효 예산은 `self._parameters` 하나뿐이다.
-        if n_terms >= self._parameters:
-            note = ("\n★ 예산이 찼습니다. 항을 추가하지 마세요.\n"
-                    "  이번 가설을 반영하려면 **가장 덜 중요한 항 하나를 "
-                    "지우고**\n  그 자리에 넣으세요. 무엇을 지웠고 왜 그것을 "
-                    "골랐는지\n  `changes` 에 쓰세요.")
+        if n_path >= self._parameters:
+            note = ("\n★ **가장 무거운 경로**의 예산이 찼습니다 "
+                    f"({n_path}/{self._parameters}).\n"
+                    "  두 가지 중 하나를 하세요:\n"
+                    "  (1) `if p.<형상값>` 으로 **가지를 나눠라** — 가지마다 "
+                    "따로 예산을 씁니다\n"
+                    "  (2) 그 경로의 **가장 덜 중요한 항 하나를 지우고** 그 "
+                    "자리에 넣어라\n"
+                    "  무엇을 했고 왜 그것을 골랐는지 `changes` 에 쓰세요.")
         else:
-            note = f"남은 예산: {self._parameters - n_terms}항"
+            note = (f"가장 무거운 경로의 남은 예산: "
+                    f"{self._parameters - n_path}개 (전체 항 {n_terms}개)")
         # ★ Analyst 가 꺼져 있으면 **가설 절 자체를 안 만든다** (§16.1, D-89).
         #   "## 이번 가설\n\n(가설 없음)" 처럼 빈 자리를 남기면 모델이
         #   "가설이 있는데 비어 있다" 로 읽어 다른 조건이 된다. 진단

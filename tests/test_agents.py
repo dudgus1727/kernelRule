@@ -198,8 +198,12 @@ def test_hypothesis_count_desc_and_validator_share_one_constant():
     from kernelrule.agents import schemas as S
     if not S.HAVE_PYDANTIC:
         pytest.skip("pydantic 없음")
+    # ★ 2026-09-08 (D-144): 3 으로 **고정**됐다. 설명·검증·에러가 같은
+    #   상수를 말해야 한다는 요구는 그대로다 (D-26).
+    exact = S.N_HYP_MIN == S.N_HYP_MAX
+    want = f"{S.N_HYP_MIN}개" if exact else f"{S.N_HYP_MIN}~{S.N_HYP_MAX}"
     desc = S.AnalysisOutput.model_fields["hypotheses"].description
-    assert f"{S.N_HYP_MIN}~{S.N_HYP_MAX}" in desc
+    assert want in desc
 
     def mk(n):
         return S.AnalysisOutput(hypotheses=[{"claim": f"가설 {i}"}
@@ -210,7 +214,7 @@ def test_hypothesis_count_desc_and_validator_share_one_constant():
         with pytest.raises(Exception) as ei:
             mk(n)
         # 에러 메시지도 같은 상수를 말해야 한다
-        assert f"{S.N_HYP_MIN}~{S.N_HYP_MAX}" in str(ei.value)
+        assert want in str(ei.value)
 
 
 def test_weight_cap_has_one_source_of_truth():

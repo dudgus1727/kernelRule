@@ -48,7 +48,12 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import FitError, fit_weights, make_score_of
 from kernelrule.report.diagnostic import build_report
 from kernelrule.rules.checks import PARAMETERS as _PARAMETERS
-from kernelrule.rules.checks import check_rule, limits_for, weight_bounds
+from kernelrule.rules.checks import (
+    check_rule,
+    fitter_for,
+    limits_for,
+    weight_bounds,
+)
 
 __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 
@@ -56,7 +61,9 @@ __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 @dataclass
 class LoopConfig:
     run_id: str
-    n_rules_per_round: int = 12
+    #: ★ 2026-09-08 (D-144): 12 -> 6. `Archive.parents` 의 비율이
+    #: exploit 3 / explore 2 / cross 1 을 만든다.
+    n_rules_per_round: int = 6
     max_rounds: int = 20
     max_evals: int = 200
     #: ★ 실행 트레이스 (D-133). `trace.jsonl` 에 사건을 시간순으로 남긴다.
@@ -202,13 +209,16 @@ def _fit_and_score(job: tuple) -> dict:
     c = _WORKER
     try:
         fn = compile_rule(code)
+        # ★ 적합기는 **이 규칙의 len(W0)** 이 정한다 (D-144). 경로별 예산이
+        #   되면서 차원이 규칙마다 다르다 — 캠페인 하나로 못 정한다.
+        _ft = fitter_for(len(w0))
         fr = fit_weights(fn, c["matrix"], c["table"], c["train"], w0,
-                         max_evals=c["max_evals"], val_split=c["val"],
+                         max_evals=_ft["max_evals"], val_split=c["val"],
                          objective=c.get("objective", "regret"),
                          rank_top_k=c.get("rank_top_k", 100),
                          rank_lambda=c.get("rank_lambda", 0.0),
-                         method=c.get("fit_method", "nelder-mead"),
-                         n_restarts=c.get("fit_restarts", 4),
+                         method=_ft["fit_method"],
+                         n_restarts=_ft["fit_restarts"],
                          bounds=weight_bounds(code, len(w0)))
     except (FitError, SchemaViolation) as e:
         return {"i": idx, "err": ("fit", str(e)[:90])}
@@ -220,8 +230,9 @@ def _fit_and_score(job: tuple) -> dict:
             "regret": fr.fit_regret, "moved": bool(fr.moved),
             "rank_loss": _rank_loss_of(fn, c, fr.w),
             "val_regret": fr.val_regret,
-            "short": ev.at(1, mask=c["short_mask"]),
-            "long": ev.at(1, mask=c["long_mask"])}
+            "mem": ev.at(1, mask=c["short_mask"]),
+            "comp": ev.at(1, mask=c["long_mask"]),
+            "all": ev.at(1)}
 
 
 def _rank_loss_of(fn, c: dict, w) -> float:
@@ -384,14 +395,10 @@ class RoundLoop:
         from kernelrule.report.table_facts import TableFacts
         self.table_facts = TableFacts.compute(table, splits.train)
         self.rng = np.random.default_rng(cfg.seed)
+        # ★ 칸은 언제나 동적 3분위다 (D-144) — `cell_mode` 를 없앴다.
         self.archive = Archive(
             noise_tol=0.0,
-            select_by=("rank" if cfg.objective == "rank" else "regret"),
-            # ★ 칸도 목적함수를 따라간다 (D-101). 절대 경계는 regret
-            #   규모에 맞춰 정한 값이라 순위 손실에서는 전부 첫 칸에
-            #   몰린다. 순위 4분위는 경계값이 필요 없다.
-            cell_mode=("quantile" if cfg.objective == "rank"
-                       else "absolute"))
+            select_by=("rank" if cfg.objective == "rank" else "regret"))
         self.rounds: list[RoundResult] = []
         self.failures: list[dict] = []
         self.hypotheses: list[dict] = []
@@ -582,13 +589,15 @@ class RoundLoop:
         #   체제는 (형상, 하드웨어)의 성질이지 피처 목록의 성질이 아니다.
         from kernelrule.core.splits import regime_of
 
-        short = np.asarray([regime_of(p, self.table.hw) == "short"
-                            for p in self.splits.train.shapes])
+        # ★ 축이 크기(SOL 0.5ms)에서 **roofline** 으로 바뀌었다 (D-144).
+        short = np.asarray([regime_of(p, self.table.hw, axis="roofline")
+                            == "mem" for p in self.splits.train.shapes])
         if not short.any() or short.all():
             import warnings
             warnings.warn(
-                f"학습 분할이 한 크기 체제만 담고 있다 "
-                f"(짧은 {int(short.sum())} / 긴 {int((~short).sum())}). "
+                f"학습 분할이 한 roofline 구간만 담고 있다 "
+                f"(memory {int(short.sum())} / compute "
+                f"{int((~short).sum())}). "
                 "셀 축이 무의미해지고, 진화가 다른 체제를 희생해도 안 보인다 "
                 "(§10.1).", stacklevel=3)
         return short, ~short
@@ -719,7 +728,8 @@ class RoundLoop:
         return Elite(
             rule_id=f"r{self._rule_seq:04d}", code=prop.code,
             w=out["w"], regret=out["regret"],
-            short_objective=out["short"], long_objective=out["long"],
+            mem_objective=out["mem"], comp_objective=out["comp"],
+            all_objective=out["all"],
             code_len=rep.n_nodes, round=len(self.rounds),
             changes=prop.changes, hypothesis_id=prop.hypothesis_id,
             val_regret=out["val_regret"],
@@ -733,14 +743,16 @@ class RoundLoop:
         fn, rep = got
 
         try:
+            # ★ 적합기는 **이 규칙의 len(W0)** 이 정한다 (D-144).
+            _ft = fitter_for(len(prop.w0))
             fr = fit_weights(fn, self.matrix, self.table, self.splits.train,
-                             prop.w0, max_evals=self.cfg.max_evals,
+                             prop.w0, max_evals=_ft["max_evals"],
                              val_split=self.splits.val,
                              objective=self._objective,
                              rank_top_k=self.cfg.rank_top_k,
                              rank_lambda=self.cfg.rank_lambda,
-                             method=self.cfg.fit_method,
-                             n_restarts=self.cfg.fit_restarts,
+                             method=_ft["fit_method"],
+                             n_restarts=_ft["fit_restarts"],
                              bounds=weight_bounds(prop.code, len(prop.w0)))
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
@@ -765,8 +777,9 @@ class RoundLoop:
                 "matrix": self.matrix, "table": self.table,
                 "train": self.splits.train}, fr.w),
             "val_regret": fr.val_regret, "moved": fr.moved,
-            "short": ev.at(1, mask=self._short_mask),
-            "long": ev.at(1, mask=self._long_mask)})
+            "mem": ev.at(1, mask=self._short_mask),
+            "comp": ev.at(1, mask=self._long_mask),
+            "all": ev.at(1)})
 
     def score_only(self, code: str, w0) -> float:
         """규칙 하나를 **학습 분할에서만** 채점한다. 아카이브에 안 넣는다.
@@ -934,13 +947,28 @@ class RoundLoop:
         parents = self.archive.parents(self.cfg.n_rules_per_round, self.rng)
         applied = [f"{h.get('id','?')}: {h.get('claim','')[:80]}"
                    for h in self.hypotheses[-4:]]
+        # ★ 칸은 3분위라 Elite 혼자서는 모른다 — 지금 배치를 뒤져 적는다.
+        _where = {id(v): list(k) for k, v in self.archive.cells.items()}
         self.trace.ev("parents", round=r, picks=[
             {"kind": k, "rules": [x.rule_id for x in ps],
-             "cells": [list(x.cell) if x.cell else None for x in ps]}
+             "cells": [_where.get(id(x)) for x in ps]}
             for k, ps in parents])
+        # ★ exploit 자리에는 **서로 다른 가설**을 준다 (D-144).
+        #   옛 방식은 전 자리 무작위라 exploit 끼리 같은 가설을 뽑을 수
+        #   있었고, 트레이스에서 exploit 중복 77건 중 67건(87%)이
+        #   "같은 부모 + 같은 가설" 이었다. 부모가 같으니(전역 최고 하나)
+        #   가설까지 같으면 프롬프트가 문자 그대로 같아진다.
+        #   ⚠️ 자리 전체의 무작위는 유지한다 — exploit 끼리만 다르게 한다.
+        n_exploit = sum(1 for k, _ in parents if k == "exploit")
+        _exploit_hyps: list = []
+        if hyps and n_exploit:
+            idx = list(self.rng.permutation(len(hyps)))
+            while len(_exploit_hyps) < n_exploit:
+                _exploit_hyps.extend(hyps[i] for i in idx)
+            _exploit_hyps = _exploit_hyps[:n_exploit]
         reqs = []
         for kind, ps in parents:
-            parent, parent2, n_terms = None, None, 0
+            parent, parent2, n_terms, path_params = None, None, 0, 0
             if ps:
                 from kernelrule.agents.schemas import RuleProposal
                 parent = RuleProposal(code=ps[0].code, w0=ps[0].w)
@@ -957,12 +985,20 @@ class RoundLoop:
                                 shape_value_names=self._shape_vals,
                                 n_weights=len(ps[0].w))
                 n_terms = pr.n_terms
+                # ★ 경로별 예산이므로 "남은 자리" 는 **가장 무거운 경로**로
+                #   센다 (D-144). `n_terms`(전체 항 수)로 세면 가지를 나눈
+                #   부모에게 "예산이 찼다" 고 거짓말한다.
+                path_params = pr.parameters_used
             # ★ 가설 배정을 **무작위**로 (D-94). `hyps[i % len(hyps)]` 는
             #   앞쪽 가설을 더 자주 쓴다 — 가설 5개면 3 3 2 2 2, 7개면
             #   2 2 2 2 2 1 1 이다. **설계가 아니라 12 % n 이고**, 부모
             #   종류(i=0~5 exploit / 6~8 explore / 9~11 cross)와도 상관된다.
             #   `self.rng` 를 쓰므로 시드로 재현된다.
-            hyp = (hyps[int(self.rng.integers(len(hyps)))] if hyps else None)
+            if kind == "exploit" and _exploit_hyps:
+                hyp = _exploit_hyps.pop(0)
+            else:
+                hyp = (hyps[int(self.rng.integers(len(hyps)))]
+                       if hyps else None)
             reqs.append({"prompt": f"round={r} parent={kind}",
                          # ★ 부모 종류를 **별도 필드**로 남긴다. 프롬프트
                          #   문자열에만 있으면 `llm_calls` 의 `prompt` 가 빈
@@ -979,6 +1015,7 @@ class RoundLoop:
                          #   안 읽는 키다 — 프롬프트에는 안 들어간다.
                          "_parent_ids": [x.rule_id for x in ps[:2]],
                          "parent_n_terms": n_terms,
+                         "parent_path_params": path_params,
                          "hypothesis": hyp,
                          "hypotheses_applied": applied,
                          # ★ 가설 절을 만들지 말지 (§16.1). `hypothesis=None`
@@ -1081,10 +1118,11 @@ class RoundLoop:
         before = self.archive.best.regret if self.archive.best else float("inf")
         for e in elites:
             won = self.archive.consider(e)
+            # ★ 3분위 칸은 모집단이 정한다 — 지금 배치를 뒤져 적는다 (D-144).
+            _cell = next((list(k) for k, v in self.archive.cells.items()
+                          if v is e), None)
             self.trace.ev("archive", round=r, rule=e.rule_id,
-                          accepted=bool(won),
-                          cell=list(e.cell) if e.cell else None,
-                          regret=e.regret)
+                          accepted=bool(won), cell=_cell, regret=e.regret)
             if won:
                 res.n_accepted += 1
             else:
@@ -1204,8 +1242,7 @@ class RoundLoop:
                          "train": self.splits.train}, np.asarray(e.w))
         self.archive = Archive(
             noise_tol=0.0,
-            select_by=("rank" if dst == "rank" else "regret"),
-            cell_mode=("quantile" if dst == "rank" else "absolute"))
+            select_by=("rank" if dst == "rank" else "regret"))
         for e in sorted(old, key=lambda x: (x.rank_loss if dst == "rank"
                                             else x.regret)):
             self.archive.consider(e)
@@ -1221,26 +1258,40 @@ class RoundLoop:
 
     # -- 종료 판정 (§14.3) -------------------------------------------------
     def should_stop(self) -> tuple[bool, str]:
-        """★ **검증 분할**로 판정한다. 두 조건을 모두 쓴다."""
-        n = self.cfg.patience
-        # ★ 0 이면 조기 종료를 안 한다 (D-132). 라운드 상한이 유일한 종료다.
-        if n <= 0:
-            return False, ""
-        if len(self.rounds) < n + 1:
-            return False, ""
-        vals = [x.best_val_regret for x in self.rounds[-(n + 1):]]
-        if not np.all(np.isfinite(vals)):
-            return False, ""
-        improved = vals[0] - vals[-1]
-        ev = self._score(compile_rule(self.archive.best.code),
-                         self.archive.best.w, self.splits.val.shapes)
-        significant = is_significant(improved, ev)
-        new_cell_recent = (self.archive.last_new_cell_round
-                           > len(self.rounds) - 1 - n)
-        if significant or new_cell_recent:
-            return False, ""
-        return True, (f"{n}라운드 연속 검증 개선이 노이즈 바닥 이하"
-                      f"({improved:+.5f}) 이고 새 셀도 없다")
+        """⛔ **봉인됨** (2026-09-08, D-144). 언제나 `(False, "")` 다.
+
+        조기 종료는 D-132 에서 껐고 `patience` 는 0 이다. 그런데 아래 옛
+        구현은 **`best_val_regret` 을 읽었다** — 검증 분할이 종료 판정에
+        들어가는 경로다. 지금은 `patience=0` 이라 안 돌지만 **누가 켜면
+        그 순간 시험이 오염된다** (§29.7 — 검증/최종이 목적함수나 종료에
+        들어가는 경로를 두지 않는다).
+
+        ★ 그래서 경로를 지운다. 조기 종료를 되살리려면 **검증을 안 보는
+        기준**으로 새로 쓰고 실험 계획서를 먼저 써라.
+
+        ```
+        옛 구현 (봉인, 지우지 않고 남긴다):
+            n = self.cfg.patience
+            if n <= 0: return False, ""
+            if len(self.rounds) < n + 1: return False, ""
+            vals = [x.best_val_regret for x in self.rounds[-(n + 1):]]
+            if not np.all(np.isfinite(vals)): return False, ""
+            improved = vals[0] - vals[-1]
+            ev = self._score(compile_rule(self.archive.best.code),
+                             self.archive.best.w, self.splits.val.shapes)
+            significant = is_significant(improved, ev)
+            new_cell_recent = (self.archive.last_new_cell_round
+                               > len(self.rounds) - 1 - n)
+            if significant or new_cell_recent: return False, ""
+            return True, "..."
+        ```
+        """
+        if self.cfg.patience:
+            raise ValueError(
+                f"patience={self.cfg.patience} 인데 조기 종료 경로가 "
+                "봉인돼 있다 (D-144). 그 경로는 검증 분할을 읽었다 — "
+                "되살리려면 검증을 안 보는 기준으로 새로 써라.")
+        return False, ""
 
     def run(self, n_rounds: int | None = None, *, verbose: bool = True,
             dump_each_round: bool = True):

@@ -115,8 +115,15 @@ def check_banned(code: str) -> str | None:
 #: 에러는 다시 "3~5". 1개만 내도 통과했고, 그러면 그 라운드의 규칙이 **전부
 #: 같은 가설**을 반영해 §14.2 의 다양성이 무너진다.
 #:
-#: 하한 2 — 1개면 다양성이 없고, 3개를 강제하면 억지 가설이 나온다.
-N_HYP_MIN, N_HYP_MAX = 2, 8
+#: ★ 2026-09-08 (D-144): **3 으로 고정**한다.
+#:
+#: 트레이스 실측 — exploit 중복 77건 중 **67건(87%)이 "같은 부모 + 같은
+#: 가설"** 이었다. 제안 12(exploit 6)에 가설 3~5 였으므로 exploit 자리가
+#: 가설보다 많아 **반드시 겹쳤다.** 제안 6(exploit 3) + 가설 3 이면 딱 맞는다.
+#:
+#: 옛 값 이력: 설명 "3~5" / 검증 `1<=n<=8` / 에러 "3~5" 로 셋이 달랐고
+#: (D-26 이 정리), 그 뒤 `2, 8` 이었다.
+N_HYP_MIN, N_HYP_MAX = 3, 3
 
 #: 가중치 상한. **`rules.checks.LIMITS` 가 유일한 출처다** (D-26) —
 #: 스키마와 정적 검사가 어긋나면 한쪽만 통과하는 규칙이 생긴다.
@@ -342,15 +349,22 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
 
     class AnalysisOutput(BaseModel):
         hypotheses: list[HypothesisOut] = Field(
-            description=f"{N_HYP_MIN}~{N_HYP_MAX}개. 서로 다른 실패 모드를 "
-                        "다뤄라")
+            description=(f"★ 정확히 {N_HYP_MIN}개. 서로 다른 실패 모드를 "
+                         "다뤄라 — 이 라운드의 exploit 제안 3개에 하나씩 "
+                         "배정된다"
+                         if N_HYP_MIN == N_HYP_MAX else
+                         f"{N_HYP_MIN}~{N_HYP_MAX}개. 서로 다른 실패 모드를 "
+                         "다뤄라"))
 
         @field_validator("hypotheses")
         @classmethod
         def _count(cls, v: list) -> list:
             if not N_HYP_MIN <= len(v) <= N_HYP_MAX:
                 raise ValueError(
-                    f"가설이 {len(v)}개다. {N_HYP_MIN}~{N_HYP_MAX}개를 내라")
+                    f"가설이 {len(v)}개다. "
+                    + (f"정확히 {N_HYP_MIN}개를 내라"
+                       if N_HYP_MIN == N_HYP_MAX
+                       else f"{N_HYP_MIN}~{N_HYP_MAX}개를 내라"))
             return v
 
     class RuleOutput(BaseModel):

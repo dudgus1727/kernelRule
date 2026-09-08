@@ -84,22 +84,39 @@ def test_user_and_system_prompts_agree_on_the_budget(budget):
     usr_p = llm._user_prompt("rule_editor", "", parent=None,
                              parent_n_terms=0, analyst=False)
     for name, txt in (("시스템", sys_p), ("사용자", usr_p)):
-        assert (f"파라미터 상한 {budget}개" in txt
+        # ★ 문구 이력: "항 상한 N개" -> "파라미터 상한 N개"(D-128)
+        #   -> "실행 경로마다 N개"(D-144). 숫자가 한 곳에서 온다는 요구는 같다.
+        assert (f"경로마다 {budget}개" in txt
+                or f"파라미터 상한 {budget}개" in txt
                 or f"{budget} 이하" in txt), (
             f"{name} 프롬프트에 예산 {budget} 이 안 보인다")
-        assert f"파라미터 상한 {other}개" not in txt, (
+        assert (f"경로마다 {other}개" not in txt
+                and f"파라미터 상한 {other}개" not in txt), (
             f"{name} 프롬프트가 {other} 를 말한다 — 조건이 달라졌다 (D-105)")
 
 
 def test_budget_reaches_the_saturation_notice():
     """포화 문구도 유효 예산을 봐야 한다 — 8항짜리 부모가 16 예산에서
-    '예산이 찼습니다' 를 받으면 항을 절대 못 늘린다."""
+    '예산이 찼습니다' 를 받으면 항을 절대 못 늘린다.
+
+    ★ 2026-09-08 (D-144): 예산이 **경로별**이 되면서 남은 자리를
+    `parent_path_params`(가장 무거운 경로)로 센다. `parent_n_terms`
+    (전체 항 수)로 세면 가지를 나눈 부모에게 거짓말을 한다.
+    """
     llm = _llm(16)
     txt = llm._user_prompt("rule_editor", "", parent=None,
-                           parent_n_terms=8, analyst=False)
+                           parent_n_terms=8, parent_path_params=8,
+                           analyst=False)
     assert "예산이 찼습니다" not in txt, (
-        "예산 16 인데 8항 부모에게 '예산이 찼습니다' 를 보냈다 (D-105)")
-    assert "남은 예산: 8항" in txt, txt[:400]
+        "예산 16 인데 경로 8 짜리 부모에게 '찼습니다' 를 보냈다 (D-105)")
+    assert "남은 예산: 8개" in txt, txt[:400]
+
+    # ★ 가지를 나눈 부모 — 전체 항은 14개지만 가장 무거운 경로는 8이다
+    txt2 = llm._user_prompt("rule_editor", "", parent=None,
+                            parent_n_terms=14, parent_path_params=8,
+                            analyst=False)
+    assert "예산이 찼습니다" not in txt2, (
+        "경로별로 8인데 전체 항 14를 보고 '찼습니다' 를 보냈다 (D-144)")
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +243,8 @@ def test_all_four_surfaces_say_the_same_budget():
                 rule_output_for(b).model_json_schema(), ensure_ascii=False),
         }
         for name, txt in surfaces.items():
-            assert (f"파라미터 상한 {b}개" in txt or f"{b} 이하" in txt
+            assert (f"경로마다 {b}개" in txt or f"파라미터 상한 {b}개" in txt
+                    or f"{b} 이하" in txt
                     or f"최대 {b}개" in txt), f"{name} 가 예산 {b} 을 안 말한다"
         assert limits_for(b)["parameters"] == b
 

@@ -44,6 +44,21 @@
 
 ★ 실행 디렉토리 이름도 태그 규칙으로 바꿨다 — `docs/artifacts/runs.md`.
 
+## ★ 개명 대응표 (2026-09-08, D-144)
+
+| 옛 이름 | 지금 이름 | 왜 |
+|---|---|---|
+| `Elite.short_objective` | **`mem_objective`** | 셀 축이 크기(SOL<0.5ms)에서 **roofline** 으로 바뀌었다. 이름 이력: `short_regret` -> `short_objective`(D-101) -> `mem_objective` |
+| `Elite.long_objective` | **`comp_objective`** | 같음 |
+| (없었다) | **`all_objective`** | 셋째 축. 같은 (mem, comp) 칸 안에서 전체가 갈리는 칸이 13/16 이었다 |
+| `CELL_AXES` (절대 경계) | **`CELL_AXIS_NAMES`** | 절대 경계 모드를 없앴다 — 진화가 진행되면 한 칸에 몰린다 |
+| `Archive(cell_mode=...)` | (**삭제**) | 언제나 동적 3분위다 |
+| `fitter_for(parameters)` | `fitter_for(n_weights)` | 인자의 **뜻**이 바뀌었다. 경로별 예산이라 규칙마다 차원이 다르다 |
+| `RoundLoop.should_stop` | (**봉인**) | `best_val_regret` 을 읽던 경로. 켜면 에러다 |
+
+⚠️ **옛 산출물의 필드 이름은 그대로 둔다** — `runs/*/archive.jsonl` 의
+`short_objective`/`long_objective` 는 그때의 축을 기록한 것이다.
+
 ---
 
 ## 규칙의 출처

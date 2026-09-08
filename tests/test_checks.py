@@ -42,10 +42,12 @@ def test_weight_indices_do_not_eat_the_literal_budget():
 # §24.3 의 adversarial 케이스 — 하나라도 통과하면 방어에 구멍이 있다
 # ---------------------------------------------------------------------------
 ADVERSARIAL = [
+    # ★ 이유가 "직접 비교" -> "등호로" 로 바뀌었다 (D-144). 부등호는 허용,
+    #   등호는 여전히 암기 경로다.
     ("암기", ("def score(f, p, hw, w):\n"
              "    if p.M == 4096:\n"
              "        return f.waves * w[0]\n"
-             "    return f.waves * w[0]\n"), 1, "직접 비교"),
+             "    return f.waves * w[1]\n"), 2, "등호로"),
     ("정답 누출", ("def score(f, p, hw, w):\n"
                   "    return f.waves * w[0] + time_ms\n"), 1, "금지된 이름"),
     ("난이도 참조", ("def score(f, p, hw, w):\n"
@@ -103,15 +105,35 @@ def test_adversarial_case_is_rejected(name, code, nw, expect):
 
 
 def test_literal_budget_includes_weights():
-    """★ `len(W0)` 를 리터럴 예산에 합산한다 (§29.4)."""
+    """★ 리터럴 + 가중치를 **한 경로 안에서** 합산한다 (§29.4, D-144)."""
     code = ("def score(f, p, hw, w):\n"
             "    return f.waves * w[0] + f.tail_waste * w[1]\n")
     assert chk(code, 2).ok
-    # 0 리터럴 + 9 가중치 = 9 > 8
-    r = check_rule(code.replace("w[1]", "w[8]"), feature_names=FEAT,
-                   shape_value_names=SHAPE, n_weights=9)
+    # ★ 한 경로에 9개 -> 거부
+    over = ("def score(f, p, hw, w):\n"
+            "    return (f.waves*w[0] + f.tail_waste*w[1] + f.reg_pressure*w[2]"
+            " + f.has_spill*w[3] + f.sm_idle_cost*w[4] + f.split_k_cost*w[5]"
+            " + f.edge_waste*w[6] + f.smem_pressure*w[7]"
+            " + f.log_grid_tiles*w[8])\n")
+    r = check_rule(over, feature_names=FEAT, shape_value_names=SHAPE,
+                   n_weights=9)
     assert not r.ok
-    assert any("리터럴" in v for v in r.violations)
+    assert any("경로" in v for v in r.violations)
+
+
+def test_sparse_weight_indices_are_rejected():
+    """★ 인덱스에 구멍이 있으면 **공짜 파라미터**다 (D-144).
+
+    경로별 예산으로 바꾸면서 생긴 구멍이다 — 옛 합산 예산에서는
+    `len(W0)` 자체가 예산에 들어가 저절로 막혔다. 적합기는 안 쓰는
+    인덱스도 맞춘다.
+    """
+    code = ("def score(f, p, hw, w):\n"
+            "    return f.waves * w[0] + f.tail_waste * w[8]\n")
+    r = check_rule(code, feature_names=FEAT, shape_value_names=SHAPE,
+                   n_weights=9)
+    assert not r.ok
+    assert any("쓰지 않는 가중치 인덱스" in v for v in r.violations)
 
 
 def test_unused_weights_are_rejected():
@@ -332,15 +354,28 @@ def test_non_comparison_constant_still_costs():
     assert r.branch_constants == [1]
 
 
-def test_shape_size_comparison_is_still_banned():
-    """★ 면제는 **암기를 열어주지 않는다.** `p.M > 1024` 는 그대로 거부."""
-    code = ("def score(f, p, hw, w):\n"
-            "    s = np.where(p.M > 1024, f.waves, f.tail_waste) * w[0]\n"
-            "    return s\n")
-    r = check_rule(code, feature_names=FEAT, shape_value_names=SHAPE,
+def test_shape_size_equality_is_banned_but_inequality_is_not():
+    """★ 2026-09-08 (D-144): **등호만** 막는다.
+
+    ```
+    p.M == 4096   ⛔ 한 점을 외운다
+    p.M < 128     ★ 구간을 가른다 — 일반화되는 형태다
+    ```
+
+    옛 규칙은 둘을 함께 막았고("형상 크기를 직접 비교"), 그러면 모델이
+    "작은 M" 이라는 개념을 아예 쓸 수 없었다.
+    """
+    eq = ("def score(f, p, hw, w):\n"
+          "    s = np.where(p.M == 4096, f.waves, f.tail_waste) * w[0]\n"
+          "    return s\n")
+    r = check_rule(eq, feature_names=FEAT, shape_value_names=SHAPE,
                    n_weights=1)
     assert not r.ok
-    assert any("형상 크기를 직접 비교" in v for v in r.violations), r.violations
+    assert any("등호로" in v for v in r.violations), r.violations
+
+    lt = eq.replace("p.M == 4096", "p.M < 1024")
+    assert check_rule(lt, feature_names=FEAT, shape_value_names=SHAPE,
+                      n_weights=1).ok
 
 
 def test_both_budget_counters_agree():

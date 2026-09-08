@@ -42,34 +42,25 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-__all__ = ["Archive", "Elite", "CELL_AXES", "cell_of", "N_QUANTILES"]
+__all__ = ["Archive", "Elite", "CELL_AXIS_NAMES", "N_QUANTILES"]
 
-#: ★ 절대 경계 (`cell_mode="absolute"`). **regret 규모에 맞춰 정한 값이다** —
-#: 목적함수가 바뀌면 못 쓴다 (순위 손실은 0.4 근처라 전부 첫 칸에 몰린다).
-#: 그때는 `cell_mode="quantile"` 을 쓴다.
-CELL_AXES: dict[str, list[float]] = {
-    "code_len": [0, 60, 120, 200, float("inf")],
-    "short_objective": [1.0, 1.05, 1.15, 1.35, float("inf")],
-    "long_objective": [1.0, 1.05, 1.15, 1.35, float("inf")],
-}
+#: ★ 셀 축 셋 (2026-09-08, D-144).
+#:
+#: ```
+#: 옛   code_len · short_objective(SOL<0.5ms) · long_objective   4x4x4
+#: ★ 새 mem_objective · comp_objective · all_objective          3x3x3
+#: ```
+#:
+#: 구간은 `t_memory > t_compute` (roofline 하한 두 항의 비교)로 가른다 —
+#: `SOL 0.5 ms` 같은 **임의 문턱을 쓰지 않는다** (D-143 이 그 문턱을
+#: 방어할 수 없음을 보였다).
+#:
+#: `all_objective` 가 중복이 아닌 것을 확인했다 — 같은 (mem, comp) 칸
+#: 안에서 전체 구간이 갈리는 칸이 13/16 이었다.
+CELL_AXIS_NAMES = ("mem_objective", "comp_objective", "all_objective")
 
-#: 순위 기반 칸 수 (체제 축마다). 절대 경계와 같은 4칸이다.
-N_QUANTILES = 4
-
-
-def _bin(v: float, edges: list[float]) -> int:
-    for i in range(len(edges) - 1):
-        if edges[i] <= v < edges[i + 1]:
-            return i
-    return len(edges) - 2
-
-
-def cell_of(code_len: int, short_objective: float,
-            long_objective: float) -> tuple:
-    """절대 경계 칸. `cell_mode="quantile"` 이면 `Archive` 가 다르게 센다."""
-    return (_bin(code_len, CELL_AXES["code_len"]),
-            _bin(short_objective, CELL_AXES["short_objective"]),
-            _bin(long_objective, CELL_AXES["long_objective"]))
+#: 축마다 칸 수. ★ 동적 3분위다 — **절대 경계는 없다** (아래 참고).
+N_QUANTILES = 3
 
 
 @dataclass
@@ -78,12 +69,14 @@ class Elite:
     code: str
     w: list[float]
     regret: float
-    #: 학습 분할 안의 짧은 형상(roofline 하한 < 0.5ms) **목적함수 값**.
-    #: ★ 이름이 `short_regret` 이었다 (D-101). 목적함수가 regret 뿐이라는
-    #: 가정이 이름에 박혀 있었고, 순위 손실을 넣으면서 거짓이 됐다.
-    short_objective: float
-    #: 학습 분할 안의 긴 형상 목적함수 값
-    long_objective: float
+    #: 학습 분할 안의 **memory 구간**(t_memory > t_compute) 목적함수 값.
+    #: ★ 이름 이력: `short_regret` -> `short_objective`(D-101) ->
+    #: `mem_objective`(D-144). 축이 크기(SOL 0.5ms)에서 roofline 으로 바뀌었다.
+    mem_objective: float
+    #: 학습 분할 안의 **compute 구간** 목적함수 값
+    comp_objective: float
+    #: ★ 학습 분할 **전체**의 목적함수 값 (D-144 에서 새로 생긴 축)
+    all_objective: float
     code_len: int
     round: int
     changes: str = ""
@@ -96,30 +89,23 @@ class Elite:
 
     @property
     def regime_gap(self) -> float:
-        """긴 형상과 짧은 형상의 regret 격차. **전이 신호다.**
+        """compute 구간과 memory 구간의 격차. **전이 신호다.**
 
-        크면 그 규칙은 한 체제를 희생하고 있다. 아카이브가 이 축으로
-        달라지므로 격차가 작은 규칙이 따로 보존된다.
+        크면 그 규칙은 한 구간을 희생하고 있다.
         """
-        return abs(self.long_objective - self.short_objective)
-
-    @property
-    def cell(self) -> tuple:
-        return cell_of(self.code_len, self.short_objective,
-                       self.long_objective)
+        return abs(self.comp_objective - self.mem_objective)
 
     def to_dict(self) -> dict:
-        d = dict(self.__dict__)
-        d["cell"] = list(self.cell)
-        return d
+        """★ `cell` 은 여기서 못 만든다 — 3분위는 **모집단**이 정한다.
+        `Archive.dump` 가 그때의 칸을 채워 넣는다 (D-144)."""
+        return dict(self.__dict__)
 
 
 class Archive:
     """셀당 최고 하나 + 전체 최고."""
 
     def __init__(self, noise_tol: float = 0.0, *,
-                 select_by: str = "regret",
-                 cell_mode: str = "absolute") -> None:
+                 select_by: str = "regret") -> None:
         #: 갱신을 인정할 최소 개선. `is_significant` 가 준다 (§7.4).
         self.noise_tol = float(noise_tol)
         #: ★ 무엇으로 채택하나 (D-101). 기본은 `regret` — 지금까지의 모든
@@ -131,22 +117,14 @@ class Archive:
         if select_by not in ("regret", "rank"):
             raise ValueError(f"알 수 없는 채택 기준: {select_by!r}")
         self.select_by = select_by
-        #: ★ 칸을 어떻게 나누나 (D-101).
-        #:
-        #: ```
-        #: absolute   CELL_AXES 의 절대 경계. ★ regret 규모에 맞춘 값이다
-        #: quantile   ★ 보유 엘리트 + 새 후보를 **체제별 값으로** 정렬해 4분위
-        #: ```
-        #:
-        #: 절대 경계는 목적함수가 바뀌면 못 쓴다 — 순위 손실은 0.4 근처라
-        #: 전부 첫 칸에 몰린다. 순위 기반은 **경계값이 필요 없고** 목적함수가
-        #: 무엇이든 그대로 돈다.
-        #:
-        #: ⚠️ 대가: 칸의 뜻이 라운드마다 바뀐다. 전체가 좋아지면 1분위의
-        #: 절대값이 내려간다. 그 대신 칸이 고르게 찬다.
-        if cell_mode not in ("absolute", "quantile"):
-            raise ValueError(f"알 수 없는 칸 방식: {cell_mode!r}")
-        self.cell_mode = cell_mode
+        # ★ 칸은 **언제나 동적 3분위**다 (D-144). `cell_mode="absolute"` 를
+        #   없앴다 — 절대 경계 [1.0, 1.05, 1.15, 1.35, inf] 로 두면 진화가
+        #   진행되며 한 칸에 몰린다 (실측: 셀 점유 2칸 / 채택 3-12 /
+        #   전구간 tau -0.093, D-42 셋째 후보).
+        #
+        #   ⚠️ 대가: 칸의 뜻이 라운드마다 바뀐다. 전체가 좋아지면 1분위의
+        #   절대값이 내려간다. 그 대신 칸이 고르게 찬다. 경계가 바뀌면
+        #   **보유 엘리트를 전부 다시 배치한다** (`_consider_quantile`).
         self.cells: dict[tuple, Elite] = {}
         self.best: Elite | None = None
         self.history: list[dict] = []
@@ -180,7 +158,7 @@ class Archive:
     def _quantile_cells(self, pool: list[Elite]) -> dict:
         """★ 보유분 + 후보를 **체제별 값으로** 정렬해 4분위 칸을 매긴다.
 
-        ⚠️ 정렬하는 것은 `short_objective`/`long_objective` 이고, 이 값은
+        ⚠️ 정렬하는 것은 `CELL_AXIS_NAMES` 의 셋이고, 이 값은
         **언제나 체제별 regret** 이다 (`ev.at(1, mask=...)`). 목적함수가
         `rank` 여도 그렇다 — **축은 다양성 장치이고 채택이 목표를 정한다**
         는 설계 그대로다 (D-101). 처음에 "목적함수로 정렬" 이라고 적었는데
@@ -195,7 +173,7 @@ class Archive:
         n = len(pool)
         out: dict[int, tuple] = {}
         axes = {}
-        for name in ("short_objective", "long_objective"):
+        for name in CELL_AXIS_NAMES:
             vals = [getattr(x, name) for x in pool]
             order = sorted(range(n), key=lambda i: (vals[i], i))
             rank = [0] * n
@@ -206,9 +184,8 @@ class Archive:
                 rank[i] = r
             axes[name] = [min(N_QUANTILES - 1, x * N_QUANTILES // max(n, 1))
                           for x in rank]
-        for i, x in enumerate(pool):
-            out[i] = (_bin(x.code_len, CELL_AXES["code_len"]),
-                      axes["short_objective"][i], axes["long_objective"][i])
+        for i, _x in enumerate(pool):
+            out[i] = tuple(axes[nm][i] for nm in CELL_AXIS_NAMES)
         return out
 
     def _consider_quantile(self, e: Elite) -> list[str]:
@@ -243,22 +220,10 @@ class Archive:
         if self.best is None or self._key(e) < self._key(self.best) - self._tol:
             won.append("best")
             self.best = e
-        if self.cell_mode == "quantile":
-            won.extend(self._consider_quantile(e))
-            # ★ 순위 칸에서는 `e.cell`(절대 경계)이 뜻이 없다. 기록에는
-            #   실제로 들어간 칸을 남긴다 — 못 찾으면 절대 칸을 적고
-            #   그 사실이 보이게 한다.
-            c = next((k for k, v in self.cells.items() if v is e), e.cell)
-        else:
-            c = e.cell
-            cur = self.cells.get(c)
-            if cur is None:
-                won.append("new_cell")
-                self.cells[c] = e
-                self.last_new_cell_round = e.round
-            elif self._key(e) < self._key(cur) - self._tol:
-                won.append("cell")
-                self.cells[c] = e
+        won.extend(self._consider_quantile(e))
+        # ★ 3분위 칸은 **모집단**이 정하므로 Elite 혼자서는 자기 칸을 모른다.
+        #   기록에는 실제로 들어간 칸을 남긴다. 밀려났으면 빈 튜플이다.
+        c = next((k for k, v in self.cells.items() if v is e), ())
         if won:
             self.n_accepted += 1
         self.history.append({"round": e.round, "rule_id": e.rule_id,
@@ -301,8 +266,14 @@ class Archive:
                 "last_new_cell_round": self.last_new_cell_round}
 
     def dump(self, path: str | Path) -> None:
+        """★ 마지막 아카이브 **상태**를 쓴다 (D-139 — 개선 이력이 아니다).
+
+        칸은 3분위라 Elite 혼자서는 모른다 — 지금 배치를 함께 적는다.
+        """
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
         with open(p, "w") as fh:
-            for e in self.cells.values():
-                fh.write(json.dumps(e.to_dict(), ensure_ascii=False) + "\n")
+            for c, e in self.cells.items():
+                d = e.to_dict()
+                d["cell"] = list(c)
+                fh.write(json.dumps(d, ensure_ascii=False) + "\n")

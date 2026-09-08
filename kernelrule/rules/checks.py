@@ -134,13 +134,27 @@ def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
             if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
             and n.value.id == "w"}
     exempt: set[int] = set()
+    def _direct_const(side):
+        """비교의 **직접 피연산자**인 숫자 상수. ★ 음수도 잡는다 (D-144).
+
+        `-1.0` 은 `UnaryOp(USub, Constant)` 라 `Constant` 만 찾으면 못 잡고,
+        그러면 `p.log_sol_ms < -1.0` 의 `-1.0` 이 예산에 들어간다.
+        """
+        if isinstance(side, ast.UnaryOp) and isinstance(
+                side.op, (ast.USub, ast.UAdd)):
+            side = side.operand
+        if (isinstance(side, ast.Constant)
+                and isinstance(side.value, (int, float))
+                and not isinstance(side.value, bool)):
+            return side
+        return None
+
     for n in ast.walk(tree):
         if isinstance(n, ast.Compare):
             for side in [n.left, *n.comparators]:
-                if (isinstance(side, ast.Constant)
-                        and isinstance(side.value, (int, float))
-                        and not isinstance(side.value, bool)):
-                    exempt.add(id(side))
+                c = _direct_const(side)
+                if c is not None:
+                    exempt.add(id(c))
     counted: list[ast.Constant] = []
     branch: list[ast.Constant] = []
     for n in ast.walk(tree):
@@ -153,6 +167,55 @@ def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
         (branch if id(n) in exempt else counted).append(n)
     return counted, branch
 
+
+def _branch_depth(node: ast.AST) -> int:
+    """중첩된 `if` 문의 최대 깊이. `IfExp`(삼항)는 안 센다 (D-144)."""
+    if isinstance(node, ast.If):
+        return 1 + max((_branch_depth(x)
+                        for x in [*node.body, *node.orelse]), default=0)
+    return max((_branch_depth(c) for c in ast.iter_child_nodes(node)),
+               default=0)
+
+
+def _path_use(node: ast.AST, counted_ids: set[int]) -> tuple[set, set]:
+    """이 조각이 쓰는 (예산에 드는 리터럴 id, 가중치 인덱스)."""
+    lits: set[int] = set()
+    ws: set[int] = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Constant) and id(n) in counted_ids:
+            lits.add(id(n))
+        if (isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
+                and n.value.id == "w" and isinstance(n.slice, ast.Constant)
+                and isinstance(n.slice.value, int)):
+            ws.add(n.slice.value)
+    return lits, ws
+
+
+def _paths(stmts, counted_ids: set[int]) -> list[tuple[set, set]]:
+    """★ 실행 경로마다 (리터럴 id 집합, 가중치 인덱스 집합) (D-144).
+
+    ```
+    if/else 밖의 공통 항   ★ 모든 경로에 속한다
+    np.where               ★ 분기가 아니다 — 양쪽이 다 계산되므로 한 경로
+    ```
+    """
+    paths: list[tuple[set, set]] = [(set(), set())]
+    for st in stmts:
+        if isinstance(st, ast.If):
+            hl, hw = _path_use(st.test, counted_ids)
+            subs = _paths(st.body, counted_ids) + (
+                _paths(st.orelse, counted_ids) if st.orelse
+                else [(set(), set())])
+            paths = [(pl | hl | sl, pw | hw | sw)
+                     for pl, pw in paths for sl, sw in subs]
+        else:
+            al, aw = _path_use(st, counted_ids)
+            paths = [(pl | al, pw | aw) for pl, pw in paths]
+    return paths
+
+
+#: ★ 분기 깊이 상한. 경로가 최대 4개 -> 실질 파라미터 최대 32 (D-144).
+MAX_BRANCH_DEPTH = 2
 
 #: 인자가 유한하면 **언제나 1** 인 호출. 상수를 만드는 데밖에 못 쓴다.
 #: ⚠️ "이 표에서 유한하다" 는 **표 의존 사실**이다 (f 피처 19개 전부에서
@@ -253,9 +316,29 @@ def literal_parameter_message(code: str, n_weights: int,
         return None
     counted, branch = _numeric_literals(tree)
     n_lit = len(counted)
-    total = n_lit + n_weights
     b = int(parameters if parameters is not None
             else LIMITS["parameters"])
+    # ★ 예산은 **실행 경로별**로 센다 (D-144). `check_rule` 과 같은 함수를
+    #   쓴다 — 따로 세면 달라진다 (D-37 계열).
+    fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
+    if fnode is not None:
+        depth = _branch_depth(fnode)
+        if depth > MAX_BRANCH_DEPTH:
+            return (f"분기 깊이가 {depth} 다. **{MAX_BRANCH_DEPTH} 단까지**만 "
+                    "된다 — 경로별 예산이라 깊게 갈라 자리를 늘릴 수 있다")
+        per = sorted(len(a) + len(bw)
+                     for a, bw in _paths(fnode.body, {id(n) for n in counted}))
+        if per and max(per) <= b:
+            return None
+        if per:
+            return (f"실행 경로의 파라미터가 {per} 로 {b} 를 넘는다 (§29.4). "
+                    "★ 예산은 **경로마다** 센다 — `if/else` 밖의 공통 항은 "
+                    "모든 경로에 속하고, `np.where` 는 분기가 아니다"
+                    + (f". 분기 비교 상수 {len(branch)}개는 이미 면제됐다"
+                       if branch else "")
+                    + ". 가지를 나눠 각 가지에 자기 가중치를 주면 "
+                      f"`len(w0)` 은 {b} 를 넘어도 된다")
+    total = n_lit + n_weights
     if total <= b:
         return None
     hint = ""
@@ -429,8 +512,13 @@ LIMITS = {
 }
 
 
-def fitter_for(parameters: int | None) -> dict:
-    """★ 파라미터 수가 적합기를 정한다 (D-128). **한 곳에서만 정한다.**
+def fitter_for(n_weights: int | None) -> dict:
+    """★ **`len(W0)` 이** 적합기를 정한다 (D-144). 한 곳에서만 정한다.
+
+    ⚠️ **2026-09-08 에 인자의 뜻이 바뀌었다.** 예전에는 캠페인의 `parameters`
+    (경로별 예산 상한)였고 지금은 **그 규칙의 `len(W0)`** 다. 경로별 예산이
+    되면서 한 규칙의 차원이 최대 32 까지 가므로, 캠페인 단위로 정하면
+    16차원 규칙을 Nelder-Mead 로 맞추게 된다 (도달률 42~58%, D-77).
 
     ```
     <= 8   nelder-mead / 재시작 4 / 적합 200      지금까지의 모든 실행
@@ -444,7 +532,7 @@ def fitter_for(parameters: int | None) -> dict:
     ⚠️ **옛 실행 일부는 이 규칙과 다르다** — `rb08`/`rprod`/`rpow` 는
     파라미터 8인데 CMA 로 돌았다 (D-124). 재측정할 때 이 규칙으로 돈다.
     """
-    b = int(parameters if parameters is not None else PARAMETERS)
+    b = int(n_weights if n_weights is not None else PARAMETERS)
     # ★ 키 이름은 `LoopConfig` 의 필드 그대로다 — `**fitter_for(n)` 으로
     #   그대로 펼쳐 넣을 수 있어야 달라질 자리가 안 생긴다 (원칙 2).
     if b <= PARAMETERS:
@@ -526,10 +614,16 @@ class CheckReport:
     #: 기록한다 — "물리 상수인가, 이 표의 형상 분포인가" 는 정적으로 못
     #: 가르므로 사람이 본다.
     branch_constants: list[float] = field(default_factory=list)
+    #: ★ 실행 경로별 (리터럴 + 가중치) 수 (D-144). 예산은 **경로마다** 센다.
+    path_parameters: list[int] = field(default_factory=list)
+    #: 중첩된 `if` 의 최대 깊이.
+    branch_depth: int = 0
 
     @property
     def parameters_used(self) -> int:
-        return self.n_literals + self.n_weights
+        """★ 가장 무거운 경로의 파라미터 수. 경로가 없으면 전역 합계."""
+        return (max(self.path_parameters) if self.path_parameters
+                else self.n_literals + self.n_weights)
 
     def raise_if_bad(self) -> CheckReport:
         if not self.ok:
@@ -542,8 +636,11 @@ class CheckReport:
         head = "통과" if self.ok else "거부"
         bc = (f", 분기상수 {self.branch_constants}(면제)"
               if self.branch_constants else "")
+        pp = (f", 경로별 {self.path_parameters} (깊이 {self.branch_depth})"
+              if len(self.path_parameters) > 1 else "")
         return (f"[{head}] 리터럴 {self.n_literals} + 가중치 {self.n_weights} "
-                f"= {self.parameters_used}/{LIMITS['parameters']}{bc}, "
+                f"= 최대경로 {self.parameters_used}/{LIMITS['parameters']}"
+                f"{bc}{pp}, "
                 f"항 {self.n_terms}, "
                 f"노드 {self.n_nodes}/{LIMITS['ast_nodes']}, "
                 f"피처 {sorted(self.features_used)}"
@@ -635,7 +732,10 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                         "오타를 조용히 통과시키지 않는다")
             elif base == "p":
                 rep.shape_values_used.add(attr)
-                if attr not in shape_value_names:
+                # ★ M/N/K 는 등록된 피처가 아니라 **형상 자체의 값**이다.
+                #   부등호 비교만 허용한다 — 등호는 위에서 거부한다 (D-144).
+                if attr not in shape_value_names and attr not in ("M", "N",
+                                                                  "K"):
                     bad(f"등록되지 않은 형상 수준 값: p.{attr}")
             elif base == "hw":
                 pass
@@ -644,15 +744,24 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                     bad(f"허용되지 않은 numpy 함수: np.{attr}. "
                         f"허용: {sorted(_ALLOWED_NP)[:8]} ...")
 
-        # problem.M / p.M 직접 비교 -> 암기 경로
+        # problem.M / p.M 직접 비교 — ★ 등호만 금지한다 (D-144)
+        #
+        #   p.M == 4096   ⛔ 한 점을 외운다
+        #   p.M < 128     ★ 구간을 가른다 — 일반화되는 형태다
+        #
+        # 옛 규칙은 둘을 함께 막았다. 그러면 모델이 "작은 M" 이라는
+        # 개념을 아예 쓸 수 없었다.
         if isinstance(node, ast.Compare):
+            eq_ops = any(isinstance(o, (ast.Eq, ast.NotEq, ast.In, ast.NotIn))
+                         for o in node.ops)
             for sub in ast.walk(node):
                 if (isinstance(sub, ast.Attribute)
                         and isinstance(sub.value, ast.Name)
                         and sub.value.id in ("p", "problem")
-                        and sub.attr in ("M", "N", "K")):
-                    bad(f"형상 크기를 직접 비교하는 분기 금지: "
-                        f"{sub.value.id}.{sub.attr}. 피처를 거쳐라")
+                        and sub.attr in ("M", "N", "K") and eq_ops):
+                    bad(f"형상 크기를 **등호로** 비교하는 분기 금지: "
+                        f"{sub.value.id}.{sub.attr}. 한 점을 외우는 형태다 — "
+                        "부등호(<, <=, >, >=)로 구간을 갈라라")
 
         # w 접근은 인덱스만
         if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) \
@@ -728,16 +837,46 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     if rep.max_w_index >= 0 and rep.max_w_index + 1 != rep.n_weights:
         bad(f"W0 길이 {rep.n_weights} != 참조한 최대 인덱스 + 1 "
             f"({rep.max_w_index + 1}). 안 쓰는 가중치는 예산 낭비다")
+    # ★ **인덱스에 구멍이 있으면 안 된다** (D-144).
+    #
+    #   옛 합산 예산에서는 `len(W0)` 자체가 예산에 들어가서 구멍이 저절로
+    #   막혔다. 경로별로 세면 **쓰이지 않은 인덱스는 어느 경로에도 안
+    #   잡히는데 적합기는 그것까지 맞춘다** — 공짜 파라미터가 된다.
+    #   시험이 잡았다: `w[0]` 과 `w[8]` 만 쓰고 `len(W0)=9` 인 규칙이 통과했다.
+    if rep.max_w_index >= 0:
+        holes = [i for i in range(rep.max_w_index + 1)
+                 if i not in w_index_uses]
+        if holes:
+            bad(f"쓰지 않는 가중치 인덱스 {holes} 가 W0 에 있다. "
+                "적합기는 그것도 맞추므로 **공짜 파라미터**가 된다 — "
+                "인덱스를 0부터 빈틈없이 써라")
 
     if (m := identity_transform_message(code)):
         bad(m)
 
-    if rep.parameters_used > lim["parameters"]:
-        bad(f"리터럴 {rep.n_literals} + 가중치 {rep.n_weights} = "
-            f"{rep.parameters_used} > {lim['parameters']} (§29.4). "
-            + (f"분기 비교 상수 {rep.branch_constants} 는 이미 면제됐다"
-               if rep.branch_constants else
-               "분기 조건의 비교 상수는 예산에서 빠진다 (D-78)"))
+    # -- ★ 예산은 **실행 경로별**로 센다 (D-144) ---------------------------
+    #   RuleEditor 가 스스로 체제를 찾으려면 가지마다 자기 가중치가 있어야
+    #   한다. 전체가 8개면 두 가지가 4개씩 나눠 써야 했다.
+    #   ⚠️ 인덱스 재사용 허용은 답이 아니다 — 가중치 적합이 전체 shape 한
+    #      벌이라 `w[0]` 이 두 가지에서 서로 다른 피처의 계수를 겸하게 된다.
+    fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
+    if fnode is not None:
+        rep.branch_depth = _branch_depth(fnode)
+        paths = _paths(fnode.body, {id(n) for n in _counted})
+        rep.path_parameters = sorted(len(a) + len(b) for a, b in paths)
+        if rep.branch_depth > MAX_BRANCH_DEPTH:
+            bad(f"분기 깊이 {rep.branch_depth} > {MAX_BRANCH_DEPTH}. "
+                "경로별 예산이라 무한히 갈라 자리를 늘릴 수 있다 — "
+                f"중첩 `if` 는 {MAX_BRANCH_DEPTH} 단까지다")
+        over = [n for n in rep.path_parameters if n > lim["parameters"]]
+        if over:
+            bad(f"실행 경로의 파라미터가 {over} 로 {lim['parameters']} 를 "
+                f"넘는다 (경로별 {rep.path_parameters}). "
+                "★ 예산은 경로마다 센다 — if/else 밖의 공통 항은 모든 경로에 "
+                "속한다. "
+                + (f"분기 비교 상수 {rep.branch_constants} 는 이미 면제됐다"
+                   if rep.branch_constants else
+                   "분기 조건의 비교 상수는 예산에서 빠진다 (D-78)"))
 
     # -- ★ config 수준 분기 금지 -------------------------------------------
     for node in ast.walk(tree):
