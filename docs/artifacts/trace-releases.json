@@ -50,5 +50,27 @@
    "trace-F3rw-p8-nan-s5.jsonl.zst": "36e2b9ff97ba5d9cd15472b99254c8f6924aca7807a86b9488c9642c8dfc816c"
   },
   "uploaded": "2026-09-06"
+ },
+ "smoke": {
+  "bytes_raw": {
+   "smoke-s0": 199052
+  },
+  "bytes_zst": {
+   "smoke-s0": 14210
+  },
+  "commits": {
+   "smoke-s0": "579bdf6"
+  },
+  "events": {
+   "smoke-s0": 57
+  },
+  "release": "trace-smoke-579bdf6",
+  "runs": [
+   "smoke-s0"
+  ],
+  "sha256": {
+   "trace-smoke-s0.jsonl.zst": "4207dff7d8499b49b0c5b2b8d72411be2c978dd751d51dec23d32903d322a23b"
+  },
+  "uploaded": "2026-09-09"
  }
 }
