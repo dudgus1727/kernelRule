@@ -536,8 +536,8 @@ def test_no_korean_on_the_llm_path():
     token per 3.5~4 characters. Over 15 runs x 12 rounds that is about a
     million tokens (20~25% of the total load).
 
-    ⚠️ `docs/` stays in Korean — it is read by humans and does not go to the
-    LLM.
+    ⚠️ `docs/` is not on this path. Most of it stays Korean; the artefact
+    documents that code reads or writes were translated with it (D-146 §7).
     """
     import json
     import re

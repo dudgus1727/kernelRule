@@ -19,9 +19,9 @@ different.
 ⚠️ **Everything is measured on the holdout.** D-101's tau (0.389) is a value
 on the 41 training shapes and cannot be put alongside (principle 4).
 
-⚠️ 2026-09-08 (D-146): **the row labels stay in Korean.** They are the row
-names of `docs/artifacts/two-stage.md` (and `regret-at-k.md`) and the keys of
-`two-stage.json`, and `docs/` is not translated.
+⚠️ 2026-09-08 (D-146): the row labels were translated together with
+`docs/artifacts/two-stage.md` (and `regret-at-k.md`) and the keys of
+`two-stage.json`.
 """
 
 from __future__ import annotations

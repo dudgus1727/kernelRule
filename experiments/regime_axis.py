@@ -12,9 +12,8 @@ The pre-registration is `docs/artifacts/regime-axis-prereg.md`.
 here. **So arm ① is first checked against the known representative value** —
 if it differs, it stops.
 
-⚠️ 2026-09-08 (D-146): **the arm labels stay in Korean.** They are the keys of
-`arms` in `regime-axis.json` and the row names of the document, and `docs/` is
-not translated.
+⚠️ 2026-09-08 (D-146): the arm labels were translated together with the keys
+of `arms` in `regime-axis.json` and the row names of the document.
 """
 
 from __future__ import annotations

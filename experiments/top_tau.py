@@ -38,8 +38,8 @@ the 5090 tick is 16 ns  vs  the A6000's 1.024 µs   (1/64)
 absolute values** (principle 4). The answer-set size differs too (A6000
 median 5 / 5090 median 11).
 
-⚠️ 2026-09-08 (D-146): **the three block labels stay in Korean.** They are the
-top-level keys of `top-tau.json`, and `docs/` is not translated.
+⚠️ 2026-09-08 (D-146): the three block labels were translated together with
+the top-level keys of `top-tau.json` and the document.
 """
 
 from __future__ import annotations

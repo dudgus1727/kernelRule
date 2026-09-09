@@ -21,8 +21,8 @@ came out of that procedure (principle 4).
 the 5090 table". The ladder's first rung uses the 3 RuleWriter-seeded seeds
 (1.0416).
 
-⚠️ 2026-09-08 (D-146): **the two step names stay in Korean.** They are the
-keys of `steps` in `c-ladder.json`, and `docs/` is not translated.
+⚠️ 2026-09-08 (D-146): the two step names were translated together with the
+keys of `steps` in `c-ladder.json`.
 """
 
 from __future__ import annotations

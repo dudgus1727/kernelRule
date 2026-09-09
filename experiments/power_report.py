@@ -121,9 +121,6 @@ def main() -> None:
     with_e = [p for p in props if exponent_indices(p["code"])]
     without = [p for p in props if not exponent_indices(p["code"])]
     rng = np.random.default_rng(0)
-    # ⚠️ 2026-09-08 (D-146): **these two labels stay in Korean.** They are
-    #    the row names of `docs/artifacts/power.md` and the keys of `head` in
-    #    `power.json`, and `docs/` is not translated.
     pick = {"with exponent": [with_e[i] for i in
                        rng.choice(len(with_e), N_HEAD, replace=False)],
             "without exponent": [without[i] for i in

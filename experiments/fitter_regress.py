@@ -20,9 +20,8 @@ CMA  cma         · 1 restart  · fit 300 · polish 600  ← what §3 used
 training better is what it is designed to do, and that is the mechanism of
 overfitting, not the judgement (pre-registration §3).
 
-⚠️ 2026-09-08 (D-146): **the two group labels stay in Korean.** They are the
-top-level keys of `fitter-regress.json` and the row names of the document,
-and `docs/` is not translated.
+⚠️ 2026-09-08 (D-146): the two group labels were translated together with the
+top-level keys of `fitter-regress.json` and the row names of the document.
 """
 
 from __future__ import annotations

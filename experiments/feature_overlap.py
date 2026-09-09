@@ -31,9 +31,9 @@ alike the same objective is to itself), the Jaccard **between** families, and
 **the random floor** (sets of the same size drawn at random from the
 registry).
 
-⚠️ 2026-09-08 (D-146): **the three pair labels stay in Korean.** They are the
+⚠️ 2026-09-08 (D-146): the three pair labels were translated together with the
 row names of `docs/artifacts/feature-overlap.md` and the keys of
-`feature-overlap.json`, and `docs/` is not translated.
+`feature-overlap.json`.
 """
 
 from __future__ import annotations

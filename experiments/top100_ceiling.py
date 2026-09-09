@@ -29,8 +29,8 @@ the 5 p. features   they are **constant** within one shape -> 0 contribution
 the 19 f. features  ★ this is all of it
 ```
 
-⚠️ 2026-09-08 (D-146): **the two block labels stay in Korean.** They are the
-top-level keys of `top100-ceiling.json`, and `docs/` is not translated.
+⚠️ 2026-09-08 (D-146): the two block labels were translated together with the
+top-level keys of `top100-ceiling.json`.
 """
 
 from __future__ import annotations
