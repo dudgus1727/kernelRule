@@ -1,6 +1,7 @@
 # Role — RuleEditor
 
-Change the parent rule in **one place** to make a new rule.
+Change the parent rule to make a new rule. **Build on the parent** — that is
+what makes the lineage readable — but change as much as the physics asks for.
 
 ## What you are given
 
