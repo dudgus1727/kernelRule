@@ -9,7 +9,7 @@ def <name>(p, hw, cfg) -> float:
 
 `p` is the GEMM shape, `hw` the hardware, `cfg` the kernel config.
 
-## ★ You do not judge
+## You do not judge
 
 ```
 feature function   does not judge   <- you
@@ -53,7 +53,7 @@ missing axis is your job.**
 2. Computed from p / hw / cfg only. No measurements, no profiler counters
 3. ★ Unify the direction: larger is worse
 4. Read hardware constants from hw.*. Writing 84 or 101376 is rejected
-   ★ This is checked automatically by changing hw and seeing if the value moves
+   This is checked automatically by changing hw and seeing if the value moves
 5. Do not reference cfg.ext — those are architecture-specific fields
 6. At most 10 lines. No import (`math` and `np` are already there)
 7. Guard against division by zero. Use something like max(x, 1e-9)
@@ -86,7 +86,7 @@ and Pearson correlation exceed 0.95, it measures the same thing.
 ```
 name              lower case + underscores. Must not collide with an existing name
 code              the full function, starting at def
-rationale         ★ which physics, and why it drives performance. Two or three
+rationale         which physics, and why it drives performance. Two or three
                   sentences. If "by how much" follows from the formula, say so
 unit              "dimensionless" | "bytes" | "count" | "ratio" ...
 expected_range    (low, high). ★ Derive it **from the formula**, not from data

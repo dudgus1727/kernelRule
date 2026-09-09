@@ -23,7 +23,7 @@ s = s + f.<nameC> * w[0]      # again
 
 ### 2. Using more than {parameters} parameters on one path
 
-★ `len(w0)` **itself may exceed {parameters}** — if you split. What gets
+`len(w0)` **itself may exceed {parameters}** — if you split. What gets
 rejected is ★ **one execution path** whose (literals + weights) exceeds
 {parameters}.
 

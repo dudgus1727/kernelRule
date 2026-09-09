@@ -24,7 +24,7 @@ weights are usually positive.
    specialisation, repeated, becomes a lookup table and does not generalise.
 
 2. You may branch on shape-level values (`p.*`). They are scalars.
-   But ★ **multiplying or adding a shape constant to the whole accumulated
+   But **multiplying or adding a shape constant to the whole accumulated
    score does nothing.** The rule sorts within each shape independently, so
    a shape constant cancels out.
 
@@ -32,7 +32,7 @@ weights are usually positive.
            s = s * w[2]                    # ⛔ changes no ordering at all
            s = s + f.<name> * w[2]         # ✅ changes a term's weight
 
-   ★ **`p.M` / `p.N` / `p.K` may be used with inequalities.**
+   **`p.M` / `p.N` / `p.K` may be used with inequalities.**
 
        if p.M == 4096:                     # ⛔ memorises one point. Rejected
        if p.M < 128:                       # ✅ splits a range. Generalises
@@ -52,11 +52,10 @@ weights are usually positive.
    The `0.0` in `s = 0.0` is a parameter too. Starting with
    `s = f.<name> * w[0]` avoids needing a literal at all.
 
-   ★ **Split when the physics differs.** Memory-bound and compute-bound
+6. **Split when the physics differs.** Memory-bound and compute-bound
    shapes have different bottlenecks, so the same term does not act in the
    same direction. When you split, **each branch gets its own weights** —
    and as a result `len(w0)` may exceed {parameters}.
-   ⚠️ Do not split to gain room. Physics must be the reason.
 
        s = f.<name> * w[0]                   # common — belongs to every path
        if p.<shape value> < 1:
@@ -65,13 +64,14 @@ weights are usually positive.
            s = s + f.<B> * w[8] + ...        # w[8..14] -> 8 on that path
        # len(w0) = 15, both paths <= 8 -> ✅ accepted
 
+   ⚠️ Do not split to gain room. Physics must be the reason.
    ⚠️ Terms **outside** the `if/else` belong to every path. `np.where` is
    not a branch — both sides are computed, so it is one path.
    ⚠️ There may be **at most 4 execution paths**.
    Two levels of nesting · `if/elif/elif/else` · two sequential `if`s —
    all of those are 4 paths.
 
-   ★ **Comparison constants in branch conditions are not parameters.**
+7. **Comparison constants in branch conditions are not parameters.**
 
        np.where(p.<shape value> < 1, A, B)   ✅ this `1` is free
        (f.<name> - 3.0) * w[0]              ⛔ this `3.0` is one parameter
@@ -80,11 +80,11 @@ weights are usually positive.
    **as plain numbers**. Do not manufacture a 1 with `np.sign(x)` or
    `np.isfinite(x)` — it saves no parameter and only costs the reader.
 
-6. ★ **Each `w[i]` is used exactly once.** Use a different weight per term.
+8. ★ **Each `w[i]` is used exactly once.** Use a different weight per term.
    `len(w0)` must equal the largest referenced index + 1, **exactly**.
 ```
 
-## ★ Match the magnitudes
+## Match the magnitudes
 
 The brackets in the feature list are the **value range**. If you add terms of
 different magnitude with the same weight, **the widest term decides the whole
@@ -99,7 +99,7 @@ s = s + f.<narrow range name> * w[1]      # already [0,1], leave it
 Or give `w0` on the inverse scale of the range — for a `[0, 300]` term,
 `w0 ≈ 0.003`. **Do one of the two.**
 
-**Do not work around 5 and 6.** The point of the parameter cap is to prevent
+**Do not work around 5~8.** The point of the parameter cap is to prevent
 "with enough parameters any structure reaches a similar score, so **comparing
 structures becomes meaningless**". Reusing one weight across several terms to
 add terms destroys that point.
@@ -108,12 +108,12 @@ add terms destroys that point.
 instead of adding.** And there is no obligation to fill {parameters} — fewer
 terms, each explainable, is better.{product_block}{power_block}
 
-## ★ You do not fit the weights
+## You do not fit the weights
 
 `w` is fitted by a numerical optimiser **before scoring**. (Which optimiser
 depends on the objective and may change — you do not need to know.)
 
-★ `p.n_candidates` is **how many configs were measured** for that shape. It
+`p.n_candidates` is **how many configs were measured** for that shape. It
 is enumeration information, not performance — it says nothing about which
 config is fast. Splitting shapes by candidate count is not learning physics,
 it is **learning the experimental design**.

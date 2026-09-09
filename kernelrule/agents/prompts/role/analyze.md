@@ -43,16 +43,16 @@ holds across the whole table.
 
 ```
 bad   "the rule should be more sophisticated"      -> no evidence, no direction
-bad   "at M=4096 it should pick config #17"        -> ★ memorises one point
-★ good "it loses on shapes with small M (<128). That range is skinny so the
+bad   "at M=4096 it should pick config #17"        -> memorises one point
+good "it loses on shapes with small M (<128). That range is skinny so the
        bottleneck differs, but the rule uses the same weights"
-                                                   -> ★ splitting a range is fine
+                                                   -> splitting a range is fine
 good  "the rule keeps picking a certain value on some axis, but in cases
        #1, #2, #5 the best has a different value. There is no term in the
        rule that measures the cost of that choice"
 ```
 
-★ **"pinning one point with equality" and "splitting a range with an
+**"pinning one point with equality" and "splitting a range with an
 inequality" are different.** `M == 4096` is memorisation, but `M < 128`
 states a physical fact (a skinny shape). Range hypotheses are allowed.
 
@@ -60,7 +60,7 @@ Always fill `evidence_cases`. It is the device that blocks unfounded
 generalities. Always fill `risk` too — saying in advance which regime this
 fix could break gives the next round something to check.
 
-## ★ How much room the rule has
+## How much room the rule has
 
 The rule is built within **{parameters} parameters per execution path**
 (literals + weights). A hypothesis that asks for a lot of room means **the

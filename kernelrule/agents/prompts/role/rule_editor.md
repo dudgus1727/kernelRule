@@ -9,7 +9,7 @@ the parent rule's code
 {inputs_hyp}the list of available features
 ```
 
-## ★ Parameter cap — **{parameters} per execution path**
+## Parameter cap — **{parameters} per execution path**
 {product_note}{power_note}
 ```
 parent rule: {n_terms} terms / {n_weights} weights (cap {parameters} per path)
@@ -18,7 +18,7 @@ parent rule: {n_terms} terms / {n_weights} weights (cap {parameters} per path)
 
 That is the parameter rule above, applied to this particular parent.
 
-★ **Split when the physics differs.** Splitting with `if p.<shape value>`
+**Split when the physics differs.** Splitting with `if p.<shape value>`
 gives each branch its own weights, and as a result `len(w0)` may exceed
 {parameters}. ⚠️ You do not split because you ran out of room — you split
 because the bottleneck is different in that regime. Without a physical
@@ -52,7 +52,7 @@ Non-linear transforms are sometimes useful. `1/(1-x) - 1` and `log2(x)` are
 linear term cannot. But there must be a physical reason — do not attach
 arbitrary exponents.
 
-★ **Splitting a branch is also a good edit when the bottleneck differs.**
+**Splitting a branch is also a good edit when the bottleneck differs.**
 
 ```python
 # good — the bottleneck differs per regime.
@@ -61,7 +61,7 @@ s = f.<common name> * w[0]
 if p.<shape value>:
     s = s + f.<traffic-ish> * w[1] + f.<bandwidth-ish> * w[2]
 else:
-    s = s + f.<instruction-ish> * w[8] + f.<occupancy-ish> * w[9]
+    s = s + f.<instruction-ish> * w[3] + f.<occupancy-ish> * w[4]
 ```
 
 ⚠️ `np.where` is not a branch — both sides are computed, so it is the **same

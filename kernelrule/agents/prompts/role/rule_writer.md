@@ -41,22 +41,6 @@ whether splitting costs     split-K buys parallelism and sells reduction
 **Which of these dominates when** is the content of the rule. Branching on a
 shape-level value to change a term's weight is how you express that.
 
-## Terms and weights — ★ this is where most rejections happen
-
-**One weight per term. Using `w[i]` twice is rejected.**
-
-```python
-s = f.a * w[0]
-s = s + f.b * w[0]          # ⛔ w[0] reused. Rejected immediately
-s = s + f.b * w[1]          # ✅
-
-if p.<shape value>:
-    s = s + f.a * w[3]      # ✅ re-weighting the same feature is fine
-```
-
-(The parameter count and the no-reuse rule are in "Absolute rules" 5 and 6
-above. Here we only point out what actually caught writers from scratch.)
-
 ## What to put in `changes`
 
 There is no parent, so instead of "what changed" write **one line per term
@@ -74,7 +58,16 @@ in one pass.**
 [ ] 4. at most 4 execution paths
 ```
 
-The reasoning and examples are in **"Absolute rules"** above (5, 6, 2).
+On 1: the same **feature** may appear again with a different weight — it is
+the weight index that may not repeat.
+
+```python
+if p.<shape value>:
+    s = s + f.a * w[3]      # ✅ re-weighting the same feature is fine
+```
+
+The reasoning and the rest of the examples are in **"Absolute rules"** above
+(5~8, 2).
 
 **The safest shape that satisfies all of them:**
 
@@ -88,7 +81,7 @@ def score(f, p, hw, w):
     return s
 ```
 
-0 literals + 4 weights = 4. ★ **On this path** there is room for 4 more
+0 literals + 4 weights = 4. **On this path** there is room for 4 more
 (there is no branch, so there is one path).
 
 ---
