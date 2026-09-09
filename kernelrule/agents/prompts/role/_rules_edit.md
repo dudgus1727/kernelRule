@@ -15,7 +15,7 @@ memorise.
 ### 1. Adding terms by reusing a weight (the most common one)
 
 ```python
-# ⛔ rejected: 19 terms built out of 8 weights
+# ⛔ rejected: three terms built out of one weight
 s = s + f.<nameA> * w[0]
 s = s + f.<nameB> * w[0]      # w[0] reused
 s = s + f.<nameC> * w[0]      # again
