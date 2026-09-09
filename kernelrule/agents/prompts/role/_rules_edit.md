@@ -15,33 +15,25 @@ memorise.
 ### 1. Adding terms by reusing a weight (the most common one)
 
 ```python
-# ⛔ rejected: 19 terms built out of {parameters} weights
+# ⛔ rejected: 19 terms built out of 8 weights
 s = s + f.<nameA> * w[0]
 s = s + f.<nameB> * w[0]      # w[0] reused
 s = s + f.<nameC> * w[0]      # again
 ```
 
-### 2. Using more than {parameters} parameters on one path
-
-`len(w0)` **itself may exceed {parameters}** — if you split. What gets
-rejected is ★ **one execution path** whose (literals + weights) exceeds
-{parameters}.
+### 2. Leaving a hole in `w0`
 
 ```python
-# ✅ accepted: <= {parameters} per path. len(w0) is larger than that
-s = f.<nameA> * w[0]                       # common — belongs to every path
-if p.<shape value> < 1:
-    s = s + f.<nameB> * w[1] + ...         # the rest of this path's room
-else:
-    s = s + f.<nameC> * w[8] + ...         # the rest of that path's room
+# ⛔ rejected: w[0] and w[8] used with len(w0) = 9 — the six in between
+#    are fitted anyway, so they are free parameters
 ```
 
-(The path cap itself is in the absolute rules above.)
+`len(w0)` must equal the largest index you use + 1.
 
 ### 3. Code that is too long
 
-The cap is {ast_nodes} AST nodes. About {parameters} terms fits comfortably.
-Going past it is a sign that you are piling up special cases.
+The cap is {ast_nodes} AST nodes. Going past it is a sign that you are piling
+up special cases, not adding physics.
 
 ### 4. Multiplying or adding a shape constant to the accumulated score
 

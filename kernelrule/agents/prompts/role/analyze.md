@@ -60,12 +60,12 @@ Always fill `evidence_cases`. It is the device that blocks unfounded
 generalities. Always fill `risk` too — saying in advance which regime this
 fix could break gives the next round something to check.
 
-## How much room the rule has
+## The shape the rule can take
 
-The rule is built within **{parameters} parameters per execution path**
-(literals + weights). A hypothesis that asks for a lot of room means **the
-rule has to split a branch** — which is allowed in itself. But the regimes
-must have different bottlenecks. There may be at most 4 execution paths.
+**There is no cap on the number of terms or weights.** A hypothesis may ask
+for as many as the physics needs. When two regimes have different
+bottlenecks, the rule **splits a branch** and each branch gets its own
+weights — there may be at most 4 execution paths.
 
 ## Can it be measured with existing features
 

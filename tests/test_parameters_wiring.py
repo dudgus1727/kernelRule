@@ -1,70 +1,22 @@
-"""★ The parameter budget goes to **every prompt** as the same value
-(D-105).
+"""★ The rule-writing surfaces must say **the same thing** (D-105).
 
-A campaign was run with `--rule-budget 16`, and only the checker was 16 —
-**the role files of the system prompt and the user prompt rendered 8.**
-Within the same prompt, `_rules_common.md` said "at most 16" while
-`rule_editor.md` said "a term cap of 8" (the wording changed in D-128 to "a
-parameter cap of N" — what is checked is **whether the four surfaces say the
-same number**). All 36 rules stopped at 8 terms, and it was nearly read as
-"raising the budget does not raise the term count".
+A campaign once ran with `--rule-budget 16` while only the checker was 16 —
+the role files and the user prompt rendered 8, all 36 rules stopped at 8
+terms, and it was nearly read as "raising the budget does not raise the term
+count". The lesson is that a rule the model must obey lives on four surfaces
+at once: **the prompt / the schema / the checker / the assembling code.**
 
-The cause was that there were several places (principle 23):
-
-    load_prompt(..., parameters=)   only `assemble_instructions` passed it
-    load_prompt("role/...")         `_agent` and `_optimize_prompt` did not
-    checks.PARAMETERS               the user prompt **imported it directly**
-
-The old test `test_rule_writers_get_the_budget` was `"8" in body` — 8 also
-appears in the feature descriptions, so it passes even when changed to 16.
-**A changing value must not be searched for as a constant.**
+⚠️ 2026-09-09 (D-150): **the parameter cap itself is gone.** The tests that
+pinned the number across the four surfaces went with it — there is no number.
+What is left here is the wiring that still carries something: the objective
+block, the hints, and the fitter choice.
 """
 from __future__ import annotations
 
-import ast
-import json
 import os
 from pathlib import Path
 
 import pytest
-
-SRC = Path(__file__).resolve().parents[1] / "kernelrule/agents/openai_client.py"
-
-
-def test_every_load_prompt_call_passes_the_budget():
-    """★ It counts **every** call site — one missed and the prompt
-    diverges."""
-    tree = ast.parse(SRC.read_text())
-    bad = [n.lineno for n in ast.walk(tree)
-           if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
-           and n.func.id == "load_prompt"
-           and "parameters" not in {k.arg for k in n.keywords}]
-    assert not bad, (
-        f"there is a call without `parameters=`: {SRC.name} lines {bad}. "
-        f"Falling back to the default ignores `parameters` (D-105).")
-
-
-#: The functions allowed to read `checks.PARAMETERS`. Read anywhere else it
-#: ignores `parameters` — the condition silently returns to 8.
-_MAY_READ_PARAMETERS = {"load_prompt", "__init__"}
-
-
-def test_only_two_functions_read_the_module_constant():
-    """★ It **counts** the places that read `checks.PARAMETERS`. There is
-    one effective budget."""
-    tree = ast.parse(SRC.read_text())
-    bad = []
-    for fn in ast.walk(tree):
-        if not isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
-            continue
-        if fn.name in _MAY_READ_PARAMETERS:
-            continue
-        for n in ast.walk(fn):
-            if isinstance(n, ast.Name) and n.id in ("BUDGET", "_CHECK_BUDGET"):
-                bad.append((fn.name, n.lineno))
-    assert not bad, (
-        f"places that read `checks.PARAMETERS` directly: {bad}. "
-        f"Only `self._budget` may be looked at (D-105).")
 
 
 def _llm(budget: int | None):
@@ -76,34 +28,6 @@ def _llm(budget: int | None):
                      shape_values=[], registry=FeatureRegistry("F1"))
 
 
-def test_budget_reaches_the_saturation_notice():
-    """The saturation notice must see the effective budget too — an
-    8-term parent told "the budget is full" under a budget of 16 can never
-    add a term.
-
-    ★ 2026-09-08 (D-144): with the budget now **per path**, the room left is
-    counted from `parent_path_params` (the heaviest path). Counting from
-    `parent_n_terms` (the total term count) lies to a parent that split its
-    branches.
-    """
-    llm = _llm(16)
-    txt = llm._user_prompt("rule_editor", "", parent=None,
-                           parent_n_terms=8, parent_path_params=8,
-                           analyst=False)
-    assert "is at the cap" not in txt, (
-        "budget is 16 but a parent with 8 on its path was told it is at the "
-        "cap (D-105)")
-    assert "Room left on the heaviest path: 8" in txt, txt[:400]
-
-    # ★ A parent that split its branches — 14 terms in total but the
-    #   heaviest path is 8
-    txt2 = llm._user_prompt("rule_editor", "", parent=None,
-                            parent_n_terms=14, parent_path_params=8,
-                            analyst=False)
-    assert "is at the cap" not in txt2, (
-        "8 per path but told 'at the cap' from the total of 14 terms (D-144)")
-
-
 # ---------------------------------------------------------------------------
 # ★ The caps **attached** to the budget (D-106)
 # ---------------------------------------------------------------------------
@@ -112,51 +36,6 @@ def test_budget_reaches_the_saturation_notice():
 # against a cap of 400. Raising only the budget to 16 makes 16-term rules
 # **refused at the node cap** — what gets measured is not "a budget of 16 has
 # no effect" but "16 terms could not be used".
-
-
-def test_limits_scale_with_the_budget():
-    from kernelrule.rules.checks import LIMITS, limits_for
-
-    assert limits_for(None) == LIMITS
-    assert limits_for(8)["ast_nodes"] == LIMITS["ast_nodes"]
-    assert limits_for(16)["ast_nodes"] == 2 * LIMITS["ast_nodes"]
-    assert limits_for(16)["max_lines"] == 2 * LIMITS["max_lines"]
-
-
-def test_prompt_states_the_scaled_node_cap():
-    """If the prompt says the constant 400 it diverges from the checker
-    (800)."""
-    from kernelrule.agents.openai_client import load_prompt
-    from kernelrule.rules.checks import limits_for
-
-    for b in (8, 16):
-        txt = load_prompt("role/_rules_edit.md", parameters=b)
-        n = limits_for(b)["ast_nodes"]
-        assert f"{n} AST nodes" in txt, (
-            f"the node cap does not match at budget {b}")
-
-
-def test_a_sixteen_term_rule_fits_only_under_the_raised_cap():
-    """★ Confirmed with a real 16-term rule — matching the numbers alone is
-    useless."""
-    from kernelrule.rules.checks import check_rule, limits_for
-
-    terms = "\n".join(
-        f"    s = s + np.where(p.is_memory_bound, f.log_dram_traffic, "
-        f"f.log_inst_total) * w[{i}]" for i in range(1, 16))
-    code = ("def score(f, p, hw, w):\n"
-            "    s = f.reg_pressure * w[0]\n" + terms + "\n    return s")
-    kw = {"feature_names": ["reg_pressure", "log_dram_traffic",
-                            "log_inst_total"],
-          "shape_value_names": ["is_memory_bound"], "n_weights": 16}
-    lo = check_rule(code, limits=limits_for(8), **kw)
-    hi = check_rule(code, limits=limits_for(16), **kw)
-    assert not lo.ok, (
-        "if 16 terms pass at a budget of 8, the checker is not filtering")
-    assert hi.n_nodes > limits_for(8)["ast_nodes"], (
-        f"there are only {hi.n_nodes} nodes, so the cap check is never "
-        f"touched — this test cannot measure what it meant to")
-    assert hi.ok, f"refused even at a budget of 16: {hi.violations}"
 
 
 # ---------------------------------------------------------------------------
@@ -170,71 +49,12 @@ def test_a_sixteen_term_rule_fits_only_under_the_raised_cap():
 # tried.
 
 
-def _twelve_terms() -> str:
-    body = "".join(f"    s = s + f.edge_waste * w[{i}]\n" for i in range(1, 12))
-    return ("def score(f, p, hw, w):\n"
-            "    s = f.reg_pressure * w[0]\n" + body + "    return s")
-
-
-def test_output_schema_validation_follows_the_budget():
-    """★ If only the description is fixed and the validation stays at 8,
-    the model tries and gets refused."""
-    from kernelrule.agents.schemas import rule_output_for
-
-    kw = {"code": _twelve_terms(), "w0": [1.0] * 12, "changes": "",
-          "hypothesis_id": ""}
-    with pytest.raises(Exception, match="12"):
-        rule_output_for(8)(**kw)
-    rule_output_for(16)(**kw)          # at a budget of 16 it must pass
-
-
-def test_dict_path_validation_follows_the_budget():
-    """The MockLLM path and any path not using structured output must see
-    the same budget."""
-    from kernelrule.agents.schemas import (
-        SchemaViolation,
-        validate_rule_proposal,
-    )
-
-    d = {"code": _twelve_terms(), "w0": [1.0] * 12}
-    with pytest.raises(SchemaViolation):
-        validate_rule_proposal(d)
-    validate_rule_proposal(d, parameters=16)
-
-
 #: ★ **Every surface** the budget number goes out on. One missed and the
 #: condition changes.
 #:
 #:   D-105  only the checker was reached (the prompt files / the user prompt)
 #:   D-106  the attached cap (ast_nodes) did not follow
 #:   D-107  the output schema's description was frozen at 8
-def test_all_four_surfaces_say_the_same_budget():
-    """★ 2026-09-09 (D-148): this **subsumes** the two tests that were here —
-    one for the system+user prompts, one for the output schema. It checks all
-    three surfaces at both budgets, so those were duplicate coverage."""
-    from kernelrule.agents.openai_client import assemble_instructions
-    from kernelrule.agents.schemas import rule_output_for
-    from kernelrule.rules.checks import limits_for
-
-    for b in (8, 16):
-        llm = _llm(b)
-        surfaces = {
-            "system prompt": assemble_instructions(
-                "rule_editor", objective="rank", parameters=llm._parameters),
-            "user prompt": llm._user_prompt(
-                "rule_editor", "", parent=None, parent_n_terms=0,
-                analyst=False),
-            "output schema": json.dumps(
-                rule_output_for(b).model_json_schema(), ensure_ascii=False),
-        }
-        for name, txt in surfaces.items():
-            assert (f"{b} per execution path" in txt
-                    or f"at most {b}" in txt
-                    or f"At most {b}" in txt), (
-                f"{name} does not state the budget {b}")
-        assert limits_for(b)["parameters"] == b
-
-
 # ---------------------------------------------------------------------------
 # ★ The numbers of the goal definition (k, lambda) and the product term
 # (D-109 / D-110)

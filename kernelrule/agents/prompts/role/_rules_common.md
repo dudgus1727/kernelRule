@@ -47,41 +47,26 @@ weights are usually positive.
    floor ceil round isfinite nan_to_num square fmin fmax
    `np.random` is forbidden — the rule must be deterministic.
 
-5. ★ The number of numeric literals + weights must be **at most
-   {parameters} per execution path**. Not the total — **per path**.
-   The `0.0` in `s = 0.0` is a parameter too. Starting with
-   `s = f.<name> * w[0]` avoids needing a literal at all.
-
-6. **Split when the physics differs.** Memory-bound and compute-bound
+5. **Split when the physics differs.** Memory-bound and compute-bound
    shapes have different bottlenecks, so the same term does not act in the
-   same direction. When you split, **each branch gets its own weights** —
-   and as a result `len(w0)` may exceed {parameters}.
+   same direction. When you split, **each branch gets its own weights.**
 
        s = f.<name> * w[0]                   # common — belongs to every path
        if p.<shape value> < 1:
-           s = s + f.<A> * w[1] + ...        # w[1..7]  -> 8 on this path
+           s = s + f.<A> * w[1] + f.<A2> * w[2] + ...
        else:
-           s = s + f.<B> * w[8] + ...        # w[8..14] -> 8 on that path
-       # len(w0) = 15, both paths <= 8 -> ✅ accepted
+           s = s + f.<B> * w[3] + f.<B2> * w[4] + ...
 
-   ⚠️ Do not split to gain room. Physics must be the reason.
+   Physics must be the reason for a split — not the shape of the code.
    ⚠️ Terms **outside** the `if/else` belong to every path. `np.where` is
    not a branch — both sides are computed, so it is one path.
    ⚠️ There may be **at most 4 execution paths**.
    Two levels of nesting · `if/elif/elif/else` · two sequential `if`s —
    all of those are 4 paths.
 
-7. **Comparison constants in branch conditions are not parameters.**
-
-       np.where(p.<shape value> < 1, A, B)   ✅ this `1` is free
-       (f.<name> - 3.0) * w[0]              ⛔ this `3.0` is one parameter
-
-   Write physical boundaries (the roofline knee, an occupancy limit, ...)
-   **as plain numbers**. Do not manufacture a 1 with `np.sign(x)` or
-   `np.isfinite(x)` — it saves no parameter and only costs the reader.
-
-8. ★ **Each `w[i]` is used exactly once.** Use a different weight per term.
-   `len(w0)` must equal the largest referenced index + 1, **exactly**.
+6. ★ **Each `w[i]` is used exactly once.** Use a different weight per term.
+   `len(w0)` must equal the largest referenced index + 1, **exactly** — an
+   index you never use is still fitted, so it would be a free parameter.
 ```
 
 ## Match the magnitudes
@@ -99,14 +84,13 @@ s = s + f.<narrow range name> * w[1]      # already [0,1], leave it
 Or give `w0` on the inverse scale of the range — for a `[0, 300]` term,
 `w0 ≈ 0.003`. **Do one of the two.**
 
-**Do not work around 5~8.** The point of the parameter cap is to prevent
-"with enough parameters any structure reaches a similar score, so **comparing
-structures becomes meaningless**". Reusing one weight across several terms to
-add terms destroys that point.
+**Do not work around 6.** Reusing one weight across several terms hides
+terms from the count and gives the fitter one coefficient for two different
+physical quantities.
 
-**If a path already has {parameters} terms, drop the least important one
-instead of adding.** And there is no obligation to fill {parameters} — fewer
-terms, each explainable, is better.{product_block}{power_block}
+**Use as many terms as the physics needs — no more.** There is no cap, and
+there is no target either: a term you cannot explain is worse than a term you
+do not add.{product_block}{power_block}
 
 ## You do not fit the weights
 

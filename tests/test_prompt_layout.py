@@ -80,25 +80,19 @@ def test_feature_and_rule_editor_prompts_have_no_hardware_constants():
             f"a hardware constant leaked into the {role} prompt: {hit}")
 
 
-def test_rule_writers_get_the_budget():
-    """★ Does the budget go in **as the value given**?
+def test_rule_writers_get_the_rule_shape():
+    """★ 2026-09-09 (D-150): this used to check that the parameter budget
+    rendered **as the value given** — `"8" in body` had once passed while the
+    prompt said 16 (D-105).
 
-    It used to be `"8" in body`. 8 also appears in the feature descriptions,
-    so it passed even when the budget rendered as 16, and a `--rule-budget
-    16` campaign really ran at 8 (D-105). **A changing value must not be
-    searched for as a constant.**
+    There is no budget now, so what is pinned is the opposite: the rule
+    shape reaches both roles and **no cap sentence does.**
     """
-    from kernelrule.agents.openai_client import assemble_instructions
-
     for role in ("rule_editor", "rule_writer"):
-        assert "w[0]" in _instructions(role), (
-            f"{role} has no rule shape")
-        for b in (8, 16):
-            body = assemble_instructions(role, objective="rank", parameters=b,
-                                         hw_text=HW_TEXT)
-            assert (f"{b} per execution path" in body
-                    or f"at most {b}" in body), (
-                f"{role}: the budget {b} is not visible")
+        body = _instructions(role)
+        assert "w[0]" in body, f"{role} has no rule shape"
+        assert "per execution path" not in body, f"{role}: a cap sentence"
+        assert "{parameters}" not in body, f"{role}: an unfilled budget slot"
 
 
 def test_hw_goes_only_to_roles_that_need_it():

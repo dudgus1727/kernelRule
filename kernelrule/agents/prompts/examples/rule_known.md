@@ -36,9 +36,8 @@ explained in one line — that is the bar.
 ## ★ The split form — each branch has its own weights
 
 When the bottleneck differs, split with `if`. **This differs from
-`np.where`** — `np.where` computes both sides, so it is one path and gains no
-room, while `if` splits the path and **each branch spends its own
-parameters.**
+`np.where`** — `np.where` computes both sides, so it is one path, while `if`
+splits the path and **each branch carries its own weights.**
 
 ```python
 def score(f, p, hw, w):
@@ -50,13 +49,13 @@ def score(f, p, hw, w):
         s = s + f.tail_waste * w[2]
     else:
         # the other regime: instructions and occupancy are the bottleneck
-        s = s + f.<compute-side axis> * w[8]
-        s = s + f.occupancy_deficit * w[9]
+        s = s + f.<compute-side axis> * w[3]
+        s = s + f.occupancy_deficit * w[4]
     return s
 ```
 
 ```
-len(w0) = 10 but only 3 per path — both are within the cap
-★ Do not split to gain room. Split only when the physics differs
+len(w0) = 5, and the indices run 0..4 with no gaps
+★ Split only when the physics differs — not to make the rule look bigger
 ⚠️ There may be at most 4 execution paths
 ```

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from kernelrule.rules.checks import LIMITS, CheckReport, RuleCheckError, check_rule
+from kernelrule.rules.checks import CheckReport, RuleCheckError, check_rule
 
 FEAT = {"tail_waste", "smem_pressure", "waves", "has_spill", "edge_waste",
         "traffic_amplification", "sm_idle_cost", "split_k_cost",
@@ -111,22 +111,25 @@ def test_adversarial_case_is_rejected(name, code, nw, expect):
         f"{name}: not the expected reason ({expect}) but {r.violations}"
 
 
-def test_literal_budget_includes_weights():
-    """★ Literals + weights are summed **within one path** (§29.4,
-    D-144)."""
+def test_a_long_flat_rule_is_accepted():
+    """★ 2026-09-09 (D-150): 9 parameters on one path used to be refused.
+
+    The cap is gone, so the same rule passes. What still refuses is the path
+    count, weight reuse and index holes — those have their own tests.
+    """
     code = ("def score(f, p, hw, w):\n"
             "    return f.waves * w[0] + f.tail_waste * w[1]\n")
     assert chk(code, 2).ok
-    # ★ 9 in one path -> refused
-    over = ("def score(f, p, hw, w):\n"
-            "    return (f.waves*w[0] + f.tail_waste*w[1] + f.reg_pressure*w[2]"
-            " + f.has_spill*w[3] + f.sm_idle_cost*w[4] + f.split_k_cost*w[5]"
-            " + f.edge_waste*w[6] + f.smem_pressure*w[7]"
-            " + f.log_grid_tiles*w[8])\n")
-    r = check_rule(over, feature_names=FEAT, shape_value_names=SHAPE,
+    long_one = ("def score(f, p, hw, w):\n"
+                "    return (f.waves*w[0] + f.tail_waste*w[1]"
+                " + f.traffic_amplification*w[2]"
+                " + f.has_spill*w[3] + f.sm_idle_cost*w[4] + f.split_k_cost*w[5]"
+                " + f.edge_waste*w[6] + f.smem_pressure*w[7]"
+                " + f.pipeline_warmup_frac*w[8])\n")
+    r = check_rule(long_one, feature_names=FEAT, shape_value_names=SHAPE,
                    n_weights=9)
-    assert not r.ok
-    assert any("path" in v for v in r.violations)
+    assert r.ok, r.violations
+    assert r.parameters_used == 9      # reported, not enforced
 
 
 def test_sparse_weight_indices_are_rejected():
@@ -174,7 +177,9 @@ def test_human_guided_rule_obeys_the_same_constraints():
     """★ The human baseline is under **the same constraints** as a rule
     (§9.4).
 
-    The comparison is only fair under the same conditions.
+    The comparison is only fair under the same conditions. ⚠️ 2026-09-09
+    (D-150): the parameter-count assertion went with the cap; what is left is
+    every constraint that still refuses.
     """
     import kernelrule.features.physical  # noqa: F401  registration
     from kernelrule.features import REGISTRY
@@ -184,7 +189,6 @@ def test_human_guided_rule_obeys_the_same_constraints():
                    shape_value_names=REGISTRY.names(shape_level=True),
                    n_weights=len(W0))
     assert r.ok, r.violations
-    assert r.parameters_used <= LIMITS["parameters"]
 
 
 # ---------------------------------------------------------------------------

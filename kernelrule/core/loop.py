@@ -475,14 +475,12 @@ class RoundLoop:
         self.bests: list[dict] = []
         #: ★ The objective-switch state (D-104). `switch_round` is -1 when
         #: it never switches.
-        #: ★ The budget is fed to the checker. With `None` it stays at the
-        #: default (8).
+        #: ⚠️ 2026-09-09 (D-150): there is no parameter budget. The field is
+        #: kept because `config.json` records `parameters` and old configs
+        #: carry it — nothing refuses a rule for it.
         self._budget = (cfg.parameters if cfg.parameters is not None
                         else _PARAMETERS)
-        # ★ Raising only the budget **runs into the AST node cap**
-        #   (D-106). The caps move together, from one place.
-        self._limits = (limits_for(cfg.parameters)
-                        if cfg.parameters is not None else None)
+        self._limits = limits_for()
         self._objective = cfg.objective
         self._switched = False
         self.switch_round = -1
@@ -1101,10 +1099,8 @@ class RoundLoop:
                                 shape_value_names=self._shape_vals,
                                 n_weights=len(ps[0].w))
                 n_terms = pr.n_terms
-                # ★ The budget is per path, so "room left" is counted on
-                #   **the heaviest path** (D-144). Counting by `n_terms`
-                #   (the total term count) lies to a parent that split its
-                #   branches, telling it the budget is full.
+                # The heaviest path's parameter count — **reported to the
+                # model, not enforced** (D-150).
                 path_params = pr.parameters_used
             # ★ Hypothesis assignment is **random** (D-94).
             #   `hyps[i % len(hyps)]` uses the earlier hypotheses more often

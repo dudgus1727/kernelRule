@@ -357,8 +357,12 @@ def _same_arg_transform(a, b, fn: str) -> bool:
 
 def literal_parameter_message(code: str, n_weights: int,
                            *, parameters: int | None = None) -> str | None:
-    """A message when numeric literals + weights exceed the budget, else
-    `None`.
+    """A message when the rule breaks a **counting** rule, else `None`.
+
+    ⚠️ 2026-09-09 (D-150): the parameter cap is gone, so what is left here is
+    the execution-path count. `parameters` is accepted and ignored — the
+    callers pass it and removing it from all four surfaces at once is how
+    D-105/D-107 happened. It is dropped in one place, here.
 
     ★ Split out for the same reason as `weight_reuse_message` — the retry
     has to happen at the LLM boundary for the model to hear what was wrong.
@@ -375,46 +379,20 @@ def literal_parameter_message(code: str, n_weights: int,
         tree = ast.parse(code.strip())
     except SyntaxError:
         return None
-    counted, branch = _numeric_literals(tree)
-    n_lit = len(counted)
-    b = int(parameters if parameters is not None
-            else LIMITS["parameters"])
-    # ★ The budget is counted **per execution path** (D-144). It uses the
-    #   same function as `check_rule` — counted separately they would
-    #   diverge (the D-37 family).
+    counted, _branch = _numeric_literals(tree)
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
-    if fnode is not None:
-        paths = _paths(fnode.body, {id(n) for n in counted}, cap=MAX_PATHS)
-        if len(paths) > MAX_PATHS:
-            return (f"there are more than {MAX_PATHS} execution paths. "
-                    f"**At most {MAX_PATHS}** are allowed — the budget is "
-                    f"per path, so splitting could grow the room without "
-                    f"limit. Two levels of nesting, `if/elif/elif/else`, and "
-                    f"two sequential `if`s are all 4 paths")
-        per = sorted(len(a) + len(bw) for a, bw in paths)
-        if per and max(per) <= b:
-            return None
-        if per:
-            return (f"the parameters per execution path are {per}, "
-                    f"exceeding {b} (§29.4). ★ The budget is counted **per "
-                    f"path** — a common term outside `if/else` belongs to "
-                    f"every path, and `np.where` is not a branch"
-                    + (f". The {len(branch)} branch comparison constants are "
-                       f"already exempt" if branch else "")
-                    + f". If you split the branches and give each its own "
-                      f"weights, `len(w0)` may exceed {b}")
-    total = n_lit + n_weights
-    if total <= b:
+    if fnode is None:
         return None
-    hint = ""
-    if branch:
-        hint = (f" ({len(branch)} branch comparison constants are excluded "
-                f"from the budget — you may keep using those)")
-    return (f"{n_lit} numeric literals + {n_weights} weights = {total} > "
-            f"{b} (§29.4).{hint} Weights and numeric literals that are "
-            f"**not branch comparisons** share the same budget — using one "
-            f"constant means dropping one weight. Reduce the terms, or move "
-            f"that constant into a branch condition's comparison")
+    # ★ The same `_paths` as `check_rule` — counted separately they would
+    #   diverge (the D-37 family).
+    paths = _paths(fnode.body, {id(n) for n in counted}, cap=MAX_PATHS)
+    if len(paths) > MAX_PATHS:
+        return (f"there are more than {MAX_PATHS} execution paths. "
+                f"**At most {MAX_PATHS}** are allowed — beyond that the "
+                f"paths explode and the rule becomes a lookup table. Two "
+                f"levels of nesting, `if/elif/elif/else`, and two sequential "
+                f"`if`s are all 4 paths")
+    return None
 
 
 #: ★ The bounds on an exponent-slot weight (D-112). **Normalisation, not a
@@ -580,17 +558,20 @@ def weight_reuse_message(code: str) -> str | None:
 #: ⚠️ **8 is an arbitrary number and has not been validated** (§29.4). An
 #: attempt to measure 8 vs 16 stopped because the fitter could not cope in
 #: 16 dimensions (D-77).
+#:
+#: ⚠️ 2026-09-09 (D-150): **it is no longer a cap.** Nothing refuses a rule
+#: for its parameter count any more. The constant stays because
+#: `fitter_for` uses 8 as the boundary between Nelder-Mead and CMA, and
+#: because the old records that cite "budget 8" have to keep meaning
+#: something (§29.4 is kept as correction history, not deleted).
 PARAMETERS = 8
 
 LIMITS = {
-    #: The weight count + numeric literals that are **not branch
-    #: comparisons** (D-78).
-    #: Weights are in the budget because of §29.4 — with many weights any
-    #: structure reaches a similar regret and structural comparison becomes
-    #: meaningless.
-    "parameters": PARAMETERS,
-    "ast_nodes": 400,
-    "max_lines": 60,
+    #: ★ A safety valve, not a budget (D-150). It stops unboundedly long
+    #: code; it must not become the new cap, so it is the value the old
+    #: "16 parameters" arm ran under (2x 400), not the 8-parameter one.
+    "ast_nodes": 800,
+    "max_lines": 120,
 }
 
 
@@ -627,25 +608,22 @@ def fitter_for(n_weights: int | None) -> dict:
     return {"fit_method": "cma", "fit_restarts": 1, "max_evals": 300}
 
 
-def limits_for(parameters: int | None) -> dict:
-    """★ The caps that **move with the budget**. Raising only the budget
-    runs into another wall.
+def limits_for(parameters: int | None = None) -> dict:
+    """The size caps. **They no longer move with anything** (D-150).
 
-    Measured: an 8-term rule has a median of 271 AST nodes and a maximum of
-    383. Leaving the cap at 400 and raising only the budget to 16 means
-    **16-term rules are refused at the node cap.** Then what gets measured is
-    not "a budget of 16 has no effect" but "16 terms could not be used" (the
-    same spot as D-105).
+    They used to scale with the parameter budget, because leaving the node
+    cap at 400 while raising the budget to 16 would have refused 16-term
+    rules at the node cap — measuring "16 terms could not be used" instead of
+    "a budget of 16 has no effect" (the same spot as D-105).
 
-    They rise proportionally — 400 at 8 terms is 800 at 16.
+    ★ With the budget gone the same trap is here: if the node cap stayed at
+    400 it would silently **become** the budget. So the standing cap is the
+    value the 16-parameter arm ran under.
+
+    `parameters` is accepted and ignored — the callers are unpicked one at a
+    time, not all four surfaces at once (that is how D-105/D-107 happened).
     """
-    b = int(parameters if parameters is not None else PARAMETERS)
-    if b < 1:
-        raise ValueError(f"the budget must be at least 1: {b}")
-    k = b / PARAMETERS
-    return {"parameters": b,
-            "ast_nodes": int(round(LIMITS["ast_nodes"] * k)),
-            "max_lines": int(round(LIMITS["max_lines"] * k))}
+    return dict(LIMITS)
 
 #: Names that must not appear in rule source. They are answers or escape
 #: routes.
@@ -722,8 +700,9 @@ class CheckReport:
 
     @property
     def parameters_used(self) -> int:
-        """★ The parameter count of the heaviest path. The global sum when
-        there are no paths."""
+        """The parameter count of the heaviest path (the global sum when
+        there are no paths). ★ 2026-09-09 (D-150): **reported, not
+        enforced** — it is now one of the things being measured."""
         return (max(self.path_parameters) if self.path_parameters
                 else self.n_literals + self.n_weights)
 
@@ -743,8 +722,7 @@ class CheckReport:
               if len(self.path_parameters) > 1 else "")
         return (f"[{head}] literals {self.n_literals} + weights "
                 f"{self.n_weights} "
-                f"= heaviest path {self.parameters_used}/"
-                f"{LIMITS['parameters']}"
+                f"= heaviest path {self.parameters_used}"
                 f"{bc}{pp}, "
                 f"terms {self.n_terms}, "
                 f"nodes {self.n_nodes}/{LIMITS['ast_nodes']}, "
@@ -758,8 +736,9 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                feature_mins: dict | None = None) -> CheckReport:
     """Checks the source of `score(f, p, hw, w)`.
 
-    `n_weights` is the length of the `W0` the LLM gave. **It is summed into
-    the literal budget.**
+    `n_weights` is the length of the `W0` the LLM gave. ⚠️ 2026-09-09
+    (D-150): it is no longer summed into a budget — it is used for the
+    reuse and index-hole checks and reported.
     """
     lim = {**LIMITS, **(limits or {})}
     rep = CheckReport(ok=True, n_weights=int(n_weights))
@@ -974,35 +953,29 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     if (m := identity_transform_message(code)):
         bad(m)
 
-    # -- ★ The budget is counted **per execution path** (D-144) ------------
-    #   For RuleEditor to find a regime on its own, each branch needs its own
-    #   weights. With 8 overall, two branches had to split 4 and 4.
-    #   ⚠️ Allowing index reuse is not the answer — weight fitting is one set
-    #      across all shapes, so `w[0]` would double as the coefficient of
-    #      different features in the two branches.
+    # -- ★ The path count. **There is no parameter cap any more** (D-150) --
+    #   The cap existed to keep structures comparable (§29.4), but it made
+    #   the intended behaviour unreachable: a rule with 8 common terms had to
+    #   throw a term away before it could grow a single branch, so 12 of 12
+    #   proposals stayed at `len(w0) = 8` and never split their weights
+    #   (D-149 §0). D-108 had already measured 8 vs 16 as indistinguishable
+    #   with a **negative** train-holdout gap on 6/6 seeds.
+    #   ★ The path count stays — it is a safety valve against path explosion
+    #     and check cost, not a budget.
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
     if fnode is not None:
         rep.branch_depth = _branch_depth(fnode)
         paths = _paths(fnode.body, {id(n) for n in _counted}, cap=MAX_PATHS)
         rep.n_paths = len(paths)
+        #: Reported, not enforced — "how many parameters did it settle on"
+        #: is now a **result** (D-150 §1-5).
         rep.path_parameters = sorted(len(a) + len(b) for a, b in paths)
         if rep.n_paths > MAX_PATHS:
-            bad(f"there are more than {MAX_PATHS} execution paths. The "
-                f"budget is per path, so splitting could grow the room "
-                f"without limit — at most {MAX_PATHS} paths are allowed "
-                f"(two levels of nesting, if/elif/elif/else, and two "
-                f"sequential ifs are all 4 paths)")
-        over = [n for n in rep.path_parameters if n > lim["parameters"]]
-        if over:
-            bad(f"the parameters of an execution path are {over}, "
-                f"exceeding {lim['parameters']} (per path "
-                f"{rep.path_parameters}). ★ The budget is counted per path — "
-                f"a common term outside if/else belongs to every path. "
-                + (f"The branch comparison constants {rep.branch_constants} "
-                   f"are already exempt"
-                   if rep.branch_constants else
-                   "Comparison constants in branch conditions are excluded "
-                   "from the budget (D-78)"))
+            bad(f"there are more than {MAX_PATHS} execution paths. At most "
+                f"{MAX_PATHS} are allowed — beyond that the paths explode "
+                f"and the rule becomes a lookup table (two levels of "
+                f"nesting, if/elif/elif/else, and two sequential ifs are "
+                f"all 4 paths)")
 
     # -- ★ No config-level branching --------------------------------------
     for node in ast.walk(tree):

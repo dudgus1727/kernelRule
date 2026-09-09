@@ -17,7 +17,7 @@ from functools import lru_cache
 from typing import Any
 
 from kernelrule.rules.checks import (
-    LIMITS,
+    PARAMETERS,
     exponent_message,
     literal_parameter_message,
     noop_term_message,
@@ -136,9 +136,6 @@ def check_banned(code: str) -> str | None:
 #: `2, 8`.
 N_HYP_MIN, N_HYP_MAX = 3, 3
 
-#: The weight cap. **`rules.checks.LIMITS` is the single source** (D-26) —
-#: if the schema and the static checks diverge, rules appear that pass only
-#: one of them.
 #: ★ The **shape sizes** that must not enter a hypothesis sentence (D-114).
 #: It catches multiplication forms such as `4096x4096` and namings such as
 #: `M = 4096`. It does not catch fewer than three digits — that would
@@ -146,7 +143,10 @@ N_HYP_MIN, N_HYP_MAX = 3, 3
 _SHAPE_SIZE = re.compile(r"\d{3,6}\s*[x*×]\s*\d{3,6}"
                          r"|\b[MNK]\s*=\s*\d{3,6}\b")
 
-MAX_WEIGHTS = LIMITS["parameters"]
+#: ⚠️ 2026-09-09 (D-150): **there is no weight cap.** The name is kept
+#: because it is exported and cited; the value is only the boundary
+#: `fitter_for` uses. Nothing refuses a proposal for exceeding it.
+MAX_WEIGHTS = PARAMETERS
 
 
 #: ★ Experiment B (D-110). The schema must say the same thing as the
@@ -163,14 +163,14 @@ _POWER_DESC = (" ★ A weight may sit **in the exponent** — replacing "
 
 def _desc_code(b: int, product: bool = False,
                power: bool = False) -> str:
+    del b                     # ★ no parameter cap since D-150
     return ("The full function, starting at `def score(f, p, hw, w):`. "
             "No prose, no markdown fences. "
-            f"★ At most {b} parameters **per execution path**, and each w[i] "
-            "may be used exactly once — reusing one weight across terms to "
-            "add terms is rejected. "
-            "★ Comparison constants in branch conditions "
-            "(`p.roofline_ratio < 1`) do not count — write physical "
-            "boundaries as plain numbers"
+            "★ Each w[i] may be used exactly once — reusing one weight "
+            "across terms is rejected — and `len(w0)` must equal the largest "
+            "index used + 1, with no gaps. "
+            "Use as many terms as the physics needs; when you split on a "
+            "shape value, give each branch its own weights."
             + (_PRODUCT_DESC if product else "")
             + (_POWER_DESC if power else ""))
 
@@ -186,6 +186,8 @@ def _desc_w0(b: int) -> str:
 
 
 def _w0_message(n: int, b: int) -> str:
+    """⚠️ 2026-09-09 (D-150): kept for the record of the old refusals — no
+    caller raises it any more. `classify_violation` still maps its wording."""
     return (f"{n} weights. The budget is {b} — it is summed with numeric "
             f"literals. But **comparison constants in branch conditions are "
             f"excluded** (§29.4 / D-78)")
@@ -263,12 +265,11 @@ def validate_rule_proposal(obj: Any, *, parameters: int | None = None
     """LLM response -> `RuleProposal`. **A violation raises. It is not
     patched up and used.**
 
-    ★ Without `parameters` it is `LIMITS["parameters"]` (8). Any path that
-    uses `--parameters` **must pass it** — otherwise a 16-term proposal is
-    silently refused here and the experiment measures "a budget of 16 has no
-    effect" (D-107).
+    ⚠️ 2026-09-09 (D-150): `parameters` is accepted and ignored. There is no
+    cap — a proposal is refused for reusing a weight index or leaving a hole
+    in `w0`, not for how many it uses.
     """
-    _b = int(parameters if parameters is not None else MAX_WEIGHTS)
+    del parameters
     if isinstance(obj, RuleProposal):
         d = {"code": obj.code, "w0": obj.w0, "changes": obj.changes,
              "hypothesis_id": obj.hypothesis_id, "parent_ids": obj.parent_ids,
@@ -295,8 +296,6 @@ def validate_rule_proposal(obj: Any, *, parameters: int | None = None
     # ★ It must be **the same condition** as the Pydantic validator (§24 /
     #   D-26). Without it here, a budget overrun passes on the MockLLM path
     #   alone and the ablation breaks.
-    if len(w0) > _b:
-        raise SchemaViolation(_w0_message(len(w0), _b))
     if not all(abs(x) < 1e6 for x in w0):
         raise SchemaViolation("the w0 values are abnormally large")
     return RuleProposal(code=code, w0=w0, changes=str(d.get("changes", "")),
@@ -566,8 +565,6 @@ def rule_output_for(parameters: int | None = None, *,
         def _w0(cls, v: list[float]) -> list[float]:
             if not v:
                 raise ValueError("w0 is empty")
-            if len(v) > b:
-                raise ValueError(_w0_message(len(v), b))
             if not all(abs(x) < 1e6 for x in v):
                 raise ValueError("the w0 values are abnormally large")
             return v

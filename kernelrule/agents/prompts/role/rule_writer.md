@@ -54,7 +54,7 @@ in one pass.**
 ```
 [ ] 1. no w[i] used twice
 [ ] 2. no shape constant applied to the accumulated score
-[ ] 3. per path, (literals + weights) <= {parameters}
+[ ] 3. len(w0) == the largest index used + 1, with no gaps
 [ ] 4. at most 4 execution paths
 ```
 
@@ -67,7 +67,7 @@ if p.<shape value>:
 ```
 
 The reasoning and the rest of the examples are in **"Absolute rules"** above
-(5~8, 2).
+(6, 5, 2).
 
 **The safest shape that satisfies all of them:**
 
@@ -81,8 +81,8 @@ def score(f, p, hw, w):
     return s
 ```
 
-0 literals + 4 weights = 4. **On this path** there is room for 4 more
-(there is no branch, so there is one path).
+That is the smallest honest shape. Add a term whenever you can say which
+physics it is, and split when the bottleneck differs.
 
 ---
 

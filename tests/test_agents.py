@@ -226,27 +226,23 @@ def test_hypothesis_count_desc_and_validator_share_one_constant():
         assert want in str(ei.value)
 
 
-def test_weight_cap_has_one_source_of_truth():
-    from kernelrule.agents.schemas import MAX_WEIGHTS
-    from kernelrule.rules.checks import LIMITS
-    assert LIMITS["parameters"] == MAX_WEIGHTS
+def test_there_is_no_weight_cap():
+    """★ 2026-09-09 (D-150): the parameter cap is gone.
 
-
-def test_mock_and_real_paths_enforce_the_same_budget():
-    """§24 — `validate_rule_proposal` alone had no w0 length check.
-
-    Developing on the mock, a budget overrun went uncaught and was caught
-    only on the real LLM.
+    It used to assert `LIMITS["parameters"] == MAX_WEIGHTS` — one source for
+    one cap. There is no cap now, so what is pinned is its absence: a long
+    `w0` is accepted, and `LIMITS` no longer carries a budget at all.
     """
-    from kernelrule.agents.schemas import (
-        MAX_WEIGHTS,
-        SchemaViolation,
-        validate_rule_proposal,
-    )
-    code = "def score(f, p, hw, w):\n    return f.waves * w[0]\n"
-    validate_rule_proposal({"code": code, "w0": [1.0] * MAX_WEIGHTS})
-    with pytest.raises(SchemaViolation, match="budget"):
-        validate_rule_proposal({"code": code, "w0": [1.0] * (MAX_WEIGHTS + 1)})
+    from kernelrule.agents.schemas import validate_rule_proposal
+    from kernelrule.rules.checks import LIMITS
+
+    assert "parameters" not in LIMITS
+    code = ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+            + "".join(f"    s = s + f.tail_waste * w[{i}]\n"
+                      for i in range(1, 20))
+            + "    return s\n")
+    p = validate_rule_proposal({"code": code, "w0": [1.0] * 20})
+    assert len(p.w0) == 20
 
 
 # ---------------------------------------------------------------------------
@@ -359,53 +355,41 @@ def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
         f"the shape example contains a real feature: {leaked}")
 
 
-def test_prompts_never_hardcode_the_budget_number(monkeypatch):
-    """★ The budget number has **one** source: `checks.PARAMETERS`.
+def test_prompts_state_no_parameter_cap(monkeypatch):
+    """★ 2026-09-09 (D-150): the budget number is gone from the prompts.
 
-    Five prompt files, the schema and the checker each wrote their own 8. A
-    change misses one — it would be the sixth after `is_reference` /
-    `top_k` / `DEFAULT_MODEL` / `REGISTRY` / `load_generated`.
-
-    If the prompt follows when `checks.PARAMETERS` changes, it is a single
-    source.
+    This test used to change `checks.PARAMETERS` to 16 and demand that every
+    prompt follow. Now there is nothing to follow — what it pins is that no
+    prompt states a cap the checker does not enforce, which is the D-105
+    failure in the other direction.
     """
     from kernelrule.agents.openai_client import load_prompt
-    from kernelrule.rules import checks
 
-    files = ["role/_rules_common.md", "role/_rules_edit.md",
-             "role/rule_editor.md", "role/rule_writer.md"]
-    monkeypatch.setattr(checks, "PARAMETERS", 16)
-    for f in files:
+    for f in ("role/_rules_common.md", "role/_rules_edit.md",
+              "role/rule_editor.md", "role/rule_writer.md"):
         txt = load_prompt(f)
-        assert "{budget}" not in txt, f"{f}: the substitution did not happen"
-        assert "16" in txt, f"{f}: the budget does not flow into the prompt"
-        # No old number may remain in a budget sentence
+        assert "{parameters}" not in txt, f"{f}: a budget slot is left"
         for line in txt.splitlines():
             low = line.lower()
-            if "budget" in low or "cap" in low or "literal" in low:
-                assert " 8 " not in line and "8 parameters" not in line \
-                    and "<= 8" not in line, (
-                        f"{f}: a frozen 8 remains — {line}")
+            if "no cap" in low:
+                continue
+            assert "per execution path" not in low, f"{f}: {line}"
+            assert "8 parameters" not in low, f"{f}: {line}"
 
 
-def test_prompt_tells_the_model_branch_constants_are_free():
+def test_prompt_tells_the_model_there_is_no_cap():
     """★ When the rule changes, **the model must know too** (D-78).
 
-    Loosening only the checker and leaving the prompt as it is keeps the
-    model going around — because it does not know the constraint was
-    loosened.
-
-    ★ 2026-09-08 (D-145): it looks at the **assembled prompt**. Which file
-    the explanation lives in depends on deduplication (§3-4), and what the
-    model receives is the assembled result. Checking per file breaks the
-    test every time a duplicate is removed.
+    The exemption for branch comparison constants went with the cap itself
+    (D-150) — with nothing counted, nothing needs exempting. What has to
+    reach the model now is that there is no cap, or it keeps trimming rules
+    to eight (D-149).
     """
     from kernelrule.agents.openai_client import assemble_instructions
 
     for role in ("rule_writer", "rule_editor"):
-        kw = {"objective": "regret", "parameters": 8}
+        kw = {"objective": "regret"}
         if role == "rule_writer":
             kw["hw_text"] = "GPU: T\n"
-        txt = assemble_instructions(role, **kw)
-        assert "branch condition" in txt and "not parameters" in txt, (
-            f"{role}: the exemption is not explained")
+        txt = assemble_instructions(role, **kw).lower()
+        assert "no cap" in txt, f"{role}: it is not told that there is no cap"

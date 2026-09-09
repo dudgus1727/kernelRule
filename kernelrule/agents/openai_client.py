@@ -383,25 +383,22 @@ def load_prompt(name: str, *, parameters: int | None = None) -> str:
     that goes to the model it (1) costs tokens, (2) leaks internal decision
     numbers and (3) under some conditions could hand over the answer.
 
-    ★ The parameter count is **not written into the prompt directly.**
-    Written as `{parameters}`, it is filled in here from
-    `checks.PARAMETERS`. Five prompt files, the schema and the checker each
-    wrote their own number, and then a change misses one (it would be the
-    sixth after `is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
-    `load_generated`).
-    """
-    from kernelrule.rules.checks import PARAMETERS, limits_for
+    ★ A number that the checker also holds is **not written into the prompt
+    directly** — it is written as `{ast_nodes}` and filled in here from
+    `checks.LIMITS`. Five prompt files, the schema and the checker each wrote
+    their own number once, and a change missed one.
 
+    ⚠️ 2026-09-09 (D-150): `{parameters}` is gone with the cap. The argument
+    is accepted and ignored so the call sites can be unpicked one at a time.
+    """
+    from kernelrule.rules.checks import limits_for
+
+    del parameters
     p = _PROMPTS / name
     if not p.exists():
         raise FileNotFoundError(f"no such prompt: {p}")
     txt = _HTML_COMMENT.sub("", p.read_text()).strip() + "\n"
-    # ★ The caps attached to the parameter count are filled in **too**
-    #   (D-106). With `ast_nodes` written as a constant, at 16 parameters
-    #   the prompt says "the cap is 400" while the checker uses 800 — the
-    #   prompt and the checker diverge.
-    lim = limits_for(parameters if parameters is not None else PARAMETERS)
-    for k, v in lim.items():
+    for k, v in limits_for().items():
         txt = txt.replace("{" + k + "}", str(v))
     return txt
 
@@ -642,11 +639,9 @@ class OpenAILLM:
         #: is not in the loop, left here, reads as "to be switched on some
         #: day".
         self._extra: dict[str, tuple] = {}
-        # ★ The effective term budget. **Decided once here and passed to
-        #   every place** (principle 2). It used to be decided separately by
-        #   `load_prompt`'s default and a direct import of
-        #   `checks.PARAMETERS`, so even with `parameters=16` **the user
-        #   prompt and the role files rendered 8** (D-105).
+        # ⚠️ 2026-09-09 (D-150): there is no term budget. The field is kept
+        #   because `config.json` records it and old configs carry it; it is
+        #   **passed nowhere that refuses anything** any more.
         from kernelrule.rules.checks import PARAMETERS as _CHECK_PARAMETERS
         self._parameters = int(cfg.parameters if cfg.parameters is not None
                            else _CHECK_PARAMETERS)
@@ -841,30 +836,15 @@ class OpenAILLM:
         parent = kw.get("parent")
         hyp = kw.get("hypothesis") or {}
         applied = kw.get("hypotheses_applied") or []
-        # ★ The parent's current term count is injected, and at saturation
-        #   it **instructs a replacement**. "You may drop one" is an option;
-        #   "drop one and put it in" is an instruction. With the budget only
-        #   in `role/_rules.md` (the system prompt) it is diluted in a long
-        #   context.
+        # ⚠️ 2026-09-09 (D-150): this used to say "the heaviest path is at
+        #   the cap — drop a term or split". There is no cap now, so it
+        #   states **what the parent spends** and nothing else. Telling the
+        #   model to drop a term was what kept every proposal at 8 (D-149).
         n_terms = int(kw.get("parent_n_terms") or 0)
-        # ★ The budget is **per path** (D-144). The room left is counted on
-        #   the heaviest path.
         n_path = int(kw.get("parent_path_params") or 0)
         n_w = len(parent.w0) if parent else 0
-        # ★ Reading `checks.PARAMETERS` directly ignores `parameters`
-        #   (D-105). The effective budget is `self._parameters` alone.
-        if n_path >= self._parameters:
-            note = ("\n★ The **heaviest path** is at the cap "
-                    f"({n_path}/{self._parameters}).\n"
-                    "  Do one of two things:\n"
-                    "  (1) **split a branch** with `if p.<shape value>` — "
-                    "each branch spends its own room\n"
-                    "  (2) **drop the least important term** on that path and "
-                    "put the new one there\n"
-                    "  Write what you did and why you chose it in `changes`.")
-        else:
-            note = (f"Room left on the heaviest path: "
-                    f"{self._parameters - n_path} ({n_terms} terms in total)")
+        note = (f"The parent uses {n_terms} terms, {n_w} weights "
+                f"(the heaviest path spends {n_path}).")
         # ★ With the Analyst off, **the hypothesis section is not built at
         #   all** (§16.1, D-89). Leaving an empty slot such as
         #   "## This round's hypothesis\n\n(none)" makes the model read "there
@@ -886,7 +866,12 @@ class OpenAILLM:
                    "yourself)"))
             inputs_hyp = ("the one hypothesis to reflect this round\n"
                           "the hypotheses already reflected in the rule\n")
-            one_change = "The hypothesis being local is **deliberate**. "
+            # ⚠️ 2026-09-09 (D-150): it used to say "the hypothesis being
+            #   local is deliberate" — the lead-in to "change one thing at a
+            #   time". Reflecting a hypothesis often takes several edits, and
+            #   asking for one made the model trim the rule instead (D-149).
+            one_change = ("Reflect the hypothesis as fully as it needs — "
+                          "several terms, a split, or a replacement. ")
             applied_warn = (
                 "\n**Do not undo the effect of the existing hypotheses.** The "
                 "terms listed below\nare there for a reason. Removing one "
@@ -909,9 +894,7 @@ class OpenAILLM:
                 f"Second parent's weights: {list(p2.w0)}\n\n"
                 "**Pick the good terms from each and make one rule.** Do not "
                 "copy one side as is — that is not a crossover.\n\n"
-                f"⚠️ The cap is {self._parameters} per path, so combining "
-                "**forces you to drop something.** Write what you dropped and "
-                "why you chose it in `changes`.\n")
+                "Write what you took from each and why in `changes`.\n")
         body = load_prompt("role/rule_editor.md", parameters=self._parameters) \
             .replace("{product_note}", product_note(self._product)) \
             .replace("{power_note}", power_note(self._power))

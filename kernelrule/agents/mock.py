@@ -124,10 +124,14 @@ ADVERSARIAL_CASES: tuple[tuple[str, str, list[float]], ...] = (
         return f.waves * w[0]
     return f.waves * w[0]
 """, [1.0]),
-    ("too many literals", """def score(f, p, hw, w):
-    return (f.waves*1.1 + f.tail_waste*2.2 + f.smem_pressure*3.3
-            + f.has_spill*4.4 + f.edge_waste*5.5 + 6.6 + 7.7 + 8.8) * w[0]
-""", [1.0]),
+    # ⚠️ 2026-09-09 (D-150): this slot held "too many literals". With the
+    #    parameter cap gone that rule is legal, so the case would have been
+    #    **scored** — the adversarial set has to hold only what is still
+    #    refused. Its replacement is the hole in `w0`: indices 1~7 are never
+    #    used and the fitter would fit them as free parameters.
+    ("index hole", """def score(f, p, hw, w):
+    return f.waves * w[0] + f.tail_waste * w[8]
+""", [1.0] * 9),
     ("non-determinism", """def score(f, p, hw, w):
     return np.random.rand(3) * w[0]
 """, [1.0]),

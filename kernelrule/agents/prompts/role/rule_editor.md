@@ -9,20 +9,19 @@ the parent rule's code
 {inputs_hyp}the list of available features
 ```
 
-## Parameter cap — **{parameters} per execution path**
+## The parent's size
 {product_note}{power_note}
 ```
-parent rule: {n_terms} terms / {n_weights} weights (cap {parameters} per path)
+parent rule: {n_terms} terms / {n_weights} weights
 {parameters_note}
 ```
 
-That is the parameter rule above, applied to this particular parent.
+**There is no cap on how many terms or weights you may use.** Add what the
+physics needs and leave out what you cannot explain.
 
-**Split when the physics differs.** Splitting with `if p.<shape value>`
-gives each branch its own weights, and as a result `len(w0)` may exceed
-{parameters}. ⚠️ You do not split because you ran out of room — you split
-because the bottleneck is different in that regime. Without a physical
-reason, drop the least important term instead.
+**Split when the physics differs.** Splitting with `if p.<shape value>` gives
+each branch its own weights. You split because the bottleneck is different in
+that regime — not to make room, and not to make the code look richer.
 
 ## Output
 
@@ -30,10 +29,11 @@ The **full text** of the `score(f, p, hw, w)` function, plus `w0`. Not a diff.
 
 Follow the "Shape of the rule function" above. **Full text, not a diff.**
 
-## Change one thing at a time
+## How much to change
 
-{one_change_hyp}Only by changing one thing at a time can you know the cause.
-The side effects of a local edit are caught by the global scoring.
+{one_change_hyp}**Write everything you changed, and why, in `changes`.** That
+text is the only record of this rule's lineage — a change that is not written
+down cannot be read back later.
 {applied_warning}
 
 ## Good edits and bad edits
@@ -56,7 +56,7 @@ arbitrary exponents.
 
 ```python
 # good — the bottleneck differs per regime.
-#        Each branch gets its own weights (unlike np.where, the room is separate)
+#        Each branch gets its own weights (unlike np.where)
 s = f.<common name> * w[0]
 if p.<shape value>:
     s = s + f.<traffic-ish> * w[1] + f.<bandwidth-ish> * w[2]
@@ -65,7 +65,8 @@ else:
 ```
 
 ⚠️ `np.where` is not a branch — both sides are computed, so it is the **same
-path** and gains no room. Use `if` to split.
+path**, and both sides share one weight. Use `if` when the two regimes need
+different weights.
 
 {hypothesis_block}
 
