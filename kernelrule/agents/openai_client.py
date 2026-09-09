@@ -744,7 +744,7 @@ class OpenAILLM:
         #   regret definition and the weight budget every time.
         #
         #                      hardware-independent   hardware-dependent
-        #     role-independent  _base.md              hw/sm_86.md
+        #     role-independent  _base.md              the generated hw facts
         #     role-dependent    role/*.md             (none)
         #
         #   `hw` goes to Analyst / RuleWriter only. Not seeing it makes the

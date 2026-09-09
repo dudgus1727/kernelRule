@@ -25,8 +25,24 @@ measurement-limit section  ★ the tick and the "what % per kernel length"
                            table are **computed** from tick_ms
 ```
 
-`hw/sm_86.md` is **kept, not deleted** — it is the condition of every run
-before 2026-09-03, and deleting it makes those runs impossible to retrace.
+## ⚠️ 2026-09-08 (D-146): `hw/sm_86.md` was deleted
+
+It was kept until now as the condition of every run before 2026-09-03. It was
+deleted on instruction, and `prompts/hw/` is empty as a result.
+
+```
+the Korean original   commit ee53b4d
+the English version   commit 5c54e0f (D-146 translated it, which was itself a
+                      condition change)
+★ what it costs       re-running an old `config.json` whose `arch_prompt` is
+                      `"hw/sm_86.md"` now fails at load time. It fails loudly,
+                      not silently (§26.4)
+★ what it does not    `run_condition` reads `arch_prompt` **as a string**, so
+   cost               the recorded condition of the old runs is unchanged
+```
+
+The facts themselves are not lost — `hw_prompt_from_bundle` generates them
+from the bundle, which is what D-113 decided in the first place.
 """
 
 from __future__ import annotations
@@ -247,8 +263,10 @@ def check_hw_prompt(text: str, hw: Hardware, tick_ms: float) -> None:
             f"the hardware prompt does not speak of {hw.name!r}. "
             "Another GPU's facts are going out (D-113).")
     # ★ 2026-09-08 (D-146): the prompt became English. **The old Korean form
-    #   is accepted too** — `hw/sm_86.md` is a frozen file and is in Korean,
-    #   and it must remain checkable.
+    #   is accepted too** — the prompts recorded in the `llm_calls/` of the
+    #   old runs are in Korean and they must remain checkable. (The frozen
+    #   `hw/sm_86.md` that used to be the reason is deleted, but the logs it
+    #   produced are not.)
     m = (re.search(r"tick \(([\d.]+) us\)", text)
          or re.search(r"눈금\(([\d.]+) us\)", text))
     if not m:

@@ -120,7 +120,9 @@ def test_estimate_requires_confirmation():
 # The prompts — two layers (§11.2)
 # ---------------------------------------------------------------------------
 def test_prompts_exist():
-    for n in ("_base.md", "hw/sm_86.md", "role/_rules_common.md",
+    # ★ `hw/sm_86.md` is not in the list — it was deleted on 2026-09-08
+    #   (D-146) and the hardware facts are generated from the bundle (D-113).
+    for n in ("_base.md", "role/_rules_common.md",
               "role/_rules_edit.md", "role/analyze.md", "role/rule_editor.md",
               "role/feature.md", "role/rule_writer.md", "role/categorize.md"):
         assert load_prompt(n).strip()
@@ -134,8 +136,10 @@ def test_missing_prompt_is_an_error():
 def test_instructions_are_two_axes(client, monkeypatch):
     """★ Two axes — hardware-independent/dependent x
     role-independent/dependent (§30.10)."""
+    from conftest import a6000_hw_text
+
     base = load_prompt("_base.md")
-    hw = load_prompt("hw/sm_86.md")
+    hw = a6000_hw_text()
     assert "GEMM" in base and "sm_86" in hw
     # Swapping only the hardware file gives a new backend
     assert "RTX A6000" in hw and "RTX A6000" not in base

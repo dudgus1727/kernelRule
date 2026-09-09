@@ -88,14 +88,17 @@ def test_generated_a6000_prompt_reproduces_the_frozen_numbers():
 
     The body differs (the codename `GA102` is not in `env.json`). What must
     match is the numbers — those are the condition.
+
+    ⚠️ 2026-09-08 (D-146): `hw/sm_86.md` was deleted. The numbers below are
+    **the ones that file held** and they stay written here — that is what
+    makes the deletion checkable (the file itself is at commit `ee53b4d`).
     """
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
     txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
                                    table=_table(*A6000))
     # ★ 2026-09-08 (D-146): the prompt became English. **What has to be
-    #   reproduced is the numbers**, so only the numbers are checked — the
-    #   old file (`hw/sm_86.md`) is frozen.
+    #   reproduced is the numbers**, so only the numbers are checked.
     for want in ("SMs        84", "101,376 B", "6 MB", "116.1 TFLOP/s",
                  "729.7 GB/s", "159.1 FLOP/byte", "tick (1.024 us)"):
         assert want in txt, f"cannot reproduce {want!r} from the frozen file"
@@ -108,13 +111,20 @@ def test_generated_a6000_prompt_reproduces_the_frozen_numbers():
 
 
 def test_a6000_prompt_on_a_5090_table_is_refused():
-    from kernelrule.agents.hwprompt import HwPromptError, check_hw_prompt
-    from kernelrule.agents.openai_client import load_prompt
+    """★ 2026-09-08 (D-146): this used to load the frozen `hw/sm_86.md`. That
+    file was deleted, so the A6000 prompt is **generated** here — what is
+    tested is the same thing, one GPU's facts put on another's table."""
+    from kernelrule.agents.hwprompt import (
+        HwPromptError,
+        check_hw_prompt,
+        hw_prompt_from_bundle,
+    )
 
     t = _table(*G5090)
+    a6000 = _table(*A6000)
+    txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1], table=a6000)
     with pytest.raises(HwPromptError, match="5090"):
-        check_hw_prompt(load_prompt("hw/sm_86.md"), t.hw,
-                        float(t.noise.tick_ms))
+        check_hw_prompt(txt, t.hw, float(t.noise.tick_ms))
 
 
 def test_same_gpu_but_wrong_tick_is_refused():

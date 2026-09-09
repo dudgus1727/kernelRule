@@ -7,7 +7,7 @@ received the regret definition, the weight budget of 8 and the gallery of
 refused rules every time.
 
               hardware-independent   hardware-dependent
-    role-indep _base.md              hw/sm_86.md
+    role-indep _base.md              the generated hw facts
     role-dep   role/*.md             (none)
 """
 from __future__ import annotations
@@ -26,10 +26,12 @@ ROLES = ("analyze", "rule_editor", "feature", "rule_writer")
 PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 
 
-#: ★ The hardware facts of runs before 2026-09-03. **It is not deleted** —
-#: this file is those runs' condition. New runs generate it from the bundle
-#: (D-113).
-FROZEN_HW = "hw/sm_86.md"
+def _hw_text() -> str:
+    """★ The hardware facts, **generated** (D-113). It is built in one place
+    — `conftest.a6000_hw_text` (principle 2)."""
+    from conftest import a6000_hw_text
+
+    return a6000_hw_text()
 
 
 def _instructions(role: str, *, objective: str = "rank") -> str:
@@ -39,13 +41,14 @@ def _instructions(role: str, *, objective: str = "rank") -> str:
     appeared, only the test side left it unfilled and they diverged —
     assembly happens in one place only.
 
-    ★ `hw_file` is **stated explicitly.** The default is gone (D-113), and a
-    test leaning on a default cannot see that the default is a condition.
+    ★ The hardware facts are **passed in explicitly.** The default is gone
+    (D-113), and a test leaning on a default cannot see that the default is a
+    condition.
     """
     from kernelrule.agents.openai_client import assemble_instructions
 
     return assemble_instructions(role, objective=objective,
-                                 hw_file=FROZEN_HW)
+                                 hw_text=_hw_text())
 
 
 # ---------------------------------------------------------------------------
@@ -69,8 +72,8 @@ def test_feature_prompt_has_no_rule_material():
 
 def test_feature_and_rule_editor_prompts_have_no_hardware_constants():
     """★ Not seeing hw makes that prompt **GPU-independent** (§16.2)."""
-    hw = load_prompt(FROZEN_HW)
-    marks = [m for m in ("RTX A6000", "sm_86", "84", "101376") if m in hw]
+    hw = _hw_text()
+    marks = [m for m in ("RTX A6000", "sm_86", "84", "101,376") if m in hw]
     assert marks, (
         "no marker was found in the hardware file — this check is moot")
     for role in ("feature", "rule_editor"):
@@ -95,7 +98,7 @@ def test_rule_writers_get_the_budget():
             f"{role} has no rule shape")
         for b in (8, 16):
             body = assemble_instructions(role, objective="rank", parameters=b,
-                                         hw_file=FROZEN_HW)
+                                         hw_text=_hw_text())
             assert (f"{b} per execution path" in body
                     or f"at most {b}" in body), (
                 f"{role}: the budget {b} is not visible")
@@ -222,8 +225,11 @@ def test_hw_block_does_not_reference_cases():
     no cases. "look at the ... attached to the case" points at something
     that does not exist (§30.10).
     """
-    hw = load_prompt(FROZEN_HW)
-    assert "사례에 붙은" not in hw   # ★ a frozen file, so it is Korean (D-113)
+    hw = _hw_text()
+    # ★ Both wordings — the generated prompt is English, and the old frozen
+    #   file was Korean (D-146 deleted it, its logs remain).
+    for phrase in ("사례에 붙은", "attached to the case"):
+        assert phrase not in hw
     arch = _instructions("rule_writer")
     assert "no cases" in arch, "the role file changed — this check is moot"
 
@@ -562,14 +568,12 @@ def test_no_korean_on_the_llm_path():
         if hits:
             bad.append(f"system prompt {role}: {''.join(hits[:20])}")
 
-    # (2) the prompt files — ★ `hw/sm_86.md` is **frozen**, so it is
-    #     excluded (D-113). It is the condition record of old runs and is not
-    #     used on today's LLM path.
+    # (2) the prompt files. ★ The exception for the frozen `hw/sm_86.md` is
+    #     gone — that file was deleted on 2026-09-08 (D-146), so every file
+    #     left here is on today's LLM path and every one of them is checked.
     from pathlib import Path
     root = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
     for f in sorted(root.rglob("*.md")):
-        if f.name == "sm_86.md":
-            continue
         hits = KO.findall(load_prompt(str(f.relative_to(root))))
         if hits:
             bad.append(f"{f.relative_to(root)}: {''.join(hits[:20])}")

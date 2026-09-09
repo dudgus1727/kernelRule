@@ -13,7 +13,7 @@ do nothing.
 Counting on the training split makes no difference (§12.3b). And leaving the
 correction history in the prompt means **writing the sentence again while
 saying it was removed** (§12.3c) — which is exactly what happened in
-`hw/sm_86.md`.
+`hw/sm_86.md` (deleted 2026-09-08, D-146).
 
 ## Limits
 
@@ -34,8 +34,10 @@ PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 #: Traces of a sentence that can only be written by looking at the table.
 #:
 #: ⚠️ 2026-09-08 (D-146): the prompts became English, so the English forms
-#: were added. **The Korean patterns are kept** — `hw/sm_86.md` is frozen and
-#: is in Korean, and it must stay checkable.
+#: were added. **The Korean patterns are kept** — the prompts recorded in the
+#: `llm_calls/` of the old runs are in Korean and must stay checkable. (The
+#: frozen `hw/sm_86.md` that used to be the reason was deleted the same day;
+#: the logs it produced were not.)
 _LEAK = (
     (re.compile(r"\d+\s*형상\s*중\s*\d+"), "M of N shapes — a full tally"),
     (re.compile(r"\d+\s*of\s*\d+\s*shapes"), "M of N shapes — a full tally"),
