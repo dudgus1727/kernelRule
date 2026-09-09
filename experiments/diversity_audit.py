@@ -61,8 +61,9 @@ def analyst_overlap() -> None:
             regimes.append(
                 (a.get("affected_regime") or "").strip()
                 == (b.get("affected_regime") or "").strip() != "")
-            # ★ The `가-힣` class stays: old `claim` texts are in Korean and
-            #   must still be tokenised (D-146).
+            # ★ The `가-힣` class stays. Checked 2026-09-09 (D-147): 3,330 of
+            #   the 3,332 logs with a `claim` are Korean — without it the
+            #   Jaccard is computed over empty sets.
             wa = set(re.findall(r"[가-힣A-Za-z_]{2,}", a.get("claim", "")))
             wb = set(re.findall(r"[가-힣A-Za-z_]{2,}", b.get("claim", "")))
             words.append(_jaccard(wa, wb))

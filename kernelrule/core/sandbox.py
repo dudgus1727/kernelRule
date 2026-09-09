@@ -42,24 +42,20 @@ from typing import Any
 
 import numpy as np
 
+# ★ The `np` a rule sees is **not the whole module** — `np.random` makes
+#   things non-deterministic and `np.load` opens files. The static checks
+#   already filter the names; being absent at runtime too makes the two
+#   layers fail in the same direction.
+#   ★ 2026-09-09 (D-147): **one list, not two.** `rules/checks.py` is the
+#   source — this file used to keep a copy and they had already drifted.
+from kernelrule.rules.checks import ALLOWED_NP
+
 __all__ = ["SandboxError", "SandboxResult", "compile_rule", "run_isolated",
            "safe_namespace"]
 
 DEFAULT_TIMEOUT_S = 5.0
 DEFAULT_MEM_MB = 2048
 
-#: The `np` given to a rule is **not the whole module.** `np.random` makes
-#: things non-deterministic and `np.load` opens files. The static checks
-#: already filter the names, but it is better for them to be absent at
-#: runtime too — the two layers must fail in the same direction.
-_NP_ALLOWED = (
-    "where", "clip", "minimum", "maximum", "log", "log2", "log10", "sqrt",
-    "abs", "exp", "power", "sign", "floor", "ceil", "round", "isfinite",
-    "nan_to_num", "square", "reciprocal", "logical_and", "logical_or",
-    "logical_not", "greater", "less", "equal", "asarray", "zeros_like",
-    "ones_like", "full_like", "fmin", "fmax", "hypot", "cbrt",
-    "float64", "inf", "pi", "e",
-)
 
 _BUILTINS = {
     "abs": abs, "min": min, "max": max, "sum": sum, "len": len,
@@ -94,10 +90,10 @@ class _NpProxy:
     __slots__ = ()
 
     def __getattr__(self, name: str):
-        if name not in _NP_ALLOWED:
+        if name not in ALLOWED_NP:
             raise AttributeError(
                 f"np.{name} cannot be used in a rule. "
-                f"allowed: {', '.join(sorted(_NP_ALLOWED)[:10])} ...")
+                f"allowed: {', '.join(sorted(ALLOWED_NP)[:10])} ...")
         return getattr(np, name)
 
 

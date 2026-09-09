@@ -272,11 +272,6 @@ VIOLATIONS = [
     ("Exceeded maximum output retries (2)", "retries_exhausted"),
     ("Semaphore is bound to a different event loop", "event_loop_bug"),
     ("something entirely new", "other"),
-    # ★ The old Korean messages must stay classifiable (D-146) — old
-    #   `llm_calls/` logs are read with the same function.
-    ("가중치 9개. 리터럴 예산이 8개다 (§29.4)", "w0_too_long"),
-    ("가중치를 여러 항에 재사용했다: ['w[0]x4']", "weight_reuse"),
-    ("금지된 참조: 'time_ms'", "banned_substring"),
 ]
 
 

@@ -43,7 +43,7 @@ from kernelrule.agents.schemas import SchemaViolation, validate_rule_proposal
 from kernelrule.core.archive import Archive, Elite
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import SandboxError, compile_rule, run_isolated
-from kernelrule.core.scoring import evaluate_scores, is_significant
+from kernelrule.core.scoring import evaluate_scores
 from kernelrule.core.splits import SplitSet
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import FitError, fit_weights, make_score_of
@@ -85,7 +85,9 @@ class LoopConfig:
     #:    principle (D-131: +0.0187)
     #: raising patience to 5 only shrinks the size; the problem is the same
     #: ```
-    #: Above 0 the old rule runs unchanged — kept for reproducing old runs.
+    #: ★ It must stay 0. Above 0 `should_stop` **raises** — the early-stop
+    #: path was sealed at D-144 because it read the validation split. The
+    #: field is kept so that turning it on fails loudly instead of silently.
     patience: int = 0
     seed: int = 0
     sandbox_first_seen: bool = True

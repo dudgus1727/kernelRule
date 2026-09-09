@@ -26,10 +26,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 
 #: The role names no longer used. It fails if one appears as a string literal.
-#: ⚠️ This tuple holds **the old names**. It got caught in a bulk substitution
-#: twice — the `RENAME` of `rename_roles.py` and here. Both substituted
-#: themselves and the check was disabled entirely. `test_rename_map_is_not_identity`
-#: below and this file's exclusion list catch that.
+#: ⚠️ This tuple holds **the old names**, so a bulk substitution can eat it
+#: and silently disable the check — that happened once. The exclusion list
+#: below is this file only, for that reason.
 _OLD_ROLES = ("architect", "optimize")
 #: ★ `critique` is **a role outside the loop**, so `experiments/critic.py`
 #: brings it in with `register_role`. What is forbidden is it remaining inside
@@ -48,8 +47,8 @@ def test_no_old_role_string_literals():
     bad: list[str] = []
     for f in _py_files():
         rel = f.relative_to(ROOT).as_posix()
-        if rel in ("experiments/rename_roles.py", "tests/test_role_names.py"):
-            continue         # the move script and this test know the old names
+        if rel == "tests/test_role_names.py":
+            continue                      # this test has to know the old names
         try:
             tree = ast.parse(f.read_text(), filename=rel)
         except SyntaxError:
@@ -117,18 +116,14 @@ def test_register_role_refuses_to_shadow_a_loop_role(name):
         llm.register_role(name, instructions="x", output_type=dict)
 
 
-def test_rename_map_is_not_identity():
-    """★ The move script once got caught in **its own** bulk substitution.
+def test_the_old_role_names_are_still_named_here():
+    """★ The guard above only works while this tuple holds **the old** names.
 
-    If `RENAME` becomes the identity map, "0 old names left" turns false — it
-    moves nothing and passes.
+    A bulk substitution once rewrote the tuple itself and the check silently
+    passed on everything. ⚠️ 2026-09-09 (D-147): the move script
+    (`rename_roles.py`, D-93) was deleted — it had 0 files left to move — so
+    the identity check that read its `RENAME` went with it. This is what is
+    left of it, and it is the part that matters.
     """
-    import sys
-
-    sys.path.insert(0, str(ROOT / "experiments"))
-    from rename_roles import RENAME
-
-    assert RENAME, "the move table is empty"
-    for old, new in RENAME.items():
-        assert old != new, f"{old!r} maps to itself"
-        assert old in _OLD_ROLES
+    assert _OLD_ROLES == ("architect", "optimize"), (
+        "the old-name tuple was rewritten — the check above is now vacuous")

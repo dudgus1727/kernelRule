@@ -200,13 +200,6 @@ class Evaluation:
         s = self.strata
         return self.at(k, mask=s.hard) - self.at(k, mask=~s.hard)
 
-    def by_layer(self, k: int = 1) -> dict[str, float]:
-        out: dict[str, float] = {}
-        for name in sorted(set(self.strata.layer)):
-            m = np.asarray([x == name for x in self.strata.layer])
-            out[name] = self.at(k, mask=m)
-        return out
-
     def report(self) -> str:
         """★ Prints the size stratification first (§30.5)."""
         st = self.strata

@@ -19,8 +19,9 @@ from pathlib import Path
 
 #: If it is in a requirement sentence, **table information has leaked**
 #: (pre-registration item 5).
-#: ⚠️ 2026-09-08 (D-146): the English forms were added. **The Korean patterns
-#: are kept** — the old hypotheses are in Korean and must stay checkable.
+#: ⚠️ The Korean patterns stay. Checked 2026-09-09 (D-147): **136 of the 136**
+#: d75 Analyst logs this script reads are Korean, so dropping them would make
+#: the leak check pass by looking at nothing.
 _LEAK = (
     (re.compile(r"사례\s*#?\d"), "a case number"),
     (re.compile(r"case\s*#?\d"), "a case number"),

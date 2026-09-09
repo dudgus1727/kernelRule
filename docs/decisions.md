@@ -166,6 +166,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-144](#d-144-전면-수정-경로별-예산-roofline-셀-축-제안-6-층별-3-fold)  전면 수정 — 경로별 예산 · roofline 셀 축 · 제안 6 · 층별 3-fold
 - [D-145](#d-145-경로-상한-프롬프트-정합성-중복-제거)  경로 상한 · 프롬프트 정합성 · 중복 제거
 - [D-146](#d-146-llm-경로를-전부-영어로-그리고-재발을-시험으로-막는다)  LLM 경로를 **전부 영어로** — 그리고 재발을 시험으로 막는다
+- [D-147](#d-147-죽은-코드-훑기-남은-레거시를-전부-지웠다-2026-09-09)  죽은 코드 훑기 — 남은 레거시를 전부 지웠다 (2026-09-09)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -8673,3 +8674,109 @@ check_hw_prompt      눈금 정규식을 한글/영어 둘 다
 ```
 
 순 변화: **-106 줄 / +48 줄** (6파일).
+
+## D-147  죽은 코드 훑기 — 남은 레거시를 전부 지웠다 (2026-09-09)
+
+D-146 §10 에서 배운 방법("그 분기가 **실제로 도달 가능한가**")을 저장소
+전체에 돌렸다. 지시: "모두 삭제. C·E 도 인용/시험 사용이 유일한 이유라면
+그것이 아직 유효한지 확인하고 지워라."
+
+### 1. 참조 0 — 그냥 죽어 있던 것
+
+```
+checks._ALLOWED_BUILTINS      ★ 아무 데서도 안 쓴다. 진짜 허용 목록은
+                              sandbox._BUILTINS 이고 두 벌이 이미 어긋나
+                              있었다 (checks 쪽에 bool·round·True/False/None
+                              없음)
+RegretResult.by_layer()       core/scoring.py
+FeatureMatrix.as_dict()       core/matrix.py
+rule_output_to_proposal()     agents/schemas.py — rule_output_for 로 대체된 잔재
+generated._Spec               쓰이지 않는 데이터클래스
+loop.py 의 is_significant     import ★ D-144 가 should_stop 을 봉인하면서
+                              죽었다 (ruff 가 이미 잡고 있었다)
+generated.py 의 dataclass     import _Spec 을 지우면서 함께
+```
+
+### 2. 이유가 사실이 아니었던 레거시 분기
+
+```
+classify_violation 의 한글 9패턴  "옛 llm_calls 로그를 분류 가능하게" 라고
+                                 적혀 있었다. ★ 호출자는 라이브 두 곳뿐이고
+                                 (방금 만든 검증기 메시지), read_logs.py 는
+                                 로그에 **저장된 code 필드**를 읽는다.
+                                 옛 메시지를 다시 분류하는 경로가 없다
+mock.py 의 "★ 미사용"            MockLLM 은 round_profile.py 와 시험에서
+                                 **새로 생성한 영어 리포트**만 받는다
+test_loop 의 되돌린 한글 문구 2개  프롬프트 한글 자체가 금지돼 있고 영어
+                                 대응 문구가 같은 목록에 있다
+test_diagnostic·test_prompt_layout 의 "옛 한글 목록은 …" 주석
+                                 이력은 git 과 여기 있다. 트리에 둘 이유가 없다
+areas 검사의 한글 두 항목         프롬프트가 영어다
+```
+
+### 3. C(살아 있다고 봤던 것)를 다시 검사했다 — 증거로
+
+★ **셋은 진짜 살아 있다.** 실제 파일을 세서 확인했고, 그 숫자를 코드 주석에
+적었다 (다음에 또 물으면 세지 않아도 되게).
+
+```
+wall_report._prompt_k       옛 프롬프트 45,087개가 한글 형태와 일치, 영어 0
+d75_observe._LEAK           d75 Analyst 로그 136개 중 136개가 한글
+diversity_audit 의 가-힣     claim 이 있는 로그 3,332개 중 3,330개가 한글
+   -> 지우면 검사가 **빈 문자열을 보고 통과**한다. 남긴다
+```
+
+**둘은 죽어 있었다.**
+
+```
+seed_selection.PRIOR + 합산 블록   seedabl-desc-* / newaxes-A-base-* 를 가리키는데
+                                  ★ 둘 다 gpt-5.4 실행이라 D-52 에서 runs/ 에서
+                                  지웠다. 디렉토리가 없어 분기가 돌 수도 없었고,
+                                  돌았다면 모델을 섞었을 것이다 (D-31 다섯째 축)
+conclusion.json 의 "f1k" 키        ★ 산출물이 "그때의 기록" 이라 예외였지만,
+                                  runs_table.py 가 **오늘** 그 키로 표를 만든다
+                                  = 살아 있는 별칭이다. 키를 "f2" 로 바꾸고
+                                  D-128 인용을 지웠다. 숫자는 안 바뀐다
+```
+
+**셋은 남긴다 — 이유가 인용이 아니라 기능이다.**
+
+```
+LoopConfig.patience   ★ 0 보다 크면 should_stop 이 **예외를 던진다** (D-144
+                      봉인). 조용히 오염되는 대신 시끄럽게 죽게 하는 장치다.
+                      ⚠️ "0 보다 크면 옛 규칙이 그대로 돈다" 는 주석이 거짓이라
+                      고쳤다
+weight_bounds -> None 지수 슬롯이 없으면 옛 실행과 같은 조건 (원칙 36)
+schemas 의 _NoPydantic  core/loop.py 가 schemas 를 import 한다 — pydantic 은
+                      선택 의존(llm extra)이라 없이도 import 돼야 한다
+test_no_old_names     살아 있는 감시다 (옛 이름이 다시 기어들어오는 것을 막는다)
+```
+
+### 4. E — 두 벌이던 numpy 허용 목록을 하나로
+
+```
+전       checks._ALLOWED_NP (33) · sandbox._NP_ALLOWED (37)
+         ★ 이미 어긋나 있었다 — 런타임은 e/pi/inf/float64 를 열어 뒀는데
+           정적 관문이 막으므로 **어떤 규칙도 거기 닿을 수 없었다**
+후       checks.ALLOWED_NP 하나. sandbox 가 import 한다
+         관문은 그대로고 런타임이 관문과 정확히 같은 폭이 됐다 — 조건 변경 아님
+```
+
+### 5. 일 다 한 일회성 도구
+
+`experiments/rename_roles.py` (D-93 역할 이름 이관). `--check` 를 돌리니
+**옛 이름 파일 0개 · 디렉토리 0개** — 할 일이 없다. 지웠다.
+딸린 `test_rename_map_is_not_identity` 는 그 스크립트의 `RENAME` 을 읽던
+시험이라 함께 지우고, **그것이 지키려던 것**(옛 이름 튜플이 일괄 치환에
+먹히지 않았는가)만 남겼다.
+
+### 6. 상태
+
+```
+시험    644 통과 · 1 실패 — test_runs_table_is_not_stale (D146r 릴리즈 없음,
+        이 작업 전부터 실패한다)
+ruff    32 -> 31 (죽은 import 를 지웠다)
+훑기    남은 미참조 def 는 pydantic @field_validator 4개뿐 (거짓 양성)
+        한 번도 import 안 되는 모듈 0 · 미참조 프롬프트 0 · 고아 스크립트 0
+        ★ kernelrule/ 에 한글 0줄
+```

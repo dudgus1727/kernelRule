@@ -17,9 +17,8 @@ from kernelrule.core.splits import Split, SplitError
 #: Nailing **the conclusion of other data** into the template, rather than
 #: this data's, is the trap this project stepped into.
 #:
-#: ⚠️ 2026-09-08 (D-146): the report became English, so these are the English
-#: words. The old Korean list was ("보다", "더 크", "더 작", "지배적",
-#: "대부분", "훨씬", "가장 큰", "가장 작", "대체로", "일반적으로").
+#: ⚠️ The report is English (D-146). The Korean list it replaced is in the
+#: history, not here.
 COMPARATIVES = ("larger than", "smaller than", "greater than", "dominant",
                 "dominates", "mostly", "much more", "much larger",
                 "in general", "generally", "typically")

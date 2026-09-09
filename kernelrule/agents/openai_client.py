@@ -59,32 +59,25 @@ class BudgetExceeded(RuntimeError):
 #: `llm 132 cases`, there is no way to know what was caught, nor where to fix
 #: the prompt.
 #:
-#: ⚠️ 2026-09-08 (D-146): the validator messages became English. **The old
-#:    Korean patterns are kept** — old `llm_calls/` logs have to stay
-#:    classifiable (the correction-history rule).
+#: ⚠️ 2026-09-09 (D-147): the Korean patterns are gone. They were kept "so
+#:    old logs stay classifiable", but this function is only ever called on
+#:    a **message that has just been produced** (below, in the retry loop).
+#:    An old log already carries its `code` field and `read_logs.py` reads
+#:    that — nothing re-classifies an old message.
 _VIOLATION_PATTERNS: tuple[tuple[str, str], ...] = (
     # ⚠️ The patterns must match the **actual validator messages**. It once
     #    said "8 weights" and failed to catch "9 weights...", which leaked
     #    into other.
     ("the budget is", "w0_too_long"),
     ("numeric literals +", "w0_too_long"),
-    ("리터럴 예산이", "w0_too_long"),
-    ("최대 8개", "w0_too_long"),
     ("reused across terms", "weight_reuse"),
-    ("재사용", "weight_reuse"),
     ("largest referenced index", "w0_length_mismatch"),
-    ("최대 인덱스", "w0_length_mismatch"),
     ("w0 is empty", "w0_empty"),
-    ("w0 가 비었다", "w0_empty"),
     ("abnormally large", "w0_huge"),
-    ("비정상적으로 크다", "w0_huge"),
     ("banned reference", "banned_substring"),
-    ("금지된 참조", "banned_substring"),
     ("def score", "no_def_score"),
     ("code in a hypothesis", "hypothesis_has_code"),
-    ("가설에 코드", "hypothesis_has_code"),
     ("hypotheses", "hypothesis_count"),
-    ("가설이", "hypothesis_count"),
     ("Exceeded maximum", "retries_exhausted"),
     ("event loop", "event_loop_bug"),
     ("rate limit", "rate_limit"),

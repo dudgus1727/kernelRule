@@ -93,9 +93,6 @@ class _DictAttr:
     def keys(self):
         return self._cols.keys()
 
-    def as_dict(self) -> dict:
-        return dict(self._cols)
-
 
 #: ★ Shape fields that are always present, **independent of** the registry.
 #: They are properties of the problem itself, so `p.M` and the like can be

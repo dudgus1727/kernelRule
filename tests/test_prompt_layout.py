@@ -327,10 +327,8 @@ _KNOWN_BY_DESIGN = {"examples/known5.md", "examples/rule_known.md"}
 #: Statements knowable only from the table. One of them in the prompt is a
 #: §12.3 violation.
 #:
-#: ⚠️ 2026-09-08 (D-146): the prompts became English, so these are the
-#: English wordings. The old Korean list was ("이 표에서", "최적 0회",
-#: "최적으로 뽑힌", "rel 중앙", "7.4%", "13.6", "37.2", "26% 어긋",
-#: "정답 집합").
+#: ⚠️ The prompts are English (D-146). The Korean list they replaced is in
+#: the history, not here.
 _MEASURED = ("in this table", "optimal 0 times", "picked as optimal",
              "rel median", "7.4%", "13.6", "37.2", "off by 26%",
              "answer set")
@@ -388,8 +386,7 @@ def test_areas_are_fixed_and_do_not_name_features():
     rows = [ln for ln in body.splitlines() if "|" in ln]
     assert len(rows) == 7, f"there are not seven areas: {len(rows)}"
     # There must be no enumeration naming the features to build
-    for banned in ("wave 양자화", "타일 낭비", "wave quantization",
-                   "tile waste"):
+    for banned in ("wave quantization", "tile waste"):
         assert banned not in areas, banned
 
 

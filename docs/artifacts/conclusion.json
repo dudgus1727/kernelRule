@@ -109,7 +109,7 @@
    "dozens of Claude Code sessions"
   ]
  },
- "f1k": {
+ "f2": {
   "_procedure": "the canonical scoring per run -> the median of the 6 runs. The same procedure as F1",
   "_status": "★ provisional — the state with only stage 1 improved",
   "start_library": 5,

@@ -32,7 +32,7 @@ from __future__ import annotations
 import ast
 import math
 import re
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 import numpy as np
 
@@ -164,12 +164,6 @@ def detect_shape_level(f: Feature, table, *, n_shapes: int = 8
     return True, ("★ it references cfg yet is constant in this table — it "
                   "may be config-dependent in another bundle. Re-judgement "
                   "needed")
-
-
-@dataclass(frozen=True, slots=True)
-class _Spec:
-    name: str
-    code: str
 
 
 def check_feature_code(code: str, *, known: frozenset[str]) -> str:

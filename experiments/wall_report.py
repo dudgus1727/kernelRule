@@ -108,6 +108,9 @@ def _prompt_k(text: str) -> str:
     and this reads those artefacts.
     """
     for w in text.split("\n"):
+        # ★ Checked 2026-09-09 (D-147): 45,087 of the saved `llm_calls/`
+        #   prompts match this Korean form and 0 match the English one. The
+        #   branch is live.
         if "config " in w and "개" in w:               # the old Korean prompt
             return "k=" + w.split("config ")[1].split("개")[0]
         if "fastest configs" in w:                    # the English prompt

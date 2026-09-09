@@ -75,8 +75,7 @@ CANON: dict[str, tuple[str, tuple, str]] = {
     "F3rw-p8-old": ("conclusion.json", ("f1_vs_human", "human_median"),
                     "one"),
     "F1rw-p8": ("conclusion.json", ("f1_vs_human", "f1_median"), "one"),
-    # `f1k` is an **old key** inside conclusion.json (D-128 renamed it)
-    "F2rw-p8": ("conclusion.json", ("f1k", "median"), "one"),  # D-128
+    "F2rw-p8": ("conclusion.json", ("f2", "median"), "one"),
     "F3rw-p8-cma": ("expressive-regret.json", ("r1", "rb08"), "med"),
     "F3rw-p16": ("expressive-regret.json", ("r1", "rb16"), "med"),
     "F3rw-p8-prod": ("expressive-regret.json", ("r1", "rprod"), "med"),

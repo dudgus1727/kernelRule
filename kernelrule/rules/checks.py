@@ -669,19 +669,21 @@ _BANNED_NAMES = frozenset({
 #: `x.__globals__`).
 _BANNED_ATTR_PREFIX = ("__",)
 
-#: The allowed numpy functions. Anything else is refused — `np.random`
-#: makes things non-deterministic.
-_ALLOWED_NP = frozenset({
+#: The allowed numpy names. Anything else is refused — `np.random` makes
+#: things non-deterministic.
+#:
+#: ★ 2026-09-09 (D-147): this is **the one list** (principle 2).
+#: `core/sandbox.py` imports it for the runtime proxy. It used to keep its
+#: own copy and the two had already drifted apart — the runtime allowed
+#: `e`/`pi`/`inf`/`float64`, which this gate rejects, so no rule could ever
+#: reach them. The gate is unchanged; the runtime is now exactly as wide.
+ALLOWED_NP = frozenset({
     "where", "clip", "minimum", "maximum", "log", "log2", "log10", "sqrt",
     "abs", "exp", "power", "sign", "floor", "ceil", "round", "isfinite",
     "nan_to_num", "square", "reciprocal", "logical_and", "logical_or",
     "logical_not", "greater", "less", "equal", "asarray", "zeros_like",
     "ones_like", "full_like", "fmin", "fmax", "hypot", "cbrt",
 })
-
-_ALLOWED_BUILTINS = frozenset({"min", "max", "abs", "float", "int", "len",
-                               "sum", "sorted", "range", "enumerate", "zip"})
-
 
 class RuleCheckError(RuntimeError):
     """The rule did not pass the static checks."""
@@ -849,9 +851,9 @@ def check_rule(code: str, *, feature_names, shape_value_names,
             elif base == "hw":
                 pass
             elif base == "np":
-                if attr not in _ALLOWED_NP:
+                if attr not in ALLOWED_NP:
                     bad(f"numpy function not allowed: np.{attr}. "
-                        f"allowed: {sorted(_ALLOWED_NP)[:8]} ...")
+                        f"allowed: {sorted(ALLOWED_NP)[:8]} ...")
 
         # A direct comparison against problem.M / p.M — ★ only equality is
         # forbidden (D-144)

@@ -60,13 +60,6 @@ BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
 MODEL = DEFAULT_MODEL   # ★ a single source (D-45)
 
-#: The two earlier sets. Used for the pooled 12-seed distribution.
-#: ⚠️ The Korean in the first run id is **a directory name** — it is not
-#: translated (D-146).
-PRIOR = [f"seedabl-desc-다-noseed-s{s}" for s in range(3)] + \
-        [f"newaxes-A-base-s{s}" for s in range(3)]
-
-
 def _setup(table):
     def aligned(p) -> bool:
         d = table.frame_for(p)
@@ -182,63 +175,20 @@ def main(n_seeds: int = 6, seed_base: int = 20260823, tag: str = "selB",
           f"optimism bias in itself (D-50).\n        Before the procedure is "
           f"fixed and it is measured on **a new set**, it is not an estimate.")
 
-    # -- pooling the sets ---------------------------------------------------
-    #    ★ Only **the same model and endpoint** are pooled (the fifth axis of
-    #      D-31). PRIOR is gpt-5.4 + chat, so it must not be mixed with the
-    #      luna runs.
-    import json as _json
-    def _model_of(run: str) -> str:
-        f = Path("runs") / run / "config.json"
-        if f.exists():
-            try:
-                c = _json.loads(f.read_text()).get("llm", {})
-                return f"{c.get('model','?')}/{c.get('endpoint','chat')}"
-            except Exception:                               # noqa: BLE001
-                pass
-        # From the time before config.json — **only the model** is recovered
-        # from llm_calls.
-        # ★ The endpoint is not left anywhere. Asserting `/chat` labels a
-        #   responses run as chat and **breaks D-31 without our even knowing
-        #   it was broken.** What is unknown is written down as unknown
-        #   (§26.4).
-        for g in sorted((Path("runs") / run / "llm_calls").glob("*.json"))[:1]:
-            try:
-                m = _json.loads(g.read_text()).get("model", "?")
-                return f"{m}/endpoint-unknown"
-            except Exception:                               # noqa: BLE001
-                pass
-        return "unknown"
-
-    here = _model_of(f"{tag}-s0")
-    same = [r for r in PRIOR if _model_of(r) == here]
+    # -- the spread ---------------------------------------------------------
+    #    ⚠️ 2026-09-09 (D-147): the pooling with the earlier sets is gone.
+    #    It pooled `seedabl-desc-*` / `newaxes-A-base-*`, which are gpt-5.4
+    #    runs — **deleted from `runs/` at D-52 and not citable as grounds**.
+    #    With the directories gone the branch could not run, and if it had
+    #    it would have mixed models (the fifth axis of D-31).
     print(f"\n{'=' * 76}")
-    print(f"pooling the sets — ★ only within the same condition ({here})")
+    print(f"the spread of this set ({len(new)} seeds)")
     print("=" * 76)
-    if not same:
-        print("  the earlier sets have a different condition — they are not "
-              "pooled (D-31).")
-        print(f"  This set of {len(new)} seeds alone cannot estimate the "
-              f"spread.")
-        ho2 = sorted(x[2] for x in new)
-        print(f"  {tag} struct HO  " + "  ".join(f"{x:.4f}" for x in ho2)
-              + f"   width {ho2[-1] - ho2[0]:.4f}")
-        return
-    allr = []
-    for run in same:
-        r = score(run)
-        if r:
-            allr.append((run, r.in_sample, r.holdout))
-    allr += new
-    a = np.array([[x[1], x[2]] for x in allr])
-    from kernelrule.features.validate import _pearson, _spearman
-    print(f"  n={len(allr)}   struct HO median {np.median(a[:, 1]):.4f}  "
-          f"min {a[:, 1].min():.4f}  max {a[:, 1].max():.4f}  "
-          f"width {a[:, 1].max() - a[:, 1].min():.4f}")
-    print(f"  in-sample vs holdout  Spearman {_spearman(a[:, 0], a[:, 1]):.3f}"
-          f"  Pearson {_pearson(a[:, 0], a[:, 1]):.3f}")
-    print(f"  picking the in-sample minimum over everything: "
-          f"{min(allr, key=lambda x: x[1])[0]} "
-          f"-> {min(allr, key=lambda x: x[1])[2]:.4f}")
+    print(f"  This set of {len(new)} seeds alone cannot estimate the spread "
+          f"— an earlier set under the same condition is needed (D-31).")
+    ho2 = sorted(x[2] for x in new)
+    print(f"  {tag} struct HO  " + "  ".join(f"{x:.4f}" for x in ho2)
+          + f"   width {ho2[-1] - ho2[0]:.4f}")
 
 
 if __name__ == "__main__":

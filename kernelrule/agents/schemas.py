@@ -524,16 +524,6 @@ else:                                               # pragma: no cover
     HypothesisOut = _NoPydantic("HypothesisOut")
 
 
-def rule_output_to_proposal(out, *, parameters: int | None = None
-                            ) -> RuleProposal:
-    """`RuleOutput` -> `RuleProposal`. Converted once, at the
-    boundary."""
-    return validate_rule_proposal({"code": out.code, "w0": list(out.w0),
-                                   "changes": out.changes,
-                                   "hypothesis_id": out.hypothesis_id},
-                                  parameters=parameters)
-
-
 @lru_cache(maxsize=16)
 def rule_output_for(parameters: int | None = None, *,
                     product_hint: bool = False, power_hint: bool = False):

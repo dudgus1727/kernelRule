@@ -336,10 +336,7 @@ class MockLLM:
         """
         missing = []
         for ln in prompt.split("\n"):
-            # ★ 2026-09-08 (D-146): the report became English. **The old
-            #   form is read too** — this mock must still run on an old
-            #   report.
-            if "★ unused" in ln or "★ 미사용" in ln:
+            if "★ unused" in ln:
                 name = ln.split()[0]
                 if name in self.features and name not in missing:
                     missing.append(name)

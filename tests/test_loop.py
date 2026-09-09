@@ -622,8 +622,6 @@ def test_analyze_prompt_matches_the_measured_baseline():
         "as a new family (D-81)")
     # Have the things added on 2026-08-28 and then reverted come back?
     for gone in ("physical_requirement",
-                 "전달되지 않고 버려집니다",       # the old Korean wording
-                 "measurable_with 를 쓰는 편이 낫습니다",
                  "is discarded rather than passed on",
                  "you had better use measurable_with"):
         assert gone not in txt, f"a reverted phrase came back: {gone!r}"
