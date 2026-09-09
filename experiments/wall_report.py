@@ -103,14 +103,16 @@ def _prod_pairs(code: str) -> list[tuple]:
 def _prompt_k(text: str) -> str:
     """The `k` the system prompt states, read from the saved prompt.
 
+    It reads `runs/<run>/llm_calls/_system-rule_editor.md` — the system
+    prompt saved with that run.
+
     ⚠️ 2026-09-08 (D-146): the prompts became English, but **the Korean form
-    is still matched** — the prompts saved with the old runs are in Korean
-    and this reads those artefacts.
+    is still matched** — the prompts saved with these runs are in Korean.
+    ★ Counted 2026-09-09 (D-147) over the files this actually opens: of the
+    8 arms, 7 have a saved prompt and **all 7 are the Korean form**, 0 the
+    English one (the 8th prints "(not recorded)").
     """
     for w in text.split("\n"):
-        # ★ Checked 2026-09-09 (D-147): 45,087 of the saved `llm_calls/`
-        #   prompts match this Korean form and 0 match the English one. The
-        #   branch is live.
         if "config " in w and "개" in w:               # the old Korean prompt
             return "k=" + w.split("config ")[1].split("개")[0]
         if "fastest configs" in w:                    # the English prompt
@@ -142,7 +144,13 @@ def main() -> None:
     sp = _splits(T)
     hold, train = list(sp.val.shapes), list(sp.train.shapes)
     A = {t: (lab, k, lam, ph) for t, lab, k, lam, ph in ARMS}
-    dirs = {t: [Path("runs") / f"f1pipe-F3-{t}-s{i}" for i in range(SEEDS)]
+    # ⚠️ 2026-09-09 (D-147): this said `f1pipe-F3-{t}-s{i}`, the name the
+    #   runs had when this script was written (D-109/110/111). They were
+    #   later renamed with the `x-` prefix (= the retired rank-loss line,
+    #   D-128) and **this script has been broken ever since** — the
+    #   "reproduce" line of `wall.md` did not run. Repointed at the real
+    #   directories.
+    dirs = {t: [Path("runs") / f"x-rank-{t}-s{i}" for i in range(SEEDS)]
             for t, *_ in ARMS}
     best = {t: [_best(d) for d in dirs[t]] for t, *_ in ARMS}
     out: dict = {"n_holdout": len(hold)}
