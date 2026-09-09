@@ -33,24 +33,19 @@ PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 
 #: Traces of a sentence that can only be written by looking at the table.
 #:
-#: ⚠️ 2026-09-08 (D-146): the prompts became English, so the English forms
-#: were added. **The Korean patterns are kept** — the prompts recorded in the
-#: `llm_calls/` of the old runs are in Korean and must stay checkable. (The
-#: frozen `hw/sm_86.md` that used to be the reason was deleted the same day;
-#: the logs it produced were not.)
+#: ⚠️ 2026-09-08 (D-146): the prompts became English and the patterns
+#: followed. The Korean forms were kept for one day for the frozen
+#: `hw/sm_86.md`; that file is deleted and every file this scans is English,
+#: so they are gone. What this scans is `prompts/*.md` and the schema
+#: descriptions — both live code, both checked for Korean by
+#: `test_prompt_layout` with no exception.
 _LEAK = (
-    (re.compile(r"\d+\s*형상\s*중\s*\d+"), "M of N shapes — a full tally"),
     (re.compile(r"\d+\s*of\s*\d+\s*shapes"), "M of N shapes — a full tally"),
     (re.compile(r"\d+\s*/\s*66|\d+\s*/\s*61"), "N/66 · N/61 — this table's denominator"),
-    (re.compile(r"최적(을)?\s*(낸 적이|한 적이)\s*없"), "'was never optimal'"),
     (re.compile(r"(was|were)\s+never\s+(?:been\s+)?optimal"), "'was never optimal'"),
-    (re.compile(r"최적\s*0\s*회|0\s*회\s*최적"), "'optimal 0 times'"),
     (re.compile(r"optimal\s*0\s*times"), "'optimal 0 times'"),
-    (re.compile(r"가설은?\s*기각"), "a hypothesis rejected by the table"),
     (re.compile(r"hypothesis\s+(was\s+)?rejected"), "a hypothesis rejected by the table"),
-    (re.compile(r"이 표(에서|의)"), "'in/of this table' — it points at the table"),
     (re.compile(r"in this table"), "'in this table' — it points at the table"),
-    (re.compile(r"(정답 집합|answer set)에\s*(든|들어)"), "an answer-set tally"),
     (re.compile(r"(entered|is in|are in) the answer set"), "an answer-set tally"),
 )
 
@@ -161,7 +156,7 @@ def test_shared_schema_does_not_mention_a_parent():
 
     for fname in ("code", "w0"):
         d = S.RuleOutput.model_fields[fname].description or ""
-        assert "부모" not in d and "parent" not in d.lower(), (
+        assert "parent" not in d.lower(), (
             f"the RuleOutput.{fname} description mentions a parent — "
             f"RuleWriter has no parent")
 
@@ -180,7 +175,7 @@ def test_w0_description_agrees_with_the_prompt():
     import kernelrule.agents.schemas as S
 
     d = S.RuleOutput.model_fields["w0"].description or ""
-    assert "대략적이면 충분" not in d and "roughly is enough" not in d, (
+    assert "roughly is enough" not in d, (
         "it says the opposite of the prompt")
     assert "Do not give them carelessly" in d
     assert "do not give a careless `w0`" in load_prompt("role/_rules_common.md")

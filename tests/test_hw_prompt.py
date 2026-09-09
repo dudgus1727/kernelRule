@@ -1,6 +1,7 @@
 """★ Are the hardware facts **the ones for this table** (D-113)?
 
-The default of `LLMConfig.arch_prompt` was pinned to `"hw/sm_86.md"` and
+The default of `LLMConfig.arch_prompt` was pinned to `"hw/sm_86.md"` (that
+file was deleted on 2026-09-08, D-146) and
 `f1_pipeline` did not change it. There was only one file in `hw/`, so another
 architecture **could not be chosen in the first place.** So the §29.5 (c)
 regeneration run on the 5090 table received A6000 facts.
@@ -82,23 +83,18 @@ def test_generated_prompt_matches_its_bundle(bundle, env_hash):
     assert f"{t.hw.ridge_point:.1f} FLOP/byte" in txt
 
 
-def test_generated_a6000_prompt_reproduces_the_frozen_numbers():
-    """★ The generator reproduces the **numbers** of the old hand-written
-    file exactly.
+def test_generated_a6000_prompt_has_the_bundle_numbers():
+    """★ The numbers below are the ones the hand-written `hw/sm_86.md` held.
+    They stay written out here — that is what made deleting the file
+    (2026-09-08, D-146) checkable rather than a leap of faith.
 
-    The body differs (the codename `GA102` is not in `env.json`). What must
-    match is the numbers — those are the condition.
-
-    ⚠️ 2026-09-08 (D-146): `hw/sm_86.md` was deleted. The numbers below are
-    **the ones that file held** and they stay written here — that is what
-    makes the deletion checkable (the file itself is at commit `ee53b4d`).
+    The body differs from that file (the codename `GA102` is not in
+    `env.json`). What must match is the numbers — those are the condition.
     """
     from kernelrule.agents.hwprompt import hw_prompt_from_bundle
 
     txt, _ = hw_prompt_from_bundle(A6000[0], env_hash=A6000[1],
                                    table=_table(*A6000))
-    # ★ 2026-09-08 (D-146): the prompt became English. **What has to be
-    #   reproduced is the numbers**, so only the numbers are checked.
     for want in ("SMs        84", "101,376 B", "6 MB", "116.1 TFLOP/s",
                  "729.7 GB/s", "159.1 FLOP/byte", "tick (1.024 us)"):
         assert want in txt, f"cannot reproduce {want!r} from the frozen file"
@@ -111,9 +107,7 @@ def test_generated_a6000_prompt_reproduces_the_frozen_numbers():
 
 
 def test_a6000_prompt_on_a_5090_table_is_refused():
-    """★ 2026-09-08 (D-146): this used to load the frozen `hw/sm_86.md`. That
-    file was deleted, so the A6000 prompt is **generated** here — what is
-    tested is the same thing, one GPU's facts put on another's table."""
+    """One GPU's facts put on another's table must be refused."""
     from kernelrule.agents.hwprompt import (
         HwPromptError,
         check_hw_prompt,

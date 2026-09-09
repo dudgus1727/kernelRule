@@ -237,7 +237,8 @@ def pytest_collection_modifyitems(session, config, items):
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-def a6000_hardware():
+@pytest.fixture(scope="session")
+def hw_a6000():
     """The **effective** specs of the A6000 with clocks locked at
     1350/7601 MHz (§6.2)."""
     from kernelrule.core.types import Hardware
@@ -245,29 +246,6 @@ def a6000_hardware():
                     smem_per_block=101376, max_threads_per_sm=1536,
                     regs_per_sm=65536, peak_tflops_f16=116.1,
                     bandwidth_gbps=729.7, l2_bytes=6291456)
-
-
-@pytest.fixture(scope="session")
-def hw_a6000():
-    return a6000_hardware()
-
-
-def a6000_hw_text() -> str:
-    """★ The hardware-facts prompt, **generated** (D-113).
-
-    `hw/sm_86.md`, the frozen file the prompt tests used to load, was deleted
-    on 2026-09-08 (D-146). The text is built here the way the pipeline builds
-    it, so the tests need no bundle and nothing gets skipped.
-
-    `min_ms` is the A6000's shortest kernel (11.3 us). It is a test value —
-    the real path reads it from the table (D-117).
-    """
-    from kernelrule.agents.hwprompt import render_hw_prompt
-    from kernelrule.core.noise import NoiseModel
-
-    return render_hw_prompt(a6000_hardware(),
-                            noise=NoiseModel.a6000_reference(), env={},
-                            min_ms=0.0113)
 
 
 @pytest.fixture(scope="session")

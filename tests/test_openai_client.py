@@ -133,16 +133,17 @@ def test_missing_prompt_is_an_error():
         load_prompt("nope.md")
 
 
-def test_instructions_are_two_axes(client, monkeypatch):
-    """★ Two axes — hardware-independent/dependent x
-    role-independent/dependent (§30.10)."""
-    from conftest import a6000_hw_text
+def test_base_prompt_is_hardware_independent(client, monkeypatch):
+    """★ The role-independent block carries **no hardware** (§30.10).
 
+    ⚠️ 2026-09-08 (D-146): this was `test_instructions_are_two_axes` and it
+    compared two **files**, `_base.md` against `hw/sm_86.md`. The hardware
+    side is generated from the bundle now (D-113) and that file is deleted,
+    so what is left to check here is the base side.
+    """
     base = load_prompt("_base.md")
-    hw = a6000_hw_text()
-    assert "GEMM" in base and "sm_86" in hw
-    # Swapping only the hardware file gives a new backend
-    assert "RTX A6000" in hw and "RTX A6000" not in base
+    assert "GEMM" in base
+    assert "RTX A6000" not in base and "sm_86" not in base
     # ★ _base.md must stay short — anything piled up here is paid for by
     #   every role
     assert len(base.splitlines()) < 40, "the common block swelled again"

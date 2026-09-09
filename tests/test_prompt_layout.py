@@ -26,12 +26,11 @@ ROLES = ("analyze", "rule_editor", "feature", "rule_writer")
 PROMPTS = Path(__file__).resolve().parents[1] / "kernelrule/agents/prompts"
 
 
-def _hw_text() -> str:
-    """★ The hardware facts, **generated** (D-113). It is built in one place
-    — `conftest.a6000_hw_text` (principle 2)."""
-    from conftest import a6000_hw_text
-
-    return a6000_hw_text()
+#: A stand-in for the hardware facts. The real text is **generated from the
+#: bundle** (`hwprompt`, D-113) and `tests/test_hw_prompt.py` is where its
+#: content is checked. These tests are about layout, so all they need is a
+#: block carrying hardware markers.
+HW_TEXT = "GPU  NVIDIA RTX A6000 (sm_86)\nSMs  84\n"
 
 
 def _instructions(role: str, *, objective: str = "rank") -> str:
@@ -48,7 +47,7 @@ def _instructions(role: str, *, objective: str = "rank") -> str:
     from kernelrule.agents.openai_client import assemble_instructions
 
     return assemble_instructions(role, objective=objective,
-                                 hw_text=_hw_text())
+                                 hw_text=HW_TEXT)
 
 
 # ---------------------------------------------------------------------------
@@ -72,10 +71,8 @@ def test_feature_prompt_has_no_rule_material():
 
 def test_feature_and_rule_editor_prompts_have_no_hardware_constants():
     """★ Not seeing hw makes that prompt **GPU-independent** (§16.2)."""
-    hw = _hw_text()
-    marks = [m for m in ("RTX A6000", "sm_86", "84", "101,376") if m in hw]
-    assert marks, (
-        "no marker was found in the hardware file — this check is moot")
+    marks = [m for m in ("RTX A6000", "sm_86") if m in HW_TEXT]
+    assert marks, "the hw block carries no marker — this check is moot"
     for role in ("feature", "rule_editor"):
         body = _instructions(role)
         hit = [m for m in ("RTX A6000", "sm_86") if m in body]
@@ -98,7 +95,7 @@ def test_rule_writers_get_the_budget():
             f"{role} has no rule shape")
         for b in (8, 16):
             body = assemble_instructions(role, objective="rank", parameters=b,
-                                         hw_text=_hw_text())
+                                         hw_text=HW_TEXT)
             assert (f"{b} per execution path" in body
                     or f"at most {b}" in body), (
                 f"{role}: the budget {b} is not visible")
@@ -220,16 +217,13 @@ def test_every_role_gets_the_base(role):
     assert "Measurements are not available at deployment time" in _instructions(role)
 
 
-def test_hw_block_does_not_reference_cases():
-    """★ `hw/*.md` now goes to **RuleWriter only**, and RuleWriter receives
-    no cases. "look at the ... attached to the case" points at something
-    that does not exist (§30.10).
+def test_rule_writer_is_told_it_gets_no_cases():
+    """★ RuleWriter receives no cases, and the role file says so (§30.10).
+
+    ⚠️ 2026-09-08 (D-146): this used to also grep the hw block for a sentence
+    pointing at cases. That block was hand-written prose (`hw/sm_86.md`); it
+    is generated from the bundle now, so there is nothing to grep.
     """
-    hw = _hw_text()
-    # ★ Both wordings — the generated prompt is English, and the old frozen
-    #   file was Korean (D-146 deleted it, its logs remain).
-    for phrase in ("사례에 붙은", "attached to the case"):
-        assert phrase not in hw
     arch = _instructions("rule_writer")
     assert "no cases" in arch, "the role file changed — this check is moot"
 
