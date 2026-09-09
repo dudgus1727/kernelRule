@@ -20,9 +20,12 @@ regret@k = (the mean true time of the top k the rule picked)
 It is a mean, so it is robust to noise, and predicting 38th place as 36th is
 barely punished.
 
-⚠️ 2026-09-08 (D-146): **the arm labels stay in Korean.** They are the row
-names of `docs/artifacts/regret-at-k.md` and the keys of
-`regret-at-k.json`, and `docs/` is not translated.
+⚠️ Note the `k` here is **not** the `k` of the headline metric. This is a
+mean over the k the rule picked; `RegretResult.at(k)` is the best of the k it
+picked; `rank_top_k` is how deep the **true** top is scored while fitting.
+
+⚠️ 2026-09-08 (D-146): the arm labels were translated together with
+`docs/artifacts/regret-at-k.md` and the keys of `regret-at-k.json`.
 """
 
 from __future__ import annotations
