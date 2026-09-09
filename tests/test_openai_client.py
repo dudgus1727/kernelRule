@@ -310,12 +310,6 @@ def test_violation_report_detects_useless_retries(client):
         "the feedback failure was not caught")
 
 
-def test_retries_raised_to_three():
-    """(d) Temporary. While the refusal rate is high it separates "the
-    model is learning" from "structurally impossible"."""
-    assert LLMConfig().max_retries == 3
-
-
 # ---------------------------------------------------------------------------
 # RuleWriter — condition A sees nothing that came from the table (§11.8)
 # ---------------------------------------------------------------------------

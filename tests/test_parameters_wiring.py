@@ -76,30 +76,6 @@ def _llm(budget: int | None):
                      shape_values=[], registry=FeatureRegistry("F1"))
 
 
-@pytest.mark.parametrize("budget", [8, 16])
-def test_user_and_system_prompts_agree_on_the_budget(budget):
-    """Do the system and user prompts say **the same number**?"""
-    from kernelrule.agents.openai_client import assemble_instructions
-
-    llm = _llm(budget)
-    other = 16 if budget == 8 else 8
-    sys_p = assemble_instructions("rule_editor", objective="rank",
-                                  parameters=llm._parameters)
-    usr_p = llm._user_prompt("rule_editor", "", parent=None,
-                             parent_n_terms=0, analyst=False)
-    for name, txt in (("system", sys_p), ("user", usr_p)):
-        # ★ Wording history: "a term cap of N" -> "a parameter cap of N"
-        #   (D-128) -> "N per execution path" (D-144). The requirement that
-        #   the number comes from one place is unchanged.
-        assert (f"{budget} per execution path" in txt
-                or f"at most {budget}" in txt), (
-            f"the budget {budget} is not visible in the {name} prompt")
-        assert (f"{other} per execution path" not in txt
-                and f"at most {other}" not in txt), (
-            f"the {name} prompt says {other} — the condition changed "
-            f"(D-105)")
-
-
 def test_budget_reaches_the_saturation_notice():
     """The saturation notice must see the effective budget too — an
     8-term parent told "the budget is full" under a budget of 16 can never
@@ -200,19 +176,6 @@ def _twelve_terms() -> str:
             "    s = f.reg_pressure * w[0]\n" + body + "    return s")
 
 
-@pytest.mark.parametrize("budget", [8, 16])
-def test_output_schema_states_the_budget(budget):
-    from kernelrule.agents.schemas import rule_output_for
-
-    schema = rule_output_for(budget).model_json_schema()
-    for fld in ("code", "w0"):
-        d = schema["properties"][fld]["description"]
-        assert f"At most {budget}" in d or f"at most {budget}" in d, (
-            f"the output schema's {fld} description does not state the "
-            f"budget {budget} — the model sets the term count from this "
-            "sentence (D-107)")
-
-
 def test_output_schema_validation_follows_the_budget():
     """★ If only the description is fixed and the validation stays at 8,
     the model tries and gets refused."""
@@ -246,6 +209,9 @@ def test_dict_path_validation_follows_the_budget():
 #:   D-106  the attached cap (ast_nodes) did not follow
 #:   D-107  the output schema's description was frozen at 8
 def test_all_four_surfaces_say_the_same_budget():
+    """★ 2026-09-09 (D-148): this **subsumes** the two tests that were here —
+    one for the system+user prompts, one for the output schema. It checks all
+    three surfaces at both budgets, so those were duplicate coverage."""
     from kernelrule.agents.openai_client import assemble_instructions
     from kernelrule.agents.schemas import rule_output_for
     from kernelrule.rules.checks import limits_for

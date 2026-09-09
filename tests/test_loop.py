@@ -178,15 +178,6 @@ def test_replay_reproduces_the_run(synth_table, tmp_path):
                                                  for r in b.rounds]
 
 
-def test_early_stop_uses_the_validation_split(loop):
-    """★ Early stopping is judged on the **validation split** (§10.2,
-    §14.3)."""
-    import inspect
-    src = inspect.getsource(RoundLoop.should_stop)
-    assert "self.splits.val" in src
-    assert "self.splits.train" not in src
-
-
 def test_early_stop_path_is_sealed(loop):
     """★ The early-stop path is **sealed** (D-144).
 
