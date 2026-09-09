@@ -68,6 +68,7 @@ F3hg-p8-d75-a  the human_guided seed
 | `luna` | 3 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
 | `lunaNAMES` | 6 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
 | `smoke` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 2 | a6000 | `579bdf6` | trace-smoke-579bdf6 | — | — | ★ a wiring smoke run, not a result (D-149) — 1 seed x 2 rounds, fold 0. Do not read its numbers |
+| `uncapped` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 2 | a6000 | `32a53ec` | trace-uncapped-32a53ec | — | — | ★ a behaviour check, not a result (D-150) — 1 seed x 2 rounds, fold 0, with the parameter cap removed. Do not read its numbers |
 | `verify` | 2 | 19/? | ? | ? | default | nelder-mead/4/200 | 6 | a6000 | `?` | — | — | — | |
 
 <!-- RUNS:END -->

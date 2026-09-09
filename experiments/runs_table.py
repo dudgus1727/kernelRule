@@ -104,6 +104,9 @@ NOTES = {
     "F3rw-p8-p3": "a campaign stopped at r4~r6 by patience 3 (D-131)",
     "smoke": "★ a wiring smoke run, not a result (D-149) — 1 seed x 2 rounds, "
              "fold 0. Do not read its numbers",
+    "uncapped": "★ a behaviour check, not a result (D-150) — 1 seed x 2 "
+                "rounds, fold 0, with the parameter cap removed. Do not read "
+                "its numbers",
 }
 #: The prefixes dropped from the table. **They are not deleted** — they are
 #: only marked by name.
