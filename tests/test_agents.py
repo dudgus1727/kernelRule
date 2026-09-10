@@ -558,3 +558,24 @@ def test_the_measured_range_never_reaches_the_prompt():
                 continue
             assert f"{v:.4g}" not in text, (
                 f"the measured range of {n} is in the prompt: {v}")
+
+
+def test_no_output_schema_uses_prefixitems():
+    """★ D-160 — the API refuses `prefixItems` with no `items`.
+
+    Making `expected_range` required turned it into `400 ... array schema
+    missing items` and **20 of 20 stage-1 calls died**; while it had a
+    default it was not in `required` and the same schema went through. A
+    fixed-length tuple is what renders that way, so no output schema may
+    contain one.
+    """
+    import json
+
+    from kernelrule.agents import schemas as S
+    if not S.HAVE_PYDANTIC:
+        pytest.skip("no pydantic")
+    for name in ("AnalysisOutput", "RuleOutput", "FeatureOutput",
+                 "CategoryOutput", "CritiqueOutput"):
+        sch = json.dumps(getattr(S, name).model_json_schema())
+        assert "prefixItems" not in sch, (
+            f"{name} renders a fixed-length tuple — the API refuses it")

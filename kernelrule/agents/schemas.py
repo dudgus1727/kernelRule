@@ -11,6 +11,7 @@ there is no validation** — it does not pass silently (§26.4).
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -497,12 +498,34 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         rationale: str
         unit: str = Field(description="e.g. ratio / bytes / count / "
                                       "dimensionless. **Required**")
-        expected_range: tuple[float, float] = Field(
-            description="(low, high) this feature actually takes on real "
-                        "configs. **Required** — it sets the scale the rule "
-                        "writer sees")
+        #: ⚠️ **`list[float]`, not `tuple[float, float]`.** A tuple renders
+        #: as `prefixItems` with no `items`, and the API refuses that
+        #: schema outright — 20/20 stage-1 calls came back
+        #: `400 ... array schema missing items` the first time this field
+        #: was made required (D-160). While it had a default it was not in
+        #: `required` and the same schema went through. The length is
+        #: checked by the validator below, and **that message is what the
+        #: model gets on the retry**.
+        expected_range: list[float] = Field(
+            description="[low, high] — exactly two numbers, the range this "
+                        "feature takes on real configs. **Required**; it "
+                        "sets the scale the rule writer sees")
         direction: str = Field(
             description="higher_is_worse or higher_is_better. **Required**")
+
+        @field_validator("expected_range")
+        @classmethod
+        def _range(cls, v: list[float]) -> list[float]:
+            if len(v) != 2:
+                raise ValueError(
+                    f"expected_range must be exactly two numbers "
+                    f"[low, high]. Got {len(v)}")
+            if not all(math.isfinite(x) for x in v):
+                raise ValueError("expected_range must be finite numbers")
+            if v[0] > v[1]:
+                raise ValueError(
+                    f"expected_range is [low, high] and {v[0]} > {v[1]}")
+            return v
 
     class Category(BaseModel):
         name: str = Field(description="lower case + underscores")
