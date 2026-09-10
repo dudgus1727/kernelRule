@@ -352,6 +352,40 @@ def test_recheck_warning_is_recorded(perf_table):
     assert "Re-judgement" in why, why
 
 
+def test_the_shape_level_verdict_looks_at_every_shape(perf_table):
+    """★ D-160 — it used to look at the first 8 shapes only.
+
+    `k_loop_padding_fraction` (the F1 run's own feature, D-159) is constant
+    on those 8 and config-dependent on 3 of the 66 (K = 4097 · 4098 · 4100),
+    so it was registered as shape level and its value was then taken from
+    one representative config. **The verdict is checked by behaviour**: the
+    same function must come out config level now, and still come out shape
+    level under the old 8-shape window.
+    """
+    from kernelrule.features import Feature
+    from kernelrule.features.generated import detect_shape_level
+
+    code = ("def k_loop_padding_fraction(p, hw, cfg) -> float:\n"
+            "    tk = max(cfg.tile_k, 1)\n"
+            "    iters = (max(p.K, 1) + tk - 1) // tk\n"
+            "    covered = iters * tk\n"
+            "    return 1.0 - max(p.K, 1) / max(covered, 1)\n")
+    env: dict = {}
+    exec(compile(code, "<t>", "exec"), env)  # noqa: S102
+    f = Feature(name="k_loop_padding_fraction",
+                fn=env["k_loop_padding_fraction"], unit="ratio",
+                expected_range=(0.0, 1.0), direction="higher_is_worse",
+                code_hash="h", source=code)
+
+    got, why = detect_shape_level(f, perf_table)
+    assert got is False, f"it must be config level now: {why}"
+
+    old, _why = detect_shape_level(f, perf_table, n_shapes=8)
+    assert old is True, ("the 8-shape window is what produced the wrong "
+                         "verdict — if this changes, the test no longer "
+                         "shows what D-160 fixed")
+
+
 def test_load_generated_requires_a_table():
     """★ Giving `table` a default makes callers leave it out (D-67).
 

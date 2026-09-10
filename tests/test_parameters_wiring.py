@@ -158,3 +158,69 @@ def test_pipeline_has_no_fitter_or_rank_flags():
                  '"--objective"', '"--objective-switch"', '"--rank-top-k"',
                  '"--rank-lambda"'):
         assert flag not in src, f"{flag} is still there"
+
+
+# ---------------------------------------------------------------------------
+# ★ D-160 — "no cap" must be recorded as no cap
+# ---------------------------------------------------------------------------
+def _config_of(cfg):
+    """`RoundLoop._config_dict` with the pieces it reads stubbed out. It is
+    the **real** method — a copy here would diverge from it (principle 2)."""
+    from kernelrule.core.loop import RoundLoop
+
+    class _Split:
+        shapes = ()
+
+    stub = type("S", (), {
+        "cfg": cfg,
+        "splits": type("Sp", (), {"kind": "t", "train": _Split(),
+                                  "val": _Split()})(),
+        "matrix": type("M", (), {"feature_names": lambda self: []})(),
+        "features_made": [], "switch_round": -1, "_objective": cfg.objective,
+        "llm": None})()
+    return RoundLoop._config_dict(stub)
+
+
+
+def test_config_records_an_absent_cap_as_absent(tmp_path):
+    """★ It used to write `FITTER_SWITCH_DIM` (8) when there was no cap.
+
+    "ran with a cap of 8" and "ran with no cap" then read identically in
+    `config.json`, and `runs.md` tagged both `p8` (D-159 §5-③). Checked by
+    **behaviour**: dump a config with `parameters=None` and read it back
+    through `run_condition`.
+    """
+    import json
+
+    from kernelrule.core.loop import LoopConfig
+    from kernelrule.core.runset import run_condition
+
+    cfg = LoopConfig(run_id="nocap-probe", parameters=None,
+                     out_dir=str(tmp_path))
+    d = _config_of(cfg)
+    assert d["rule_constraints"]["parameters"] is None
+    assert d["rule_constraints"]["no_parameter_cap"] is True
+
+    run = tmp_path / "nocap-probe-s0"
+    run.mkdir()
+    (run / "config.json").write_text(json.dumps(
+        {"loop": {}, "llm": {}, "split": {},
+         "rule_constraints": d["rule_constraints"]}))
+    assert run_condition("nocap-probe-s0", root=tmp_path)["parameters"] \
+        == "none"
+
+
+def test_an_old_config_still_reads_as_the_number_it_had(tmp_path):
+    """⚠️ Old artefacts are **not** rewritten — back then the cap really was
+    8. `run_condition` must keep reading them as 8."""
+    import json
+
+    from kernelrule.core.runset import run_condition
+
+    run = tmp_path / "old-p8-s0"
+    run.mkdir()
+    (run / "config.json").write_text(json.dumps(
+        {"loop": {}, "llm": {}, "split": {},
+         "rule_constraints": {"parameters": 8,
+                              "branch_constants_exempt": True}}))
+    assert run_condition("old-p8-s0", root=tmp_path)["parameters"] == 8

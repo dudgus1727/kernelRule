@@ -56,6 +56,20 @@ class RunSetError(ValueError):
     (§26.4)."""
 
 
+def _parameters(rc: dict):
+    """The parameter cap as recorded. `"none"` = **explicitly no cap**,
+    `None` = the run does not say (D-160)."""
+    if rc.get("no_parameter_cap"):
+        return "none"
+    v = rc.get("parameters")
+    if v is None:
+        v = rc.get("budget")
+    if v is None and ("parameters" in rc or "budget" in rc):
+        # The key is there and holds null — that is "no cap" written out.
+        return "none"
+    return v
+
+
 def _campaign(run: str) -> str:
     """`f1pipe-F3-tag-s0` -> `f1pipe-F3-tag`. The seed is per campaign."""
     parts = run.rsplit("-s", 1)
@@ -82,8 +96,11 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         # ★ D-128 rename: `budget` -> `parameters`. The repository's old
         #   artefacts were converted, but an old run may arrive from outside,
         #   so both names are read.
-        "parameters": (rc.get("parameters") if rc.get("parameters") is not None
-                       else rc.get("budget")),
+        # ★ 2026-09-10 (D-160): `"none"` is **no cap**, and it is a
+        #   different thing from `None` = the run does not say. Runs before
+        #   D-160 wrote 8 even with the cap off, and those files are left
+        #   alone — the commit is what separates them.
+        "parameters": _parameters(rc),
         "product_hint": llm.get("product_hint"),
         "power_hint": llm.get("power_hint"),
         "hw": hw_id,

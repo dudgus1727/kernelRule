@@ -492,3 +492,69 @@ def test_the_numeric_safety_checks_stay():
         cls(code=code, w0=[])
     with _pytest.raises(Exception, match="abnormally large"):
         cls(code=code, w0=[1e9])
+
+
+# ---------------------------------------------------------------------------
+# ★ D-160 — the feature metadata is required, and the measured range is not
+#           a prompt
+# ---------------------------------------------------------------------------
+def test_feature_metadata_has_no_defaults():
+    """★ With defaults there is no telling "chosen" from "not filled in".
+
+    On the F1 run `expected_range` was the schema default [0,1] in 15 of 20
+    and `direction` was the default in **20 of 20** (D-159 §3-1). Checked by
+    behaviour: leaving one out must fail validation, and the failure message
+    is what the model gets back on the retry.
+    """
+    from kernelrule.agents import schemas as S
+    if not S.HAVE_PYDANTIC:
+        pytest.skip("no pydantic")
+    import pydantic
+
+    base = {"name": "probe", "code": "def probe(p, hw, cfg) -> float:\n"
+                                     "    return 0.0\n",
+            "rationale": "why"}
+    for missing in ("unit", "expected_range", "direction"):
+        kw = dict(base, unit="ratio", expected_range=(0.0, 4.0),
+                  direction="higher_is_worse")
+        kw.pop(missing)
+        with pytest.raises(pydantic.ValidationError) as ei:
+            S.FeatureOutput(**kw)
+        assert missing in str(ei.value)
+    assert S.FeatureOutput(**base, unit="ratio", expected_range=(0.0, 4.0),
+                           direction="higher_is_worse").unit == "ratio"
+
+
+def test_the_measured_range_never_reaches_the_prompt():
+    """⛔ D-160 §2-3 — the observed range is recorded, never shown.
+
+    A range read off this table is an observation **of this table**, and
+    putting it in front of the model makes the run condition B. Checked by
+    behaviour: the numbers `observed_ranges` returns must not appear in the
+    rendered feature block, not even with `include_observed=True`.
+    """
+    import warnings
+
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.core.table import PerfTable
+    from kernelrule.features import REGISTRY, FeatureRegistry, render_features
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        t = PerfTable.from_bundle("datasets/rtx-a6000-sm_86-c63710df",
+                                  env_hash="c63710df", ok_only=False)
+    reg = FeatureRegistry("probe")
+    for n in ("log_grid_tiles", "edge_waste"):
+        reg.add(REGISTRY[n])
+    m = FeatureMatrix(t, reg)
+    obs = m.observed_ranges(list(t.shapes())[:4])
+    text = render_features(reg, include_observed=True)
+    for n, (lo, hi) in obs.items():
+        for v in (lo, hi):
+            # A measured bound that is not also a declared bound must be
+            # absent from the text.
+            if v in reg[n].expected_range:
+                continue
+            assert f"{v:.4g}" not in text, (
+                f"the measured range of {n} is in the prompt: {v}")

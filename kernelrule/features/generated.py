@@ -217,9 +217,17 @@ _CONST_RTOL = 1e-12
 SHAPE_LEVEL_REASON: dict[str, str] = {}
 
 
-def detect_shape_level(f: Feature, table, *, n_shapes: int = 8
+def detect_shape_level(f: Feature, table, *, n_shapes: int | None = None
                        ) -> tuple[bool, str]:
     """★ A two-layer verdict — `(is it shape level, why)` (§30.12).
+
+    ⚠️ 2026-09-10 (D-160): it used to look at **the first 8 shapes**
+    (`n_shapes=8`). `k_loop_padding_fraction` is config-dependent on 3 of
+    the 66 shapes (K = 4097 · 4098 · 4100) and all three fall outside those
+    8, so it was registered as shape level and its value was then read off
+    one representative config (D-159). It now looks at **every shape**, and
+    that costs nothing: `FeatureMatrix(table, one)` below already computes
+    the column for every shape — the slice only threw the rest away.
 
     ```
     1. data   is the relative variance across configs 0 on every shape
@@ -240,7 +248,8 @@ def detect_shape_level(f: Feature, table, *, n_shapes: int = 8
     one = FeatureRegistry(f"probe-shape-{f.name}")
     one.add(f)
     mat = FeatureMatrix(table, one)
-    for p in list(table.shapes())[:n_shapes]:
+    shapes = list(table.shapes())
+    for p in (shapes if n_shapes is None else shapes[:n_shapes]):
         fe, _ = mat.for_shape(p)
         v = np.asarray(getattr(fe, f.name), dtype=np.float64)
         scale = max(float(np.nanmax(np.abs(v))), 1.0)
@@ -248,9 +257,9 @@ def detect_shape_level(f: Feature, table, *, n_shapes: int = 8
             return False, "the value differs per config"
     if f.source and not uses_cfg(f.source):
         return True, "it does not reference cfg — the code guarantees it"
-    return True, ("★ it references cfg yet is constant in this table — it "
-                  "may be config-dependent in another bundle. Re-judgement "
-                  "needed")
+    return True, (f"★ it references cfg yet is constant on all "
+                  f"{len(shapes)} shapes of this table — it may be "
+                  f"config-dependent in another bundle. Re-judgement needed")
 
 
 def check_feature_code(code: str, *, known: frozenset[str]) -> str:

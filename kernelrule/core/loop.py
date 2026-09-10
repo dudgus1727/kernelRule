@@ -93,13 +93,24 @@ class LoopConfig:
     sandbox_first_seen: bool = True
     out_dir: str = "runs"
     #: ★ The Analyst -> FeatureWriter path (D-75). The cap on how many new
-    #: axes may be created per round. **At 0 the path does not exist** — the
-    #: behaviour before 2026-08-28, and the default.
+    #: axes may be created per round. **At 0 the path does not exist.**
     #:
-    #: The cap is needed because of §21: the feature matrix recomputes every
-    #: shape for each new axis, and the cache key is the registry hash, so
-    #: if it changes every round the cache never hits. Do not exceed 1~2.
-    max_new_features_per_round: int = 0
+    #: ⚠️ 2026-09-10 (D-160): the default was **0** and every campaign so far
+    #: ran with the path shut. Under F3 nobody noticed — the Analyst asked
+    #: for a new axis 0 times in 36 hypotheses, because `log_flops` and
+    #: `log_min_dim` were already there. Under F1 it asked **30 times in 36**
+    #: and every one of them was dropped before the FeatureWriter (D-159).
+    #:
+    #: ★ 3 per round, **the same for F1/F2/F3** — a condition that differs
+    #: between arms cannot be compared later. There is no cap on the total,
+    #: nor on how many one feature may use: an axis nobody uses does not
+    #: enter the archive and dies there.
+    #:
+    #: The per-round cap exists because of §21 — the feature matrix
+    #: recomputes every shape for each new axis and the cache key is the
+    #: registry hash, so a registry that changes every round never hits the
+    #: cache. 12 rounds x 3 is up to 36 more axes.
+    max_new_features_per_round: int = 3
     #: The FeatureWriter condition (F1/F2/F3). It must be given **the same
     #: condition** as stage 1 outside the loop — otherwise the condition
     #: changes inside a round.
@@ -671,6 +682,9 @@ class RoundLoop:
                 #   (D-95).
                 self._restart_pool()
                 row.update(accepted=True, shape_level=f.shape_level)
+                # ★ Declared vs actual, for an axis built inside the loop
+                #   too (D-160). ⛔ Recorded, not shown.
+                row["range"] = self._range_rows().get(f.name)
                 made.append(f.name)
             except FeatureRejected as e:
                 row.update(accepted=False, error=str(e)[:200])
@@ -678,8 +692,29 @@ class RoundLoop:
                 row.update(accepted=False,
                            error=f"{type(e).__name__}: {e}"[:200])
             self.features_made.append(row)
+            # ★ The attempt goes into the trace as well (D-160). Until now
+            #   "was an axis built inside the loop" could only be read from
+            #   a separate file, and the trace is what gets released.
+            self.trace.ev("feature", round=r, hypothesis_id=hid,
+                          requirement=text, name=row.get("name"),
+                          accepted=bool(row.get("accepted")),
+                          shape_level=row.get("shape_level"),
+                          range=row.get("range"), error=row.get("error"),
+                          code=row.get("code"))
         res.n_features_made = len(made)
         return made
+
+    def _range_rows(self) -> dict:
+        """`name -> {declared, observed}` on the **training** shapes (D-160).
+
+        ⛔ Not for a prompt — see `FeatureMatrix.observed_ranges`.
+        """
+        obs = self.matrix.observed_ranges(self.splits.train.shapes)
+        reg = self.matrix.registry
+        return {n: {"declared": [float(x) for x in reg[n].expected_range],
+                    "observed": [round(v, 6) for v in obs[n]],
+                    "shape_level": bool(reg[n].shape_level)}
+                for n in sorted(obs)}
 
     # -- Regime masks (the cell axes) — ★ cut by size (§10.1, §30.5) ------
     def _regime_masks(self):
@@ -1524,6 +1559,12 @@ class RoundLoop:
                       n_train=len(self.splits.train.shapes),
                       n_val=len(self.splits.val.shapes),
                       features=sorted(self.matrix.feature_names()),
+                      # ★ Declared range vs the range actually taken on the
+                      #   training configs (D-160). The declaration is the
+                      #   model's word and this is the table's. ⛔ It is
+                      #   recorded, never shown — putting it in a prompt
+                      #   makes the run condition B.
+                      feature_ranges=self._range_rows(),
                       output_schemas=_output_schemas())
         try:
             for _ in range(n):
@@ -1596,10 +1637,19 @@ class RoundLoop:
                      "objective_switch": self.cfg.objective_switch,
                      "switch_round": self.switch_round,
                      "final_objective": self._objective,
+                     # ★ 2026-09-10 (D-160): when there is no cap this
+                     #   used to write `_FITTER_DIM` (8) — the **fitter
+                     #   switch dimension**, which is a different quantity.
+                     #   "ran with a cap of 8" and "ran with no cap" then
+                     #   read the same in `config.json`, and `runs.md`
+                     #   tagged both `p8`. A cap that is absent is written
+                     #   as absent.
+                     #   ⚠️ Old `config.json` files are **not** rewritten —
+                     #   back then the cap really was 8. The commit is what
+                     #   separates them.
                      "rule_constraints": {
-                         "parameters": (self.cfg.parameters
-                                        if self.cfg.parameters is not None
-                                        else _FITTER_DIM),
+                         "parameters": self.cfg.parameters,
+                         "no_parameter_cap": self.cfg.parameters is None,
                          "branch_constants_exempt": True}}
         llm_cfg = getattr(self.llm, "cfg", None)
         if llm_cfg is not None and hasattr(llm_cfg, "to_dict"):

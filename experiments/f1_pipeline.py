@@ -548,6 +548,46 @@ _SEED_TERMS = ("traffic_amplification", "sm_idle_cost", "smem_pressure",
                "has_spill", "split_k_cost", "pipeline_warmup_frac")
 
 
+def _range_report(matrix, reg: FeatureRegistry, splits) -> dict:
+    """★ Declared range vs the range actually taken on the training configs
+    (D-160). 0 LLM calls.
+
+    ⛔ **Not for a prompt.** The `include_observed` line in
+    `features/__init__.py` is what separates condition A from B, and this
+    value is on the B side. It exists so that "was the declaration far off"
+    can be answered, and the answer is read from the artefact by a human.
+    """
+    obs = matrix.observed_ranges(splits.train.shapes)
+    rows = {}
+    for n in sorted(reg._items):
+        f = reg[n]
+        lo_d, hi_d = (float(x) for x in f.expected_range)
+        lo_o, hi_o = obs[n]
+        span_d, span_o = hi_d - lo_d, hi_o - lo_o
+        rows[n] = {
+            "declared": [lo_d, hi_d], "observed": [lo_o, hi_o],
+            "shape_level": bool(f.shape_level), "unit": f.unit,
+            "direction": f.direction,
+            # How many times wider the declaration is than the truth. `null`
+            # when the observed span is 0 (a constant axis) — a ratio would
+            # be a division by zero and **is not filled in by guessing**.
+            "span_ratio": (span_d / span_o) if span_o > 0 else None,
+            "outside": bool(lo_o < lo_d or hi_o > hi_d),
+            "constant": span_o == 0.0}
+    n_out = sum(1 for r in rows.values() if r["outside"])
+    ratios = [r["span_ratio"] for r in rows.values() if r["span_ratio"]]
+    return {"n_train_shapes": len(splits.train.shapes),
+            "split_kind": splits.kind,
+            "note": ("★ measured on the TRAINING shapes only, and it never "
+                     "goes into a prompt (D-160 §2-3)"),
+            "n_features": len(rows),
+            "n_outside_the_declaration": n_out,
+            "n_constant": sum(1 for r in rows.values() if r["constant"]),
+            "span_ratio_median": (sorted(ratios)[len(ratios) // 2]
+                                  if ratios else None),
+            "features": rows}
+
+
 def _physics_coverage(table, gen: FeatureRegistry,
                       base: FeatureRegistry) -> dict:
     """★ Does the F1 library cover the hand seed's physics — **a result to
@@ -731,7 +771,8 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        #   (D-144)
                        seed=a.seed,
                        max_new_features_per_round=getattr(
-                           a, "max_new_features", 0),
+                           a, "max_new_features",
+                           LoopConfig.max_new_features_per_round),
                        feature_condition=a.condition,
                        use_analyst=not getattr(a, "no_analyst", False),
                        n_workers=getattr(a, "workers", 0),
@@ -910,11 +951,13 @@ def main() -> None:
                     help="score and fit in N processes (0=sequential). The "
                          "result equals the sequential one — "
                          "test_parallel_matches_sequential pins it")
-    ap.add_argument("--max-new-features", type=int, default=0,
+    ap.add_argument("--max-new-features", type=int,
+                    default=LoopConfig.max_new_features_per_round,
                     metavar="N",
                     help="new axes buildable per round (0=no path, D-75). "
-                         "Do not exceed 1~2 — the §21 feature-matrix cache "
-                         "is invalidated")
+                         "★ The default is LoopConfig's (3, D-160) — the "
+                         "same for every condition. The §21 feature-matrix "
+                         "cache is invalidated on each new axis")
     ap.add_argument("--bundle", default=BUNDLE,
                     help="the measurement table. ★ Changing to another GPU "
                          "is a **different condition** — do not mix it into "
@@ -1084,6 +1127,12 @@ def main() -> None:
               f"{len(reg._items) - n_sh}) ---")
 
     matrix = FeatureMatrix(table, reg)
+    # ★ What the axes **actually** take on the training configs (D-160).
+    #   The declaration is what the model said; this is what the table says.
+    #   ⛔ It is written to the artefact and nowhere near a prompt — a range
+    #   read off this table would make the run condition B.
+    _dump_json(d / "stage1-features" / "observed-ranges.json",
+               _range_report(matrix, reg, splits))
     from kernelrule.core.splits import is_unsealed
 
     _dump_json(d / "config.json", {

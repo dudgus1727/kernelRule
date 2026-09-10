@@ -98,6 +98,10 @@ N_QUANTILES = 3
 #: 1 of 6 rules in at r0 and 20 of 69 by r11, and the line keeps falling as
 #: the population improves — that is the property being bought, not the
 #: number.
+#:
+#: ★ 2026-09-10 (D-160): the **tertiles are drawn from the passers**, so
+#: this fraction now sets the whole grid: the three bands are the top
+#: 0~10% / 10~20% / 20~30%. See `Archive._population`.
 TOP_FRACTION = 0.30
 
 
@@ -247,9 +251,36 @@ class Archive:
         """
         return self.noise_tol if self.select_by == "regret" else 0.0
 
+    def _population(self) -> list[tuple[float, ...]]:
+        """★ The rules the tertiles are computed from — **the ones that got
+        past the cut line** (D-160).
+
+        ⚠️ Before, all three axes were tertiles of **everything scored**
+        while the cut line let only the top `TOP_FRACTION` in. Those are the
+        same quantity read twice: passing the cut put a rule in the best
+        third of axis 1 automatically, so **axis 1 was 0 for all 25 accepted
+        rules** of the D-156 run and 18 of the 27 cells were unreachable.
+        Axes 2 and 3 leaned the same way for the same reason.
+
+        With the population cut to the passers, the three bands mean the top
+        0~10% / 10~20% / 20~30% of everything scored. Simulated on the D-156
+        data: 4 distinct cells -> 7 with axis 1 alone -> **11 with all
+        three**.
+
+        ⚠️ The number of cells is **not the goal** — the goal is to widen
+        what `explore`/`cross` can draw from. As a run converges the cells
+        get fewer, and that is not a fault.
+        """
+        cut = self._cut_line()
+        pop = [a for a, k in zip(self._seen_axes, self._seen_keys,
+                                 strict=True) if k <= cut]
+        # Before anything is scored there is no population; `_cut_line` is
+        # `inf` then, so at least the first rule always passes.
+        return pop or self._seen_axes
+
     def _boundaries(self) -> list[tuple[float, ...]]:
-        """★ The tertile boundaries per axis, from **every rule scored so
-        far** (D-155).
+        """★ The tertile boundaries per axis, over `_population()`
+        (D-155 · D-160).
 
         There are no absolute boundaries — set at the scale of regret they
         stop meaning anything as the whole population improves (D-42's third
@@ -257,9 +288,10 @@ class Archive:
         means something different every round, so **every held elite is
         re-placed** whenever they move.
         """
+        pop = self._population()
         out = []
         for j in range(len(CELL_AXIS_NAMES)):
-            vals = sorted(v[j] for v in self._seen_axes)
+            vals = sorted(v[j] for v in pop)
             if not vals:
                 out.append(())
                 continue
@@ -344,6 +376,11 @@ class Archive:
                              "select_by": self.select_by, "cell": list(c),
                              "won": won, "changes": e.changes,
                              "cut_line": self._cut_line(),
+                             # ★ How many rules the tertiles were drawn from
+                             #   (D-160) — the passers, not everything
+                             #   scored.
+                             "n_population": len(self._population()),
+                             "n_seen": self.n_seen,
                              "axes": {nm: getattr(e, nm)
                                       for nm in CELL_AXIS_NAMES}})
         return won

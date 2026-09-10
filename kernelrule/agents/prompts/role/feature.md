@@ -94,6 +94,9 @@ expected_range    (low, high). ★ Derive it **from the formula**, not from data
 direction         "higher_is_worse" | "higher_is_better" | "neutral"
 ```
 
+★ The last three are **required** — there is no default to fall back on.
+Write what this formula gives, not a placeholder.
+
 Do not be careless with `expected_range` — the rule uses it to set the weight
 ratios. Adding a `[0,1]` term and a `[0,300]` term with the same weight lets
 the latter decide the whole ordering.

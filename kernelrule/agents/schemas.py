@@ -481,12 +481,28 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
             return v
 
     class FeatureOutput(BaseModel):
+        """★ 2026-09-10 (D-160): `unit` · `expected_range` · `direction`
+        became **required**.
+
+        With defaults there was no telling "chosen" from "not filled in".
+        Measured on the F1 run (D-159): `expected_range` was the default
+        [0,1] in 15 of 20 and `direction` was the default in **20 of 20** —
+        a column that cannot be read either way. Required fields cost
+        retries, and stage 1 is 20 calls per run, so the retry count is
+        recorded instead of the cost being guessed.
+        """
+
         name: str
         code: str
         rationale: str
-        unit: str = "dimensionless"
-        expected_range: tuple[float, float] = (0.0, 1.0)
-        direction: str = "higher_is_worse"
+        unit: str = Field(description="e.g. ratio / bytes / count / "
+                                      "dimensionless. **Required**")
+        expected_range: tuple[float, float] = Field(
+            description="(low, high) this feature actually takes on real "
+                        "configs. **Required** — it sets the scale the rule "
+                        "writer sees")
+        direction: str = Field(
+            description="higher_is_worse or higher_is_better. **Required**")
 
     class Category(BaseModel):
         name: str = Field(description="lower case + underscores")

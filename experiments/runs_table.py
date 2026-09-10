@@ -278,7 +278,10 @@ def _rows() -> list[dict]:
             "fitter": f"{one('fit_method')}/{one('fit_restarts')}/"
                       f"{cfg['loop'].get('max_evals', '?')}",
             # ★ Is this run off the §1-6 rule (nelder-mead when p<=8)
-            "off_rule": (one("parameters") not in ("?", "★split")
+            # ★ "none" = no cap (D-160). The fitter is then chosen per
+            #   rule from `len(w0)`, so a campaign-level verdict does not
+            #   apply — it is not marked as off the rule.
+            "off_rule": (one("parameters") not in ("?", "★split", "none")
                          and one("fit_method") != fitter_for(
                              int(one("parameters")))["fit_method"]),
             "rounds": "~".join(map(str, nr)),

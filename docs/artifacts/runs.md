@@ -34,6 +34,10 @@ F3rw-p8        the F3 library · the RuleWriter seed · parameters 8 · default
 F3rw-p16       parameters 16
 F3rw-p8-prod   the product hint    F3rw-p8-pow   the exponent hint
 F3hg-p8-d75-a  the human_guided seed
+★ parameters `none` = **the cap is off** (removed at D-152). A run before
+  2026-09-10 wrote `8` into config.json even with the cap off — a recording
+  fault (D-160). Those files are **not** rewritten; the commit tells them
+  apart
 ★ The table (GPU), the inheritance and the code version do not go in the tag
   — config.json holds them
 ★ A directory starting with `x-` is **discarded** (the rank-loss line · a

@@ -177,6 +177,35 @@ class FeatureMatrix:
         return {n: float(self.registry[n].expected_range[0])
                 for n in self.registry.names(shape_level=False)}
 
+    def observed_ranges(self, shapes=None) -> dict[str, tuple[float, float]]:
+        """★ The **actual** min/max each axis takes on those shapes' configs
+        (D-160).
+
+        The declared `expected_range` is what the model said; this is what
+        the table says. Measured on the F1 run, 15 of 20 declarations were
+        the schema default [0,1].
+
+        ⛔ **It must not go into a prompt.** A range read off this table is
+        an observation of this table, and putting it in front of the model
+        makes the run condition B (`describe_with(include_observed=...)`
+        holds that line). It is written to the artefacts and the trace only
+        — and it is not put in `Feature.observed`, which is the field that
+        does reach the prompt.
+
+        `shapes` defaults to every shape in the table. The caller passes the
+        **training** shapes so that nothing from the holdout is measured.
+        """
+        shapes = list(self.table.shapes() if shapes is None else shapes)
+        out: dict[str, tuple[float, float]] = {}
+        for n in self.registry.names(shape_level=False):
+            lo = min(float(self._cols[p.key][n].min()) for p in shapes)
+            hi = max(float(self._cols[p.key][n].max()) for p in shapes)
+            out[n] = (lo, hi)
+        for n in self.registry.names(shape_level=True):
+            vals = [float(self._info[p.key][n]) for p in shapes]
+            out[n] = (min(vals), max(vals))
+        return out
+
     def column(self, name: str) -> np.ndarray:
         """The column with every shape concatenated. For the GBDT baseline
         and correlation analysis."""

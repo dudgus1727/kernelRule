@@ -521,9 +521,22 @@ def _d75_loop(synth_table, tmp_path, *, cap: int):
                      llm=llm), reg
 
 
-def test_feature_path_is_off_by_default(synth_table, tmp_path):
-    """★ The default is **off** — it must be the same condition as the runs
-    so far."""
+def test_the_feature_path_is_on_by_default():
+    """★ The default is **3 per round** (D-160).
+
+    It was 0 and every campaign ran with the path shut. Under F1 the Analyst
+    asked 30 times in 36 hypotheses and not one reached the FeatureWriter
+    (D-159). The number is checked **on LoopConfig**, because that is the
+    default the pipeline reads.
+    """
+    from kernelrule.core.loop import LoopConfig
+
+    assert LoopConfig.max_new_features_per_round == 3
+
+
+def test_cap_zero_shuts_the_feature_path(synth_table, tmp_path):
+    """★ At 0 the path does not exist — the state every run before D-160
+    was in. It is what makes the old runs readable."""
     loop, _reg = _d75_loop(synth_table, tmp_path, cap=0)
     assert loop.cfg.max_new_features_per_round == 0
     loop.seed(*_SEED_RULE)
