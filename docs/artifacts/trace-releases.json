@@ -161,6 +161,28 @@
   },
   "uploaded": "2026-09-10"
  },
+ "noregime": {
+  "bytes_raw": {
+   "noregime-s0": 1419827
+  },
+  "bytes_zst": {
+   "noregime-s0": 55029
+  },
+  "commits": {
+   "noregime-s0": "c5c196a"
+  },
+  "events": {
+   "noregime-s0": 343
+  },
+  "release": "trace-noregime-c5c196a",
+  "runs": [
+   "noregime-s0"
+  ],
+  "sha256": {
+   "trace-noregime-s0.jsonl.zst": "a085ecf23ce24512bdb5f73df0868d4c3765ae983c4b7a213bbc1c0957c2b948"
+  },
+  "uploaded": "2026-09-10"
+ },
  "seed3": {
   "bytes_raw": {
    "seed3-s0": 94480

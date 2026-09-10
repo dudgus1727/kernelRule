@@ -113,6 +113,9 @@ NOTES = {
     "seed3": "★ a contrast, not a result (D-151) — the same round with a "
              "**3-term seed**, to see whether len(w0) follows the parent. Do "
              "not read its numbers",
+    "noregime": "★ 12 rounds with our regime axis taken out of what the "
+                "model sees (D-156) — 1 seed, fold 0, 3-term seed. Do not "
+                "read its numbers",
     "archive": "★ 12 rounds with the archive rebuilt (D-155) — 1 seed, fold "
                "0, 3-term seed. New population, cut line and axes. Do not "
                "read its numbers",
