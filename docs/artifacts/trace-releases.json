@@ -51,6 +51,28 @@
   },
   "uploaded": "2026-09-06"
  },
+ "full12": {
+  "bytes_raw": {
+   "full12-s0": 1514781
+  },
+  "bytes_zst": {
+   "full12-s0": 53311
+  },
+  "commits": {
+   "full12-s0": "51af0d9"
+  },
+  "events": {
+   "full12-s0": 331
+  },
+  "release": "trace-full12-51af0d9",
+  "runs": [
+   "full12-s0"
+  ],
+  "sha256": {
+   "trace-full12-s0.jsonl.zst": "62e2cd4d9054285c1e2cdfda6e50c9c1cfcf45f5a12aa06bfaa3a32823c9bc5f"
+  },
+  "uploaded": "2026-09-10"
+ },
  "nocap": {
   "bytes_raw": {
    "nocap-s0": 198836

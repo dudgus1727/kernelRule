@@ -65,6 +65,7 @@ F3hg-p8-d75-a  the human_guided seed
 | `F3rw-p8-p3` | 6 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 5~6~7 | a6000 | `?` | — | — | — | a campaign stopped at r4~r6 by patience 3 (D-131) |
 | `F3rw-p8-pow` | 3 | 19/F3 | rule_writer-try05 | 8 | pow | cma/1/300 | 12 | a6000 | `?` | — | 1.0839 | expressive-regret.json | ⛔ retired — p8 and yet CMA. To be re-measured |
 | `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | prod | cma/1/300 | 12 | a6000 | `?` | — | 1.0840 | expressive-regret.json | ⛔ retired — p8 and yet CMA. To be re-measured |
+| `full12` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `51af0d9` | trace-full12-51af0d9 | — | — | ★ the first full 12 rounds under the new design (D-153) — 1 seed, fold 0, 3-term seed. ⚠️ 17 of its 18 refusals are the AST node cap. Do not read its numbers |
 | `luna` | 3 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
 | `lunaNAMES` | 6 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
 | `nocap` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 2 | a6000 | `131d612` | trace-nocap-131d612 | — | — | ★ a behaviour check, not a result (D-152) — 1 seed x 2 rounds, fold 0, 3-term seed, **after the live cap in the schema validator was removed**. Do not read its numbers |
