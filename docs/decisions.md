@@ -92,6 +92,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-148](#d-148-결정-기록을-147개에서-70개로-접었다-2026-09-09)  결정 기록을 147개에서 70개로 접었다 (2026-09-09)
 - [D-149](#d-149-렌더링-리뷰-다섯-수정-2라운드-배선-실측-2026-09-09)  렌더링 리뷰 다섯 수정 + 2라운드 배선 실측 (2026-09-09)
 - [D-150](#d-150-파라미터-상한과-한-번에-하나-를-없앤다-2026-09-09)  파라미터 상한과 "한 번에 하나" 를 없앤다 (2026-09-09)
+- [D-151](#d-151-없는-8-의-출처-출력-스키마의-w0-설명이었다-2026-09-10)  없는 "8" 의 출처 — **출력 스키마의 `w0` 설명이었다** (2026-09-10)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -5381,3 +5382,123 @@ rule_editor  12  ★ 14,238           ★ 4,186
 
 ⚠️ 잔재 때문에 다시 돌린 두 실행은 `runs/x-uncapped-pre7eddfde` ·
 `x-uncapped-pre32a53ec` 로 남겼다 — 지우지 않았고, `x-` 라 표에 안 들어간다.
+
+## D-151  없는 "8" 의 출처 — **출력 스키마의 `w0` 설명이었다** (2026-09-10)
+
+D-150 의 실측에서 제안 12개가 전부 `len(w0) = 8` 이었고 `changes` 여섯 개가
+**입력에 없는 제약**을 인용했다. 원인을 재서 찾았다.
+
+### 1. ★ 찾았다 — `schemas._desc_w0`
+
+```
+"Initial weights. … The length must equal the largest index the code
+ references + 1. ★ At most 8 **per execution path**, summed with numeric
+ literals, so literals reduce it — except comparison constants in branch
+ conditions"
+```
+
+D-150 이 검사기·프롬프트·`_desc_code` 에서 상한을 뺐는데 **`_desc_w0` 하나를
+빠뜨렸다.** `pydantic-ai` 는 필드 설명을 **도구 스키마로 모델에게 그대로
+넘긴다** — 그것이 D-107 이 말한 네 번째 면이고, 이번이 그 **다섯 번째
+사례**다.
+
+### 2. 모델에게 직접 물었다 (§3-1, LLM 2회)
+
+같은 시스템·사용자 프롬프트에 한 줄만 덧붙였다 — "쓸 수 있는 항과 가중치가
+몇 개이고, 그 제한은 입력의 어디서 오는가? 인용하라."
+
+```
+스키마를 붙였을 때
+  "There is no fixed cap on total terms or weights; this round permits up to
+   8 terms/weight uses per execution path. ★ The limit comes from the
+   output-schema requirement: “At most 8 **per execution path**”"
+스키마를 뺐을 때 (대조)
+  "★ There is no fixed limit on the number of terms or weights."
+  그리고 우리 문장을 인용한다 — "There is no cap on how many terms or
+  weights you may use"
+```
+
+**모델이 출처를 그대로 인용했다.** 사전 지식이 아니라 입력이었다.
+
+### 3. 입력 경로 전수 조사 (§3-5, LLM 0회)
+
+`rule_editor` 호출 하나의 전체 입력(18,274자)의 **모든 숫자**를 훑었다.
+
+```
+시스템 프롬프트   예산으로 읽힐 숫자 0
+                 ⚠️ 다만 인덱스 구멍 예시가 "w[0] and w[8] … len(w0) = 9 —
+                    rejected" 다. 대충 읽으면 "9는 거부" -> "8이 최대" 로
+                    읽힐 수 있는 자리다 (고치지는 않았다 — 그 예시는 구멍을
+                    설명하는 데 필요하다)
+사용자 프롬프트   "parent rule: 7 terms / 7 weights" 뿐
+진단 리포트       규칙 크기 언급 없음
+피처 목록         19개. 개수를 지시하는 문장 없음
+예시 파일         rule_known 5항 · rule_other_domain 4항 — 8항 예시는 없다
+Analyst 가설      개수 언급 없음
+★ 출력 스키마     ★ 여기 있었다 (§1)
+```
+
+### 4. 프롬프트 위생 (§4)
+
+```
+지웠다   "There is no cap" 두 곳 — ★ 부정문이 부정 대상을 활성화한다
+         "## The parent's size" 절 — 개수를 제목으로 세우면 지킬 값이 된다
+         "The cap is 800 AST nodes" 의 cap 표현 (검사는 그대로 산다)
+         "Full text, not a diff." 중복 · 분기 예시 중복 · Split 문단 중복
+모았다   np.where 설명을 절대 규칙 1 한 곳으로 — 언제 쓰고 언제 나쁜지 함께
+한 방향  "no more" / "leave out what you cannot explain"
+         -> "설명할 수 있는 항을 써라" (줄이는 쪽이 기본으로 읽히지 않게)
+```
+
+렌더링: analyze 3,732 · feature 3,490 · rule_writer 8,723 ·
+rule_editor **7,922** (-727).
+
+### 5. 대조 (§3-3 · §3-4 · §3-2)
+
+```
+                              len(w0)              changes 의 "eight/budget"
+7eddfde  스키마 + 프롬프트 8    8 x 12               11/12
+32a53ec  스키마만 남음          8 x 12                6/12
+1ecdd56  ★ 스키마도 제거        8 x 6                 3/6     ← nocount
+1ecdd56  ★ + 3항 씨앗           ★ 6 7 5 6 7 6         ★ 0/6   ← seed3
+```
+
+★ **씨앗을 3항으로 바꾸니 8이 사라졌다.** 5~7이 나오고 개수를 말하는
+`changes` 가 하나도 없다.
+
+⚠️ 첫 `seed3` 시도는 **무효다.** `--seed-from` 만 주면 F3 가 stage 2 에서
+손 씨앗으로 덮어쓴다 — `--stage 3` 을 같이 줘야 한다. 프롬프트를 확인해
+부모가 7항인 것을 보고 알았다. 무효 실행은 `runs/x-seed3-void` 로 남겼다.
+
+### 6. ★ 판단과 근거
+
+```
+★ "eight" 이라는 **말**의 출처는 출력 스키마다 — 모델이 그 줄을 인용했고,
+  빼면 "제한 없다" 고 답한다. 이것은 가렸다
+★ **만들어내는 가중치 수**는 부모를 따라간다 — 7항 부모에서 8, 3항 부모에서
+  5~7. 이것도 가렸다
+⚠️ 스키마를 뺀 뒤에도 7항 부모에서 3/6 이 "eight-term budget" 을 말한다.
+  그것이 부모(7)+1 을 사후에 정당화하는 말인지, 남은 사전 지식인지는
+  ★ 이 표본(6개)으로 못 가른다
+```
+
+**"부모가 8이라 따라갔다" 로 돌아간 것이 아니다** — 인용의 출처는 스키마이고
+(부모가 7일 때도 모델은 8을 인용했다), 여기서 부모가 정하는 것은 **개수**다.
+둘은 다른 질문이고 둘 다 쟀다.
+
+### 7. 다음에 볼 자리
+
+```
+[ ] 1라운드 6제안은 작다 — 라운드를 늘리면 개수가 자라는지
+[ ] 인덱스 구멍 예시의 "len(w0) = 9 rejected" 를 다른 형태로 쓸 수 있는지
+```
+
+### 8. 릴리즈
+
+```
+trace-nocount-1ecdd56   nocount-s0 (스키마·부정문 제거 후, 손 씨앗 7항)
+trace-seed3-1ecdd56     seed3-s0   (같은 커밋, ★ 3항 씨앗)
+둘 다 트레이스 축약 없음 · .sha256 동반
+```
+
+⚠️ `runs_table --check` 는 여전히 `D146r` 하나로 빨갛다 — 이 작업 전부터다.

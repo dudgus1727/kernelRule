@@ -107,6 +107,12 @@ NOTES = {
     "uncapped": "★ a behaviour check, not a result (D-150) — 1 seed x 2 "
                 "rounds, fold 0, with the parameter cap removed. Do not read "
                 "its numbers",
+    "nocount": "★ a contrast, not a result (D-151) — 1 seed x 1 round, fold "
+               "0, after the size sentences were taken out of every surface. "
+               "Do not read its numbers",
+    "seed3": "★ a contrast, not a result (D-151) — the same round with a "
+             "**3-term seed**, to see whether len(w0) follows the parent. Do "
+             "not read its numbers",
 }
 #: The prefixes dropped from the table. **They are not deleted** — they are
 #: only marked by name.
