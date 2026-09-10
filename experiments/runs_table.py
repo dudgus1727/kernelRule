@@ -113,6 +113,9 @@ NOTES = {
     "seed3": "★ a contrast, not a result (D-151) — the same round with a "
              "**3-term seed**, to see whether len(w0) follows the parent. Do "
              "not read its numbers",
+    "archive": "★ 12 rounds with the archive rebuilt (D-155) — 1 seed, fold "
+               "0, 3-term seed. New population, cut line and axes. Do not "
+               "read its numbers",
     "ast3000": "★ 12 rounds with the AST node cap at 3000 (D-154) — 1 seed, "
                "fold 0, 3-term seed. Refusals 3/72, none of them the cap. Do "
                "not read its numbers",

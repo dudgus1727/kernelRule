@@ -51,6 +51,28 @@
   },
   "uploaded": "2026-09-06"
  },
+ "archive": {
+  "bytes_raw": {
+   "archive-s0": 1506870
+  },
+  "bytes_zst": {
+   "archive-s0": 55453
+  },
+  "commits": {
+   "archive-s0": "06c7c7b"
+  },
+  "events": {
+   "archive-s0": 343
+  },
+  "release": "trace-archive-06c7c7b",
+  "runs": [
+   "archive-s0"
+  ],
+  "sha256": {
+   "trace-archive-s0.jsonl.zst": "1a25318a13532c7816921b920c2221e7e1fa8db652a96ae29cb9d24c797183f7"
+  },
+  "uploaded": "2026-09-10"
+ },
  "ast3000": {
   "bytes_raw": {
    "ast3000-s0": 1411672
