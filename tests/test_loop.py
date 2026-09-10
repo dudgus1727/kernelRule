@@ -34,13 +34,54 @@ def test_cell_axes_are_27_cells():
 
 def test_specialist_survives_even_with_bad_overall():
     """★ Even with a poor overall score, **best in one region is kept
-    alive** (§13.1)."""
+    alive** (§13.1).
+
+    ⚠️ 2026-09-10 (D-155): a specialist must also clear the cut line — the
+    archive keeps different **kinds**, not bad rules. Both of these are
+    inside the top fraction of the population.
+    """
     a = Archive()
+    for i in range(8):
+        a.consider(_elite(regret=1.30 + 0.02 * i, short=1.2 + 0.05 * i,
+                          long=1.5 - 0.05 * i, rid=f"mid{i}"))
     a.consider(_elite(regret=1.12, short=1.20, long=1.10, rid="all"))
-    won = a.consider(_elite(regret=1.24, short=1.02, long=1.40, rid="shortspec"))
-    assert "new_cell" in won, "the short-shape specialist was discarded"
+    won = a.consider(_elite(regret=1.13, short=1.02, long=1.40,
+                            rid="memspec"))
+    assert won, "the memory-band specialist was discarded"
     assert a.best.rule_id == "all"
-    assert any(e.rule_id == "shortspec" for e in a.cells.values())
+    assert any(e.rule_id == "memspec" for e in a.cells.values())
+
+
+def test_a_bad_rule_does_not_take_a_cell():
+    """★ The archive is where different kinds live, not where the worst is
+    stored (D-155)."""
+    a = Archive()
+    for i in range(9):
+        a.consider(_elite(regret=1.10 + 0.01 * i, rid=f"g{i}"))
+    n_before = a.n_cells
+    won = a.consider(_elite(regret=1.60, short=1.9, long=1.3, rid="bad"))
+    assert not won, "a rule far below the cut line took a cell"
+    assert a.n_cells == n_before
+    assert all(e.rule_id != "bad" for e in a.cells.values())
+
+
+def test_the_population_is_every_rule_scored():
+    """★ The boundaries come from everything scored, not from the elites
+    that are alive (D-155).
+
+    With the live elites as the population it fed back on itself: a good
+    candidate could not get in, so the population did not change, so the
+    boundaries did not move, so the next good candidate could not get in.
+    """
+    a = Archive()
+    for i in range(6):
+        a.consider(_elite(regret=1.40 - 0.01 * i, rid=f"x{i}"))
+    assert len(a._seen_keys) == 6
+    seen, cells = a.n_seen, a.n_cells
+    a.consider(_elite(regret=1.90, rid="refused"))
+    assert a.n_seen == seen + 1, "a refusal must still enter the population"
+    assert len(a._seen_keys) == 7
+    assert a.n_cells == cells
 
 
 def test_noise_tolerance_blocks_meaningless_updates():
@@ -324,16 +365,27 @@ def test_balance_check_is_strictable():
         check_balance(Split("train", tuple(tiny)), hw, strict=True)
 
 
-def test_cell_axes_use_roofline_regimes():
-    """★ The cell axes are the **roofline** (D-144).
+def test_cell_axes_are_not_all_scores():
+    """★ The three axes (D-155): how good · how complex · which band.
 
-    The old axes were `code_len` + the size regime (SOL<0.5ms). D-143 showed
-    that threshold could not be defended, and D-144 swapped the axes.
+    ⚠️ They used to be `mem_objective` · `comp_objective` · `all_objective`
+    — **three scores**. A good rule was top-band on all three and landed in
+    `(0,0,0)`, while bad rules scattered and took cells of their own; at
+    D-154, 4 of 5 held cells were rules at regret 1.29~1.41 and the archive
+    stopped moving for five rounds.
     """
     from kernelrule.core.archive import CELL_AXIS_NAMES
 
-    assert set(CELL_AXIS_NAMES) == {"mem_objective", "comp_objective",
-                                    "all_objective"}
+    assert set(CELL_AXIS_NAMES) == {"regret", "n_weights", "regime_skew"}
+
+
+def test_regime_skew_keeps_its_sign():
+    """★ `regime_gap` is absolute, so a memory specialist and a compute
+    specialist share a cell. The axis is the **signed** one (D-155)."""
+    mem_spec = _elite(regret=1.2, short=1.05, long=1.40)
+    comp_spec = _elite(regret=1.2, short=1.40, long=1.05)
+    assert mem_spec.regime_gap == pytest.approx(comp_spec.regime_gap)
+    assert mem_spec.regime_skew < 0 < comp_spec.regime_skew
 
 
 def test_regime_gap_is_exposed():

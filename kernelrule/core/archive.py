@@ -49,24 +49,52 @@ from pathlib import Path
 
 __all__ = ["Archive", "Elite", "CELL_AXIS_NAMES", "N_QUANTILES"]
 
-#: ★ The three cell axes (2026-09-08, D-144).
+#: ★ The three cell axes (2026-09-10, D-155).
 #:
 #: ```
-#: old   code_len · short_objective(SOL<0.5ms) · long_objective   4x4x4
-#: ★ new mem_objective · comp_objective · all_objective           3x3x3
+#: 2026-09-08 (D-144)  mem_objective · comp_objective · all_objective
+#: ★ now               regret · n_weights · regime_skew
 #: ```
 #:
-#: The bands are cut by `t_memory > t_compute` (a comparison of the two
-#: roofline lower-bound terms) — **no arbitrary threshold** such as
-#: `SOL 0.5 ms` is used (D-143 showed that threshold cannot be defended).
+#: ⚠️ **All three of the old axes were scores.** A good rule is in the top
+#: band of all three and lands in `(0,0,0)`; a bad one scatters and takes a
+#: cell of its own — the grid ran backwards, spending its cells on bad
+#: rules. Measured at D-154: 4 of the 5 held cells were rules at regret
+#: 1.29~1.41 while every good proposal (1.10~1.14) fell into the one cell
+#: that already held 1.1002, and the archive stopped moving for five rounds.
 #:
-#: `all_objective` was confirmed not to be redundant — within the same
-#: (mem, comp) cell, the overall band differed in 13 of 16 cells.
-CELL_AXIS_NAMES = ("mem_objective", "comp_objective", "all_objective")
+#: ```
+#: regret       how good it is
+#: n_weights    how complex it is
+#: regime_skew  mem - comp: which band it leans to
+#:              band 0 = better on memory · 1 = balanced · 2 = better on
+#:              compute
+#: ```
+#:
+#: ★ None of the three depends on which features exist, so a FeatureWriter
+#: run that invents new axes needs no human to re-map them.
+#:
+#: ⚠️ The path count is **not** an axis — it correlates with `n_weights` at
+#: r = +0.867 (measured on the D-154 run), so it would be the same axis
+#: twice.
+CELL_AXIS_NAMES = ("regret", "n_weights", "regime_skew")
 
 #: Bands per axis. ★ Dynamic tertiles — **there are no absolute
-#: boundaries** (see below).
+#: boundaries** (see below). ⚠️ 3 is arbitrary.
 N_QUANTILES = 3
+
+#: ★ Only the top fraction by the acceptance key may enter the archive
+#: (D-155).
+#:
+#: The archive is where **different kinds** are kept, not where bad rules
+#: are kept. Without a cut the lowest band is forced to hold whatever is
+#: worst, and those rules then occupy cells and are handed out as parents.
+#:
+#: ⚠️ **0.30 is arbitrary.** It was not swept. On the D-154 data it lets
+#: 1 of 6 rules in at r0 and 20 of 69 by r11, and the line keeps falling as
+#: the population improves — that is the property being bought, not the
+#: number.
+TOP_FRACTION = 0.30
 
 
 @dataclass
@@ -107,6 +135,21 @@ class Elite:
         """
         return abs(self.comp_objective - self.mem_objective)
 
+    @property
+    def n_weights(self) -> int:
+        """Cell axis 2 — how complex the rule is (D-155)."""
+        return len(self.w)
+
+    @property
+    def regime_skew(self) -> float:
+        """Cell axis 3 — **signed**, unlike `regime_gap` (D-155).
+
+        Negative means it does better on the memory band, positive on the
+        compute band. The sign is the point: `regime_gap` puts a
+        memory-specialist and a compute-specialist in the same cell.
+        """
+        return self.mem_objective - self.comp_objective
+
     def to_dict(self) -> dict:
         """★ `cell` cannot be built here — the tertiles are decided by the
         **population**. `Archive.dump` fills in the cell at that moment
@@ -144,6 +187,16 @@ class Archive:
         #   In exchange the cells fill evenly. When the boundaries move,
         #   **every held elite is re-placed** (`_consider_quantile`).
         self.cells: dict[tuple, Elite] = {}
+        #: ★ The tertiles are computed from **every rule ever scored**, not
+        #: from the elites that happen to be alive (D-155). With the live
+        #: elites as the population the thing fed back on itself: a good
+        #: candidate could not get in, so the population did not change, so
+        #: the boundaries did not move. Only the axis values are kept — three
+        #: floats per rule, 69 rules over 12 rounds.
+        self._seen_axes: list[tuple[float, ...]] = []
+        #: The acceptance key of every rule ever scored. The cut line is a
+        #: quantile of this.
+        self._seen_keys: list[float] = []
         self.best: Elite | None = None
         self.history: list[dict] = []
         self.n_seen = 0
@@ -175,58 +228,65 @@ class Archive:
         """
         return self.noise_tol if self.select_by == "regret" else 0.0
 
-    def _quantile_cells(self, pool: list[Elite]) -> dict:
-        """★ Sorts the held elites + the candidate **by the per-regime
-        values** and assigns quantile cells.
+    def _boundaries(self) -> list[tuple[float, ...]]:
+        """★ The tertile boundaries per axis, from **every rule scored so
+        far** (D-155).
 
-        ⚠️ What is sorted are the three of `CELL_AXIS_NAMES`, and those
-        values are **always per-regime regret** (`ev.at(1, mask=...)`). That
-        holds even when the objective is `rank` — exactly as designed:
-        **the axes are the diversity device and acceptance sets the goal**
-        (D-101). It was first written as "sorted by the objective", which
-        was inaccurate (corrected in D-104).
-
-        The point is that there are no boundary values — absolute boundaries
-        are set at the scale of regret, so when the value distribution moves
-        everything piles into one cell. The archive holds at most 64, so
-        sorting is free.
-
-        **Ties share a cell** (`argsort(argsort(.))` is not used, D-41).
+        There are no absolute boundaries — set at the scale of regret they
+        stop meaning anything as the whole population improves (D-42's third
+        candidate: 2 cells occupied, tau -0.093). The price is that a cell
+        means something different every round, so **every held elite is
+        re-placed** whenever they move.
         """
-        n = len(pool)
-        out: dict[int, tuple] = {}
-        axes = {}
-        for name in CELL_AXIS_NAMES:
-            vals = [getattr(x, name) for x in pool]
-            order = sorted(range(n), key=lambda i: (vals[i], i))
-            rank = [0] * n
-            r = 0
-            for pos, i in enumerate(order):
-                if pos and vals[i] > vals[order[pos - 1]]:
-                    r = pos
-                rank[i] = r
-            axes[name] = [min(N_QUANTILES - 1, x * N_QUANTILES // max(n, 1))
-                          for x in rank]
-        for i, _x in enumerate(pool):
-            out[i] = tuple(axes[nm][i] for nm in CELL_AXIS_NAMES)
+        out = []
+        for j in range(len(CELL_AXIS_NAMES)):
+            vals = sorted(v[j] for v in self._seen_axes)
+            if not vals:
+                out.append(())
+                continue
+            n = len(vals)
+            out.append(tuple(vals[min(n - 1, (n * q) // N_QUANTILES)]
+                             for q in range(1, N_QUANTILES)))
         return out
 
+    def _cell_of(self, e: Elite, bounds: list[tuple[float, ...]]) -> tuple:
+        """The band per axis. **Ties fall in the lower band** — the same
+        rule as before (D-41), a value equal to a boundary does not create a
+        cell of its own."""
+        cell = []
+        for j, name in enumerate(CELL_AXIS_NAMES):
+            v = getattr(e, name)
+            band = 0
+            for b in bounds[j]:
+                if v > b:
+                    band += 1
+            cell.append(min(N_QUANTILES - 1, band))
+        return tuple(cell)
+
+    def _cut_line(self) -> float:
+        """★ The acceptance key a rule must beat to enter the archive at all
+        (D-155). `inf` until something has been scored."""
+        if not self._seen_keys:
+            return float("inf")
+        vals = sorted(self._seen_keys)
+        k = max(1, int(TOP_FRACTION * len(vals)))
+        return vals[k - 1]
+
     def _consider_quantile(self, e: Elite) -> list[str]:
-        """Re-assigns the cells and keeps only the best per cell. If `e`
-        survives, it won."""
+        """Re-places every elite against the current boundaries and keeps
+        the best per cell. If `e` survives, it won."""
+        bounds = self._boundaries()
         pool = [*self.cells.values(), e]
-        cells = self._quantile_cells(pool)
-        best: dict[tuple, int] = {}
-        for i, x in enumerate(pool):
-            c = cells[i]
+        best: dict[tuple, Elite] = {}
+        for x in pool:
+            c = self._cell_of(x, bounds)
             cur = best.get(c)
-            if cur is None or self._key(x) < self._key(pool[cur]):
-                best[c] = i
-        new = {c: pool[i] for c, i in best.items()}
+            if cur is None or self._key(x) < self._key(cur):
+                best[c] = x
         won: list[str] = []
-        if e in new.values():
-            won.append("new_cell" if len(new) > len(self.cells) else "cell")
-        self.cells = new
+        if e in best.values():
+            won.append("new_cell" if len(best) > len(self.cells) else "cell")
+        self.cells = best
         if won:
             self.last_new_cell_round = e.round
         return won
@@ -240,12 +300,20 @@ class Archive:
         where only the first candidate got in unchecked (a test caught it).
         """
         self.n_seen += 1
-        self._key(e)          # ★ the check. The value is used again below
+        k = self._key(e)      # ★ the check. The value is used again below
+        # ★ The population every boundary is computed from is **everything
+        #   scored**, so it grows even when the candidate is refused (D-155).
+        self._seen_axes.append(tuple(float(getattr(e, nm))
+                                     for nm in CELL_AXIS_NAMES))
+        self._seen_keys.append(k)
         won: list[str] = []
         if self.best is None or self._key(e) < self._key(self.best) - self._tol:
             won.append("best")
             self.best = e
-        won.extend(self._consider_quantile(e))
+        # ★ Only the top `TOP_FRACTION` may take a cell. The overall best is
+        #   decided above and is not subject to it — the best is never lost.
+        if k <= self._cut_line():
+            won.extend(self._consider_quantile(e))
         # ★ The tertile cell is decided by the **population**, so an Elite
         #   alone does not know its own cell. What is recorded is the cell
         #   it actually landed in. An empty tuple if it was pushed out.
@@ -255,7 +323,10 @@ class Archive:
         self.history.append({"round": e.round, "rule_id": e.rule_id,
                              "regret": e.regret, "rank_loss": e.rank_loss,
                              "select_by": self.select_by, "cell": list(c),
-                             "won": won, "changes": e.changes})
+                             "won": won, "changes": e.changes,
+                             "cut_line": self._cut_line(),
+                             "axes": {nm: getattr(e, nm)
+                                      for nm in CELL_AXIS_NAMES}})
         return won
 
     # -- Parent selection (§13.3) -----------------------------------------
@@ -290,6 +361,7 @@ class Archive:
         return {"n_cells": self.n_cells, "n_seen": self.n_seen,
                 "n_accepted": self.n_accepted,
                 "best_regret": self.best.regret if self.best else float("nan"),
+                "cut_line": self._cut_line(),
                 "last_new_cell_round": self.last_new_cell_round}
 
     def dump(self, path: str | Path) -> None:
@@ -305,4 +377,8 @@ class Archive:
             for c, e in self.cells.items():
                 d = e.to_dict()
                 d["cell"] = list(c)
+                # ★ The raw axis values beside the cell (D-155) — without
+                #   them "why did the cells come out that way" cannot be read
+                #   back from the artefact.
+                d["axes"] = {nm: getattr(e, nm) for nm in CELL_AXIS_NAMES}
                 fh.write(json.dumps(d, ensure_ascii=False) + "\n")

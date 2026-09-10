@@ -1294,8 +1294,16 @@ class RoundLoop:
             #   current placement is looked up and written down (D-144).
             _cell = next((list(k) for k, v in self.archive.cells.items()
                           if v is e), None)
+            # ★ 2026-09-10 (D-155): the **raw axis values** go in beside the
+            #   cell. Without them the trace shows which cell a rule landed
+            #   in but not why, and "the cells are spent on bad rules" took a
+            #   re-analysis of the code to see.
+            from kernelrule.core.archive import CELL_AXIS_NAMES as _AX
             self.trace.ev("archive", round=r, rule=e.rule_id,
-                          accepted=bool(won), cell=_cell, regret=e.regret)
+                          accepted=bool(won), cell=_cell, regret=e.regret,
+                          axes={nm: getattr(e, nm) for nm in _AX},
+                          mem=e.mem_objective, comp=e.comp_objective,
+                          cut_line=self.archive.summary()["cut_line"])
             if won:
                 res.n_accepted += 1
             else:
