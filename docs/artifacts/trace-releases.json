@@ -1,4 +1,26 @@
 {
+ "F1new": {
+  "bytes_raw": {
+   "F1new-s0": 2258011
+  },
+  "bytes_zst": {
+   "F1new-s0": 58798
+  },
+  "commits": {
+   "F1new-s0": "605a380"
+  },
+  "events": {
+   "F1new-s0": 346
+  },
+  "release": "trace-F1-605a380",
+  "runs": [
+   "F1new-s0"
+  ],
+  "sha256": {
+   "trace-F1new-s0.jsonl.zst": "ddceaff1c77a8ebb668f1784bf02d0f32c2d4f23534612c5d346fc5b558e7f4f"
+  },
+  "uploaded": "2026-09-10"
+ },
  "F3rw-p8-nan": {
   "bytes_raw": {
    "F3rw-p8-nan-s0": 4643730,

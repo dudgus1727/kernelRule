@@ -1079,7 +1079,7 @@ class RoundLoop:
                           #   `needs_new_feature` (both names, D-81). Reading
                           #   a name that exists nowhere wrote null every
                           #   time, and under F1 30 of 36 hypotheses ask for
-                          #   a feature (D-160)
+                          #   a feature (D-159)
                           needs_feature=[_requirement_of(h) or None
                                          for h in hyps],
                           n_replaced=len(replaced))

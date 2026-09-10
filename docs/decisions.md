@@ -100,6 +100,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-156](#d-156-우리가-정한-축을-모델에게-안-먹인다-재사용-허용-2026-09-10)  우리가 정한 축을 모델에게 안 먹인다 + 재사용 허용 (2026-09-10)
 - [D-157](#d-157-큰-규칙이-옮겨지나-a-이식-b-재적합-2026-09-10)  큰 규칙이 옮겨지나 — (a) 이식 · (b) 재적합 (2026-09-10)
 - [D-158](#d-158-벤더-기준선을-네-gpu-전부에-5090-값은-우리-버그였다-2026-09-10)  벤더 기준선을 네 GPU 전부에 + ⛔ 5090 값은 우리 버그였다 (2026-09-10)
+- [D-159](#d-159-f1-을-처음-끝까지-돌렸다-피처-19개-씨앗-19가중치-12라운드-2026-09-10)  F1 을 처음 끝까지 돌렸다 — 피처 19개 · 씨앗 19가중치 · 12라운드 (2026-09-10)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -6373,3 +6374,196 @@ h100    1.0526 (r5)    1.1522     1.1921       1.0937   ★ 전부 아래
 문턱이었다.
 
 ⚠️ 1시드 산출물(r5·r11)이라는 유보는 그대로다.
+
+## D-159  F1 을 처음 끝까지 돌렸다 — 피처 19개 · 씨앗 19가중치 · 12라운드 (2026-09-10)
+
+> 재현: `python3 experiments/f1_pipeline.py F1 --n-seeds 1 --rounds 12 --fold 0
+> --tag F1new` (약 62분, `--stage 3` 을 주지 않는다) ·
+> 릴리즈 `trace-F1-605a380` (자산 15개 + sha256 15개) · 커밋 `605a380`
+
+지금까지 12라운드 실행이 전부 F3(사람이 쓴 레지스트리) 였고 그래서
+FeatureWriter 와 RuleWriter 는 **한 번도 안 돌았다**. §1 에서 원시 필드
+설명을 채우고(33개 전부) F1 을 한 번 돌렸다.
+
+### 1. FeatureWriter 출력 품질 (§3-1)
+
+```
+제안 20 · 채택 19 · 거부 1 (math.log1p — 샌드박스가 math 를 안 준다)
+expected_range 가 기본값 [0,1]     ★ 15/20
+rationale 가 빈 것                  0/20  (최소 265자 · 중앙 345자)
+unit 이 기본값 "dimensionless"      5/20  (ratio 12 · fraction 2 ·
+                                          instructions/FLOP 1)
+direction 이 기본값 higher_is_worse 20/20 ★ 기본값과 구분이 안 된다
+```
+
+★ **§1 에서 설명을 채운 필드를 실제로 쓴다.** 33개 중 27개가 최소 한 번
+쓰였다.
+
+```
+cfg.tile_m/tile_n 11 · p.K 8 · cfg.tile_k 6 · cfg.split_k 6 ·
+★ cfg.max_blocks_per_sm 4 · ★ cfg.split_k_mode 3 · cfg.threads 3 ·
+hw.l2_bytes 2 · ★ cfg.pipeline_kind 1 · ★ cfg.inst_total 1 ·
+cfg.spill_bytes 1 · hw.regs_per_sm 1 · hw.ridge_point 1 ·
+p.acc_bytes_per_element 1 · cfg.align_a/b/c 각 1
+안 쓰인 6개  p.dtype · p.acc_dtype · p.layout_a · p.layout_b ·
+             hw.peak_tflops_f16 · hw.bandwidth_gbps
+```
+
+`hw.peak_tflops_f16` 과 `hw.bandwidth_gbps` 를 안 쓴 것은 **이미 나눠 놓은
+`hw.ridge_point` 를 대신 썼기** 때문이다 (roofline_memory_deficit).
+
+### 2. 사람이 쓴 축과 얼마나 겹치나 — ★ 이름이 아니라 값으로 (§3-2)
+
+레지스트리는 지금 **27개**(설정 수준 19 + 형상 수준 8)다. 지시서의 "24개"
+는 `log_sol_ms` 를 빼기 전(D-156)의 수다 — 옛 수를 지우지 않고 여기 적어
+둔다.
+
+> 재현: 표의 앞 4형상(62,370행)에서 두 집합의 열을 만들어 Pearson·Spearman.
+> `|r| > 0.95` 가 **둘 다**여야 "겹친다"(§8.4 와 같은 기준).
+
+```
+★ 겹친다 4/19
+  global_load_redundancy_ratio  ~ traffic_amplification   1.000 / 1.000
+  occupancy_deficit             ~ occupancy_deficit       1.000 / 1.000  ★ 이름까지 같다
+  register_file_footprint_ratio ~ reg_pressure            1.000 / 1.000
+  shared_memory_pressure        ~ smem_pressure           1.000 / 1.000
+가까우나 못 미친다
+  output_stride_exposure_fraction ~ traffic_amplification 0.913 / 0.952
+  cta_wave_pressure               ~ log_grid_tiles        0.906 / 0.926
+  local_spill_traffic_ratio       ~ spill_magnitude       0.892 / 1.000  ★ 순서만 같다
+새 축 (가장 가까운 것도 |pearson| < 0.75)
+  mainloop_iteration_frequency 0.360 · pipeline_startup_drain_fraction 0.488 ·
+  serial_reduction_work_fraction 0.529 · l2_working_set_pressure 0.560 ·
+  wave_tail_imbalance 0.698 · shared_operand_traffic_ratio 0.709 ·
+  roofline_memory_deficit 0.715 · parallel_reduction_traffic_ratio 0.726 ·
+  edge_tile_waste_fraction 0.800(spearman 1.000) · instruction_density 0.830
+  alignment_deficit · k_loop_padding_fraction  ★ 이 표에서 상수라 상관이 정의 안 된다
+★ F1 내부끼리 |pearson| > 0.95 인 쌍은 0개다 — 중복을 스스로 안 만들었다
+```
+
+### 3. 씨앗 단계 (§3-2)
+
+```
+RuleWriter 10회 중 ★ 10회 통과 (359초)
+고른 것  rule_writer-try08 — 학습 regret 로만 고른다 (홀드아웃 안 본다)
+  항 19 · 가중치 19 · ★ 경로 2 (`if p.alignment_deficit == 0`) · 학습 1.1027
+10개 분포  가중치 14~23 · fit_regret 1.1027~1.2296 · 8개가 분기를 하나 썼다
+```
+
+⚠️ **F3 씨앗(항 7 · 가중치 7)과 나란히 놓을 수 있는 것이 없다.** 최근
+12라운드 F3 실행들(D-153~D-156)은 stage 2 를 안 돌리고 **손 씨앗 3항**을
+넣었고, 파이프라인이 F3 로 stage 2 를 돌린 기록은 `F3rw-p8-old`(A6000,
+항 8, 옛 커밋)와 `F3rw-p8-5090`(5090 표, 항 7)뿐이다. 표도 커밋도 다르다.
+
+### 4. 루프 (§3-3)
+
+```
+ r  제안 len(w0) 중앙  채택  셀   학습     val     격차
+ 0        20.0          2    3  1.0948  1.0931 -0.0017
+ 1        21.5          2    5  1.0948  1.0931 -0.0017
+ 2        22.5          2    4  1.0948  1.0931 -0.0017
+ 3        24.5          1    5  1.0948  1.0931 -0.0017
+ 4        23.0          0    5  1.0948  1.0931 -0.0017
+ 5        22.0          2    5  1.0932  1.0887 -0.0045
+ 6        26.0          0    5  1.0932  1.0887 -0.0045
+ 7        32.0          1    5  1.0865  1.0770 -0.0095
+ 8        30.0          1    5  1.0829  1.0708 -0.0121
+ 9        35.5          1    5  1.0829  1.0708 -0.0121
+10        37.5          1    4  1.0815  1.0600 -0.0214
+11        41.5          2    4  1.0782  1.0592 -0.0190
+★ val 이 마지막 라운드(r11)에서 최고다 — D-156(F3)은 r5 였다
+★ 학습이 r0~r4 다섯 라운드 동안 안 움직인다 (첫 개선이 r5)
+격차는 계속 음수 = val 이 학습보다 좋다. 벌어진다 (-0.0017 -> -0.0190)
+```
+
+```
+분기 축   ★ alignment_deficit 4 · k_loop_padding_fraction 1 — 둘뿐이다
+문턱      alignment_deficit  r0:==0 · r5·r9·r11:<0.5   (거의 안 흔들린다)
+⛔ 그런데 두 축 다 이 표에서 **형상 안에서 상수**다. alignment_deficit 는
+   66형상 전부 상수이고 값이 0 인 형상이 있어 분기가 한쪽으로만 간다
+거부   1/72 (인덱스 구멍 — w0 22개인데 최대 인덱스 20)
+중복   2 · 셀 최대 5/27 · 아카이브 채택 15/69 · ★ r11 에도 2개 채택
+적합기 ★ 72/72 가 CMA — 모든 제안이 19가중치 이상이라 fitter_for 가 넘긴다
+       (config 에 적힌 nelder-mead 는 캠페인 기본값이고 안 쓰인다)
+moved  69/69 = 100%
+LLM    analyze 12 (in 중앙 15,532 · out 2,286) ·
+       rule_editor 72 (in 중앙 5,524 · out 2,116) · ★ feature 0
+벽시계 2,220초 (라운드 142~230초)
+len(w0)  최소 19 · 중앙 24 · 최대 48 — "8" 을 말하는 changes 0/72
+```
+
+★ **FeatureWriter 는 루프 중에 0번 불렸다. 그런데 그것은 모델이 안 물어서가
+아니다.**
+
+```
+가설 36개 중 ★ 30개가 새 피처를 요구했다 (F3 는 0/36 이었다)
+  "shape-level output aspect ratio or normalized M relative to candidate tile height"
+  "explicit pipeline stage count or pipeline-family identifier"
+  "reduction-length or long-reduction shape regime indicator"
+⛔ 그런데 --max-new-features 기본값이 0 이라 그 길이 아예 없다
+   (loop.py:1043 이 `> 0` 일 때만 FeatureWriter 를 부른다)
+```
+
+F1 라이브러리에 **형상 수준 축이 사실상 없다**(2개인데 둘 다 상수)는 것이
+가설로 계속 올라온다. F3 에서는 `log_flops` · `log_min_dim` 같은 것이 이미
+있어서 아무도 안 물었다.
+
+### 5. F3 와 견줄 수 있는 것과 없는 것 (§3-4)
+
+```
+같다     fold 0 분할 · 12라운드 · 제안 6 · 아카이브 3x3x3 · 상한 없음 ·
+         목적 regret · 1시드 · 모델 gpt-5.6-luna
+다르다   ★ 피처 라이브러리(F1 생성 19 vs 사람 27) · ★ 씨앗(생성 19항 vs
+         손 3항) · ★ stage 1·2 를 도는지 · ★ §1 필드 설명 · 커밋
+```
+
+```
+             F1new(605a380)      noregime(c5c196a, F3)
+학습 r0->r11  1.0948 -> 1.0782    1.1281 -> 1.0559
+val 최고      r11 1.0592          ★ r5 1.0472
+아카이브 채택 15                  25
+셀 최대       5/27                8/27
+중복          2                   5
+벽시계        2,220초             1,661초
+len(w0) 중앙  24 (19~48)          21 (4~43)
+```
+
+★ **1시드끼리라 판정하지 않는다.** 경향만 적는다 — 시작점이 F1 쪽이 낮고
+(씨앗이 19항이다) 끝점도 F1 쪽이 높다. 셀 점유와 채택 수는 F1 쪽이 적다.
+
+### 6. §5 에서 드러난 배선 문제 셋
+
+```
+① ★ 트레이스의 hypotheses.needs_feature 가 **모든 실행에서 null 이었다**
+   loop.py:1078 이 h.get("needs_feature") 를 읽는데 그 이름은 어디에도 없다.
+   스키마는 needs_new_feature 이고 정식 접근자는 _requirement_of 다 (D-81).
+   -> 고쳤다. 기록 경로만 바뀐다 (채점 무관)
+② ★ shape_level 판정이 앞 8형상만 본다 (detect_shape_level 의 n_shapes=8)
+   k_loop_padding_fraction 은 66형상 중 3개(K=4097·4098·4100)에서
+   설정 의존인데 그 셋이 전부 8형상 밖이라 형상 수준으로 등록됐다.
+   -> ⚠️ **안 고쳤다.** 표본 수를 바꾸는 것은 이 지시서에 없는 설계 변경이다
+③ ★ 상한을 없앴는데 config 에는 아직 "parameters: 8" 이 찍힌다
+   loop.py:1600 이 parameters=None 일 때 _FITTER_DIM(=8) 로 채운다.
+   runs.md 가 그것을 읽어서 상한 없는 실행도 p8 로 보인다.
+   -> ⚠️ **안 고쳤다.** 기록 의미를 바꾸는 일이라 지시를 받고 한다
+```
+
+확인만 하고 지나간 것:
+
+```
+✅ 새 검사 통과 — 거부 1건은 math.log1p 이고 경로·AST·형상값 목록 위반 0
+✅ regime_skew 가 F1 피처로도 계산된다 (-0.0784 ~ +0.0308, 전부 유한)
+   memory/compute 구분은 roofline 이라 피처와 무관하다 — 확인했다
+✅ log_sol_ms 제거가 F1 경로를 안 건드린다 (거부·경고 0)
+```
+
+### 7. 릴리즈
+
+```
+trace-F1-605a380   자산 30개 (파일 15 + sha256 15)
+  trace-F1new-s0.jsonl.zst (346 이벤트) · system-*.md 넷 (★ feature ·
+  rule_writer 포함) · schema-*.json 넷 · stage1-proposals.jsonl (소스+메타) ·
+  stage1-features.py · stage1-summary.json · stage2-chosen.json ·
+  stage2-candidates.json (10개 전부) · rule_writer-user-prompt-try00.md
+다시 받아 sha256sum -c: ★ 15/15 OK
+```
