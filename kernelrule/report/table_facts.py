@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from kernelrule.core.splits import Split, SplitError, regime_of
+from kernelrule.core.splits import Split, SplitError
 from kernelrule.core.table import PerfTable
 
 __all__ = ["TableFacts", "MIN_SUPPORT"]
@@ -117,16 +117,10 @@ class TableFacts:
              f"top-1 {res.by_k[1]['all']:.3f}   top-3 {res.by_k[3]['all']:.3f}"
              f"   top-8 {res.by_k[8]['all']:.3f}", n)
 
-        # -- Broken down by regime. ★ Size comes first (§30.5) -------------
-        fast = [p for p in shapes if regime_of(p, table.hw) == "short"]
-        slow = [p for p in shapes if regime_of(p, table.hw) == "long"]
-        for group, label in ((fast, "fast regime (SOL<0.5ms)"),
-                             (slow, "slow regime (SOL>=0.5ms)")):
-            if not group:
-                continue
-            r = StaticTopK(table, group, coverage="union").run(ks=(1,))
-            emit(f"  {label}, {len(group):2d} shapes only: top-1 "
-                 f"{r.by_k[1]['all']:.3f}", len(group))
+        # ⚠️ 2026-09-10 (D-156): the per-regime baselines that stood here
+        #   ("fast regime (SOL<0.5ms), 27 shapes only: top-1 1.179") are
+        #   gone. They named our axis, in the same block that is supposed to
+        #   hold **table structure**, not our stratification.
 
         # -- Sharpness of the answer — shapes whose ranking vanishes inside
         #    the noise ------------------------------------------------------

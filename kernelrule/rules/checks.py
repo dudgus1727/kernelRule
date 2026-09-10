@@ -518,18 +518,20 @@ def _touches_weight(node) -> bool:
 
 
 def weight_reuse_message(code: str) -> str | None:
-    """A message if `w[i]` is reused across terms, else `None`.
+    """⛔ **Always `None` since 2026-09-10 (D-156).** Reusing `w[i]` across
+    terms is allowed.
 
-    ★ This one was split out **in order to trigger a retry at the LLM
-    boundary**. The full check walks the AST heavily and needs the list of
-    registered features, whereas reuse can be seen from the code alone. When
-    the schema validator calls this, Pydantic AI feeds the message back to
-    the model and **has it fixed and resubmitted**.
+    The refusal existed to stop a rule going around the parameter budget
+    (§29.4). There has been no budget since D-150, so there is nothing to go
+    around, and `f.a * w[0] + f.b * w[0]` is a claim worth being able to
+    make — "these two carry the same weight".
 
-    While this check lived only in `checks.py`, RuleWriter proposals were
-    silently discarded — the model never heard what was wrong and repeated
-    the same mistake.
+    ⚠️ The function is kept, and kept exported, because
+    `classify_violation` still maps its old wording when reading the
+    `llm_calls/` of runs made before today.
     """
+    return None
+    # -- the old body, unreachable. Kept so the wording above is checkable --
     uses: dict[int, int] = {}
     try:
         tree = ast.parse(code.strip())
@@ -921,13 +923,15 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     #   regret and structural comparison becomes meaningless", and growing
     #   the term count without limit destroys that purpose. The
     #   `len(W0) == max_index + 1` check alone cannot catch it.
-    dup_w = sorted(i for i, c in w_index_uses.items() if c > 1)
-    if dup_w:
-        bad(f"a weight is reused across terms: "
-            f"{[f'w[{i}]x{w_index_uses[i]}' for i in dup_w]}. "
-            f"{sum(w_index_uses.values())} terms on {rep.n_weights} weights "
-            f"— that goes around the literal budget (§29.4). Use a different "
-            f"weight for each term")
+    # ⚠️ 2026-09-10 (D-156): reusing `w[i]` across terms **is allowed now.**
+    #   The refusal existed to stop a rule going around the parameter budget
+    #   (§29.4); there is no budget since D-150, so there is nothing to go
+    #   around. Reuse is a structural claim in itself — `f.a * w[0] + f.b *
+    #   w[0]` says "these two carry the same weight" — and if it scores worse
+    #   the evolution drops it.
+    #   ★ `n_terms` keeps counting **uses**, not indices: it is the archive's
+    #     size axis (D-156 §2-3), and with reuse allowed `len(w0)` no longer
+    #     measures how big a rule is.
     rep.n_terms = sum(w_index_uses.values())
 
     # ⚠️ "refuse when the same expression appears twice" is not added. It

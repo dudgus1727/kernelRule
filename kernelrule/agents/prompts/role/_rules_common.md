@@ -75,9 +75,16 @@ weights are usually positive.
    Two levels of nesting · `if/elif/elif/else` · two sequential `if`s —
    all of those are 4 paths.
 
-6. ★ **Each `w[i]` is used exactly once.** Use a different weight per term.
-   `len(w0)` must equal the largest referenced index + 1, **exactly** — an
-   index you never use is still fitted, so it would be a free parameter.
+6. ★ **`len(w0)` must equal the largest index you use + 1, exactly.**
+   An index you never use is still fitted, so it would be a free parameter.
+
+       s = f.<A> * w[0] + f.<B> * w[8]      ⛔ 1..7 are never used
+       s = f.<A> * w[0] + f.<B> * w[1]      ✅
+
+   The same `w[i]` **may** appear in several terms. That is a claim — "these
+   carry the same weight" — and it costs one coefficient instead of two.
+
+       s = f.<A> * w[0] + f.<B> * w[0]      ✅ the same weight, deliberately
 ```
 
 ## Match the magnitudes

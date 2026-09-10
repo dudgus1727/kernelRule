@@ -376,7 +376,7 @@ def test_cell_axes_are_not_all_scores():
     """
     from kernelrule.core.archive import CELL_AXIS_NAMES
 
-    assert set(CELL_AXIS_NAMES) == {"regret", "n_weights", "regime_skew"}
+    assert set(CELL_AXIS_NAMES) == {"regret", "n_terms", "regime_skew"}
 
 
 def test_regime_skew_keeps_its_sign():

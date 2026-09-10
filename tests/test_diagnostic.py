@@ -103,12 +103,18 @@ def _toy(regret_by_shape):
     return make_table(times)
 
 
-def test_stratification_sentence_follows_the_data():
-    """★ The same template must produce **the opposite sentence on the
-    opposite data**.
+def test_the_report_names_no_regime_axis():
+    """★ The report must not tell the model which axis to look along
+    (D-156).
 
-    A source check is not enough — a conclusion can be nailed inside a
-    computed f-string. It is confirmed by behaviour.
+    It used to print eight bands (`t_sol < 0.5ms`, `waves 1~4`, ...), label
+    every case with its band, and give per-band baselines. Every one of those
+    is **our** axis: the SOL gap was the biggest number in the report, the
+    Analyst read it every round, and the rules branched there.
+
+    ⚠️ This replaces `test_stratification_sentence_follows_the_data`, which
+    checked that the size-gap sentence followed the data. There is no such
+    sentence now.
     """
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.core.noise import NoiseModel
@@ -119,41 +125,33 @@ def test_stratification_sentence_follows_the_data():
                     expected_range=(0.0, 10.0), direction="neutral",
                     vec=lambda df, hw, p: np.arange(len(df), dtype=float),
                     code_hash="x"))
-    reg.add(Feature(name="log_sol_ms", fn=lambda p, hw, c: 0.0,
-                    expected_range=(-30.0, 30.0), direction="neutral",
-                    unit="dimensionless", shape_level=True, code_hash="y"))
     reg.add(Feature(name="is_memory_bound", fn=lambda p, hw, c: 0.0,
                     expected_range=(0.0, 1.0), direction="neutral",
                     unit="dimensionless", shape_level=True, code_hash="z"))
-
-    def build(times):
-        t = make_table(times, noise=NoiseModel.a6000_reference())
-        m = FeatureMatrix(t, reg)
-        return t, m
 
     code = "def score(f, p, hw, w):\n    return f.idx * w[0]\n"
 
     def score(f, p, hw, w):
         return f.idx * w[0]
 
-    # A table where short shapes are bad / where long shapes are bad
     short_bad = {(64, 64, 64): [0.02, 0.10], (4096, 4096, 4096): [2.0, 2.02]}
     long_bad = {(64, 64, 64): [0.02, 0.0202], (4096, 4096, 4096): [2.0, 10.0]}
     texts = []
     for times in (short_bad, long_bad):
-        t, m = build(times)
+        t = make_table(times, noise=NoiseModel.a6000_reference())
+        m = FeatureMatrix(t, reg)
         rep = D.build_report(run_id="toy", table=t, matrix=m, score_fn=score,
                              weights=[-1.0], code=code,
                              train=Split("train", tuple(t.shapes())))
         texts.append(rep.render())
     a, b = texts
     assert a != b, "the data is opposite yet the reports are identical"
-    # The sign of the size gap must be opposite in the two reports
-    import re
-    ga = float(re.search(r"gap ([+-][\d.]+)", a).group(1))
-    gb = float(re.search(r"gap ([+-][\d.]+)", b).group(1))
-    assert ga * gb < 0, (
-        f"the size gap does not follow the data: {ga} vs {gb}")
+    for txt in (a, b):
+        low = txt.lower()
+        for banned in ("t_sol", "0.5ms", "regime", "memory-bound",
+                       "compute-bound", "waves <", "short mainloop",
+                       "stratification", "size_gap"):
+            assert banned not in low, f"the report names an axis: {banned!r}"
 
 
 def test_report_refuses_non_train_split():

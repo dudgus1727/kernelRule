@@ -422,15 +422,26 @@ def is_memory_bound(p: Problem, hw: Hardware, cfg: Config) -> float:
     return 1.0 if roofline_ratio(p, hw, cfg) < 1.0 else 0.0
 
 
-@shape_feature(expected_range=(-25.0, 15.0), direction="neutral")
 def log_sol_ms(p: Problem, hw: Hardware, cfg: Config) -> float:
     """The roofline lower-bound time (log2, ms). **Computed from the
     shape, not measured.**
 
-    A proxy for how short a shape is. Size stratification (§30.4) matters in
-    the metric, but `best_ms` is `ANSWER_COLS` and a rule cannot see it.
-    This is computed from the shape and the hardware alone, so it is known
-    at deployment time too.
+    ⚠️ 2026-09-10 (D-156): **no longer a registered feature.** It used to
+    carry `@shape_feature`, so a rule could branch on `p.log_sol_ms` — and
+    the diagnostic report handed the model the SOL 0.5 ms split every round,
+    so it did. That is **our** axis, chosen in 2026-08, and D-143 had already
+    found it indefensible as a regime boundary. Feeding it back through the
+    report made the model rediscover it every round (the r9 rule of D-155
+    branches on `p.log_sol_ms < -5`, then drifts to `log_flops > 20/40/30`).
+
+    ★ The function stays because the **scoring** path uses it: the canonical
+    procedure refits per regime on this split (`core/canonical.py`,
+    §10.2 · D-69), and every committed number was produced that way.
+    ⚠️ So the axis is gone from what the model sees, **not** from how we
+    score. That asymmetry is deliberate and is written down in D-156.
+
+    If it matters, FeatureWriter can invent it again — and then it is the
+    model's axis, not ours.
     """
     eb = _ebytes(p.dtype)
     t_c = 2.0 * p.M * p.N * p.K / (hw.peak_tflops_f16 * 1e12) * 1e3
@@ -615,10 +626,6 @@ _PHYSICS: dict[str, str] = {
     "arith_intensity":
         "2MNK / bytes moved. A function of the shape alone, so no config can "
         "change it",
-    "log_sol_ms":
-        "Roofline lower-bound time (log2 ms). **Computed from the shape, not "
-        "measured.** The shorter the kernel, the larger the timer tick is "
-        "relatively, blurring the ordering",
     "log_flops":
         "log2(2*M*N*K). The absolute size of the problem",
     "aspect_MN":

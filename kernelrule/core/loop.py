@@ -856,7 +856,8 @@ class RoundLoop:
             w=out["w"], regret=out["regret"],
             mem_objective=out["mem"], comp_objective=out["comp"],
             all_objective=out["all"],
-            code_len=rep.n_nodes, round=len(self.rounds),
+            code_len=rep.n_nodes, code_terms=rep.n_terms,
+            round=len(self.rounds),
             changes=prop.changes, hypothesis_id=prop.hypothesis_id,
             val_regret=out["val_regret"],
             rank_loss=float(out.get("rank_loss", float("nan"))))

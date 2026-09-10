@@ -52,22 +52,12 @@ Proposals were discarded three times in a row on these. **Get them all right
 in one pass.**
 
 ```
-[ ] 1. no w[i] used twice
+[ ] 1. len(w0) == the largest index used + 1, with no gaps
 [ ] 2. no shape constant applied to the accumulated score
-[ ] 3. len(w0) == the largest index used + 1, with no gaps
-[ ] 4. at most 4 execution paths
+[ ] 3. at most 4 execution paths
 ```
 
-On 1: the same **feature** may appear again with a different weight — it is
-the weight index that may not repeat.
-
-```python
-if p.<shape value>:
-    s = s + f.a * w[3]      # ✅ re-weighting the same feature is fine
-```
-
-The reasoning and the rest of the examples are in **"Absolute rules"** above
-(6, 5, 2).
+The reasoning and the examples are in **"Absolute rules"** above (6, 5, 2).
 
 **The safest shape that satisfies all of them:**
 

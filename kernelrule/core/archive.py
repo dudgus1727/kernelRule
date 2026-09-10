@@ -65,19 +65,23 @@ __all__ = ["Archive", "Elite", "CELL_AXIS_NAMES", "N_QUANTILES"]
 #:
 #: ```
 #: regret       how good it is
-#: n_weights    how complex it is
+#: n_terms      how complex it is
 #: regime_skew  mem - comp: which band it leans to
 #:              band 0 = better on memory · 1 = balanced · 2 = better on
 #:              compute
 #: ```
 #:
+#: ⚠️ 2026-09-10 (D-156): axis 2 was `len(w0)`. Reusing a weight across terms
+#: is allowed now, so twenty terms can run on one index and `len(w0)` stops
+#: measuring size. **The term count is the honest measure.**
+#:
 #: ★ None of the three depends on which features exist, so a FeatureWriter
 #: run that invents new axes needs no human to re-map them.
 #:
-#: ⚠️ The path count is **not** an axis — it correlates with `n_weights` at
+#: ⚠️ The path count is **not** an axis — it correlates with the rule size at
 #: r = +0.867 (measured on the D-154 run), so it would be the same axis
 #: twice.
-CELL_AXIS_NAMES = ("regret", "n_weights", "regime_skew")
+CELL_AXIS_NAMES = ("regret", "n_terms", "regime_skew")
 
 #: Bands per axis. ★ Dynamic tertiles — **there are no absolute
 #: boundaries** (see below). ⚠️ 3 is arbitrary.
@@ -117,6 +121,11 @@ class Elite:
     all_objective: float
     code_len: int
     round: int
+    #: ★ The number of terms — `w[i]` **uses**, from `CheckReport.n_terms`
+    #: (D-156). It is the archive's size axis; `len(w0)` stopped measuring
+    #: size when weight reuse was allowed. 0 falls back to `len(w)` so an
+    #: Elite built by hand in a test still works.
+    code_terms: int = 0
     changes: str = ""
     hypothesis_id: str = ""
     parent_ids: list[str] = field(default_factory=list)
@@ -137,8 +146,18 @@ class Elite:
 
     @property
     def n_weights(self) -> int:
-        """Cell axis 2 — how complex the rule is (D-155)."""
+        """How many fitted coefficients. ⚠️ **Not the size axis** since
+        D-156 — with reuse allowed it undercounts a big rule."""
         return len(self.w)
+
+    @property
+    def n_terms(self) -> int:
+        """Cell axis 2 — how complex the rule is (D-155 · D-156).
+
+        ★ It counts `w[i]` **uses**, not distinct indices, so reusing one
+        weight across twenty terms still reads as twenty.
+        """
+        return int(self.code_terms or len(self.w))
 
     @property
     def regime_skew(self) -> float:

@@ -12,16 +12,7 @@ memorise.
 
 ## ★ What actually got rejected — write it this way and it is discarded
 
-### 1. Adding terms by reusing a weight (the most common one)
-
-```python
-# ⛔ rejected: three terms built out of one weight
-s = s + f.<nameA> * w[0]
-s = s + f.<nameB> * w[0]      # w[0] reused
-s = s + f.<nameC> * w[0]      # again
-```
-
-### 2. Leaving a hole in `w0`
+### 1. Leaving a hole in `w0`
 
 ```python
 # ⛔ rejected: w[0] and w[8] used with len(w0) = 9 — the six in between
@@ -30,11 +21,11 @@ s = s + f.<nameC> * w[0]      # again
 
 `len(w0)` must equal the largest index you use + 1.
 
-### 3. Code that is too long
+### 2. Code that is too long
 
 Code long enough to be refused is a sign that you are piling up special
 cases, not adding physics.
 
-### 4. Multiplying or adding a shape constant to the accumulated score
+### 3. Multiplying or adding a shape constant to the accumulated score
 
 Re-read absolute rule 2. **It changes no ordering at all.**

@@ -265,13 +265,16 @@ def test_warnings_do_not_affect_ok():
 # ★ Going around the literal budget — the hole a real LLM broke through
 # (§29.4)
 # ---------------------------------------------------------------------------
-def test_weight_reuse_is_rejected():
-    """★ A rule that built 19 terms out of 8 weights really did pass.
+def test_weight_reuse_is_allowed_and_counted():
+    """★ 2026-09-10 (D-156): reusing `w[i]` across terms **is allowed**.
 
-    Looking only at `len(W0) == max_index + 1` cannot catch it. The budget's
-    purpose is to block "with many parameters any structure reaches a
-    similar regret and structural comparison becomes meaningless", and
-    evading that limit by growing the term count destroys the purpose.
+    The refusal existed to stop a rule going around the parameter budget
+    (a rule really did build 19 terms out of 8 weights). There is no budget
+    since D-150, so there is nothing to go around, and `f.a * w[0] + f.b *
+    w[0]` is a structural claim — "these two carry the same weight".
+
+    ⚠️ What must not break: `n_terms` counts **uses**, because it is the
+    archive's size axis now (`len(w0)` would read 2 for this rule).
     """
     code = ("def score(f, p, hw, w):\n"
             "    s = f.waves * w[0]\n"
@@ -279,8 +282,7 @@ def test_weight_reuse_is_rejected():
             "    s = s + f.has_spill * w[1]\n"
             "    return s\n")
     r = chk(code, 2)
-    assert not r.ok
-    assert any("reused" in v for v in r.violations)
+    assert r.ok, r.violations
     assert r.n_terms == 3 and r.n_weights == 2
 
 
@@ -317,8 +319,12 @@ def test_interaction_term_is_allowed():
     assert chk(code, 2).ok
 
 
-def test_the_actual_evasive_rule_is_now_rejected():
-    """Pins a rule that came out of a real run as a regression."""
+def test_the_rule_that_reused_weights_now_passes():
+    """The rule that came out of a real run and was refused for reuse.
+
+    ⚠️ 2026-09-10 (D-156): kept as a regression the other way round — it
+    passes now, and its six terms are counted as six.
+    """
     code = ("def score(f, p, hw, w):\n"
             "    s = np.log2(f.traffic_amplification) * w[0]\n"
             "    s = s + f.sm_idle_cost * w[1]\n"
@@ -328,7 +334,8 @@ def test_the_actual_evasive_rule_is_now_rejected():
             "    s = s + f.waves * w[1]\n"
             "    return s\n")
     r = chk(code, 4)
-    assert not r.ok and any("reused" in v for v in r.violations)
+    assert r.ok, r.violations
+    assert r.n_terms == 6 and r.n_weights == 4
 
 
 def test_human_guided_rule_uses_one_weight_per_term():

@@ -164,9 +164,9 @@ _POWER_DESC = (" ★ A weight may sit **in the exponent** — replacing "
 def _desc_code(product: bool = False, power: bool = False) -> str:
     return ("The full function, starting at `def score(f, p, hw, w):`. "
             "No prose, no markdown fences. "
-            "★ Each w[i] may be used exactly once — reusing one weight "
-            "across terms is rejected — and `len(w0)` must equal the largest "
-            "index used + 1, with no gaps. "
+            "★ `len(w0)` must equal the largest index used + 1, with no "
+            "gaps. The same w[i] may appear in several terms — that says "
+            "they carry the same weight. "
             "Use as many terms as the physics needs; when you split on a "
             "shape value, give each branch its own weights."
             + (_PRODUCT_DESC if product else "")
@@ -260,8 +260,8 @@ def validate_rule_proposal(obj: Any, *, parameters: int | None = None
     patched up and used.**
 
     ⚠️ 2026-09-09 (D-150): `parameters` is accepted and ignored. There is no
-    cap — a proposal is refused for reusing a weight index or leaving a hole
-    in `w0`, not for how many it uses.
+    cap — a proposal is refused for leaving a hole in `w0`, not for how many
+    weights it uses or how often it reuses one (D-156).
     """
     del parameters
     if isinstance(obj, RuleProposal):
@@ -447,6 +447,10 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
             #   triggered** — the proposal was silently discarded and the
             #   model never heard what was wrong. Lifted here, Pydantic AI
             #   feeds the message back and it gets fixed.
+            # ⚠️ 2026-09-10 (D-156): `weight_reuse_message` always returns
+            #   None now — reuse is allowed. The call stays so that the day
+            #   it starts refusing again, it refuses **here**, at the LLM
+            #   boundary, where the model hears why.
             if (m := weight_reuse_message(v)) is not None:
                 raise ValueError(m)
             # ★ A term that silently does nothing — no exception, and it

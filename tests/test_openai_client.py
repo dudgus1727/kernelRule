@@ -248,13 +248,16 @@ def test_failed_calls_are_counted():
 
 def test_prompt_shows_rejected_examples():
     """★ Stating the rules alone gets them broken. Real refused cases are
-    given alongside."""
+    given alongside.
+
+    ⚠️ 2026-09-10 (D-156): the example used to be `w[0] reused`. Reuse is
+    allowed now, so the example is the hole in `w0` — which is still
+    refused.
+    """
     c = load_prompt("role/_rules_edit.md")
     assert "actually got rejected" in c
-    assert "w[0] reused" in c
-    # ★ The rules themselves live in `_rules_common.md` — the gallery only
-    #   gives cases
-    assert "used exactly once" in load_prompt("role/_rules_common.md")
+    assert "w[8]" in c and "len(w0) = 9" in c
+    assert "reused" not in c, "the reuse example came back"
 
 
 # ---------------------------------------------------------------------------

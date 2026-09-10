@@ -69,23 +69,19 @@ from kernelrule.report.table_facts import TableFacts
 
 __all__ = ["DiagnosticReport", "Case", "Regime", "build_report"]
 
-#: The regime definitions. `(name, shape predicate)`.
+#: ⚠️ 2026-09-10 (D-156): **empty on purpose.** It used to hold eight bands
+#: — memory/compute, `t_sol` 0.5 ms, wave counts, `K<=1024` — and Block 3
+#: printed the regret of each. Every one of them is **an axis we chose**, and
+#: the biggest number in the report was the SOL gap (+0.4307 at D-155). The
+#: Analyst read it every round, the hypotheses pointed there, and the rules
+#: branched there: the best rule of D-155 starts at `p.log_sol_ms < -5` and
+#: then drifts to `log_flops > 20 / 40 / 30`.
 #:
-#: ★ 2026-09-08 (D-145): **memory/compute moved to the front**. The archive
-#: preserves along that axis (D-144) while the Analyst was diagnosing by
-#: size (SOL<0.5ms) — with diagnosis and preservation on different axes, a
-#: hypothesis cannot point at what the archive is protecting.
-#: Showing all eight bands is itself information, so that is kept.
-REGIMES: tuple[tuple[str, str], ...] = (
-    ("memory-bound", "mem"),
-    ("compute-bound", "comp"),
-    ("t_sol < 0.5ms (short)", "small"),
-    ("t_sol >= 0.5ms (long)", "large"),
-    ("waves < 1", "wlt1"),
-    ("waves 1~4", "w14"),
-    ("waves > 8", "wgt8"),
-    ("K <= 1024 (short mainloop)", "smallk"),
-)
+#: The report now gives **cases** and lets the model find the pattern.
+#: ⚠️ The price is real: "the short shapes are +0.43 worse" was one line and
+#: is now something to infer from nine cases. It may not be seen at all.
+#: That is what D-156's run is measuring.
+REGIMES: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass
@@ -311,40 +307,44 @@ def _make_case(table: PerfTable, matrix: FeatureMatrix, p: Problem,
 
 def _select_cases(table, matrix, order_of, ev, masks, shapes,
                   used_features: frozenset = frozenset(),
-                  per_regime: int = 2, n_best: int = 2) -> list[Case]:
-    """The worst n per regime + 2 **well-matched cases** (§12.1).
+                  n_worst: int = 8, n_best: int = 2) -> list[Case]:
+    """The worst n by regret + 2 **well-matched cases** (§12.1).
 
     "the top 15 by regret" is a bad choice — the same failure mode repeated
     15 times carries only one piece of information. And **showing failures
     only breaks what was working.**
+
+    ⚠️ 2026-09-10 (D-156): it used to take the worst **two per regime** over
+    eight bands, and each case was labelled with its band. Both the selection
+    and the label told the model which axis to look along. What is left is
+    the diversity rule that does not name an axis: **no two cases with the
+    same (picked, optimum) pair.**
     """
+    del masks
     r1 = ev.regret[:, 0]
     cases, used = [], set()
     # ★ If the same (pick, optimum) pair repeats, several cases carry only
-    #   one piece of information. §12.1's "enforce diversity" applies not
-    #   only to regimes but to **failure modes**.
+    #   one piece of information. §12.1's "enforce diversity" applies to
+    #   **failure modes**.
     seen_modes: set[tuple[str, str]] = set()
 
     def _mode(c: Case) -> tuple[str, str]:
         return (_cfg_summary(c.picked), _cfg_summary(c.optimum))
 
-    for name, key in REGIMES:
-        m = masks[key]
-        if not m.any():
+    for raw_i in np.argsort(-r1):
+        if len(cases) >= n_worst:
+            break
+        i = int(raw_i)
+        if i in used or r1[i] <= 1.0 + 1e-9:
             continue
-        idx = np.argsort(np.where(m, -r1, np.inf))[:per_regime]
-        for raw_i in idx:
-            i = int(raw_i)
-            if not m[i] or i in used or r1[i] <= 1.0 + 1e-9:
-                continue
-            used.add(i)
-            c = _make_case(table, matrix, shapes[i], order_of(shapes[i]),
-                           float(r1[i]), name, "worst", used_features)
-            sig = _mode(c)     # `m` is the mask above. No shadowing
-            if sig in seen_modes:
-                continue   # the same failure mode. It adds no information
-            seen_modes.add(sig)
-            cases.append(c)
+        used.add(i)
+        c = _make_case(table, matrix, shapes[i], order_of(shapes[i]),
+                       float(r1[i]), "", "worst", used_features)
+        sig = _mode(c)
+        if sig in seen_modes:
+            continue   # the same failure mode. It adds no information
+        seen_modes.add(sig)
+        cases.append(c)
     n_added = 0
     for raw_i in np.argsort(r1):
         if n_added >= n_best:
@@ -353,8 +353,7 @@ def _select_cases(table, matrix, order_of, ev, masks, shapes,
         if i in used:
             continue
         c = _make_case(table, matrix, shapes[i], order_of(shapes[i]),
-                       float(r1[i]), "a well-matched case", "best",
-                       used_features)
+                       float(r1[i]), "", "best", used_features)
         sig = _mode(c)
         if sig in seen_modes:
             continue
@@ -471,7 +470,7 @@ def _render(r: DiagnosticReport) -> str:
             add(f"  {h}")
 
     add("")
-    add("## Block 3 — regret broken down by regime")
+    add("## Block 3 — how the rule is doing overall")
     o = r.overall
     add("```")
     add(f"overall regret@1 {o['regret@1']:.4f}  (@3 {o['regret@3']:.4f}  "
@@ -482,37 +481,12 @@ def _render(r: DiagnosticReport) -> str:
         f"(a hit = within 2 sigma of the noise floor from the optimum)")
     add("  Low regret with hit 0 means **not a near miss but structurally")
     add("  pointing elsewhere** — that needs a term, not a weight change.")
-    add("")
-    # ★ Do not pre-write the conclusion. The numbers in this report may say
-    #   the opposite, and then the LLM believes the sentence, not the data.
-    #   **Measure it and write that.**
-    sg, dg = abs(o["size_gap@1"]), abs(o["difficulty_gap@1"])
-    which = ("size" if sg > dg else "difficulty")
-    ratio = (max(sg, dg) / max(min(sg, dg), 1e-9))
-    add(f"stratification — on this split, **{which} separates more** "
-        f"({max(sg,dg):.4f} vs {min(sg,dg):.4f})")
-    # ★ Show the archive axis (roofline) **first** (D-145).
-    if "mem" in o and "comp" in o:
-        add(f"  ★ memory-bound   {o['mem']:.4f}   "
-            f"({int(o.get('n_mem', 0))} shapes)")
-        add(f"  ★ compute-bound  {o['comp']:.4f}   "
-            f"({int(o['n_shapes']) - int(o.get('n_mem', 0))} shapes)   "
-            f"gap {o['comp'] - o['mem']:+.4f}")
-    add(f"  t_sol >= 0.5ms   {o['large(>=0.5ms)']:.4f}   "
-        f"({int(o['n_shapes']) - int(o['n_small'])} shapes)")
-    add(f"  t_sol <  0.5ms   {o['small(<0.5ms)']:.4f}   "
-        f"({int(o['n_small'])} shapes)   gap {o['size_gap@1']:+.4f}")
-    add(f"  difficulty hi/lo {o['hard']:.4f} / {o['easy']:.4f}   "
-        f"gap {o['difficulty_gap@1']:+.4f}")
-    if ratio < 2.0:
-        add("  (the two axes separate similarly. It may be the shape mix "
-            "of this split)")
-    add("")
-    add(f"{'regime':26s} {'shapes':>6} {'regret':>8}   worst shape")
-    for g in r.regimes:
-        add(f"{g.name:26s} {g.n_shapes:6d} {g.regret:8.4f}   "
-            f"{g.worst_shape} ({g.worst_regret:.3f})")
+    add(f"  over {int(o['n_shapes'])} shapes")
     add("```")
+    # ⚠️ 2026-09-10 (D-156): the per-band breakdown that stood here is gone.
+    #   Eight bands, all of them axes we chose; the model read them and
+    #   branched on them. The cases below are what is left, and finding the
+    #   pattern in them is the model's job.
 
     if r.table_facts is not None:
         add("")
@@ -531,8 +505,11 @@ def _render(r: DiagnosticReport) -> str:
     add("must hit it exactly.")
     for i, c in enumerate(r.cases, 1):
         add("")
+        # ⚠️ 2026-09-10 (D-156): the band label that stood here
+        #   (`[t_sol >= 0.5ms (long)]`) is gone — it named our axis on every
+        #   single case.
         add(f"### Case #{i}  {c.shape[0]}x{c.shape[1]}x{c.shape[2]}  "
-            f"[{c.regime}] {'★ good match' if c.kind == 'best' else ''}")
+            f"{'★ good match' if c.kind == 'best' else ''}")
         add("```")
         add(f"rule picked: {_cfg_summary(c.picked):46s} -> "
             f"{c.picked['ms']*1000:9.2f}us  (regret {c.regret:.3f})")
