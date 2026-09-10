@@ -46,6 +46,7 @@ F3hg-p8-d75-a  the human_guided seed
 | tag | seeds | features | seed rule | parameters | expressiveness | fitter | rounds | table | commit | trace | final score | source | status |
 |---|--:|---|---|--:|---|---|---|---|---|---|--:|---|---|
 | `D146r` | 1 | 19/F3 | rule_writer-try05 | 8 | default | nelder-mead/4/200 | 1 | a6000 | `ee53b4d` | ★ not uploaded | — | — | |
+| `F1new` | 1 | 17/F1 | rule_writer-try08 | 8 | default | nelder-mead/4/200 | 12 | a6000 | `605a380` | ★ not uploaded | — | — | |
 | `F1rw-p8` | 6 | 16/? | rule_writer-try09 | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1195 | conclusion.json | |
 | `F2rw-p8` | 6 | 17/? | rule_writer-try01 | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | 1.1288 | conclusion.json | |
 | `F3hg-p8-d75-a` | 3 | 20/F3 | human_guided | 8 | default | nelder-mead/4/200 | 4 | a6000 | `?` | — | — | — | |

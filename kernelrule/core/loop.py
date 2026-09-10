@@ -1075,7 +1075,12 @@ class RoundLoop:
             self.trace.ev("hypotheses", round=r,
                           ids=[h.get("id") for h in hyps],
                           claims=[h.get("claim", "") for h in hyps],
-                          needs_feature=[h.get("needs_feature")
+                          # ★ `_requirement_of` — the field is
+                          #   `needs_new_feature` (both names, D-81). Reading
+                          #   a name that exists nowhere wrote null every
+                          #   time, and under F1 30 of 36 hypotheses ask for
+                          #   a feature (D-160)
+                          needs_feature=[_requirement_of(h) or None
                                          for h in hyps],
                           n_replaced=len(replaced))
         elif self.cfg.hypothesis_pool and self.archive.best is not None:
