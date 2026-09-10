@@ -563,11 +563,25 @@ def weight_reuse_message(code: str) -> str | None:
 FITTER_SWITCH_DIM = 8
 
 LIMITS = {
-    #: ★ A safety valve, not a budget (D-150). It stops unboundedly long
-    #: code; it must not become the new cap, so it is the value the old
-    #: "16 parameters" arm ran under (2x 400), not the 8-parameter one.
-    "ast_nodes": 800,
-    "max_lines": 120,
+    #: ★ A safety valve against runaway code, **not a size limit**
+    #: (D-150 · D-154).
+    #:
+    #: ⚠️ 800 became the cap the moment the parameter budget went: the first
+    #: full 12 rounds refused **17 proposals out of 72** on it, all of them
+    #: the large rules (D-153). A parameter costs about 30 nodes, so 800 was
+    #: a cap of roughly 27 parameters.
+    #:
+    #: ⚠️ **3000 is arbitrary too.** It is about 100 parameters at 30 nodes
+    #: each. Whether the evolution ever goes that far is exactly what is
+    #: being measured — **if this number starts refusing proposals again it
+    #: has to be raised again**, and that is a finding, not a nuisance.
+    #: Parsing 3000 nodes is milliseconds; real runaway code still stops.
+    "ast_nodes": 3000,
+    #: ⚠️ Swept at D-154 together with `ast_nodes`: the largest rule of the
+    #: 12-round run was 61 lines against this 120, so it is not binding yet.
+    #: It is raised in the same proportion so it does not become the next
+    #: wall while nobody is looking.
+    "max_lines": 400,
 }
 
 

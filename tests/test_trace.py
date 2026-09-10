@@ -100,3 +100,44 @@ def test_trace_is_not_a_condition():
     from kernelrule.core.runset import KEYS
 
     assert "trace" not in KEYS
+
+
+def test_a_refusal_records_why_and_the_code(synth_table, tmp_path):
+    """★ A refusal must say **what** refused it, in full (D-154).
+
+    It used to be recorded as `why="fit_or_run"` with no detail whatever the
+    real cause was. 17 AST-cap refusals went into a trace that way, and the
+    reason had to be recovered by re-checking the code by hand (D-153).
+    """
+    import json
+
+    from kernelrule.agents.mock import MockLLM
+    from kernelrule.core.loop import LoopConfig, RoundLoop
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.core.splits import Split, SplitSet
+    from kernelrule.features import REGISTRY
+
+    fm = FeatureMatrix(synth_table, REGISTRY)
+    sh = synth_table.shapes()
+    splits = SplitSet(train=Split("train", tuple(sh[:-2])),
+                      val=Split("val", tuple(sh[-2:])))
+    # adversarial: every proposal is refused, and by different checks
+    llm = MockLLM("adversarial", seed=0, feature_names=fm.feature_names())
+    cfg = LoopConfig(run_id="rej", n_rules_per_round=12, max_rounds=1,
+                     max_evals=20, seed=0, out_dir=str(tmp_path))
+    lp = RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
+                   llm=llm)
+    lp.run_round()
+    evs = [json.loads(x) for x in
+           (tmp_path / "rej" / "trace.jsonl").read_text().splitlines()]
+    rej = [e for e in evs if e["ev"] == "reject"]
+    assert rej, "no refusal was recorded"
+    assert not [e for e in rej if e["why"] == "fit_or_run"], (
+        "a refusal is still recorded as the catch-all `fit_or_run`")
+    for e in rej:
+        assert e["why"] in ("schema", "static", "compile", "sandbox", "fit",
+                            "run", "llm", "llm-transport"), e["why"]
+        assert e.get("detail"), f"{e['why']}: no message was kept"
+    # the code of a refused proposal is in the trace, not only its hash
+    with_code = [e for e in rej if e.get("code")]
+    assert with_code, "the refused code is not in the trace"

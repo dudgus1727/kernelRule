@@ -501,6 +501,10 @@ class RoundLoop:
         self._budget = (cfg.parameters if cfg.parameters is not None
                         else _FITTER_DIM)
         self._limits = limits_for()
+        #: ★ Where a refusal happened -> (why, the full message), keyed by
+        #: code (D-154). Written by `_admit` / `_evaluate_candidate`, drained
+        #: by the trace event. It is not state the loop reads.
+        self._why: dict[str, tuple[str, str]] = {}
         self._objective = cfg.objective
         self._switched = False
         self.switch_round = -1
@@ -786,6 +790,8 @@ class RoundLoop:
             if "err" in d:
                 res.n_rejected_fit += 1
                 res.rejections.append(d["err"])
+                self._why[prop.code.strip()] = (
+                    str(d["err"][0]), str(d["err"][1]))
                 continue
             if d["moved"]:
                 res.n_fit_moved += 1
@@ -813,6 +819,12 @@ class RoundLoop:
         if not rep.ok:
             res.n_rejected_static += 1
             res.rejections.append(("static", rep.violations[0][:90]))
+            # ★ **Every** violation, not the first (D-154). The static check
+            #   returns several at once, and the trace used to keep none of
+            #   them — a refusal read as `fit_or_run` and the reason had to
+            #   be recovered by re-checking the code by hand.
+            self._why[prop.code.strip()] = (
+                "static", " | ".join(rep.violations))
             return None
 
         try:
@@ -820,6 +832,7 @@ class RoundLoop:
         except SandboxError as e:
             res.n_rejected_sandbox += 1
             res.rejections.append(("compile", str(e)[:90]))
+            self._why[prop.code.strip()] = ("compile", str(e))
             return None
 
         if self.cfg.sandbox_first_seen:
@@ -830,6 +843,7 @@ class RoundLoop:
             if not out.ok:
                 res.n_rejected_sandbox += 1
                 res.rejections.append(("sandbox", str(out)[:90]))
+                self._why[prop.code.strip()] = ("sandbox", str(out))
                 return None
         return fn, rep
 
@@ -870,12 +884,14 @@ class RoundLoop:
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
             res.rejections.append(("fit", str(e)[:90]))
+            self._why[prop.code.strip()] = ("fit", str(e))
             return None
         except Exception as e:                            # noqa: BLE001
             # A rule blowing up during scoring is a **rejection**. It is
             # not swallowed (§26.4).
             res.n_rejected_fit += 1
-            res.rejections.append(("run", f"{type(e).__name__}: {e}"[:90]))
+            res.rejections.append(("run", f"{type(e).__name__}: {e}"))
+            self._why[prop.code.strip()] = ("run", f"{type(e).__name__}: {e}")
             return None
 
         if fr.moved:
@@ -1247,9 +1263,17 @@ class RoundLoop:
             e2 = by_code.get(prop.code.strip())
             if e2 is None:
                 self._seen_code.pop(prop.code.strip(), None)
-                # ★ It never reached scoring — until now this was recorded
-                #   nowhere (D-133)
-                self.trace.ev("reject", round=r, kind=kind, why="fit_or_run",
+                # ★ It never reached scoring. ⚠️ 2026-09-10 (D-154): this used
+                #   to say `why="fit_or_run"` with no detail whatever the
+                #   real cause was — 17 AST-cap refusals were recorded that
+                #   way and had to be recovered by re-checking the code
+                #   (D-153). The reason is now taken from where it happened,
+                #   with **the full message and the code**.
+                why, detail = self._why.pop(prop.code.strip(),
+                                            ("fit_or_run", ""))
+                self.trace.ev("reject", round=r, kind=kind, why=why,
+                              detail=detail, code=prop.code,
+                              n_weights=len(prop.w0),
                               code_sha=_sha(prop.code))
                 continue
             bump(kind, "scored")
