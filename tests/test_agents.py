@@ -377,19 +377,30 @@ def test_prompts_state_no_parameter_cap(monkeypatch):
             assert "8 parameters" not in low, f"{f}: {line}"
 
 
-def test_prompt_tells_the_model_there_is_no_cap():
-    """★ When the rule changes, **the model must know too** (D-78).
+def test_prompt_states_no_size_limit_at_all():
+    """★ 2026-09-10 (D-151): this used to require the sentence "there is no
+    cap" to reach the model.
 
-    The exemption for branch comparison constants went with the cap itself
-    (D-150) — with nothing counted, nothing needs exempting. What has to
-    reach the model now is that there is no cap, or it keeps trimming rules
-    to eight (D-149).
+    It was itself the problem — **a negation activates what it negates**, and
+    the schema field description still carried "at most 8 per execution
+    path", which the model quoted back when asked. What is pinned now is that
+    no surface the model sees states a size limit at all: not the prompts,
+    not the output schema.
     """
-    from kernelrule.agents.openai_client import assemble_instructions
+    import json
 
-    for role in ("rule_writer", "rule_editor"):
+    from kernelrule.agents.openai_client import assemble_instructions
+    from kernelrule.agents.schemas import rule_output_for
+
+    surfaces = {"schema": json.dumps(rule_output_for().model_json_schema(),
+                                     ensure_ascii=False)}
+    for role in ("rule_writer", "rule_editor", "analyze"):
         kw = {"objective": "regret"}
         if role == "rule_writer":
             kw["hw_text"] = "GPU: T\n"
-        txt = assemble_instructions(role, **kw).lower()
-        assert "no cap" in txt, f"{role}: it is not told that there is no cap"
+        surfaces[role] = assemble_instructions(role, **kw)
+    for name, txt in surfaces.items():
+        low = txt.lower()
+        for phrase in ("per execution path", "at most 8", "no cap",
+                       "{parameters}"):
+            assert phrase not in low, f"{name}: {phrase!r} is still there"

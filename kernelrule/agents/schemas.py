@@ -176,13 +176,19 @@ def _desc_code(b: int, product: bool = False,
 
 
 def _desc_w0(b: int) -> str:
+    """⚠️ 2026-09-10 (D-151): this sentence used to end with "★ At most {b}
+    **per execution path**". D-150 took the cap out of the checker, the
+    prompts and `_desc_code` — **and missed this one.** `pydantic-ai` hands
+    the field description to the model as the tool schema, so the model kept
+    reading a cap that no longer existed and asked point-blank said so:
+    "the limit comes from the output-schema requirement". The fifth instance
+    of D-107's spot."""
+    del b
     return ("Initial weights. ★ Do not give them carelessly — the objective "
             "is a step function and the optimiser can get stuck on a plateau "
             "near the starting point. Give a **starting point that reflects "
             "the physical magnitude of each term**. The length must equal the "
-            f"largest index the code references + 1. ★ At most {b} **per "
-            "execution path**, summed with numeric literals, so literals "
-            "reduce it — except comparison constants in branch conditions")
+            "largest index the code references + 1, with no gaps")
 
 
 def _w0_message(n: int, b: int) -> str:

@@ -836,15 +836,13 @@ class OpenAILLM:
         parent = kw.get("parent")
         hyp = kw.get("hypothesis") or {}
         applied = kw.get("hypotheses_applied") or []
-        # ⚠️ 2026-09-09 (D-150): this used to say "the heaviest path is at
-        #   the cap — drop a term or split". There is no cap now, so it
-        #   states **what the parent spends** and nothing else. Telling the
-        #   model to drop a term was what kept every proposal at 8 (D-149).
-        n_terms = int(kw.get("parent_n_terms") or 0)
-        n_path = int(kw.get("parent_path_params") or 0)
-        n_w = len(parent.w0) if parent else 0
-        note = (f"The parent uses {n_terms} terms, {n_w} weights "
-                f"(the heaviest path spends {n_path}).")
+        # ⚠️ 2026-09-10 (D-151): the whole "## The parent's size" section is
+        #   gone. It stated the parent's term and weight counts under a
+        #   heading, and a count stated as a heading reads as a value to
+        #   hold. The parent's code is in the prompt in full — counting it is
+        #   the model's job, not ours. (`parent_n_terms` /
+        #   `parent_path_params` still arrive from the loop and are ignored
+        #   here; the loop reports them into the trace.)
         # ★ With the Analyst off, **the hypothesis section is not built at
         #   all** (§16.1, D-89). Leaving an empty slot such as
         #   "## This round's hypothesis\n\n(none)" makes the model read "there
@@ -900,7 +898,6 @@ class OpenAILLM:
             .replace("{power_note}", power_note(self._power))
         return body.format(
             second_parent_block=second,
-            n_terms=n_terms, n_weights=n_w, parameters_note=note,
             feature_block=fl, hypothesis_block=hyp_block,
             inputs_hyp=inputs_hyp, one_change_hyp=one_change,
             applied_warning=applied_warn,

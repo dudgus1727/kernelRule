@@ -32,8 +32,8 @@ s = s + f.<nameC> * w[0]      # again
 
 ### 3. Code that is too long
 
-The cap is {ast_nodes} AST nodes. Going past it is a sign that you are piling
-up special cases, not adding physics.
+Code long enough to be refused is a sign that you are piling up special
+cases, not adding physics.
 
 ### 4. Multiplying or adding a shape constant to the accumulated score
 

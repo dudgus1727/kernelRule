@@ -62,10 +62,9 @@ fix could break gives the next round something to check.
 
 ## The shape the rule can take
 
-**There is no cap on the number of terms or weights.** A hypothesis may ask
-for as many as the physics needs. When two regimes have different
-bottlenecks, the rule **splits a branch** and each branch gets its own
-weights — there may be at most 4 execution paths.
+A hypothesis may ask for as much as the physics needs. When two regimes have
+different bottlenecks, the rule **splits a branch** and each branch gets its
+own weights — there may be at most 4 execution paths.
 
 ## Can it be measured with existing features
 

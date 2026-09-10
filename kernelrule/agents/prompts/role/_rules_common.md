@@ -20,8 +20,19 @@ weights are usually positive.
 ```
 1. Do not branch on config-level features (`f.*`).
    `f.*` is an **array** over all candidates, so `if f.<name> < 1:` raises.
-   Use `np.where(...)`. This constraint is deliberate — conditional
-   specialisation, repeated, becomes a lookup table and does not generalise.
+   This constraint is deliberate — conditional specialisation, repeated,
+   becomes a lookup table and does not generalise.
+
+   `np.where(...)` is the only way to write a config-level condition, and it
+   is **one expression, not a branch**: both sides are computed and the term
+   keeps one weight.
+
+       s = s + np.where(f.<name> < 1, w[3], 0.0)   ⛔ a constant per side —
+                                                      that is specialisation
+       s = s + np.where(p.<shape value> < 1,
+                        f.<A>, f.<B>) * w[3]       ✅ which physics to read
+       s = s + f.<other name> * w[3]               ✅ a continuous term is
+                                                      better still
 
 2. You may branch on shape-level values (`p.*`). They are scalars.
    But **multiplying or adding a shape constant to the whole accumulated
@@ -88,9 +99,8 @@ Or give `w0` on the inverse scale of the range — for a `[0, 300]` term,
 terms from the count and gives the fitter one coefficient for two different
 physical quantities.
 
-**Use as many terms as the physics needs — no more.** There is no cap, and
-there is no target either: a term you cannot explain is worse than a term you
-do not add.{product_block}{power_block}
+**Write the terms you can explain.** One line of physics per term is the
+bar.{product_block}{power_block}
 
 ## You do not fit the weights
 
