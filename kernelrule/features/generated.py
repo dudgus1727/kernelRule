@@ -88,22 +88,109 @@ _HW_LITERALS = re.compile(r"\b(84|101376|99328|65536|1536|116\.1|729\.7|"
 MAX_LINES = 12
 
 
+#: What each raw field **means**, one line each (D-159).
+#:
+#: ⚠️ Names alone are not self-explanatory. `cfg.pipeline_kind` ·
+#: `cfg.split_k_mode` · `cfg.max_blocks_per_sm` were listed with nothing but
+#: their names, and a field you do not understand is either unused or used
+#: wrongly.
+#:
+#: ⛔ **No values, and no GPU name.** The FeatureWriter is told what a field
+#: is, never what it holds on this machine. A feature has to be a
+#: hardware-independent formula —
+#: `waves = tiles / (hw.sm_count * cfg.max_blocks_per_sm)` is right whatever
+#: the SM count is — and knowing "84" invites `/ 84`, which does not
+#: transfer. (`RuleWriter` is different: it fits weights **for** one GPU and
+#: needs the magnitudes to match its terms.)
+FIELD_MEANING: dict[str, str] = {
+    # -- the shape ---------------------------------------------------------
+    "p.M": "rows of A and of the output (int)",
+    "p.N": "columns of B and of the output (int)",
+    "p.K": "the reduction length — the mainloop runs over it (int)",
+    "p.dtype": "element type of A/B, e.g. \"f16\" (string)",
+    "p.acc_dtype": "type the accumulator keeps, e.g. \"f32\" (string)",
+    "p.bytes_per_element": "bytes of one A/B/C element, from dtype (float)",
+    "p.acc_bytes_per_element":
+        "bytes of one accumulator element — the size of a parallel split-K "
+        "partial sum (float)",
+    "p.layout_a": "\"row\" or \"col\" for A (string)",
+    "p.layout_b": "\"row\" or \"col\" for B (string)",
+    "p.layout_c": "\"row\" or \"col\" for the output (string)",
+    # -- the hardware ------------------------------------------------------
+    "hw.sm_count": "how many SMs the GPU has (int)",
+    "hw.smem_per_block": "shared memory one block may use, in bytes (int)",
+    "hw.max_threads_per_sm": "thread slots on one SM (int)",
+    "hw.regs_per_sm": "size of one SM's register file, in registers (int)",
+    "hw.peak_tflops_f16":
+        "effective f16 tensor-core throughput, TFLOP/s — measured with the "
+        "clocks locked, not the spec number (float)",
+    "hw.bandwidth_gbps": "effective DRAM bandwidth, GB/s (float)",
+    "hw.l2_bytes": "L2 cache size in bytes (int)",
+    "hw.ridge_point":
+        "peak_flops / bandwidth [FLOP/byte] — the roofline knee, already "
+        "computed (float)",
+    # -- the config --------------------------------------------------------
+    "cfg.tile_m": "rows of the output tile one CTA computes (int)",
+    "cfg.tile_n": "columns of that tile (int)",
+    "cfg.tile_k": "how much of K one mainloop iteration consumes (int)",
+    "cfg.align_a":
+        "alignment of A in elements — 8 means 16-byte access is possible, "
+        "which is what cp.async needs (int)",
+    "cfg.align_b": "the same for B (int)",
+    "cfg.align_c": "the same for the output (int)",
+    "cfg.split_k":
+        "how many pieces K is cut into. 1 means no split (int)",
+    "cfg.split_k_mode":
+        "\"serial\" (partials reduced in place, in the accumulator type) or "
+        "\"parallel\" (partials written to DRAM and read back) (string)",
+    "cfg.regs_per_thread": "registers one thread uses (int)",
+    "cfg.threads": "threads in one CTA (int)",
+    "cfg.smem_bytes": "shared memory one CTA takes, in bytes (int)",
+    "cfg.spill_bytes":
+        "bytes spilled to local memory per thread. 0 means no spill (int)",
+    "cfg.max_blocks_per_sm":
+        "how many CTAs fit on one SM at once, from the resource limits "
+        "(int)",
+    "cfg.pipeline_kind":
+        "\"pipelined\" (2 stages) or \"multistage\" (3+ stages, cp.async) — "
+        "**different kernel families**, not a knob on one (string)",
+    "cfg.inst_total":
+        "estimated SASS instruction count of the kernel (int)",
+}
+
+
 def field_block() -> str:
-    """The list of raw fields to put in the prompt."""
+    """The list of raw fields to put in the prompt, **with one line of
+    meaning each** (D-159).
+
+    ⚠️ Every field in `RAW_FIELDS` must be in `FIELD_MEANING` — a field
+    listed without one is what this fixes, so it fails loudly rather than
+    printing a bare name (§26.4).
+    """
     out = []
     for base, names in RAW_FIELDS.items():
         out.append(f"### `{base}` — "
                    + {"p": "the GEMM shape", "hw": "the hardware",
                       "cfg": "the kernel config"}[base])
-        out.append("  " + "  ".join(f"`{base}.{n}`" for n in names))
+        for n in names:
+            key = f"{base}.{n}"
+            try:
+                mean = FIELD_MEANING[key]
+            except KeyError:
+                raise KeyError(
+                    f"{key} is in RAW_FIELDS with no line in FIELD_MEANING. "
+                    f"A field with only a name is either unused or used "
+                    f"wrongly (D-159).") from None
+            out.append(f"  `{key}`".ljust(31) + f" {mean}")
+        out.append("")
+    out.append("★ A dtype field is a **string** — the sandbox has no "
+               "`np.dtype(...).itemsize`, so use `p.bytes_per_element` when "
+               "you need bytes.")
     out.append("")
-    out.append("`hw.ridge_point` is `peak_flops / bandwidth` — the knee of "
-               "the roofline, already computed for you.")
-    out.append("")
-    out.append("★ `p.dtype` / `p.acc_dtype` are **strings** (like "
-               "`\"f16\"`). If you need bytes, use "
-               "`p.bytes_per_element` / `p.acc_bytes_per_element` — floats "
-               "derived from the dtype.")
+    out.append("★ The values are **not** given — not the GPU's name either. "
+               "A feature must be a formula that is right on any GPU: "
+               "`tiles / (hw.sm_count * cfg.max_blocks_per_sm)` holds "
+               "whatever the SM count is.")
     return "\n".join(out)
 
 

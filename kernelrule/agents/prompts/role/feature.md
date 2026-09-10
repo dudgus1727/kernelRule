@@ -52,7 +52,8 @@ missing axis is your job.**
 1. Pure function. No side effects. Returns a single float
 2. Computed from p / hw / cfg only. No measurements, no profiler counters
 3. ★ Unify the direction: larger is worse
-4. Read hardware constants from hw.*. Writing 84 or 101376 is rejected
+4. Read every hardware constant from `hw.*`. A feature with a machine's
+   number written into it does not transfer, and is rejected
    This is checked automatically by changing hw and seeing if the value moves
 5. Do not reference cfg.ext — those are architecture-specific fields
 6. At most 10 lines. No import (`math` and `np` are already there)

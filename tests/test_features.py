@@ -484,3 +484,47 @@ def test_banned_words_still_catch_real_leaks():
                 f"    return {leak}\n")
         with pytest.raises(FeatureRejected):
             check_feature_code(code, known=frozenset())
+
+
+def test_every_raw_field_has_a_meaning():
+    """★ A field listed with only its name is either unused or used wrongly
+    (D-159).
+
+    `cfg.pipeline_kind` · `cfg.split_k_mode` · `cfg.max_blocks_per_sm` sat in
+    the prompt as bare names for months.
+    """
+    from kernelrule.features.generated import (
+        FIELD_MEANING,
+        RAW_FIELDS,
+        field_block,
+    )
+
+    for base, names in RAW_FIELDS.items():
+        for n in names:
+            key = f"{base}.{n}"
+            assert key in FIELD_MEANING, f"{key} has no meaning line"
+            assert len(FIELD_MEANING[key]) > 10, key
+    txt = field_block()
+    for base, names in RAW_FIELDS.items():
+        for n in names:
+            assert f"`{base}.{n}`" in txt, f"{base}.{n} is not rendered"
+
+
+def test_the_feature_writer_is_told_no_hardware_value():
+    """⛔ The FeatureWriter must not learn which GPU this is, or any of its
+    numbers (D-159).
+
+    A feature has to be a formula that holds on any GPU. Knowing "84 SMs"
+    invites `/ 84`, and then it does not transfer — which is the claim this
+    project rests on.
+
+    ⚠️ The prompt used to say "Writing 84 or 101376 is rejected", which
+    **handed over both numbers** while forbidding them.
+    """
+    from kernelrule.agents.openai_client import assemble_instructions
+    from kernelrule.features.generated import field_block
+
+    txt = assemble_instructions("feature", objective="regret") + field_block()
+    for banned in ("A6000", "RTX", "sm_86", "101376", "116.1", "729.7",
+                   "159.1", "6291456"):
+        assert banned not in txt, f"the feature path names {banned!r}"
