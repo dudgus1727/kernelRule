@@ -46,7 +46,14 @@ GPU_PRESETS = {
     "rtx a6000": "RTX_A6000", "rtx 4090": "RTX_4090", "rtx 3090": "RTX_3090",
     "rtx 5090": "RTX_5090", "rtx 6000 ada": "RTX_6000_ADA",
     "a100": "A100_SXM_80GB", "a40": "A40_PCIE", "a30": "A30_PCIE",
-    "a10": "A10_PCIE", "h100": "H100_SXM", "h200": "H200_SXM",
+    "a10": "A10_PCIE",
+    # ★ 2026-09-10 (D-158): the H100 comes in variants and this table mapped
+    #   every one of them to `H100_SXM`. Our bundle is an **H100 NVL** — a
+    #   different card (different clocks and bandwidth), and the preset for
+    #   it exists. The longer key wins in `preset_for`, so the variants are
+    #   listed before the bare "h100".
+    "h100 nvl": "H100_NVL", "h100 pcie": "H100_PCIE", "h100": "H100_SXM",
+    "h200": "H200_SXM",
     "l40s": "L40S", "l40": "L40", "l4": "L4", "b200": "B200",
 }
 

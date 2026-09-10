@@ -34,7 +34,7 @@ split. `gap` = (b) holdout − (b) training.
 ### a6000 -> 5090   (training 41 shapes, holdout 20 of 53 common)
 
 ```
-baseline   static top-1 1.0452 · vendor 1.2562 · human_guided refit 1.1401
+baseline   static top-1 1.0452 · ★ vendor 1.1158 · human_guided refit 1.1401
 
 rule                par/train      (a)      (b)  b train      gap  moved
 r5 (D-156)             21/41     1.1215  ★1.0358   1.0171  +0.0187   2/2
@@ -42,10 +42,16 @@ r11 (D-156)            38/41     1.1225   1.0549   1.0168  +0.0381   2/2
 old 8p                  8/41     1.2244   1.0813   1.0432  +0.0380   2/2
 ```
 
+⚠️ 2026-09-10 (D-158): the vendor number here **was 1.2562** and it was
+wrong — `vendor_order_fn` returns an order and it had been handed to
+`evaluate_scores`, which expects scores. The corrected value is 1.1158
+(`vendor-baselines.md`). The old value is not deleted; it is corrected
+here.
+
 ### a6000 -> 4090   (training 39 shapes, holdout 20 of 50 common)
 
 ```
-baseline   static top-1 1.0403 · vendor none · human_guided refit 1.0761
+baseline   static top-1 1.0403 · ★ vendor 1.0647 · human_guided refit 1.0761
 
 rule                par/train      (a)      (b)  b train      gap  moved
 r5 (D-156)             21/39     1.0515  ⛔1.2532   1.0270  +0.2262   2/2
@@ -56,7 +62,7 @@ old 8p                  8/39     1.0488   1.0565   1.0288  +0.0277   2/2
 ### a6000 -> h100   (training 39 shapes, holdout 20 of 48 common)
 
 ```
-baseline   static top-1 1.1921 · vendor none · human_guided refit 1.0937
+baseline   static top-1 1.1921 · ★ vendor 1.1522 · human_guided refit 1.0937
 
 rule                par/train      (a)      (b)  b train      gap  moved
 r5 (D-156)             21/39     1.1543  ★1.0526   1.0320  +0.0206   2/2
@@ -68,11 +74,18 @@ old 8p                  8/39     1.1965  ⛔1.2841   1.0456  +0.2386   2/2
 
 **1. (b) beats the target's own baselines on two of three targets.**
 
+★ 2026-09-10 (D-158): the vendor column is filled in on all three now.
+
 ```
-5090   (b) r5  1.0358  <  static top-1 1.0452  ·  vendor 1.2562
-h100   (b) r5  1.0526  <  static top-1 1.1921  ·  human_guided 1.0937
-4090   (b) r11 1.0407  ≈  static top-1 1.0403        ★ a tie (+0.0004)
+        (b) best        vendor    static top-1   human_guided refit
+5090    1.0358 (r5)     1.1158       1.0452          1.1401     ★ beats all
+h100    1.0526 (r5)     1.1522       1.1921          1.0937     ★ beats all
+4090    1.0407 (r11)    1.0647       1.0403          1.0761     ≈ static (+0.0004)
 ```
+
+★ On the 5090 and the H100 the transferred-and-refitted rule is **below
+every baseline that table has**, the vendor included. On the 4090 it ties
+the static top-1, which is that table's lowest bar.
 
 ★ The H100 one is worth marking: D-141 measured transfer there as **not
 beating the baseline**. It does here — with a rule 21 terms wide instead of

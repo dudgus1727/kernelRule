@@ -172,13 +172,15 @@ def main() -> None:
         st1 = StaticTopK(B, hold, coverage="union").run(ks=(1,))
         t["static_top1"] = float(st1.by_k[1]["all"])
         print(f"  {'baseline static top-1':30s} {t['static_top1']:.4f}")
-        vend = Path(f"datasets/baselines/vendor-{dst}-{D['env_hash']}.json")
+        vend = Path(f"datasets/baselines/vendor-{dst}-{D['env_hash'][:8]}.json")
         if vend.exists():
             # ★ The same call as `vendor_compare.py` — one procedure
             #   (principle 2).
             from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
-            from kernelrule.core.scoring import evaluate_scores
-            ev = evaluate_scores(
+            from kernelrule.core.scoring import evaluate
+            # ★ `vendor_order_fn` is an **order** function — `evaluate`, not
+            #   `evaluate_scores` (D-158 §2).
+            ev = evaluate(
                 vendor_order_fn(B, load_vendor(vend), mapping="nearest"),
                 B, hold, ks=(1,), label="vendor")
             t["vendor"] = float(geomean(ev.regret[:, 0]))
