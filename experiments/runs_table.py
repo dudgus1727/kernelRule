@@ -113,6 +113,9 @@ NOTES = {
     "seed3": "★ a contrast, not a result (D-151) — the same round with a "
              "**3-term seed**, to see whether len(w0) follows the parent. Do "
              "not read its numbers",
+    "nocap": "★ a behaviour check, not a result (D-152) — 1 seed x 2 rounds, "
+             "fold 0, 3-term seed, **after the live cap in the schema "
+             "validator was removed**. Do not read its numbers",
 }
 #: The prefixes dropped from the table. **They are not deleted** — they are
 #: only marked by name.

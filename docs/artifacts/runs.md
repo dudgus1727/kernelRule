@@ -67,6 +67,7 @@ F3hg-p8-d75-a  the human_guided seed
 | `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | prod | cma/1/300 | 12 | a6000 | `?` | — | 1.0840 | expressive-regret.json | ⛔ retired — p8 and yet CMA. To be re-measured |
 | `luna` | 3 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
 | `lunaNAMES` | 6 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `nocap` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 2 | a6000 | `131d612` | trace-nocap-131d612 | — | — | ★ a behaviour check, not a result (D-152) — 1 seed x 2 rounds, fold 0, 3-term seed, **after the live cap in the schema validator was removed**. Do not read its numbers |
 | `nocount` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 1 | a6000 | `1ecdd56` | trace-nocount-1ecdd56 | — | — | ★ a contrast, not a result (D-151) — 1 seed x 1 round, fold 0, after the size sentences were taken out of every surface. Do not read its numbers |
 | `seed3` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 1 | a6000 | `1ecdd56` | trace-seed3-1ecdd56 | — | — | ★ a contrast, not a result (D-151) — the same round with a **3-term seed**, to see whether len(w0) follows the parent. Do not read its numbers |
 | `smoke` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 2 | a6000 | `579bdf6` | trace-smoke-579bdf6 | — | — | ★ a wiring smoke run, not a result (D-149) — 1 seed x 2 rounds, fold 0. Do not read its numbers |
