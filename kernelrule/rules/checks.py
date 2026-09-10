@@ -28,7 +28,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 
-__all__ = ["PARAMETERS", "MAX_PATHS", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
+__all__ = ["FITTER_SWITCH_DIM", "MAX_PATHS", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
            "weight_reuse_message", "literal_parameter_message",
            "exponent_message", "exponent_indices", "weight_bounds",
            "EXPONENT_BOUNDS",
@@ -545,26 +545,22 @@ def weight_reuse_message(code: str) -> str | None:
         return None
     return (f"a weight is reused across terms: "
             f"{[f'w[{i}]x{uses[i]}' for i in dup]}. You built "
-            f"{sum(uses.values())} terms out of {len(uses)} weights — that "
-            f"goes around the literal budget (§29.4). Use a **different** "
-            f"weight for each term. If the terms exceed the budget, delete "
-            f"terms")
+            f"{sum(uses.values())} terms out of {len(uses)} weights — one "
+            f"fitted coefficient cannot carry two different physical "
+            f"quantities. Use a **different** weight for each term")
 
-#: ★ The **single source** for the budget. If the prompt, the schema and
-#: the checker each write 8 of their own, one gets missed (it would be the
-#: sixth after `is_reference` / `top_k` / `DEFAULT_MODEL` / `REGISTRY` /
-#: `load_generated`).
+#: The dimension at which `fitter_for` switches from Nelder-Mead to CMA-ES.
 #:
-#: ⚠️ **8 is an arbitrary number and has not been validated** (§29.4). An
-#: attempt to measure 8 vs 16 stopped because the fitter could not cope in
-#: 16 dimensions (D-77).
+#: ⚠️ It **was** the parameter budget, and 8 was never validated as one
+#: (§29.4; the 8 vs 16 attempt stopped at D-77 because the fitter could not
+#: cope in 16 dimensions). D-150 removed the cap; the number survives here
+#: only as the fitter boundary, which D-125 and D-123 did measure.
 #:
-#: ⚠️ 2026-09-09 (D-150): **it is no longer a cap.** Nothing refuses a rule
-#: for its parameter count any more. The constant stays because
-#: `fitter_for` uses 8 as the boundary between Nelder-Mead and CMA, and
-#: because the old records that cite "budget 8" have to keep meaning
-#: something (§29.4 is kept as correction history, not deleted).
-PARAMETERS = 8
+#: ⚠️ 2026-09-10 (D-152): renamed from `PARAMETERS`. It stopped being a cap
+#: at D-150 and the old name kept reading like one — this is **the number of
+#: fitted dimensions at which the fitter switches**, and nothing else.
+#: `docs/glossary.md` carries the mapping.
+FITTER_SWITCH_DIM = 8
 
 LIMITS = {
     #: ★ A safety valve, not a budget (D-150). It stops unboundedly long
@@ -598,11 +594,11 @@ def fitter_for(n_weights: int | None) -> dict:
     with CMA at 8 parameters (D-124). On re-measurement they run under this
     rule.
     """
-    b = int(n_weights if n_weights is not None else PARAMETERS)
+    b = int(n_weights if n_weights is not None else FITTER_SWITCH_DIM)
     # ★ The key names are exactly `LoopConfig`'s fields — being splattable
     #   as `**fitter_for(n)` is what leaves no place for divergence
     #   (principle 2).
-    if b <= PARAMETERS:
+    if b <= FITTER_SWITCH_DIM:
         return {"fit_method": "nelder-mead", "fit_restarts": 4,
                 "max_evals": 200}
     return {"fit_method": "cma", "fit_restarts": 1, "max_evals": 300}

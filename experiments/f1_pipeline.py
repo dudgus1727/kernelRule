@@ -924,7 +924,7 @@ def main() -> None:
                          "an isolation boundary")
     ap.add_argument("--parameters", type=int, default=None,
                     help="the parameter cap (weights + numeric literals). "
-                         "★ The default is checks.PARAMETERS (8) — every run "
+                         "⚠️ It caps nothing since D-150 — every run "
                          "so far is under that condition. The checker and "
                          "the prompt see the same value")
     ap.add_argument("--power-hint", action="store_true",

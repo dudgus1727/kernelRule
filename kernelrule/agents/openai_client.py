@@ -412,10 +412,9 @@ class LLMConfig:
     #: `config.json` for the condition to be recorded. Only the RuleEditor's
     #: "how it is scored" section changes — RuleWriter does not receive it.
     objective: str = "regret"
-    #: ★ The parameter cap (D-104). With `None` it is
-    #: `checks.PARAMETERS` (8). The prompt's `{parameters}` is filled from
-    #: this value — it must not diverge from the checker, so the loop passes
-    #: the same value to `check_rule(limits=...)` too.
+    #: ⚠️ Was the parameter cap (D-104). **There is no cap** (D-150/152) —
+    #: it is kept because `config.json` records it and old configs carry it.
+    #: Nothing reads it to refuse anything.
     parameters: int | None = None
     #: ★ The **numbers** of the goal definition. The prompt must say the
     #: same thing as the run conditions (D-105/D-107). Used only under the
@@ -642,9 +641,9 @@ class OpenAILLM:
         # ⚠️ 2026-09-09 (D-150): there is no term budget. The field is kept
         #   because `config.json` records it and old configs carry it; it is
         #   **passed nowhere that refuses anything** any more.
-        from kernelrule.rules.checks import PARAMETERS as _CHECK_PARAMETERS
+        from kernelrule.rules.checks import FITTER_SWITCH_DIM
         self._parameters = int(cfg.parameters if cfg.parameters is not None
-                           else _CHECK_PARAMETERS)
+                           else FITTER_SWITCH_DIM)
         self._rank_top_k = int(getattr(cfg, "rank_top_k", 100))
         self._rank_lambda = float(getattr(cfg, "rank_lambda", 0.0))
         self._product = bool(getattr(cfg, "product_hint", False))

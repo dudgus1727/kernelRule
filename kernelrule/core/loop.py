@@ -48,7 +48,7 @@ from kernelrule.core.splits import SplitSet
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import FitError, fit_weights, make_score_of
 from kernelrule.report.diagnostic import build_report
-from kernelrule.rules.checks import PARAMETERS as _PARAMETERS
+from kernelrule.rules.checks import FITTER_SWITCH_DIM as _FITTER_DIM
 from kernelrule.rules.checks import (
     check_rule,
     fitter_for,
@@ -159,10 +159,8 @@ class LoopConfig:
     #: — it switches when the improvement over the last `switch_window`
     #: rounds is below `switch_min_improve`. Rationale: s2 was flat from r5
     #: to r9, 0.2945 -> 0.2915 (1.0%).
-    #: ★ The parameter cap (D-104). With `None` it is
-    #: `checks.PARAMETERS` (8) — the behaviour so far.
-    #: The checker and the prompt must see **the same value** (principle
-    #: 2).
+    #: ⚠️ Was the parameter cap (D-104). **There is no cap** (D-150/152).
+    #: Recorded in `config.json`; it refuses nothing.
     parameters: int | None = None
     objective_switch: str | None = None
     switch_min_improve: float = 0.01
@@ -403,6 +401,28 @@ class RoundResult:
             f"{self.seconds:.1f}s")
 
 
+def _output_schemas() -> dict:
+    """Every JSON schema that goes to the model, in full (D-152).
+
+    ★ It is what the model reads, not what we think it reads — a cap of 8
+    lived in a field description for two days after the checker had dropped
+    it (D-151). Without pydantic it is `{}`; a run without the LLM extra
+    does not fail for this.
+    """
+    try:
+        from kernelrule.agents import schemas as _s
+        if not _s.HAVE_PYDANTIC:                    # pragma: no cover
+            return {}
+        out = {"RuleOutput": _s.rule_output_for().model_json_schema()}
+        for name in ("AnalysisOutput", "FeatureOutput", "CategoryOutput"):
+            cls = getattr(_s, name, None)
+            if cls is not None and hasattr(cls, "model_json_schema"):
+                out[name] = cls.model_json_schema()
+        return out
+    except Exception:                               # noqa: BLE001
+        return {}
+
+
 def _git_commit() -> str:
     """The current commit. For the trace's first line to stand on its own
     it needs the code version."""
@@ -479,7 +499,7 @@ class RoundLoop:
         #: kept because `config.json` records `parameters` and old configs
         #: carry it — nothing refuses a rule for it.
         self._budget = (cfg.parameters if cfg.parameters is not None
-                        else _PARAMETERS)
+                        else _FITTER_DIM)
         self._limits = limits_for()
         self._objective = cfg.objective
         self._switched = False
@@ -1454,13 +1474,19 @@ class RoundLoop:
         # ★ The first line must stand on its own (D-133 §3-3) — it holds
         #   the whole config and the commit hash, so the conditions can be
         #   known from the trace alone.
+        # ★ 2026-09-10 (D-152): **the output schema goes in whole.** Finding
+        #   where a phantom cap of 8 came from took two days because the
+        #   field descriptions the model actually receives were not in the
+        #   trace — `pydantic-ai` hands them over as the tool schema. With
+        #   this, the same investigation is one `jq` away.
         self.trace.ev("run_start", run_id=self.cfg.run_id, n_rounds=n,
                       commit=_git_commit(), config=self._config_dict(),
                       table=str(getattr(self.table, "bundle", "")),
                       split=self.splits.kind,
                       n_train=len(self.splits.train.shapes),
                       n_val=len(self.splits.val.shapes),
-                      features=sorted(self.matrix.feature_names()))
+                      features=sorted(self.matrix.feature_names()),
+                      output_schemas=_output_schemas())
         try:
             for _ in range(n):
                 res = self.run_round()
@@ -1535,7 +1561,7 @@ class RoundLoop:
                      "rule_constraints": {
                          "parameters": (self.cfg.parameters
                                         if self.cfg.parameters is not None
-                                        else _PARAMETERS),
+                                        else _FITTER_DIM),
                          "branch_constants_exempt": True}}
         llm_cfg = getattr(self.llm, "cfg", None)
         if llm_cfg is not None and hasattr(llm_cfg, "to_dict"):

@@ -17,7 +17,7 @@ from functools import lru_cache
 from typing import Any
 
 from kernelrule.rules.checks import (
-    PARAMETERS,
+    FITTER_SWITCH_DIM,
     exponent_message,
     literal_parameter_message,
     noop_term_message,
@@ -143,10 +143,10 @@ N_HYP_MIN, N_HYP_MAX = 3, 3
 _SHAPE_SIZE = re.compile(r"\d{3,6}\s*[x*×]\s*\d{3,6}"
                          r"|\b[MNK]\s*=\s*\d{3,6}\b")
 
-#: ⚠️ 2026-09-09 (D-150): **there is no weight cap.** The name is kept
-#: because it is exported and cited; the value is only the boundary
-#: `fitter_for` uses. Nothing refuses a proposal for exceeding it.
-MAX_WEIGHTS = PARAMETERS
+#: ⚠️ 2026-09-10 (D-152): **there is no weight cap** and nothing here counts
+#: weights any more. The name survives only because it is exported; it is the
+#: dimension at which the fitter switches, nothing else.
+MAX_WEIGHTS = FITTER_SWITCH_DIM
 
 
 #: ★ Experiment B (D-110). The schema must say the same thing as the
@@ -161,9 +161,7 @@ _POWER_DESC = (" ★ A weight may sit **in the exponent** — replacing "
                "`f.<name>`, and the exponent weight is bounded to 0~4.")
 
 
-def _desc_code(b: int, product: bool = False,
-               power: bool = False) -> str:
-    del b                     # ★ no parameter cap since D-150
+def _desc_code(product: bool = False, power: bool = False) -> str:
     return ("The full function, starting at `def score(f, p, hw, w):`. "
             "No prose, no markdown fences. "
             "★ Each w[i] may be used exactly once — reusing one weight "
@@ -175,28 +173,18 @@ def _desc_code(b: int, product: bool = False,
             + (_POWER_DESC if power else ""))
 
 
-def _desc_w0(b: int) -> str:
-    """⚠️ 2026-09-10 (D-151): this sentence used to end with "★ At most {b}
-    **per execution path**". D-150 took the cap out of the checker, the
-    prompts and `_desc_code` — **and missed this one.** `pydantic-ai` hands
-    the field description to the model as the tool schema, so the model kept
-    reading a cap that no longer existed and asked point-blank said so:
-    "the limit comes from the output-schema requirement". The fifth instance
-    of D-107's spot."""
-    del b
+def _desc_w0() -> str:
+    """⚠️ 2026-09-10 (D-151): this sentence used to end with "★ At most 8
+    **per execution path**". D-150 took the cap out of the checker and the
+    prompts — **and missed this one.** `pydantic-ai` hands the field
+    description to the model as the tool schema, so the model kept reading a
+    cap that no longer existed and, asked point-blank, quoted it back: "the
+    limit comes from the output-schema requirement"."""
     return ("Initial weights. ★ Do not give them carelessly — the objective "
             "is a step function and the optimiser can get stuck on a plateau "
             "near the starting point. Give a **starting point that reflects "
             "the physical magnitude of each term**. The length must equal the "
             "largest index the code references + 1, with no gaps")
-
-
-def _w0_message(n: int, b: int) -> str:
-    """⚠️ 2026-09-09 (D-150): kept for the record of the old refusals — no
-    caller raises it any more. `classify_violation` still maps its wording."""
-    return (f"{n} weights. The budget is {b} — it is summed with numeric "
-            f"literals. But **comparison constants in branch conditions are "
-            f"excluded** (§29.4 / D-78)")
 
 
 @dataclass
@@ -414,14 +402,14 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         #   `_rules_edit.md` was taken out of RuleWriter (§30.10). The
         #   replacement instruction is inserted per round by the RuleEditor
         #   prompt's `{parameters_note}`.
-        code: str = Field(description=_desc_code(MAX_WEIGHTS))
+        code: str = Field(description=_desc_code())
         # ⚠️ It used to say "roughly is enough". After the §29 correction
         #   the prompt (`_rules_common.md`) says "give a starting point that
         #   reflects the physical magnitude of each term", and this
         #   description alone did not follow, so **the same request said the
         #   opposite of itself.** The objective is a step function, so it
         #   cannot escape the plateau near the starting point (D-54).
-        w0: list[float] = Field(description=_desc_w0(MAX_WEIGHTS))
+        w0: list[float] = Field(description=_desc_w0())
         # ★ For lineage tracking. **A rule is not thrown away for leaving
         #   it empty** — more required fields only raise the chance of
         #   burning the retries. If empty, a warning is recorded.
@@ -477,10 +465,13 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         @field_validator("w0")
         @classmethod
         def _w0(cls, v: list[float]) -> list[float]:
+            # ⚠️ 2026-09-10 (D-152): a `len(v) > 8` refusal lived here.
+            #   D-150 removed the cap from the checker and D-151 from the
+            #   field description, and **this branch survived both** — so
+            #   every "no cap" measurement so far was taken with a live cap
+            #   of 8. What is left is numerical safety only.
             if not v:
                 raise ValueError("w0 is empty")
-            if len(v) > MAX_WEIGHTS:
-                raise ValueError(_w0_message(len(v), MAX_WEIGHTS))
             if not all(abs(x) < 1e6 for x in v):
                 raise ValueError("the w0 values are abnormally large")
             return v
@@ -547,33 +538,22 @@ def rule_output_for(parameters: int | None = None, *,
     """
     if not HAVE_PYDANTIC:                           # pragma: no cover
         return RuleOutput
-    b = int(parameters if parameters is not None else MAX_WEIGHTS)
-    if b == MAX_WEIGHTS and not product_hint and not power_hint:
+    # ⚠️ 2026-09-10 (D-152): `parameters` decided a budget here. It decides
+    #   nothing now — only whether a hint block is added — so the plain type
+    #   is returned unless a hint is on. It stays in the signature because
+    #   callers pass it and it is part of this function's cache key.
+    del parameters
+    if not product_hint and not power_hint:
         return RuleOutput
 
     class _BudgetedRuleOutput(RuleOutput):          # type: ignore[misc]
-        code: str = Field(description=_desc_code(b, product_hint, power_hint))
-        w0: list[float] = Field(description=_desc_w0(b))
+        code: str = Field(description=_desc_code(product_hint, power_hint))
+        w0: list[float] = Field(description=_desc_w0())
 
-        # ★ The name is kept **the same as the parent's**. pydantic
-        #   collects decorators by name, so only the same name **replaces**
-        #   the parent's. With a different name the parent's check of 8
-        #   stays and both run.
-        @model_validator(mode="after")
-        def _budget(self):
-            if (m := literal_parameter_message(self.code, len(self.w0),
-                                            parameters=b)):
-                raise ValueError(m)
-            return self
-
-        @field_validator("w0")
-        @classmethod
-        def _w0(cls, v: list[float]) -> list[float]:
-            if not v:
-                raise ValueError("w0 is empty")
-            if not all(abs(x) < 1e6 for x in v):
-                raise ValueError("the w0 values are abnormally large")
-            return v
+        # ⚠️ 2026-09-10 (D-152): the subclass used to re-declare `_budget`
+        #   and `_w0` to override the parent's cap of 8. The parent has no
+        #   cap now, so the overrides are gone — the subclass differs from
+        #   the parent **only in the hint sentences**.
 
     #: Keeps the type name the model sees — it is not a condition.
     _BudgetedRuleOutput.__name__ = "RuleOutput"

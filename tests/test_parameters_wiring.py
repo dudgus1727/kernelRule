@@ -118,7 +118,7 @@ def test_fitter_is_derived_from_the_parameter_count():
     (D-125), and in 16 dimensions Nelder-Mead's reach rate is 92%, short of
     the mark (D-77 · D-123).
     """
-    from kernelrule.rules.checks import PARAMETERS, fitter_for
+    from kernelrule.rules.checks import FITTER_SWITCH_DIM, fitter_for
 
     for n in (None, 4, 8):
         f = fitter_for(n)
@@ -128,7 +128,7 @@ def test_fitter_is_derived_from_the_parameter_count():
         f = fitter_for(n)
         assert f == {"fit_method": "cma", "fit_restarts": 1,
                      "max_evals": 300}, n
-    assert fitter_for(PARAMETERS)["fit_method"] == "nelder-mead"
+    assert fitter_for(FITTER_SWITCH_DIM)["fit_method"] == "nelder-mead"
 
 
 def test_fitter_keys_are_loopconfig_fields():

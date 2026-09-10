@@ -408,34 +408,32 @@ def test_shape_size_equality_is_banned_but_inequality_is_not():
                       n_weights=1).ok
 
 
-def test_both_budget_counters_agree():
-    """★ The LLM boundary and the static checks **must count the same
-    number** (the D-37 family).
+def test_the_path_counter_agrees_at_the_llm_boundary():
+    """★ The two counters must not diverge (the D-37 family).
 
-    If they diverge, the boundary lets it through and the static check
-    silently throws it away — and then the model never hears what was wrong.
+    ⚠️ 2026-09-10 (D-152): this compared "static count > cap" with "the LLM
+    boundary refuses". There is no cap, so what is left to agree on is the
+    **path count** — the one thing both still refuse.
     """
-    from kernelrule.rules.checks import PARAMETERS, literal_parameter_message
+    from kernelrule.rules.checks import MAX_PATHS, literal_parameter_message
 
-    cases = [
-        ("def score(f, p, hw, w):\n    return f.waves * w[0]\n", 1),
-        (("def score(f, p, hw, w):\n"
-          "    return np.where(p.roofline_ratio < 1, f.waves, f.tail_waste)"
-          " * w[0]\n"), 8),
-        (("def score(f, p, hw, w):\n"
-          "    return (f.waves - 2.0) * w[0]\n"), 8),
-        ("def score(f, p, hw, w):\n    return f.waves * w[0] * 1.5\n", 8),
-    ]
-    for code, nw in cases:
+    ok = "def score(f, p, hw, w):\n    return f.waves * w[0]\n"
+    many = ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+            + "".join(f"    if p.{g}:\n        s = s + f.tail_waste * w[{i}]\n"
+                      for i, g in enumerate(
+                          ("is_memory_bound", "can_use_cp_async",
+                           "roofline_ratio"), start=1))
+            + "    return s\n")
+    for code, nw in ((ok, 1), (many, 4)):
         r = check_rule(code, feature_names=FEAT,
-                       shape_value_names=SHAPE | {"roofline_ratio"},
+                       shape_value_names=SHAPE | {"roofline_ratio",
+                                                  "can_use_cp_async"},
                        n_weights=nw)
-        over_static = r.parameters_used > PARAMETERS
+        over_static = r.n_paths > MAX_PATHS
         over_llm = literal_parameter_message(code, nw) is not None
         assert over_static == over_llm, (
-            f"the two counters diverged: static "
-            f"{r.parameters_used}/{PARAMETERS} vs boundary {over_llm}\n"
-            f"{code}")
+            f"the two counters diverged: paths {r.n_paths}/{MAX_PATHS} vs "
+            f"boundary {over_llm}\n{code}")
 
 
 # ---------------------------------------------------------------------------

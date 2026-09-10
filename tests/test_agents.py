@@ -358,7 +358,7 @@ def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
 def test_prompts_state_no_parameter_cap(monkeypatch):
     """★ 2026-09-09 (D-150): the budget number is gone from the prompts.
 
-    This test used to change `checks.PARAMETERS` to 16 and demand that every
+    This test used to change the budget constant to 16 and demand that every
     prompt follow. Now there is nothing to follow — what it pins is that no
     prompt states a cap the checker does not enforce, which is the D-105
     failure in the other direction.
@@ -404,3 +404,91 @@ def test_prompt_states_no_size_limit_at_all():
         for phrase in ("per execution path", "at most 8", "no cap",
                        "{parameters}"):
             assert phrase not in low, f"{name}: {phrase!r} is still there"
+
+
+# ---------------------------------------------------------------------------
+# ★ The five surfaces that reach the model (D-152)
+# ---------------------------------------------------------------------------
+#: Everything the model reads. A rule stated on one of them and not enforced —
+#: or enforced and not stated — is the D-105/107/151/152 family of mistakes.
+#:
+#:   1 the system prompt
+#:   2 the user prompt
+#:   3 the output schema's field descriptions
+#:   4 ★ the validation failure message — pydantic-ai returns it to the model
+#:     on the retry
+#:   5 ★ the static checker's refusal message, on the same retry path
+def test_no_size_limit_on_any_of_the_five_surfaces():
+    """★ Checked **by behaviour**, not by wording (D-152).
+
+    A cap of 8 survived two removals by living in a validator: the words were
+    gone from every prompt while `len(w0) > 8` still raised. So this test
+    feeds a 20-weight rule through each surface that can refuse.
+    """
+    import json
+
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.agents.openai_client import assemble_instructions
+    from kernelrule.agents.schemas import (
+        rule_output_for,
+        validate_rule_proposal,
+    )
+    from kernelrule.features import REGISTRY
+    from kernelrule.rules.checks import check_rule, limits_for
+
+    code = ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+            + "".join(f"    s = s + f.tail_waste * w[{i}]\n"
+                      for i in range(1, 20))
+            + "    return s\n")
+    w0 = [0.1] * 20
+
+    # 3 + 4: the schema type the model fills, and its validators
+    rule_output_for()(code=code, w0=w0)
+    rule_output_for(product_hint=True)(code=code, w0=w0)
+    # the dict path (MockLLM and anything without structured output)
+    assert len(validate_rule_proposal({"code": code, "w0": w0}).w0) == 20
+    # 5: the static checker
+    rep = check_rule(code, feature_names=REGISTRY.names(shape_level=False),
+                     shape_value_names=REGISTRY.names(shape_level=True),
+                     n_weights=20, limits=limits_for())
+    assert rep.ok, rep.violations
+    # a branch, 25 weights
+    branched = ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
+                "    if p.is_memory_bound:\n"
+                + "".join(f"        s = s + f.tail_waste * w[{i}]\n"
+                          for i in range(1, 13))
+                + "    else:\n"
+                + "".join(f"        s = s + f.sm_idle_cost * w[{i}]\n"
+                          for i in range(13, 25))
+                + "    return s\n")
+    rule_output_for()(code=branched, w0=[0.1] * 25)
+    assert check_rule(branched,
+                      feature_names=REGISTRY.names(shape_level=False),
+                      shape_value_names=REGISTRY.names(shape_level=True),
+                      n_weights=25, limits=limits_for()).ok
+
+    # 1 + 2 + 3: and no surface *states* a limit either
+    blob = json.dumps(rule_output_for().model_json_schema(),
+                      ensure_ascii=False).lower()
+    for role in ("rule_writer", "rule_editor", "analyze"):
+        kw = {"objective": "regret"}
+        if role == "rule_writer":
+            kw["hw_text"] = "GPU: T\n"
+        blob += assemble_instructions(role, **kw).lower()
+    for phrase in ("per execution path", "at most 8", "the budget is",
+                   "no cap", "{parameters}"):
+        assert phrase not in blob, f"{phrase!r} is still on a surface"
+
+
+def test_the_numeric_safety_checks_stay():
+    """⚠️ Removing the cap must not remove these — they are not a budget."""
+    import pytest as _pytest
+
+    from kernelrule.agents.schemas import rule_output_for
+
+    code = "def score(f, p, hw, w):\n    return f.waves * w[0]\n"
+    cls = rule_output_for()
+    with _pytest.raises(Exception, match="empty"):
+        cls(code=code, w0=[])
+    with _pytest.raises(Exception, match="abnormally large"):
+        cls(code=code, w0=[1e9])
