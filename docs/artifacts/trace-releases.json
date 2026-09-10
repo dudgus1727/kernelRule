@@ -51,6 +51,28 @@
   },
   "uploaded": "2026-09-06"
  },
+ "ast3000": {
+  "bytes_raw": {
+   "ast3000-s0": 1411672
+  },
+  "bytes_zst": {
+   "ast3000-s0": 52008
+  },
+  "commits": {
+   "ast3000-s0": "0989b92"
+  },
+  "events": {
+   "ast3000-s0": 346
+  },
+  "release": "trace-ast3000-0989b92",
+  "runs": [
+   "ast3000-s0"
+  ],
+  "sha256": {
+   "trace-ast3000-s0.jsonl.zst": "7108e3cc746602035c2b1746888dab4c6d4af816305fa3816af5e95e228a082a"
+  },
+  "uploaded": "2026-09-10"
+ },
  "full12": {
   "bytes_raw": {
    "full12-s0": 1514781
