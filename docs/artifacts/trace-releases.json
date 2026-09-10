@@ -21,6 +21,28 @@
   },
   "uploaded": "2026-09-10"
  },
+ "F2new": {
+  "bytes_raw": {
+   "F2new-s0": 3339995
+  },
+  "bytes_zst": {
+   "F2new-s0": 74128
+  },
+  "commits": {
+   "F2new-s0": "8eae129"
+  },
+  "events": {
+   "F2new-s0": 375
+  },
+  "release": "trace-F2-8eae129",
+  "runs": [
+   "F2new-s0"
+  ],
+  "sha256": {
+   "trace-F2new-s0.jsonl.zst": "e3c5d79660cb3a558f823c0ff8aac30b6da3e7135312e000e0a47a541fb9e6e6"
+  },
+  "uploaded": "2026-09-10"
+ },
  "F3rw-p8-nan": {
   "bytes_raw": {
    "F3rw-p8-nan-s0": 4643730,
