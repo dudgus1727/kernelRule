@@ -681,7 +681,12 @@ class RoundLoop:
                 row["code"] = out.get("code")
                 f = register_generated(out["code"], registry=reg, meta=out,
                                        table=self.table, matrix=self.matrix,
-                                       hw_alt=alt_hw(self.table.hw))
+                                       hw_alt=alt_hw(self.table.hw),
+                                       # ★ D-166: the AUC check is the one
+                                       #   that reads the answer. The loop
+                                       #   knows its split, so it says which
+                                       #   shapes are its own.
+                                       train_shapes=self.splits.train.shapes)
                 # ★ The column is built now. Without it, a rule using the
                 #   name gets a KeyError.
                 # ★ 2026-09-11 (D-161): `register_generated` already handed

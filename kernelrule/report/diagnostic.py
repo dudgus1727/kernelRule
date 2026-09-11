@@ -167,11 +167,22 @@ def hardware_block(hw, noise) -> str:
             only 2 stages are possible.
 
         Limits of measurement:
+          ★ 2026-09-11 (D-166): the two percentages used to be **written
+            into the string** (7.3% / 0.08%) while the tick above them came
+            from the bundle. They are the A6000's — on the 5090 the first is
+            wrong by 64x and on the H100 by 32x, and the §29.5 (c) 5090 run
+            received exactly that. The same sentence D-117 fixed in
+            `hwprompt.py`; this copy was not swept (principles 2 · 23).
+            ⛔ The example lengths stay fixed at 14us / 1.3ms — replacing
+            them with this table's minimum would put an answer-derived
+            number into the Analyst prompt, which is what D-166 §E removed
+            from the RuleWriter prompt.
           Time is only recorded in units of the CUDA event timer's tick
             ({noise.tick_ms * 1000:.3f}us). Smaller differences **cannot be
             distinguished by measurement.**
           The shorter the kernel, the larger that tick is relatively —
-            one tick is 7.3% at 14us, 0.08% at 1.3ms.""")
+            one tick is {noise.tick_pct(0.014):.2%} at 14us, \
+{noise.tick_pct(1.3):.3%} at 1.3ms.""")
 
 
 # ---------------------------------------------------------------------------

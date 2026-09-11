@@ -25,9 +25,24 @@ only runs when given a `SplitSet`, and overlap raises.
     prompt      edited by a human              -> `splits.test` only (§10.2)
 
 This function produces the **structure holdout**: weights are fitted per
-regime on `splits.train` and evaluated on `splits.val`. The loop used val
-only for the early-stop decision, so the structure was not fitted to those
-shapes.
+regime on `splits.train` and evaluated on `splits.val`.
+
+★ 2026-09-11 (D-166): ~~The loop used val only for the early-stop
+decision~~ — **the loop does not look at val at all.** Early stopping was
+turned off at D-132 and the path was sealed at D-144: `should_stop` returns
+`(False, "")` always and raises if `patience > 0`. Acceptance, parent
+selection and the objective switch all read the training score. So the
+structure is not fitted to these shapes by any route — the old sentence
+understated the guarantee, and understating a guarantee is its own kind of
+wrong (principle 9).
+
+```
+the representative runs   F3rw-p8-nan, 6 seeds   patience = 0 (all six)
+                          -> none of them stopped on val
+⚠️ runs from before D-132 (2026-09-04) may have had an early stop that did
+   read val. **Which runs those are has not been checked** — do not assume
+   (principle 39).
+```
 
 ## Deciding the regime
 

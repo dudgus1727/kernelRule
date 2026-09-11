@@ -169,6 +169,13 @@ def main() -> None:                                          # noqa: PLR0915
 
     real = _load_archive(RUN_REAL)
     llm_train = min(real, key=lambda e: e["regret"])
+    # ⚠️ 2026-09-11 (D-166): **this arm picks the rule on the holdout.**
+    #   It exists as an upper bound — "how well would the ablation read if
+    #   the best rule for these shapes had been chosen" — and is only ever
+    #   comparable inside this ablation, never as a result. The label below
+    #   says so, because a label that does not is how a number walks out of
+    #   the badge that fences it (`docs/artifacts/structure-transfer.md`).
+    #   ⛔ Do not move this number into `conclusion.md`.
     llm_val = min((e for e in real if np.isfinite(e["val_regret"])),
                   key=lambda e: e["val_regret"])
     llm_smoke = min(_load_archive(RUN_SMOKE), key=lambda e: e["regret"])
@@ -190,7 +197,9 @@ def main() -> None:                                          # noqa: PLR0915
 
     cands = [("hand rule (7 terms)", HW, HW_W0),
              ("LLM smoke (8 terms)", llm_smoke["code"], llm_smoke["w"]),
-             ("LLM val best (16 terms)", llm_val["code"], llm_val["w"]),
+             (("LLM val-selected (16 terms) ★ picked ON the holdout — an "
+               "upper bound, not a result"),
+              llm_val["code"], llm_val["w"]),
              ("LLM train best (19 terms)", llm_train["code"], llm_train["w"])]
 
     # -- 0. checking the premise -------------------------------------------

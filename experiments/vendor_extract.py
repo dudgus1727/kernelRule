@@ -37,40 +37,20 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from pathlib import Path
 
-#: GPU name -> preset. ★ The same table as kernelTab's
-#: `scripts/baseline_vendor.py`.
-GPU_PRESETS = {
-    "rtx a6000": "RTX_A6000", "rtx 4090": "RTX_4090", "rtx 3090": "RTX_3090",
-    "rtx 5090": "RTX_5090", "rtx 6000 ada": "RTX_6000_ADA",
-    "a100": "A100_SXM_80GB", "a40": "A40_PCIE", "a30": "A30_PCIE",
-    "a10": "A10_PCIE",
-    # ★ 2026-09-10 (D-158): the H100 comes in variants and this table mapped
-    #   every one of them to `H100_SXM`. Our bundle is an **H100 NVL** — a
-    #   different card (different clocks and bandwidth), and the preset for
-    #   it exists. The longer key wins in `preset_for`, so the variants are
-    #   listed before the bare "h100".
-    "h100 nvl": "H100_NVL", "h100 pcie": "H100_PCIE", "h100": "H100_SXM",
-    "h200": "H200_SXM",
-    "l40s": "L40S", "l40": "L40", "l4": "L4", "b200": "B200",
-}
-
-PAT = re.compile(
-    r"stages\((\d+)\)\s+cta\((\d+) (\d+) (\d+)\)\s+warp\((\d+) (\d+) (\d+)\)"
-    r"\s+instr\((\d+) (\d+) (\d+)\)\s+splitK\((\d+)\)\s+swizz\((\d+)\)"
-    r"\s+ctaOrder\((\d+)\)")
-CLUSTER_PAT = re.compile(r"cluster\((\d+) (\d+)(?: (\d+))?\)")
-
-
-def preset_for(name: str) -> str:
-    low = name.lower().replace("nvidia", "").strip()
-    for k, v in sorted(GPU_PRESETS.items(), key=lambda kv: -len(kv[0])):
-        if k in low:
-            return v
-    raise SystemExit(
-        f"the preset for '{name}' is unknown. Add it to GPU_PRESETS.")
+# ★ 2026-09-11 (D-166): the preset table, the kernel pattern and `preset_for`
+#   **used to be copied here.** D-158 fixed the H100 variants in this copy and
+#   the library's went unfixed — one job, two definitions (principle 2). They
+#   are imported now, and the fixed content is what moved into the library.
+from kernelrule.baselines.vendor import (
+    CLUSTER_PAT,
+    GPU_PRESETS,  # noqa: F401  — re-exported so callers of this module see it
+    preset_for,
+)
+from kernelrule.baselines.vendor import (
+    KERNEL_PAT as PAT,
+)
 
 
 def main() -> None:
@@ -122,10 +102,23 @@ def main() -> None:
                 bad_cluster += 1
             if not isinstance(kern, str):
                 g = kern
+                # ★ 2026-09-11 (D-166): **the instr check used to sit below
+                #   this branch and never ran.** 0.1.0.27 returns a
+                #   `GemmConfig` object, not a string, so every candidate took
+                #   this path and `continue`d past the check — the printed
+                #   `instr != (16,8,16) 0` meant "not counted", not "none".
+                #   The cluster check above is fine: it runs on `str(kern)`,
+                #   and the object's `__str__` carries the whole line.
+                instr = (g.instr_tile_m, g.instr_tile_n, g.instr_tile_k)
+                if instr != (16, 8, 16):
+                    bad_instr += 1
                 lst.append({"stages": g.stages,
                             "cta": [g.cta_tile_m, g.cta_tile_n, g.cta_tile_k],
                             "warp": [g.warp_tile_m, g.warp_tile_n,
                                      g.warp_tile_k],
+                            # ★ recorded so the watch can be checked after the
+                            #   fact instead of trusted
+                            "instr": list(instr),
                             "split_k": g.split_k, "swizzle": g.swizzle_factor,
                             "cta_order": g.cta_order,
                             "pred_ms": (rt or 0) * 1000.0})
@@ -136,9 +129,11 @@ def main() -> None:
                 lst.append({"raw": raw, "parse_fail": True})
                 continue
             g = [int(x) for x in mo.groups()]
-            if tuple(g[7:10]) != (16, 8, 16):
+            instr = tuple(g[7:10])
+            if instr != (16, 8, 16):
                 bad_instr += 1
             lst.append({"stages": g[0], "cta": g[1:4], "warp": g[4:7],
+                        "instr": list(instr),
                         "split_k": g[10], "swizzle": g[11], "cta_order": g[12],
                         "pred_ms": (rt or 0) * 1000.0})
         out[f"{M}x{N}x{K}"] = lst

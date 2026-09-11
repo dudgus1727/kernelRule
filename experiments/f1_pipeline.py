@@ -253,30 +253,18 @@ def _splits(table: PerfTable, *, fold: int | None = None,
 
 
 def _base_registry(condition: str) -> FeatureRegistry:
-    """The **starting registry** the condition decides. `F1` is empty.
+    """The **starting registry** the condition decides.
 
-    ★ There are three conditions (D-128). A 0 -> 5 -> 24 ladder, with no
-    aliases.
+    ⚠️ 2026-09-11 (D-166 §M): the body moved to
+    `kernelrule.features.loader.base_registry` — `run_registry` rebuilds a
+    finished run's axis list and needs the same first layer. One copy
+    (principle 2); the three conditions and the 0 -> 5 -> 24 ladder are
+    unchanged.
     """
-    if condition == "F1":
-        return FeatureRegistry("F1-empty")
-    if condition == "F2":
-        # ★ The five public facts (§30.17). Not `physical.py`'s originals
-        #   but the **cleaned-up version with the table observations
-        #   removed** — the original docstrings carry measurement results
-        #   such as "in this table a spilling kernel was optimal 0 times"
-        #   (§12.3).
-        from kernelrule.features.known5 import KNOWN5
-        r = FeatureRegistry("F2-known5")
-        for n in sorted(KNOWN5._items):
-            r.add(KNOWN5[n])
-        return r
-    if condition == "F3":
-        r = FeatureRegistry("F3-human24")
-        for n in sorted(REGISTRY._items):
-            r.add(REGISTRY[n])
-        return r
-    raise ValueError(f"unknown condition: {condition!r}. F1/F2/F3")
+    from kernelrule.features.loader import base_registry
+    # ★ `human=` is explicit: the library must not reach for the global
+    #   registry (§30.9), so the human list is handed in from here.
+    return base_registry(condition, human=REGISTRY)
 
 
 def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
@@ -295,11 +283,14 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
             check_hw_prompt,
             hw_prompt_from_bundle,
         )
+        # ★ D-166: no `table=`. The measurement-limit section was what
+        #   needed it, and that section (with its answer-derived `min_ms`)
+        #   is gone.
         hw_text, _facts = hw_prompt_from_bundle(
-            a.bundle, env_hash=getattr(a, "env_hash", None), table=table)
+            a.bundle, env_hash=getattr(a, "env_hash", None))
         # ★ Is what was built the same hardware as this table? Verified in
-        #   reverse.
-        check_hw_prompt(hw_text, table.hw, float(table.noise.tick_ms))
+        #   reverse — name + this bundle's effective numbers (D-166 §E-③).
+        check_hw_prompt(hw_text, table.hw)
     names = sorted(n for n in registry._items if not registry[n].shape_level)
     svals = sorted(n for n in registry._items if registry[n].shape_level)
     if a.dry_run:
@@ -330,7 +321,8 @@ def _dump_json(path: Path, obj) -> None:
 # ---------------------------------------------------------------------------
 # Stage 1 — FeatureWriter
 # ---------------------------------------------------------------------------
-def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
+def stage1(a, d: Path, table, matrix, base: FeatureRegistry,
+           train_shapes=None) -> FeatureRegistry:
     """Builds features. ★ Each proposal is appended immediately (D-33).
 
     **The areas are partitioned first** (§30.10). It used to loop over
@@ -504,7 +496,9 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry) -> FeatureRegistry:
                              "expected_range", "rationale")})
                 f = register_generated(res["code"], registry=gen, meta=res,
                                        table=table, matrix=matrix,
-                                       hw_alt=hw_alt)
+                                       hw_alt=hw_alt,
+                                       # ★ D-166 — see the loop's call site
+                                       train_shapes=train_shapes)
                 row["accepted"] = True
                 row["shape_level"] = f.shape_level
                 if f.shape_level:
@@ -1122,7 +1116,8 @@ def main() -> None:
         #   anywhere.
         m0 = FeatureMatrix(table, base)
         print("--- stage 1 FeatureWriter ---")
-        reg = stage1(a, d, table, m0, base)
+        reg = stage1(a, d, table, m0, base,
+                     train_shapes=splits.train.shapes)
     elif a.condition == "F3":
         reg = base                  # the human 24 as they are
         print(f"--- no stage 1 (F3) — {len(reg._items)} human features ---")

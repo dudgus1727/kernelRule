@@ -339,3 +339,95 @@ def test_block_3_5_never_annotates_individual_features():
         "the per-feature table observations are still alive. The feature "
         "descriptions in the prompt would carry 'this axis enters the answer "
         "0 times' (§12.3b).")
+
+
+# ---------------------------------------------------------------------------
+# ★ D-166 §G — the tick lessons, moved here from `test_hw_prompt.py`
+# ---------------------------------------------------------------------------
+#
+#   D-113 · D-116 · D-117 were about the measurement-limit section of the
+#   RuleWriter prompt. That section is gone (D-166 §E) — but the information
+#   is not: it reaches the Analyst and the RuleEditor through **this**
+#   report, which is the role that can act on it. The tests move with it.
+#
+#   And the reason they had to move is itself a defect this file now guards:
+#   the percentages in this block were **written into the string** while the
+#   tick above them came from the bundle.
+_BUNDLES = (
+    ("datasets/rtx-a6000-sm_86-c63710df", "c63710df"),
+    ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403"),
+)
+
+
+def _hw_block(bundle: str, env_hash: str):
+    import warnings
+
+    from kernelrule.core.table import PerfTable
+    from kernelrule.report.diagnostic import hardware_block
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        t = PerfTable.from_bundle(bundle, env_hash=env_hash, ok_only=False)
+    return hardware_block(t.hw, t.noise), t
+
+
+@pytest.mark.needs_bundle
+def test_tick_percentages_are_computed_not_hardcoded():
+    """★ D-166 §G — this is a defect that **already happened**.
+
+    The block said "one tick is 7.3% at 14us, 0.08% at 1.3ms" on every table
+    while printing each bundle's own tick above it. Those two numbers are the
+    A6000's: on the 5090 the first is wrong by 64x. The §29.5 (c) 5090 run
+    received exactly that. It is the sentence D-117 fixed in `hwprompt.py`
+    and this copy was not swept (principles 2 · 23).
+    """
+    from pathlib import Path
+
+    seen = {}
+    for bundle, env_hash in _BUNDLES:
+        if not Path(bundle).exists():
+            pytest.skip(f"{bundle} is not here")
+        txt, t = _hw_block(bundle, env_hash)
+        assert f"{t.noise.tick_pct(0.014):.2%} at 14us" in txt, txt
+        assert f"{t.noise.tick_pct(1.3):.3%} at 1.3ms" in txt, txt
+        seen[bundle] = txt
+    a, g = (seen[b] for b, _ in _BUNDLES)
+    assert "7.31% at 14us" in a, "the A6000 row changed"
+    assert "7.31% at 14us" not in g, (
+        "the 5090 block states the A6000's tick ratio — it is nailed in as a "
+        "constant again (D-166 §G)")
+
+
+@pytest.mark.needs_bundle
+def test_the_tick_itself_still_comes_from_the_bundle():
+    """★ D-116's lesson, in its new home. The tick is 1/64 between these two
+    tables and the text has to move with it."""
+    from pathlib import Path
+
+    for bundle, env_hash in _BUNDLES:
+        if not Path(bundle).exists():
+            pytest.skip(f"{bundle} is not here")
+        txt, t = _hw_block(bundle, env_hash)
+        assert f"{t.noise.tick_ms * 1000:.3f}us" in txt
+
+
+@pytest.mark.needs_bundle
+def test_the_example_lengths_stay_fixed():
+    """⛔ D-166 §G — the example lengths are **not** replaced by this table's
+    minimum `best_ms`. That would put an answer-derived number into the
+    Analyst prompt, which is the thing §E removed from the RuleWriter
+    prompt."""
+    import inspect
+    from pathlib import Path
+
+    from kernelrule.report import diagnostic
+
+    src = inspect.getsource(diagnostic.hardware_block)
+    assert "0.014" in src and "1.3" in src
+    assert "best_time" not in src and "best_ms" not in src, (
+        "an answer-derived length came in through the other door")
+    for bundle, env_hash in _BUNDLES:
+        if not Path(bundle).exists():
+            pytest.skip(f"{bundle} is not here")
+        txt, _ = _hw_block(bundle, env_hash)
+        assert "at 14us" in txt and "at 1.3ms" in txt

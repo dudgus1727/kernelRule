@@ -1,0 +1,567 @@
+{
+ "bundle": "datasets/rtx-a6000-sm_86-c63710df",
+ "runs": {
+  "cap1": {
+   "split": "kfold0-seed12345",
+   "n_train": 40,
+   "n_val": 21,
+   "axes": [
+    {
+     "name": "parallel_reduction_traffic_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "pipeline_startup_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "register_file_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "alignment_deficit",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "13 lines > 12. Make it shorter",
+     "why_train": "13 lines > 12. Make it shorter"
+    },
+    {
+     "name": "vector_alignment_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": false,
+     "same": false,
+     "why_whole": "",
+     "why_train": "vector_alignment_deficit: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 bec"
+    },
+    {
+     "name": "sass_instruction_density",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "shared_memory_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "k_tail_padding_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "operand_traffic_waste_fraction",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "13 lines > 12. Make it shorter",
+     "why_train": "13 lines > 12. Make it shorter"
+    },
+    {
+     "name": "l2_operand_footprint_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "global_memory_traffic_ratio",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "cta_wave_count",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "operand_contiguity_deficit",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "13 lines > 12. Make it shorter",
+     "why_train": "13 lines > 12. Make it shorter"
+    },
+    {
+     "name": "shared_operand_traffic_per_flop",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "mainloop_iteration_count",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "spill_traffic_per_flop",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "cta_thread_underutilization",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "cta_thread_underutilization: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 ",
+     "why_train": "cta_thread_underutilization: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 "
+    },
+    {
+     "name": "total_instruction_work_per_flop",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "thread_work_coverage_deficit",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "thread_work_coverage_deficit: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0",
+     "why_train": "thread_work_coverage_deficit: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0"
+    },
+    {
+     "name": "warp_slot_waste",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "warp_slot_waste: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 because a ne",
+     "why_train": "warp_slot_waste: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 because a ne"
+    }
+   ]
+  },
+  "dupfix": {
+   "split": "kfold0-seed12345",
+   "n_train": 40,
+   "n_val": 21,
+   "axes": [
+    {
+     "name": "parallel_reduction_traffic",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "alignment_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": false,
+     "same": false,
+     "why_whole": "",
+     "why_train": "alignment_deficit: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 because a "
+    },
+    {
+     "name": "register_file_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "instruction_count_per_flop",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "pipeline_fill_drain_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "reduction_dimension_padding",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": false,
+     "same": false,
+     "why_whole": "",
+     "why_train": "reduction_dimension_padding: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 "
+    },
+    {
+     "name": "shared_memory_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "tiled_operand_traffic_ratio",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "spill_traffic_per_flop",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "cta_tile_l2_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "global_sm_parallelism_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "thread_work_granularity",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "cta_overhead_per_output",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "mainloop_iteration_count",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "serial_split_reduction_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "tile_segment_density",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "serial_reduction_state_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "configured_vector_alignment_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": false,
+     "same": false,
+     "why_whole": "",
+     "why_train": "configured_vector_alignment_deficit: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fall"
+    },
+    {
+     "name": "cta_roofline_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "cta_wave_count",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "13 lines > 12. Make it shorter",
+     "why_train": "13 lines > 12. Make it shorter"
+    }
+   ]
+  },
+  "F2new": {
+   "split": "kfold0-seed12345",
+   "n_train": 40,
+   "n_val": 21,
+   "axes": [
+    {
+     "name": "split_k_reduction_traffic_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "alignment_deficit",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "13 lines > 12. Make it shorter",
+     "why_train": "13 lines > 12. Make it shorter"
+    },
+    {
+     "name": "alignment_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": false,
+     "same": false,
+     "why_whole": "",
+     "why_train": "alignment_deficit: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 because a "
+    },
+    {
+     "name": "instruction_density",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "tiled_input_redundancy",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "register_file_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "pipeline_fill_drain_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "shared_memory_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "k_loop_padding_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": false,
+     "same": false,
+     "why_whole": "",
+     "why_train": "k_loop_padding_fraction: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to 0 beca"
+    },
+    {
+     "name": "grid_parallelism_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "config_roofline_deficit",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "serial_split_reduction_work",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "spill_traffic_fraction",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "resident_wave_count",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "parallel_partial_cache_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "cta_scheduling_overhead_ratio",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "13 lines > 12. Make it shorter",
+     "why_train": "13 lines > 12. Make it shorter"
+    },
+    {
+     "name": "cta_thread_quantization_waste",
+     "recorded": false,
+     "whole_table": false,
+     "train_only": false,
+     "same": true,
+     "why_whole": "cta_thread_quantization_waste: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to ",
+     "why_train": "cta_thread_quantization_waste: §8.3 validation failed — constant: std=0 — zero explanatory power. It may have fallen to "
+    },
+    {
+     "name": "operand_tile_traffic_imbalance",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "cta_l2_working_set_pressure",
+     "recorded": true,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    },
+    {
+     "name": "mainloop_iteration_count",
+     "recorded": false,
+     "whole_table": true,
+     "train_only": true,
+     "same": true,
+     "why_whole": "",
+     "why_train": ""
+    }
+   ]
+  }
+ },
+ "n_differing": 6
+}

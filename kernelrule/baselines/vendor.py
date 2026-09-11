@@ -10,12 +10,17 @@ only at heuristic ranking quality **inside the same CUTLASS kernel space**.
 
 ## It has two stages
 
-    extract   pull per-shape top-k out of nvMatmulHeuristics.
-              **Run it in a separate venv** — do not pollute this repo's
-              environment. ★ It uses no GPU. Only a GPU **preset** (a CPU
-              prediction model).
-    score     map that output onto our table and score it. This side runs in
-              the main environment.
+    extract   ★ `experiments/vendor_extract.py` — pull per-shape top-k out of
+              nvMatmulHeuristics. ★ It uses no GPU. Only a GPU **preset** (a
+              CPU prediction model).
+    score     this module — map that output onto our table and score it.
+
+⚠️ 2026-09-11 (D-166): `extract()` **used to live here too**, and nothing
+called it: every recorded extraction went through `experiments/`. Two
+implementations of one job is how `GPU_PRESETS` came to be fixed in one of
+them and not the other (D-158's H100 variants). The copy here is gone and the
+preset table below is now **the single one** — `experiments/vendor_extract.py`
+imports it.
 
 Saving the `extract` output (`vendor.json`) makes later rescoring a
 table-only operation. kernelTab did not commit it, so recomputation needed
@@ -34,22 +39,39 @@ import json
 import re
 from pathlib import Path
 
-__all__ = ["GPU_PRESETS", "extract", "load_vendor", "vendor_order_fn",
-           "match_report"]
+__all__ = ["GPU_PRESETS", "preset_for", "KERNEL_PAT", "CLUSTER_PAT",
+           "load_vendor", "vendor_order_fn", "match_report"]
 
 #: GPU name -> nvMatmulHeuristics preset. Derived from `hw.name`.
+#:
+#: ★ **This is the only copy** (D-166). `experiments/vendor_extract.py` had
+#: its own, D-158 fixed the H100 variants in that one, and this one kept
+#: mapping every H100 to `H100_SXM` — so a re-extraction through this module
+#: would have put an SXM preset on an NVL bundle with no error and no
+#: warning. Nothing re-extracted through here (the four committed files came
+#: from `experiments/`), so no number was wrong; what existed was the trap.
 GPU_PRESETS = {
     "rtx a6000": "RTX_A6000", "rtx 4090": "RTX_4090", "rtx 3090": "RTX_3090",
     "rtx 5090": "RTX_5090", "rtx 6000 ada": "RTX_6000_ADA",
     "a100": "A100_SXM_80GB", "a40": "A40_PCIE", "a30": "A30_PCIE",
-    "a10": "A10_PCIE", "h100": "H100_SXM", "h200": "H200_SXM",
+    "a10": "A10_PCIE",
+    # ★ 2026-09-10 (D-158): the H100 comes in variants and this table mapped
+    #   every one of them to `H100_SXM`. Our bundle is an **H100 NVL** — a
+    #   different card (different clocks and bandwidth), and the preset for
+    #   it exists. The longer key wins in `preset_for`, so the variants are
+    #   listed before the bare "h100".
+    "h100 nvl": "H100_NVL", "h100 pcie": "H100_PCIE", "h100": "H100_SXM",
+    "h200": "H200_SXM",
     "l40s": "L40S", "l40": "L40", "l4": "L4", "b200": "B200",
 }
 
-_PAT = re.compile(
+#: The kernel string nvMatmulHeuristics prints. ★ One copy (D-166) — the
+#: extractor imports it.
+KERNEL_PAT = re.compile(
     r"stages\((\d+)\)\s+cta\((\d+) (\d+) (\d+)\)\s+warp\((\d+) (\d+) (\d+)\)"
     r"\s+instr\((\d+) (\d+) (\d+)\)\s+splitK\((\d+)\)\s+swizz\((\d+)\)"
     r"\s+ctaOrder\((\d+)\)")
+CLUSTER_PAT = re.compile(r"cluster\((\d+) (\d+)(?: (\d+))?\)")
 
 #: Per-axis weights for the nearest mapping. The cta tile weighs most.
 #: (tm, tn, tk, wm, wn, wk, stages, swizzle, split_k, mode)
@@ -64,68 +86,6 @@ def preset_for(name: str) -> str:
     raise SystemExit(
         f"no nvMatmulHeuristics preset is known for {name!r}. "
         "Add it to GPU_PRESETS.")
-
-
-# ---------------------------------------------------------------------------
-# Stage 1 — extract (separate venv; stdlib + nvMatmulHeuristics only)
-# ---------------------------------------------------------------------------
-def extract(bundle_dir: str | Path, out_path: str | Path,
-            count: int = 8) -> int:
-    """Pull the heuristic's top-`count` for the bundle's shape list.
-
-    ★ This function imports neither `kernelrule` nor `kerneltab` — it has to
-    run in an isolated venv. Shapes and hardware are read straight from the
-    bundle files.
-    """
-    import nvMatmulHeuristics as nv
-
-    bundle_dir = Path(bundle_dir)
-    info = json.loads((bundle_dir / "BUNDLE.json").read_text())
-    gpu_name = info["gpu_name"]
-    preset = preset_for(gpu_name)
-    shapes = sorted({tuple(int(x) for x in s)
-                     for rows in info["shape_layers"].values() for s in rows})
-    print(f"{gpu_name} -> preset {preset}, {len(shapes)} shapes, top-{count}")
-
-    h = nv.NvMatmulHeuristicsInterface(nv.NvMatmulHeuristicsTarget.CUTLASS,
-                                       precision="HSS")
-    hd = h.createHardwareDescriptor()
-    h.setHardwarePredefinedGpu(hd, getattr(nv.NvMatmulHeuristicsNvidiaGpu,
-                                           preset))
-    layout = nv.NvMatmulHeuristicsMatmulLayout.TN_ROW_MAJOR
-
-    out = {"_meta": {"gpu": gpu_name, "preset": preset,
-                     "env_hash": info["env_hash"], "count": count,
-                     "bundle_id": info["bundle_id"],
-                     "layout": "TN_ROW_MAJOR", "precision": "HSS",
-                     "target": "CUTLASS"}}
-    for (M, N, K) in shapes:
-        cfgs = h.get_with_mnk(M, N, K, layout, count, hd)
-        lst = []
-        for c in cfgs:
-            kern, rt = c["kernel"], c.get("runtime")
-            if not isinstance(kern, str):
-                g = kern
-                lst.append({"stages": g.stages,
-                            "cta": [g.cta_tile_m, g.cta_tile_n, g.cta_tile_k],
-                            "warp": [g.warp_tile_m, g.warp_tile_n,
-                                     g.warp_tile_k],
-                            "split_k": g.split_k, "swizzle": g.swizzle_factor,
-                            "cta_order": g.cta_order,
-                            "pred_ms": (rt or 0) * 1000.0})
-                continue
-            mo = _PAT.search(kern)
-            if not mo:
-                lst.append({"raw": kern, "parse_fail": True})
-                continue
-            g = [int(x) for x in mo.groups()]
-            lst.append({"stages": g[0], "cta": g[1:4], "warp": g[4:7],
-                        "split_k": g[10], "swizzle": g[11], "cta_order": g[12],
-                        "pred_ms": (rt or 0) * 1000.0})
-        out[f"{M}x{N}x{K}"] = lst
-    Path(out_path).write_text(json.dumps(out, indent=1))
-    print(f"{len(out) - 1} shapes -> {out_path}")
-    return 0
 
 
 # ---------------------------------------------------------------------------

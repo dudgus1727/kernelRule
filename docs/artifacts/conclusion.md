@@ -731,9 +731,28 @@ implement Critic     physics_seeded went 1.758 -> 1.172 with 3 rounds of
                      from GBDT visible
 §16.1 ablation       the Analyst is 8% of the calls and we do not know whether
                      it contributes
-24 rounds            whether 12 is enough has not been looked at
+24 rounds            ★ measured — it is not an open question any more.
+                     See below
 the Analyst -> FeatureWriter path
 ```
+
+⚠️ 2026-09-11 (D-166 §L) — the line above read "whether 12 is enough has not
+been looked at". It **had** been: `round-curve.md` carries the D-132 §2
+pre-registration and reproduces with 0 LLM calls. The answer is not "12 is
+enough":
+
+```
+the round curve is measured (round-curve.md, pre-registered in D-132)
+★ neither 12 nor 24 is a convergence point. Both campaigns are still
+  improving in their last 4 rounds — old +0.0156, new +0.0183
+★ 12 rounds is a stopping point that was decided, not a convergence point
+```
+
+That matters for reading every number in this document: they are the values
+of a run that **stopped**, not of one that converged. ⛔ It is not an
+argument for running 24 — the number of rounds is fixed at 12 (D-166), and
+the two campaigns' final values are indistinguishable from each other
+(+0.0025, 8% of the decision line).
 
 ## The verification path (done)
 

@@ -1,5 +1,11 @@
 # ★ The final-scoring curve by round — **24 is not a convergence point either**
 
+> **Status**: measured (2026-09-05), and the verdict is in the title — ★
+> **neither 12 nor 24 is a convergence point**. The number of rounds is
+> fixed at 12 (D-166); this curve does not reopen it, it is the reservation
+> that goes with every number read out of a 12-round run.
+> ⚠️ 2026-09-11 (D-166 §L): the badge was missing — `conclusion.md` still
+> listed "whether 12 is enough" as unexamined because of it.
 > **Reproduce**: `python3 experiments/round_curve.py` (about 40 minutes,
 > **0 LLM calls**)
 > **Pre-registration**: D-132 §2 — the decision line was pinned before the
@@ -84,3 +90,12 @@ grounds   the curve rises to the last round (no reason to cut it shorter)
 ⚠️ it is not claimed that "24 is better than 12" — that difference cannot be
    measured
 ```
+
+> ⚠️ 2026-09-11 (D-166 §L): ~~"24 rounds · no early stopping is kept"~~ — the
+> number of rounds for the 21-run campaign is **12**, decided by the user.
+> The paragraph above is left as the record of what was decided on
+> 2026-09-05 and is not deleted (documentation rule 2). What survives it is
+> §2 and §3: the curve is still rising at the last round in both campaigns,
+> and the two final values are indistinguishable — so 12 is a **cost**
+> decision, exactly as §4 concluded, and the reservation in the badge rides
+> along with every 12-round number.

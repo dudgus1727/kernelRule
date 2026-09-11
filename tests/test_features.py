@@ -751,3 +751,61 @@ def test_the_comparison_shapes_are_not_all_one_m(perf_table):
     # and it is reproducible
     assert [p.key for p in sh] == [
         p.key for p in _spread_shapes(perf_table, DUP_SHAPES)]
+
+
+# ---------------------------------------------------------------------------
+# ★ D-166 §M — the axis list of a finished run
+#
+#   A rule from an F2 run uses axes the FeatureWriter built, in three
+#   places: the condition's base, `stage1-features/proposals.jsonl`, and
+#   **`features.jsonl` of the loop directory**. The third is the one that
+#   gets forgotten — `transfer_generated` was fixed for it in D-165 §1 and
+#   `export_rules` / `verify_rules` were not looked at (principle 23), so a
+#   campaign rule loaded as `AttributeError: unregistered feature` and
+#   landed in the "cannot be re-scored" bucket next to a green line.
+# ---------------------------------------------------------------------------
+@pytest.mark.needs_bundle
+def test_a_rebuilt_run_registry_rescores_that_run_s_archive(perf_table):
+    """★ The reproduction: `runs/cap1`'s best rule, re-scored through a
+    registry rebuilt from the run's artefacts, equals the `regret` the loop
+    recorded.
+
+    It is an exact-equality check on purpose. Both sides are the same
+    deterministic formula over the same shapes — a tolerance here would
+    hide the axis list being subtly different.
+    """
+    import json
+    from pathlib import Path
+
+    import numpy as np
+
+    from kernelrule.core.sandbox import compile_rule
+    from kernelrule.core.scoring import evaluate_scores
+    from kernelrule.core.weights import make_score_of
+    from kernelrule.features.loader import run_registry
+
+    run, seed = "cap1", 0
+    arc = Path(f"runs/{run}-s{seed}/archive.jsonl")
+    if not arc.exists():
+        pytest.skip(f"{arc} is not here — `runs/` is .gitignore'd")
+
+    reg, origin = run_registry(run, table=perf_table, seed=seed)
+    layers = {v.split()[0] for v in origin.values()}
+    assert "loop" in layers, (
+        "the loop's own axes are missing from the rebuilt registry — that "
+        f"is the D-165 §1 trap. layers: {sorted(layers)}")
+
+    from experiments.f1_pipeline import _splits
+    cfg = json.loads(Path(f"runs/{run}/config.json").read_text())
+    assert cfg["split_kind"] == "kfold0-seed12345", cfg["split_kind"]
+    splits = _splits(perf_table, fold=0, split_seed=12345, k=3)
+    matrix = FeatureMatrix(perf_table, reg)
+
+    rows = [json.loads(ln) for ln in arc.open() if ln.strip()]
+    best = min(rows, key=lambda e: e["regret"])
+    fn = compile_rule(best["code"])
+    ev = evaluate_scores(make_score_of(fn, matrix, np.asarray(best["w"],
+                                                              float)),
+                         perf_table, list(splits.train.shapes), ks=(1,))
+    assert ev.at(1) == pytest.approx(best["regret"], abs=1e-9), (
+        f"recorded {best['regret']:.6f} != rescored {ev.at(1):.6f}")

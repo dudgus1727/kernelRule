@@ -34,7 +34,6 @@ itself is in the history (`ee53b4d`).
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from kernelrule.core.types import Hardware, hardware_from_env
@@ -48,48 +47,46 @@ class HwPromptError(ValueError):
     (§26.4)."""
 
 
-#: **Reference** lengths [ms] for the tick table.
-#:
-#: The verdict is made not from this list but at `min_ms` — **that table's
-#: actual minimum best_ms** (D-117). 14us being the observed floor is true
-#: of the A6000 only, and judging at a length that is not in the table is a
-#: criterion unrelated to the table (principle 2).
-_TICK_ROWS = (0.5, 1.3)
-
-
 def _fmt_bytes(n: int) -> str:
     if n >= 1 << 20:
         return f"{n / (1 << 20):.0f} MB"
     return f"{n / (1 << 10):.0f} KB"
 
 
-def render_hw_prompt(hw: Hardware, *, noise, env: dict,
-                     min_ms: float) -> str:
-    """`Hardware` + noise model -> the prompt body. **Not written by
-    hand.**
+def render_hw_prompt(hw: Hardware, *, noise=None, env: dict) -> str:
+    """`Hardware` -> the prompt body. **Not written by hand.**
 
-    ★ The **conclusion of the measurement-limit section differs per table**
-    (D-116). The noise floor is `max(statistical term, tick term)`, and
-    which one wins differs per table:
+    ## ⚠️ 2026-09-11 (D-166): the measurement-limit section is gone
+
+    It used to end with a tick table and a verdict ("a difference inside one
+    tick may as well not exist — refining below it is learning noise"). Two
+    reasons it left:
 
     ```
-    A6000   at 11.3us  tick 9.09% vs statistical 3.36%  -> ★ the tick is the limit
-    5090    at 28.7us  tick 0.06% vs statistical 0.10%  -> the tick is not the limit
+    1 ★ RuleWriter cannot refine. It writes once from a blank page with no
+      parent, no score and no report. Telling it "do not refine below the
+      tick" addresses an ability it does not have. This repository already
+      keeps the objective block out of RuleWriter for exactly that reason
+      (`openai_client.py`, §30.10)
+    2 ★ it carried an answer-derived number. The verdict was read at
+      `min(table.best_time(q) for q in table.shapes())` — a **measured**
+      minimum over **every** shape, holdout included. On the H100 that
+      minimum is a holdout shape and differs from the training minimum
+      (42.848us vs 43.296us)
     ```
 
-    ★ The length at which the verdict is made is **that table's minimum
-    `best_ms`** (`min_ms`). Judging at a length that is not in the table
-    makes it a criterion unrelated to the table (D-117).
+    ⛔ Narrowing `min_ms` to the training split was considered and rejected:
+    it launders the answer-derived number instead of answering why it is
+    there at all (D-166 §E).
 
-    Sending the A6000's conclusion ("short shapes are buried inside the
-    tick") to the 5090 as is is a **wrong warning**. The verdict is made by
-    comparing the two terms `NoiseModel` already holds; no new criterion is
-    invented here (principle 2).
+    The noise and tick information is **not gone from the system** — it goes
+    to the Analyst and the RuleEditor through the diagnostic report, which is
+    where a role that can refine sees it. D-113 · D-116 · D-117 keep their
+    records; their tests moved to that renderer.
+
+    `noise` is still accepted so callers do not break, and it is unused.
     """
-    tick_ms = float(noise.tick_ms)
-    if tick_ms <= 0:
-        raise HwPromptError(
-            f"tick_ms is {tick_ms}. The tick section cannot be built.")
+    _ = noise
     spec_t = env.get("peak_tflops_f16_spec")
     spec_b = env.get("bandwidth_gbps_spec")
     sm_mhz = env.get("locked_mhz") or env.get("sm_clock_mhz")
@@ -102,31 +99,6 @@ def render_hw_prompt(hw: Hardware, *, noise, env: dict,
                      f"({spec_t:.1f} TFLOP/s, {spec_b:.0f} GB/s) but "
                      "measured with the clocks locked.\nWithout this "
                      "correction the memory-bound verdict is wrong.\n")
-    if not (min_ms and min_ms > 0):
-        raise HwPromptError(
-            f"min_ms is {min_ms}. The verdict must be made at **this "
-            "table's shortest kernel** (D-117).")
-    lens = (min_ms, *_TICK_ROWS)
-    rows = "\n".join(
-        f"  {ms * 1000:>6.1f} us kernel   tick {noise.tick_pct(ms):7.3%}"
-        f"   statistical {noise.sigma(ms):7.3%}"
-        + ("   <- this table's minimum" if ms == min_ms else "")
-        for ms in lens)
-    # ★ Which term is the limit — read at **this table's shortest
-    #   kernel**.
-    tick_binds = noise.tick_pct(min_ms) > noise.sigma(min_ms)
-    limit_note = (
-        """**A difference inside one tick may as well not exist.** Refining
-the rule below that is learning noise. It is better to block the paths that
-**lose for certain**."""
-        if tick_binds else
-        """★ **On this table the tick is not the limit.** As the table above
-shows, the statistical term is larger at every length — so what sets the
-limit is not the timer but **the spread that repetition averages down**.
-Short shapes are not especially hard to get right.
-
-Do not aim below the noise floor (the larger of the two). That is still
-learning noise.""")
     return f"""# Hardware facts — do not recall from memory, use what follows
 
 This project got it wrong from memory four times (the meaning of ScaleType,
@@ -163,36 +135,19 @@ families**. If alignment does not reach 16 bytes, cp.async is unavailable and
 only 2 stages are possible.
 ```
 
-## Limits of measurement — this affects your judgement
-
-```
-Time is only recorded in units of the CUDA event timer's tick ({tick_ms * 1000:.3f} us).
-Differences smaller than that **cannot be distinguished by measurement.**
-
-The noise floor is the **larger** of two terms:
-  tick        tick/t                    repetition does not shrink it
-                                        (a resolution limit)
-  statistical sigma_abs/t + sigma_rel   repetition averages it down
-
-{rows}
-```
-
-**This is a property of the hardware and the timer.** It appears in the same
-form on any GPU — but **which term wins differs per table.**
-
-{limit_note}
 """
 
 
-def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
-                          table=None, min_ms: float | None = None
+def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None
                           ) -> tuple[str, dict]:
     """Bundle path -> (prompt body, facts summary). **The only entry
     point.**
 
-    ★ One of `table` or `min_ms` must be given (D-117) — because the tick
-    verdict is made at **that table's shortest kernel**. There is no
-    default.
+    ⚠️ 2026-09-11 (D-166): `table` and `min_ms` are gone. They existed for
+    the measurement-limit section's verdict, that section is gone, and an
+    argument nothing reads is the shape of leftover this clean-up is about
+    (the same as `vendor.extract`). The caller in `f1_pipeline` no longer
+    passes a table.
     """
     p = Path(bundle) / "env.json"
     if not p.exists():
@@ -216,43 +171,45 @@ def hw_prompt_from_bundle(bundle: str | Path, *, env_hash: str | None = None,
             f"{str(b.env_hash)[:16]!r}")
     noise = NoiseModel.from_bundle(b)
     tick_ms = float(noise.tick_ms)
-    if min_ms is None:
-        if table is None:
-            raise HwPromptError(
-                "neither `table` nor `min_ms` is given. Whether the tick "
-                "is the limit must be judged at **that table's shortest "
-                "kernel** (D-117).")
-        min_ms = float(min(table.best_time(q) for q in table.shapes()))
-    txt = render_hw_prompt(hw, noise=noise, env=env, min_ms=min_ms)
+    txt = render_hw_prompt(hw, noise=noise, env=env)
+    # ★ `tick_ms` stays in the facts — it is a property of this bundle and
+    #   the trace records it. What left with the section is the **verdict**
+    #   made from the answer (`min_ms` · `tick_binds` · the two percentages).
     return txt, {"name": hw.name, "arch": hw.arch, "sm_count": hw.sm_count,
                  "l2_bytes": hw.l2_bytes, "ridge_point": hw.ridge_point,
-                 "tick_ms": tick_ms, "source": str(p),
-                 # ★ Recorded because it is a condition — the
-                 #   **conclusion** of the measurement-limit section changes
-                 #   with it.
-                 "min_ms": float(min_ms),
-                 "tick_binds": bool(noise.tick_pct(min_ms)
-                                    > noise.sigma(min_ms)),
-                 "tick_pct_at_min": float(noise.tick_pct(min_ms)),
-                 "sigma_at_min": float(noise.sigma(min_ms))}
+                 "tick_ms": tick_ms, "source": str(p)}
 
 
-def check_hw_prompt(text: str, hw: Hardware, tick_ms: float) -> None:
+def check_hw_prompt(text: str, hw: Hardware, tick_ms: float | None = None
+                    ) -> None:
     """Does the prompt speak of **this table's** hardware? If not, raise
     (§26.4).
 
-    ★ It checks both the name and the tick. Checking only the name lets
-    another bundle of the same GPU (with a different timer tick) pass.
+    ★ **Two legs.** The name alone lets another bundle of the same GPU
+    through, and two bundles of one GPU differ exactly where it matters.
+
+    ⚠️ 2026-09-11 (D-166): the second leg used to be the timer tick, and the
+    tick section left with the measurement-limit section (§E). It is now the
+    **effective numbers** — which is closer to what D-113 was defending: the
+    prompt's claim is `peak_tflops_f16` / `bandwidth_gbps` / `ridge_point`,
+    and those differ between two bundles of the same card whose clocks were
+    locked differently. Two of the three must be present and match.
+
+    ⛔ Do not reduce this to one leg. `tick_ms` is still accepted so callers
+    do not break, and it is no longer read.
     """
+    _ = tick_ms
     if hw.name not in text:
         raise HwPromptError(
             f"the hardware prompt does not speak of {hw.name!r}. "
             "Another GPU's facts are going out (D-113).")
-    m = re.search(r"tick \(([\d.]+) us\)", text)
-    if not m:
-        raise HwPromptError("the hardware prompt has no tick section.")
-    got, want = float(m.group(1)), tick_ms * 1000
-    if abs(got - want) > 0.5e-3 * max(1.0, want):
+    want = {"peak_tflops_f16": f"{hw.peak_tflops_f16:.1f}",
+            "bandwidth_gbps": f"{hw.bandwidth_gbps:.1f}",
+            "ridge_point": f"{hw.ridge_point:.1f}"}
+    missing = [k for k, v in want.items() if v not in text]
+    if len(want) - len(missing) < 2:
         raise HwPromptError(
-            f"the prompt's tick {got} us differs from the bundle's "
-            f"{want:.3f} us.")
+            f"the hardware prompt does not carry this bundle's effective "
+            f"numbers ({', '.join(f'{k}={v}' for k, v in want.items())}); "
+            f"absent: {missing}. Another bundle's facts are going out "
+            f"(D-113 · D-166).")

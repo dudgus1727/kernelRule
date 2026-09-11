@@ -134,8 +134,16 @@ class ReferenceColumns(dict):
     shapes: tuple = ()
 
 
-def _sample(table, n_shapes: int, rng) -> list:
-    shapes = table.shapes()
+def _sample(table, n_shapes: int, rng, train_shapes=None) -> list:
+    """`n_shapes` shapes. ★ 2026-09-11 (D-166): with `train_shapes` the draw
+    is **from the training split only**.
+
+    ⛔ The default is the whole table — what every recorded run did. Changing
+    it silently could flip an acceptance, so the narrowing is plumbing here
+    and a decision elsewhere (D-166 §C-2).
+    """
+    shapes = list(train_shapes) if train_shapes is not None \
+        else table.shapes()
     idx = rng.choice(len(shapes), size=min(n_shapes, len(shapes)),
                      replace=False)
     return [shapes[int(i)] for i in sorted(idx)]
@@ -191,6 +199,7 @@ def _pearson(a: np.ndarray, b: np.ndarray) -> float:
 def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
                      others: dict[str, np.ndarray] | None = None,
                      registry: FeatureRegistry | None = None,
+                     train_shapes=None, sample_from_train: bool = False,
                      n_shapes: int = 6, n_rows: int = 512,
                      seed: int = 0) -> ValidationReport:
     """Validates one feature. **Exceptions are caught and turned into
@@ -202,8 +211,13 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
     #   only one class and be rejected as "constant" — a sampling problem,
     #   not a feature problem. There are only dozens of shapes, so it costs
     #   nothing.
+    # ⚠️ D-166 §C-3: the shape-level pass stays over **every** shape. Narrowing
+    #    it risks the D-160 regression (a feature constant on the training
+    #    shapes but not on the others); `design.md §30.12` says why.
     shapes = (list(table.shapes()) if f.shape_level
-              else _sample(table, n_shapes, rng))
+              else _sample(table, n_shapes, rng,
+                           train_shapes=(train_shapes if sample_from_train
+                                         else None)))
 
     # -- 1. does it run ---------------------------------------------------
     vals: list[np.ndarray] = []
@@ -384,8 +398,21 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
                                 f"largest change {changed:.4g}"))
 
     # -- 7. is it useful (marked only) ------------------------------------
+    # ★ 2026-09-11 (D-166): **this is the only place in the whole validation
+    #   that reads the answer** (`answer_mask` is which candidates are
+    #   optimal). The shapes come from `_sample`, which draws from the whole
+    #   table: under the `nk11008` split 3 of the 6 drawn were holdout
+    #   shapes. Nothing leaked — this check's level is `info`/`warn` and
+    #   `FeatureRejected` is built from `rep.fails()` — but a holdout answer
+    #   has no business being read at all. `train_shapes` narrows it; without
+    #   one the behaviour is what it was.
+    train_only = set(train_shapes) if train_shapes is not None else None
     aucs = []
+    n_skipped = 0
     for p, v in zip(shapes, vals, strict=True):
+        if train_only is not None and p not in train_only:
+            n_skipped += 1
+            continue
         good = table.answer_mask(p)
         a = _rank_auc(v, good)
         if np.isfinite(a):
@@ -415,7 +442,16 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
         else:
             rep.checks.append(Check(
                 "standalone AUC", "info",
-                f"{m:.3f} ({'meaningful' if abs(m - 0.5) > 0.05 else 'almost uninformative'})"))
+                f"{m:.3f} ({'meaningful' if abs(m - 0.5) > 0.05 else 'almost uninformative'})"
+                + (f" · on {len(aucs)} training shapes, {n_skipped} holdout "
+                   f"shapes left out" if n_skipped else "")))
+    elif train_only is not None and n_skipped:
+        # ★ Every drawn shape was holdout. Saying so is the point — a silent
+        #   "no AUC" would read as "the check ran and found nothing".
+        rep.checks.append(Check(
+            "standalone AUC", "info",
+            f"not computed — all {n_skipped} sampled shapes are holdout "
+            f"(D-166)"))
     return rep
 
 

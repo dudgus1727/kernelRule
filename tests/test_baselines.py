@@ -154,3 +154,85 @@ def test_gbdt_module_imports_without_lightgbm():
     venv)."""
     import kernelrule.baselines.gbdt as g
     assert callable(g.build_xy) and "objective" in g.GBDT_PARAMS
+
+
+# ---------------------------------------------------------------------------
+# ★ D-166 — the vendor path had no test at all
+# ---------------------------------------------------------------------------
+def test_gpu_presets_are_one_table():
+    """★ The preset table was copied in two files and D-158 fixed **one** of
+    them. A re-extraction through the unfixed one would have put an
+    `H100_SXM` preset on an H100 NVL bundle — no error, no warning, a
+    recommendation from a different card.
+
+    The check is identity, not equality: two equal copies drift apart again.
+    """
+    import experiments.vendor_extract as ve
+    from kernelrule.baselines import vendor as v
+
+    assert ve.GPU_PRESETS is v.GPU_PRESETS
+    assert ve.preset_for is v.preset_for
+    assert ve.PAT is v.KERNEL_PAT
+    assert ve.CLUSTER_PAT is v.CLUSTER_PAT
+    # and the job has one implementation
+    assert not hasattr(v, "extract"), (
+        "`vendor.extract` is back. The recorded extractions all went through "
+        "`experiments/vendor_extract.py` (D-166)")
+
+
+@pytest.mark.parametrize("name,want", [
+    ("NVIDIA H100 NVL", "H100_NVL"),
+    ("NVIDIA H100 PCIe", "H100_PCIE"),
+    ("NVIDIA H100 80GB HBM3", "H100_SXM"),
+    ("NVIDIA RTX A6000", "RTX_A6000"),
+])
+def test_h100_variants_map_to_their_own_preset(name, want):
+    """★ D-158's regression guard. Our bundle is an **H100 NVL** and the bare
+    `h100` key used to swallow it."""
+    from kernelrule.baselines.vendor import preset_for
+
+    assert preset_for(name) == want
+
+
+@pytest.mark.needs_bundle
+def test_committed_vendor_json_reproduces():
+    """★ D-166 — the committed extraction can be reproduced.
+
+    Three shapes only: the point is that the procedure written down
+    (0.1.0.27 · CUTLASS · TN_ROW_MAJOR · HSS · count 8 · the preset from the
+    bundle) still produces what is in the file, not to re-extract it.
+    ⚠️ The file itself is **not** rewritten (D-166).
+    """
+    import json
+    from pathlib import Path
+
+    nv = pytest.importorskip("nvMatmulHeuristics",
+                             reason="nvMatmulHeuristics is not installed")
+    b = Path("datasets/rtx-a6000-sm_86-c63710df")
+    f = Path("datasets/baselines/vendor-a6000-c63710df.json")
+    if not b.exists() or not f.exists():
+        pytest.skip("the a6000 bundle or its vendor json is not here")
+
+    from kernelrule.baselines.vendor import preset_for
+
+    committed = json.loads(f.read_text())
+    info = json.loads((b / "BUNDLE.json").read_text())
+    preset = preset_for(info["gpu_name"])
+    shapes = sorted({tuple(int(x) for x in s)
+                     for rows in info["shape_layers"].values() for s in rows})
+    h = nv.NvMatmulHeuristicsInterface(nv.NvMatmulHeuristicsTarget.CUTLASS,
+                                       precision="HSS")
+    hd = h.createHardwareDescriptor()
+    h.setHardwarePredefinedGpu(hd, getattr(nv.NvMatmulHeuristicsNvidiaGpu,
+                                           preset))
+    layout = nv.NvMatmulHeuristicsMatmulLayout.TN_ROW_MAJOR
+    for (M, N, K) in shapes[:3]:
+        got = h.get_with_mnk(M, N, K, layout, 8, hd)
+        want = committed[f"{M}x{N}x{K}"]
+        assert len(got) == len(want), f"{M}x{N}x{K}: candidate count"
+        for c, w in zip(got, want, strict=True):
+            k = c["kernel"]
+            assert [k.cta_tile_m, k.cta_tile_n, k.cta_tile_k] == w["cta"]
+            assert k.stages == w["stages"] and k.split_k == w["split_k"]
+            assert abs((c.get("runtime") or 0) * 1000.0
+                       - w["pred_ms"]) < 1e-9

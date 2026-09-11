@@ -397,14 +397,15 @@ def compile_feature(code: str, *, known: frozenset[str]):
 DUP_SHAPES = 12
 
 
-def _spread_shapes(table, n: int) -> list:
+def _spread_shapes(table, n: int, train_shapes=None) -> list:
     """`n` shapes with **M spread out** (D-163).
 
     The first `n` of the table are all `M=1` — the sweep above is what that
     produced. They are taken one per distinct M, largest group first, so the
     set covers the range instead of one corner.
     """
-    shapes = list(table.shapes())
+    shapes = list(train_shapes) if train_shapes is not None \
+        else list(table.shapes())
     by_m: dict = {}
     for p in shapes:
         by_m.setdefault(p.M, []).append(p)
@@ -413,12 +414,13 @@ def _spread_shapes(table, n: int) -> list:
         for m in sorted(by_m):
             if by_m[m] and len(out) < n:
                 out.append(by_m[m].pop(0))
-    # ★ The order follows the table so the set is reproducible.
+    # ★ The order follows the given list so the set is reproducible.
     return sorted(out, key=shapes.index)
 
 
 def _reference_columns(table, matrix, extra: FeatureRegistry,
-                       n_shapes: int = DUP_SHAPES) -> ReferenceColumns:
+                       n_shapes: int = DUP_SHAPES,
+                       train_shapes=None) -> ReferenceColumns:
     """The reference columns for the duplication verdict. It looks at
     **both what a human wrote and what has already been built.**
 
@@ -434,7 +436,10 @@ def _reference_columns(table, matrix, extra: FeatureRegistry,
     those `n_shapes` alone.
     """
     out: dict[str, list] = {}
-    shapes = _spread_shapes(table, n_shapes)
+    # ★ D-166 §C-2: `train_shapes` restricts the comparison set to the
+    #   training split. ⛔ The default is the whole table — what every
+    #   recorded run did.
+    shapes = _spread_shapes(table, n_shapes, train_shapes=train_shapes)
     extra_mat = None
     if extra._items and extra is not matrix.registry:
         # Only what the caller's matrix does not already hold.
@@ -462,7 +467,9 @@ def _reference_columns(table, matrix, extra: FeatureRegistry,
 
 def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
                        table, matrix, hw_alt,
-                       others: dict | None = None) -> Feature:
+                       others: dict | None = None,
+                       train_shapes=None,
+                       sample_from_train: bool = False) -> Feature:
     """Check -> sandbox -> §8.3 validation -> registration. One failure
     raises.
 
@@ -493,8 +500,11 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
         others = _reference_columns(table, matrix, registry)
     # ★ D-163: the registry goes in so a duplication refusal can name what
     #   the candidate collides with, in that axis's own words.
+    # ★ D-166: `train_shapes` narrows the one check that reads the answer
+    #   (the standalone AUC). Left out, nothing changes.
     rep = validate_feature(f, table, probe, hw_alt=hw_alt, others=others,
-                           registry=registry)
+                           registry=registry, train_shapes=train_shapes,
+                           sample_from_train=sample_from_train)
     if rep.failed:
         raise FeatureRejected(
             f"{name}: §8.3 validation failed — "

@@ -139,7 +139,7 @@ export OPENAI_API_KEY=...   # without it, it stops instead of silently
 |---|---|
 | data structure | there is no time anywhere in `Problem`/`Config`/`CandidateSet` |
 | the loader | `load_for_ranking` / `load_for_scoring` split in two + a whitelist |
-| the static check | AST — forbidden names, imports, direct `M/N/K` comparisons, `if` on `f.*` |
+| the static check | AST — forbidden names, imports, shape-size **equality** comparisons, `if` on `f.*`, at most 4 execution paths |
 | the behavioural check | the `null` preset, the constant-score test |
 
 **A tie is broken by config identity alone.** In this table 29 of the 66

@@ -264,3 +264,66 @@ def test_n_candidates_is_described_as_enumeration_not_performance():
     txt = load_prompt("role/_rules_common.md", parameters=8)
     assert "p.n_candidates" in txt and (
         "enumeration information, not performance" in txt)
+
+
+# ---------------------------------------------------------------------------
+# ★ D-166 — the feature descriptions are prompt text too, and they live in
+#           **python**, not in `prompts/**.md`
+# ---------------------------------------------------------------------------
+#
+#   Everything above scans `prompts/**/*.md` and the pydantic field
+#   descriptions. But the "Existing features" block that goes into every
+#   prompt is built by `render_features()` out of strings held in
+#   `features/known5.py` (`annotate`) and `features/physical.py` (`_PHYSICS`).
+#   Writing "in this table X was never optimal" in one of those would have
+#   reached the model with nothing to catch it — `physical_meaning` appeared
+#   in no test at all.
+#
+#   ⚠️ `include_observed=True` is **not** scanned: that is RuleWriter
+#   condition B, where a table observation going in is the defined condition
+#   (§12.3b). Scanning it would be a false positive by construction.
+def test_rendered_feature_block_has_no_table_derived_claim():
+    import kernelrule.features.physical  # noqa: F401  — it fills REGISTRY
+    from kernelrule.features import REGISTRY, render_features
+    from kernelrule.features.known5 import KNOWN5
+
+    hits = []
+    for label, reg in (("REGISTRY (F3's 24)", REGISTRY),
+                       ("KNOWN5 (F2's 5)", KNOWN5)):
+        text = render_features(reg, include_observed=False)
+        for i, line in enumerate(text.splitlines(), 1):
+            if _HW_OK.search(line):
+                continue
+            for pat, why in _LEAK:
+                if pat.search(line):
+                    hits.append(f"  {label} line {i}  [{why}]\n"
+                                f"    {line.strip()}")
+                    break
+    assert not hits, (
+        "a table-derived claim is in the feature block every prompt "
+        "receives (§12.3b). It is built from `known5.annotate(...)` and "
+        "`physical._PHYSICS`, which no test used to read:\n" + "\n".join(hits))
+
+
+def test_the_feature_block_is_actually_what_the_prompt_carries():
+    """★ Principle 38 — a scan that reads a string nobody sends proves
+    nothing. The block the test above scans has to be the one the assembled
+    prompt contains."""
+    import os
+
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.features import REGISTRY, render_features
+
+    os.environ.setdefault("OPENAI_API_KEY", "t")
+    llm = OpenAILLM(LLMConfig(feature_detail="full"),
+                    feature_names=REGISTRY.names(shape_level=False),
+                    shape_values=REGISTRY.names(shape_level=True),
+                    registry=REGISTRY)
+    block = llm._feature_block()
+    rendered = render_features(REGISTRY, include_observed=False)
+    line = next(ln for ln in rendered.splitlines()
+                if "waves" in ln and ln.strip())
+    assert line.strip() in block, (
+        "`_feature_block()` is not the text `render_features` produces — the "
+        "scan above would be reading something that is never sent")

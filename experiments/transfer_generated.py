@@ -42,7 +42,6 @@ import json
 import re
 import time
 import warnings
-from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -57,10 +56,8 @@ from kernelrule.core.scoring import geomean
 from kernelrule.core.splits import Split, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights
-from kernelrule.features import Feature, FeatureRegistry
-from kernelrule.features.generated import compile_feature, detect_shape_level
-from kernelrule.features.known5 import KNOWN5
-from kernelrule.features.loader import load_generated
+from kernelrule.features import FeatureRegistry
+from kernelrule.features.loader import run_registry
 from kernelrule.rules.checks import check_rule, fitter_for, limits_for
 
 SRC = "a6000"
@@ -73,60 +70,13 @@ RUN = "cap1"
 def source_registry(table) -> tuple[FeatureRegistry, dict]:
     """★ The **source run's** axes, rebuilt on `table`.
 
-    Three layers, in the order the run itself built them:
-
-    ```
-    known5      the F2 starting point
-    stage 1     what the FeatureWriter made before the loop
-    the loop    what it made during the loop (D-160)
-    ```
-
-    ⚠️ `shape_level` is re-derived **on this table** — that is the whole
-    point of (a) above, and `load_generated(table=...)` already does it for
-    the stage-1 layer (D-67).
+    ⚠️ 2026-09-11 (D-166 §M): the three-layer rebuild this function used to
+    do inline now lives in `kernelrule.features.loader.run_registry` —
+    `export_rules` / `verify_rules` needed the same thing and a second copy
+    would have drifted (principle 2). The layers, the single probe matrix
+    and the re-derived `shape_level` are unchanged; only the home moved.
     """
-    reg = FeatureRegistry(f"{RUN}-on-{getattr(table, 'bundle', '?')}")
-    origin: dict[str, str] = {}
-    # ★ 2026-09-11 (D-166): the shape-level verdict for known5 and the
-    #   loop-built axes is made in **one pass**, not one matrix per axis.
-    #   Per axis it was a full-table matrix — 384s on the 4090 and 724s on
-    #   the H100, ten times the cost of the matrix this function exists to
-    #   enable. It is the same fix D-163 §5 made inside `load_generated`,
-    #   and the verdict is unchanged: same columns, same shapes, computed
-    #   together.
-    pending: list[Feature] = []
-    for n in sorted(KNOWN5._items):
-        pending.append(replace(KNOWN5[n], shape_level=False))
-        origin[n] = "known5"
-    made = Path(f"runs/{RUN}-s0/features.jsonl").read_text().splitlines()
-    seen = {f.name for f in pending}
-    for line in made:
-        if not line.strip():
-            continue
-        e = json.loads(line)
-        if not e.get("accepted") or e["name"] in seen:
-            continue
-        name, fn = compile_feature(e["code"], known=frozenset(seen))
-        seen.add(name)
-        pending.append(Feature(name=name, fn=fn, unit="?",
-                               expected_range=(0.0, 1.0),
-                               direction="higher_is_worse", code_hash=name,
-                               source=e["code"]))
-        origin[name] = f"loop r{e['round']}"
-    probe_reg = FeatureRegistry("probe-shape-level")
-    for f in pending:
-        probe_reg.add(f)
-    probe = FeatureMatrix(table, probe_reg) if pending else None
-    for f in pending:
-        is_shape, _ = detect_shape_level(f, table, matrix=probe)
-        reg.add(replace(f, shape_level=is_shape))
-    # ★ `load_generated` already does its own single pass (D-163 §5).
-    for f in load_generated(f"runs/{RUN}/stage1-features/proposals.jsonl",
-                            table=table):
-        if f.name not in reg._items:
-            reg.add(f)
-            origin[f.name] = "stage1"
-    return reg, origin
+    return run_registry(RUN, table=table, seed=0)
 
 
 def _fit(code, w0, table, matrix, train):
@@ -188,7 +138,7 @@ def main() -> None:
     mA = FeatureMatrix(A, regA)
     spA = _splits(A)
     print(f"  source registry {len(regA._items)} axes "
-          f"(known5 {sum(1 for v in origin.values() if v == 'known5')} + "
+          f"(base {sum(1 for v in origin.values() if v.endswith('base'))} + "
           f"stage1 {sum(1 for v in origin.values() if v == 'stage1')} + "
           f"loop {sum(1 for v in origin.values() if v.startswith('loop'))})"
           f"  built in {time.perf_counter() - t0:.0f}s")

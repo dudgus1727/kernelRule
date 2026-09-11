@@ -1,4 +1,26 @@
 {
+ "D146r": {
+  "bytes_raw": {
+   "D146r-s0": 104609
+  },
+  "bytes_zst": {
+   "D146r-s0": 10908
+  },
+  "commits": {
+   "D146r-s0": "ee53b4d"
+  },
+  "events": {
+   "D146r-s0": 30
+  },
+  "release": "trace-D146r-ee53b4d",
+  "runs": [
+   "D146r-s0"
+  ],
+  "sha256": {
+   "trace-D146r-s0.jsonl.zst": "38d6bb192558239cf2c86fdb95d3c4c8466f1c01d9a490d0e327577caed522ff"
+  },
+  "uploaded": "2026-09-11"
+ },
  "F1new": {
   "bytes_raw": {
    "F1new-s0": 2258011

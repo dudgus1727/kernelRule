@@ -107,6 +107,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-163](#d-163-적합기를-병렬로-예산은-재고-안-바꿨다-잔가지-여섯-2026-09-11)  적합기를 병렬로 · 예산은 재고 안 바꿨다 · 잔가지 여섯 (2026-09-11)
 - [D-164](#d-164-stage-2-재시도를-모델에게-닿게-21실행-용량-산정-2026-09-11)  stage 2 재시도를 모델에게 닿게 · 21실행 용량 산정 (2026-09-11)
 - [D-165](#d-165-전이가-생성-축을-들고-간다-기술-확인-2026-09-11)  전이가 생성 축을 들고 간다 — 기술 확인 (2026-09-11)
+- [D-166](#d-166-레거시-잔재-열셋-조용히-틀리는-자리들-am-2026-09-11)  레거시 잔재 열셋 — 조용히 틀리는 자리들 (A~M) (2026-09-11)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -7633,3 +7634,534 @@ trace-cap1-2392169   자산 34개 (파일 17 + sha256 17) · 다시 받아 17/17
 runs.md  cap1 행의 값을 채웠다: 1.0391 (출처 cap1-run.json)
          ⚠️ 상태 칸에 ★ "fold 0 의 val 이고 nk11008 홀드아웃이 아니다" 를 적었다
 ```
+
+## D-166  레거시 잔재 열셋 — 조용히 틀리는 자리들 (A~M) (2026-09-11)
+
+감사 세션이 찾아 온 열셋이다. 하나의 결함이 아니라 **같은 모양의 반복**이다.
+
+```
+원칙 2  한 판정을 두 곳에 적었다        A(프리셋) · M(레지스트리 로더)
+원칙 23 한 자리를 고치고 같은 종류의
+        다른 자리를 안 훑었다            A · E · G · M
+※ 나머지는 "검사가 대상을 안 덮는다"  B · C · K
+```
+
+### ★ 사용자가 정한 조건 — 다시 열지 마라 (원칙 10)
+
+```
+적합기 예산  ★ 300 고정
+라운드 수    ★ 12 고정
+```
+
+§J 와 §L 은 **그 결정을 유지한 채 붙이는 유보 문장**이다. 값을 바꾸자는
+것이 아니다. `fitter_for` · `FITTER_SWITCH_DIM` · `max_evals` ·
+`n_restarts` · `max_rounds` 는 손대지 않았다.
+
+---
+
+### A. 벤더 경로 — 사본 하나 · 죽은 코드 하나 · 안 도는 검사 하나
+
+**① 무엇이 틀렸나**
+
+```
+GPU_PRESETS · 커널 정규식 · preset_for   라이브러리와 스크립트에 ★ 두 벌
+kernelrule/baselines/vendor.py extract() 62줄, ★ 부르는 사람이 없다
+instr 검사                               ★ 한 번도 안 돌았다
+시험                                     ★ 0개
+```
+
+D-158 이 H100 변종(`h100 nvl` -> `H100_NVL`)을 고친 것은 **스크립트 사본
+쪽**이고, 라이브러리 사본은 옛 표(`h100` -> `H100_SXM`) 그대로였다.
+
+**② 왜 조용했나**
+
+죽은 코드는 부르는 사람이 없어서 틀리지 않는다. 사본은 **둘이 갈릴 때만**
+틀리고, 그때 쓰이던 쪽이 맞았다. instr 검사는 더 나쁘다 — 0.1.0.27 이
+`GemmConfig` **객체**를 돌려주므로 모든 후보가 `if not isinstance(kern, str)`
+분기로 들어가 `continue` 했고, 검사는 그 아래 있었다. 출력은
+
+```
+instr != (16,8,16)   0
+```
+
+이었고 이것은 "없다" 로 읽힌다. 실제 뜻은 **"안 셌다"** 다.
+
+**③ 무엇을 고쳤나**
+
+```
+extract() 삭제 (62줄)
+GPU_PRESETS / KERNEL_PAT / CLUSTER_PAT / preset_for  -> 라이브러리 한 벌
+  ★ 옮긴 내용은 **고쳐진 쪽**(H100 변종이 있는 스크립트 사본)이다
+vendor_extract.py 는 import 한다
+instr 검사를 객체 분기 **안**으로 옮기고, "instr": [m,n,k] 를 산출물에 기록
+  -> 사후에 믿는 대신 셀 수 있다
+시험 셋 (`test_baselines.py`)
+```
+
+**④ 판정이 바뀌었나** — 안 바뀌었다. 커밋된 `datasets/baselines/*.json`
+**네 개가 바이트 동일**하다. ⛔ 그래서 다시 뽑지 않았다.
+
+**⑤ 재현**
+
+```bash
+python3 -m pytest tests/test_baselines.py -q      # needs_bundle 재현 포함
+```
+
+---
+
+### B. 프롬프트 위생 시험이 **피처 설명 문자열**을 안 훑었다
+
+**①** `test_prompt_hygiene.py` 는 프롬프트 본문을 훑었다. 그런데 프롬프트에
+실리는 것은 본문 + **렌더된 피처 블록**이고, 표 관측이 섞이면 안 되는 곳은
+바로 그 설명 문자열이다 (§8.2 의 `physical_meaning` / `observed` 분리).
+
+**②** 검사가 있는데 대상이 빠진 형태다 — 통과가 "깨끗하다" 로 읽힌다.
+
+**③** 시험 둘 추가. (1) 렌더된 피처 블록 전체를 금지어로 훑는다.
+(2) **그 블록이 실제로 프롬프트가 싣는 것과 같은지** 확인한다 — 두 번째가
+없으면 첫 번째가 엉뚱한 문자열을 훑고 있어도 통과한다 (원칙 1).
+
+**④** 판정 안 바뀜 — 현재 레지스트리는 통과한다.
+
+**⑤** `python3 -m pytest tests/test_prompt_hygiene.py -q`
+
+---
+
+### C. 피처 검증이 **홀드아웃 형상에서** 돌았다
+
+**①** `validate_feature` 의 AUC 검사는 **답(최적 config)을 읽는다.** 그것이
+전체 표에서 돌면 그 축의 채택 여부에 홀드아웃 정보가 들어간다.
+
+**③ 고친 것과 안 고친 것**
+
+```
+C-1 AUC 검사        -> 학습 형상으로 좁혔다 (루프가 train_shapes 를 넘긴다)
+C-2 중복 검사       -> ★ 안 좁혔다. 먼저 대조했다 (아래)
+C-3 detect_shape_level -> 66형상 그대로 (D-160). 답을 안 읽는다 — 값의
+                        상수성만 본다. 문서에 적었다 (§30.12)
+C-4 문서화          -> design.md §30.12
+```
+
+**C-2 대조 실측** — 좁히면 판정이 얼마나 바뀌나. 기록된 축 전부를
+전체표 vs 학습전용으로 다시 검증했다.
+
+```
+실행     축   뒤집힘   무엇이
+cap1     20     1     vector_alignment_deficit
+dupfix   20     3     alignment_deficit · reduction_dimension_padding
+                      configured_vector_alignment_deficit
+F2new    20     2     alignment_deficit · k_loop_padding_fraction
+합       60   ★ 6     전부 "전체표 통과 -> 학습전용 탈락"
+```
+
+**판단: 21실행 전에 좁히지 않는다.** 6/60 은 조건 변화이고, 21실행은 논문
+수치를 내는 자리다 (D-163 과 같은 판단). 배선은 넣었고 **기본값은 그대로**다
+— 좁히려면 인자 하나다.
+
+**④** 판정 안 바뀜(기본값 불변). ⑤ `python3 experiments/validate_split_ab.py`
+-> `docs/artifacts/validate-split-ab.json`
+
+---
+
+### D. 원장 시험이 실패하고 있었다
+
+**①** `runs.md` 의 `D146r` 행 trace 칸이 `★ not uploaded` 였고,
+`runs_table.py --check` 가 그 상태를 실패로 잡는다.
+
+**②** 실패가 **계속 켜져 있으면** 신호가 아니라 배경이 된다 — "원래 빨간
+줄" 로 읽힌다.
+
+**③** `D146r-s0` 의 트레이스를 릴리즈로 올리고(`trace-D146r-ee53b4d`,
+자산 sha256 포함) 원장에 기록했다. `runs.md` 는 **손으로 쓰지 않았다** —
+`runs_table.py` 가 다시 냈다.
+
+**④** 판정 안 바뀜. ⑤ `python3 experiments/runs_table.py --check`
+
+---
+
+### E. ★ 측정 한계 절을 RuleWriter 프롬프트에서 뺐다
+
+**①** 하드웨어 프롬프트의 "Limits of measurement" 절에는 **답에서 나온 수가
+셋** 들어간다.
+
+```
+min_ms        그 표의 실제 최소 best_ms          ★ 답이다
+tick_binds    tick%(min_ms) > σ(min_ms)         ★ 답에서 나온 판정
+두 퍼센트     min_ms 에서의 눈금 비율과 통계 σ   ★ 답이다
+```
+
+**②** D-117 이 "14us 는 A6000 에서만 관측 하한이다" 를 고치면서 **표에서
+뽑도록** 바꿨다. 즉 누출을 정확하게 만든 것이다. 각 수는 맞았고, 맞았기
+때문에 아무도 안 봤다.
+
+**네 표 실측** (이 절이 표마다 무엇을 실었는지):
+
+```
+표      눈금      표의 최소 best_ms   min 에서 눈금%   min 에서 통계σ   binds?
+a6000   1.024us        11.26us          9.091%          3.364%      ★ True
+5090    0.016us        28.67us          0.056%          0.104%        False
+4090    0.032us        65.54us          0.049%          1.355%        False
+h100    0.032us        42.85us          0.075%          1.204%        False
+```
+
+**③** 절 전체를 뺐다(사용자 선택 (나)). `limit_note` · `rows` ·
+`_TICK_ROWS` · `min_ms` 요구 삭제, `hw_prompt_from_bundle(bundle, *,
+env_hash=None)`. 하드웨어 사실 블록(이름/arch/SM/L2/ridge/눈금/출처)은
+**그대로 둔다** — 그것은 스펙이지 답이 아니다.
+
+`check_hw_prompt` 의 두 번째 다리는 눈금 대신 **유효 수치**에 다시 걸었다.
+
+```python
+want = {"peak_tflops_f16": ..., "bandwidth_gbps": ..., "ridge_point": ...}
+# 셋 중 둘 이상이 본문에 있어야 한다
+```
+
+★ 한 다리로 줄이지 않았다. 이름만 보면 같은 GPU 의 다른 유효 수치를 못
+가른다.
+
+**④** 판정: **앞으로의 실행 조건이 바뀐다** (프롬프트가 달라진다). 지난
+수치는 안 바뀐다. 21실행 **전에** 한 이유다.
+
+**⑤** `python3 -m pytest tests/test_hw_prompt.py tests/test_diagnostic.py -q`
+(눈금 시험 일곱 중 넷은 `test_diagnostic.py` 로 이사했다 — 지우지 않았다)
+
+---
+
+### F. README 의 정적 검사 설명이 과장이었다
+
+`README.md:142` 가 "direct `M/N/K` comparisons" 라고 적었다. 실제로 막는
+것은 **크기 동등 비교**뿐이고 부등호는 통과한다. 실측:
+
+```
+p.M == 1024   REJECT
+p.M < 1024    통과
+p.K > 4096    통과
+경로 상한      MAX_PATHS = 4
+```
+
+문장을 실제 검사에 맞췄다(동등 비교 · 경로 4개 상한 명시). ④ 코드 불변.
+
+---
+
+### G. 진단 리포트의 눈금 퍼센트가 **박혀 있었다**
+
+**①** `diagnostic.py` 가 눈금 자체는 번들에서 읽으면서 그 아래 두 퍼센트는
+문자열에 박아 뒀다 — `7.3% at 14us, 0.08% at 1.3ms`. **A6000 의 값이다.**
+
+```
+표      14us 에서 눈금%   1.3ms 에서 눈금%     박힌 값 대비
+a6000        7.31%           0.079%          ★ 이것이 박힌 값
+5090         0.11%           0.001%          ★ 64배 틀림
+4090         0.23%           0.002%             32배 틀림
+h100         0.23%           0.002%             32배 틀림
+```
+
+**②** D-117 이 `hwprompt.py` 의 같은 문장을 고쳤고 이 사본은 안 훑였다
+(원칙 2 · 23). §29.5 (c) 의 5090 실행이 그 문장을 그대로 받았다.
+
+**③** 계산해서 넣는다. ⛔ 예시 길이는 14us / 1.3ms 로 **고정**이다 — 표의
+최소값으로 "개선" 하면 그것이 바로 §E 가 뺀 답 유래 수치가 된다.
+
+**④** 지난 리포트의 문장은 틀린 채로 남는다(기록). 앞으로는 맞는다.
+
+---
+
+### H. 홀드아웃에서 고른 팔에 그렇게 적었다
+
+`regime_transfer.py` 의 `llm_val` 은 **홀드아웃 점수로 고른 규칙**이다.
+라벨이 "LLM val best (16 terms)" 였다 — 상한을 결과처럼 읽게 만든다.
+
+```
+LLM val-selected (16 terms) ★ picked ON the holdout — an upper bound,
+not a result
+```
+
+로 바꾸고, 코드에 ⛔ "이 수를 conclusion.md 로 옮기지 마라" 를 적었다.
+④ 수치 불변.
+
+---
+
+### I. `canonical.py` 의 보장 문장이 낡아 있었다
+
+~~"루프는 val 을 조기 종료 판단에만 썼다"~~ — **루프는 val 을 아예 안
+본다.** 조기 종료는 D-132 에 껐고 D-144 에 봉인했다(`should_stop` 은 항상
+`(False, "")`, `patience > 0` 이면 예외). 채택 · 부모 선택 · 목적 전환이
+전부 학습 점수를 읽는다.
+
+```
+대표값 F3rw-p8-nan 6시드   patience = 0 (여섯 전부)
+⚠️ D-132(2026-09-04) 이전 실행은 val 을 읽는 조기 종료가 있었을 수 있다.
+   ★ 어느 실행인지는 확인하지 않았다 — 가정하지 마라 (원칙 39)
+```
+
+**보장을 실제보다 약하게 적는 것도 틀린 것이다** (원칙 9).
+
+---
+
+### J. `pending_fixes` 16 의 유보가 **팔 간 비교**를 안 덮었다 (문서)
+
+★ 예산 300 은 사용자가 정했다. 이 절은 그 결정을 유지한 채 붙는 기록이다.
+
+```
+fitter_for(len(w0))  ≤8 -> nelder-mead / 재시작 4 / max_evals 200
+                     >8 -> cma         / 재시작 1 / max_evals 300
+★ 재시작은 예산을 나눈다 (per = max_evals // n_restarts). 곱하지 않는다
+
+대표값 F3rw-p8-nan   아카이브 len(w) = 7~8 (6시드 54개 전부) -> NM/200
+                     = ★ 25 평가/차원
+현재   cap1 (F2)     len(w) = 37,39,40,41,42,42,43,52        -> CMA/300
+                     = ★ 5.8~8.1 평가/차원
+참고   F2new 41~53 · dupfix 42~56 — 같은 자리다
+```
+
+D-150/D-152 가 상한을 없앤 뒤 규칙이 커졌다. **차원당 평가가 3~4배 줄고
+최적화기도 다르다.** 두 수를 나란히 놓으면 라이브러리 품질과 적합기 강도가
+섞인다 (문서 규칙 3).
+
+★ `n_fit_moved` 는 이것을 **못 본다**. 실측:
+
+```
+cap1          60/64     93.8%
+F3rw-p8-nan   1475/1579 93.4%  (시드별 86.0 · 92.7 · 93.1 · 94.7 · 95.5 · 98.8%)
+```
+
+"움직였다" 는 출발점을 벗어났다는 뜻일 뿐 **수렴과 무관하다.**
+
+⑤ 재현: `python3 -c "from kernelrule.rules.checks import fitter_for;
+print(fitter_for(8), fitter_for(52))"` · `runs/<태그>/archive.jsonl` 의
+`len(w)` · `runs/<태그>/rounds.jsonl` 의 `n_fit_moved / n_scored`
+
+---
+
+### K. 「병렬 중 새 축 생성」 조합을 아무 시험도 안 덮었다
+
+**①** `test_parallel_matches_sequential` 는 고정 레지스트리 · 1라운드 ·
+피처 생성 없음이고, 피처 생성 시험은 `n_workers` 를 안 준다. 그런데 기본값이
+`n_workers=6` · `max_new_features_per_round=3` 이라 **21실행은 매 라운드 둘이
+동시에 활성**이다.
+
+**②** 워커는 fork 시점의 행렬을 들고 있다. 새 열이 생긴 뒤 낡은 행렬로
+채점하면 **조용히 다른 점수**다 (D-95 의 원래 증상). 예외도 경고도 없다.
+
+**③** 케이스 둘 추가. 기존 시험은 그대로 뒀다.
+
+```
+test_parallel_matches_sequential_while_axes_are_being_made
+   3라운드 · 축 생성 켬 · 워커 0 vs 3 -> 값·카운터·채점된 코드 집합이 같아야
+test_the_pool_is_restarted_when_an_axis_is_added
+   _restart_pool 호출 수 == 채택된 축 수
+```
+
+**⚠️ 그리고 "값이 같다" 시험은 `_restart_pool()` 을 지워도 통과했다.**
+이것이 이 절에서 실제로 배운 것이다.
+
+```
+1차  MockLLM 이 만든 축을 규칙이 아무도 안 읽는다     -> 낡은 행렬이 안 보임
+2차  읽긴 읽는데 **fork 이전에 태어난 축**을 읽는다   -> 워커가 이미 갖고 있다
+3차  fork 이후 태어난 축을 읽게 몰아붙였다            -> 단독 실행에서는 잡힌다
+★ 4차 전체 시험에서 **다시 통과했다** — 그 판은 축이 r0·r2 에 태어났고
+     r2 축을 읽을 라운드가 없었다. 어느 라운드에 축이 태어나는지가
+     파일 단독 실행과 전체 실행에서 다르다
+```
+
+**운으로 성립하는 가드는 가드가 아니다.** 그래서 "fork 이후 축을 읽는가" 를
+단언에서 뺐고, 대신 그 사실을 시험 주석과 여기에 적는다. 사보타주를
+**항상** 잡는 것은 두 번째 시험이다.
+
+```
+_restart_pool() 을 pass 로 바꾸고 돌린 결과
+  ★ the pool was restarted 0 times for 2 accepted axes     <- 항상 잡힌다
+     a different set of candidates was scored ...          <- 판에 따라 다르다
+```
+
+**"값이 같다" 시험은 값을 다르게 만들 수 있는 조건이 실제로 만들어져야만
+검사다** (원칙 1 · §26.4). 그 조건이 **결정적으로** 만들어지지 않는다면
+값 비교가 아니라 **기전을 세는 쪽**이 진짜 검사다.
+
+**④** 시험만 늘었다. ⑤ `python3 -m pytest tests/test_loop.py -q`
+
+---
+
+### L. `conclusion.md` 가 이미 답이 난 질문을 미확인으로 들고 있었다 (문서)
+
+`conclusion.md:734` 의 우선순위 목록이 `24 rounds — whether 12 is enough has
+not been looked at` 이었다. **측정은 끝나 있었다** — `round-curve.md` 는
+D-132 §2 사전 등록을 달고 LLM 0회로 재현된다.
+
+```
+old (12라운드)  최종값 σ 안에 드는 라운드 r8,   마지막 4라운드 +0.0156
+new (24라운드)  σ 안에 드는 라운드 ★ r23(마지막), 마지막 4라운드 +0.0183
+```
+
+답은 "12 면 충분하다" 가 아니라 **"12 도 24 도 수렴점이 아니다"** 이고, 이는
+보고되는 모든 수치가 **수렴하지 않은 정지점의 값**이라는 뜻이다.
+
+```
+고친 것  conclusion.md:734 을 결과로 바꾸고 유보를 붙였다
+        round-curve.md 에 ★ 상태 배지를 붙였다 (이 문서에만 없었다)
+        round-curve.md §5 의 "24라운드 유지" 에 정정 주석 —
+        ★ 라운드는 12 로 정해졌다. 옛 문단은 지우지 않는다
+⛔ 24라운드를 돌리자는 말이 아니다
+```
+
+---
+
+### M. ★ `export_rules` / `verify_rules` 가 실행의 생성 레지스트리를 못 실었다
+
+**①** 둘 다 `from kernelrule.features import REGISTRY` — 사람이 쓴 축
+고정이다. 지금 출하 규칙은 전부 F3(사람 축)라 돌았다. **그런데 21실행은 F2 로
+돌고 F2 규칙은 생성 축을 쓴다.**
+
+축은 **세 곳**에 흩어져 있다.
+
+```
+조건의 기초        F1 없음 · F2 known5 · F3 사람 축
+stage 1            runs/<태그>/stage1-features/proposals.jsonl
+★ 루프가 만든 것   runs/<태그>-s<시드>/features.jsonl     <- 이것이 빠진다
+```
+
+감사 세션이 실제로 밟았다:
+
+```
+AttributeError: unregistered feature: 'initial_grid_occupancy_deficit'
+```
+
+그 축은 cap1 에서 **루프가 라운드 중에 만든 10개 중 하나**다. D-165 §1 이
+전이에서 잡은 것과 같은 함정이고, 이 두 스크립트는 안 훑었다 (원칙 23).
+
+**② 왜 문제인가 — 조용히 틀리지는 않는다**
+
+D-156 의 skip 경로가 미등록 이름을 걸러 개수를 찍는다. 그래서 결과가 이렇게
+된다.
+
+```
+★ all 0 of 21 match (tolerance ...)
+⚠️ 21 skipped — they use a value that is no longer registered
+```
+
+**캠페인의 규칙이 통째로 "검증 안 함" 바구니로 들어가면서 화면에는 초록색
+줄이 같이 찍힌다.** 그리고 그 바구니는 원래 **"옛 레지스트리라 검증
+불가"**(D-156) 를 담는 곳이다. 성격이 다른 둘을 같은 통에 넣으면 둘 다
+안 보인다.
+
+**③ 무엇을 고쳤나**
+
+```
+① kernelrule/features/loader.py 에 공용 로더
+     base_registry(condition)          <- f1_pipeline._base_registry 가 이것을 쓴다
+     run_registry(run, table=, seed=)  <- 세 층 + shape_level 재판정, 탐침 행렬 한 번
+     registry_spec(reg, origin)        <- 축 목록을 **적어 둔다** (생성 축은 소스째)
+     registry_from_spec(spec, table=)  <- runs/ 없이 되살린다
+   ⛔ 세 번째 사본을 만들지 않았다. transfer_generated.source_registry 는
+      이제 run_registry 를 부르는 네 줄이다
+② export_rules.py
+     규칙마다 <run>.registry.json 을 쓰고 index.json 에 kind/n/hash/run/condition
+     ★ split_kind 도 실행에서 읽는다 — F2 규칙을 nk11008 로 채점하면
+       index.json 과 verify 가 **같은 방식으로 함께 틀린다** (원칙 38)
+     ⚠️ 재채점이 불가능한 옛 규칙(D-156)은 **기록된 항목을 그대로 유지**한다.
+        다시 내보내면서 기록된 수치가 사라지면 안 된다 (문서 규칙 2)
+③ verify_rules.py — 통을 셋으로 가른다
+     ✅ 검증        재채점해서 기록과 같다
+     ❌ 실패        검증 대상인데 못 했다 -> exit 1
+     ⚠️ 검증 불가   라이브러리가 은퇴시킨 값을 쓴다 (D-156). 기록된 수치는 선다
+④ 검증한 것이 0개면 "all matched" 를 찍지 않는다 (원칙 1)
+```
+
+**④ 판정이 바뀌었나** — 안 바뀌었다. 기존 12줄의 판정이 그대로다
+(검증 9 · D-156 3). 검증 경로가 넓어졌을 뿐이다.
+
+**⚠️ 옮기다가 가드를 밟았다** (원칙 12 — 검증 경로를 만들면 대상의 결함이
+드러난다). `_base_registry` 를 `experiments/` 에서 라이브러리로 옮겼더니
+
+```
+tests/test_features.py::test_library_never_imports_the_global_registry
+  kernelrule/features/loader.py 가 REGISTRY 를 직접 본다 (§30.9)
+```
+
+가 걸렸다. 실험 파일에서는 허용되는 습관이 **선을 넘어온 것**이다. 가드를
+약화시키지 않고 구조로 고쳤다 — `base_registry(condition, *, human=None)`
+이고 F3 에서 `human` 이 없으면 예외다. 호출부(`f1_pipeline` ·
+`export_rules` · `verify_rules`)가 `human=REGISTRY` 를 **명시**한다.
+
+**⑤ 재현**
+
+```bash
+# (1) 재구성한 레지스트리가 그 실행의 아카이브를 그대로 재채점하는가
+python3 -m pytest tests/test_features.py -q -k rebuilt_run_registry
+#   cap1-s0 최고 규칙  기록 1.033925  재채점 1.033925  ★ 차이 0.0e+00
+#   (29축 = known5 5 + stage1 14 + 루프 10)
+
+# (2) F2 규칙이 실제로 초록으로 나오는가 — 임시 OUT 으로 내보내고 검증
+#     (docs/artifacts/rules 는 건드리지 않는다)
+python3 - <<'PY'
+import experiments.export_rules as ex, experiments.verify_rules as ve
+ex.OUT = ve.RULES = __import__("pathlib").Path("/tmp/rules-m")
+ex.PREFIXES = ("cap1-s",); ex.main(); ve.main()
+PY
+#   cap1-s0  kfold0-seed12345  {'kind': 'run', 'n': 29, 'hash': '591ad936b07b', ...}
+#   cap1-s0  1.0391  1.0391  ✅   cap1 29 axes
+#   ★ 1 of 1 verified
+
+# (3) 기존 12줄이 그대로인가
+python3 experiments/verify_rules.py
+```
+
+⚠️ **`export_rules.py` 는 멱등이 아니다.** `canonical_score` 가 체제별로
+**다시 적합**하므로 지금 다시 내보내면 luna 계열의 holdout 이 달라진다
+(예: `luna-s5` 기록 1.1378 -> 오늘 1.0895). 적합기 조건이 D-150/D-152 이후
+달라졌기 때문이다. 그래서 이번에 **다시 내보내지 않았다** — 기록된 수치는
+`verify_rules` 가 커밋된 `W_FITTED` 로 재채점해 확인한다. 이 사실을
+`export_rules.py` 독스트링에 적었다.
+
+---
+
+### ★ 루프 자체는 깨끗하다 — 감사 목록과 재현
+
+고칠 것이 없다는 것도 기록이다.
+
+```
+아카이브 키 · 부모 선택 · 목적 전환   전부 학습 점수를 읽는다 (§I)
+should_stop                          봉인 (D-144). 풀지 않았다
+라운드마다 콘솔에 찍히는 val          기록용이고 선택에 안 들어간다
+Analyst 리포트의 사례 형상            ★ 26개 전부 학습 분할, 홀드아웃 0
+RuleEditor 프롬프트의 점수            ★ 73 호출 전부 0회
+```
+
+**재현** (`runs/cap1` 의 `llm_calls` 를 훑는다):
+
+```python
+# Analyst — 프롬프트의 MxNxK 를 분할과 대조
+#   결과: 사례 형상 26개 · 학습 26 · ★ 홀드아웃 0  (train 40 / val 21)
+# RuleEditor — regret/holdout/val_regret/validation/score 라벨 등장 횟수
+#   결과: 73 호출, 전부 0
+```
+
+⚠️ 두 번째를 처음 쟀을 때 **47/73 이 나왔다.** 정규식이 부모 규칙의
+가중치 값 `-1.0842833...` 을 점수로 잡은 것이다. 라벨로 다시 재서 0 을
+얻었다. **문자열 검색으로 "누출 없음" 을 주장할 때는 무엇이 잡혔는지
+눈으로 봐야 한다** (원칙 20).
+
+---
+
+### 앞선 결정과 잇는 자리 (지우지 않는다)
+
+```
+D-113 · D-116 · D-117   눈금/측정 한계 문장의 역사. E 와 G 가 그 뒤를 잇는다
+                        — D-117 이 고친 것은 hwprompt 쪽이고 diagnostic 사본은
+                        안 훑였다
+D-156                   "옛 레지스트리라 검증 불가" 바구니를 만든 결정.
+                        M 이 그 바구니의 **용도를 좁혔다**
+D-158 §1                H100 변종 프리셋을 고친 결정. A 가 그것이 **사본
+                        한쪽에만** 적용됐음을 잡았다
+D-158 §2                벤더 기준선 네 표. A 이후에도 값은 바이트 동일하다
+D-132 §2 · D-144        라운드 곡선 사전 등록과 조기 종료 봉인. L 과 I 가 인용
+D-163 §2                예산 150/300/450 의 엇갈린 실측. J 가 그대로 인용한다
+D-165 §1                전이가 루프 축을 들고 가게 한 수정. M 이 같은 함정을
+                        두 스크립트에서 마저 잡았다
+```
+
+### 원칙에 줄을 더할까
+
+더했다. **새 원칙은 만들지 않는다** — 열셋 중 아홉이 이미 원칙 2 와 23 의
+사례이고, 같은 말을 번호만 바꿔 다시 쓰면 원칙 목록 자체가 원칙 2 를 어긴다.
+각 원칙에 **재발 사례 한 줄씩**만 붙였다.

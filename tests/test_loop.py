@@ -868,6 +868,150 @@ def test_parallel_matches_sequential(synth_table, tmp_path):
         assert getattr(seq_r, f) == getattr(par_r, f), f
 
 
+# ---------------------------------------------------------------------------
+# ★ D-166 §K — workers **and** feature generation, together
+#
+#   `_parallel_pair` runs one round on a fixed registry with the feature
+#   path shut; the D-75 tests run the feature path with no workers. So the
+#   one combination the 21-run campaign is actually in — `n_workers=6` and
+#   `max_new_features_per_round=3`, both live every round — was covered by
+#   neither. That is the D-95 shape: a worker forked before the new column
+#   exists scores on a stale matrix and **silently gets a different score**.
+# ---------------------------------------------------------------------------
+def _feature_parallel_pair(synth_table, tmp_path, workers: int, *,
+                           rounds: int = 3):
+    """The same as `_parallel_pair` but with the feature path **open**.
+
+    ★ Two rounds, not one. An axis built at the end of round 0 only reaches
+    the workers in round 1 — with a single round the pool restart is never
+    exercised.
+
+    ★ The registry is **copied** (as in `_d75_loop`): the loop adds axes to
+    it and the global `REGISTRY` would leak into every other test.
+    """
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import REGISTRY, FeatureRegistry
+
+    reg = FeatureRegistry(f"featpar{workers}")
+    for name in REGISTRY.names():
+        reg.add(REGISTRY[name])
+    fm = FeatureMatrix(synth_table, reg)
+    sh = synth_table.shapes()
+    splits = SplitSet(train=Split("train", tuple(sh[:-2])),
+                      val=Split("val", tuple(sh[-2:])))
+    cfg = LoopConfig(run_id=f"featpar{workers}", n_rules_per_round=6,
+                     max_rounds=rounds, max_evals=30, seed=0,
+                     sandbox_first_seen=False, out_dir=str(tmp_path),
+                     n_workers=workers, max_new_features_per_round=2)
+    llm = MockLLM("mutate", seed=3, feature_names=fm.feature_names())
+    lp = RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
+                   llm=llm)
+    lp.seed(*_SEED_RULE)
+    results = []
+    for _ in range(rounds):
+        results.append(lp.run_round())
+        # ★ The mock holds the feature list it was built with; a real
+        #   RuleEditor is handed the **current** one every round. Here it is
+        #   narrowed to **the axis born last**, so the next round's rules
+        #   reach for a column the already-forked workers may not have.
+        acc = [row["name"] for row in lp.features_made if row.get("accepted")]
+        llm.features = acc[-1:] or llm.features
+    elites = sorted(lp.archive.cells.values(), key=lambda e: e.rule_id)
+    made = [(row["round"], row["name"], bool(row.get("accepted")))
+            for row in lp.features_made]
+    # ★ Every code that was **scored**, not only what reached the archive.
+    #   A candidate that reads a column the workers do not have never gets
+    #   archived — so the archive is the wrong place to look for whether
+    #   the stale-matrix path was exercised.
+    scored = sorted(lp._seen_code)
+    return results, [(e.rule_id, e.code, tuple(e.w), e.regret,
+                      e.mem_objective, e.comp_objective, e.val_regret)
+                     for e in elites], made, sorted(reg.names()), scored
+
+
+def test_parallel_matches_sequential_while_axes_are_being_made(synth_table,
+                                                               tmp_path):
+    """★ D-166 §K — the campaign's combination: workers on **and** new axes
+    appearing every round.
+
+    `_restart_pool()` in `_write_features` is what makes this hold. Without
+    it the round-1 workers would still hold the round-0 matrix, and the
+    difference shows up only as a different number — no error, no warning.
+    """
+    seq_r, seq, seq_made, seq_reg, seq_codes = _feature_parallel_pair(
+        synth_table, tmp_path / "fa", 0)
+    par_r, par, par_made, par_reg, par_codes = _feature_parallel_pair(
+        synth_table, tmp_path / "fb", 3)
+
+    # ★ The test is meaningless unless an axis was really built while the
+    #   workers were up (§26.4 — a check that cannot fail is not a check).
+    assert any(ok for _, _, ok in seq_made), (
+        f"no axis was accepted, so the combination was never exercised: "
+        f"{seq_made}")
+    # ⚠️ **This equality is not what catches a stale worker matrix.**
+    #   Measured (D-166 §K): with `_restart_pool()` removed this test still
+    #   passes unless a scored rule happens to read a column born *after*
+    #   the pool forked, and whether the mock produces such a rule depends
+    #   on which round each axis lands in — it differs between running this
+    #   file alone and running the whole suite. A guard that holds by luck
+    #   is not a guard, so it is not asserted here.
+    #   ★ `test_the_pool_is_restarted_when_an_axis_is_added` below is the
+    #     one that fails when the restart is removed. This case stays as
+    #     what it is: workers on + axes being made must not change a value.
+    assert seq_reg != sorted(
+        __import__("kernelrule.features", fromlist=["REGISTRY"]).REGISTRY
+        .names()), "the registry did not grow"
+    assert seq, "the sequential run produced nothing"
+
+    assert seq_made == par_made, "a different set of axes was built"
+    assert seq_reg == par_reg, "the registries ended up different"
+    assert seq_codes == par_codes, (
+        "a different set of candidates was scored — a worker refused one "
+        "the sequential path scored")
+    assert seq == par, "the parallel result differs from the sequential one"
+    for i, (a, b) in enumerate(zip(seq_r, par_r, strict=True)):
+        for f in ("n_proposed", "n_scored", "n_accepted", "n_fit_moved",
+                  "n_rejected_static", "n_rejected_fit", "n_cells",
+                  "n_feature_requests", "n_features_made"):
+            assert getattr(a, f) == getattr(b, f), f"round {i}: {f}"
+
+
+def test_the_pool_is_restarted_when_an_axis_is_added(synth_table, tmp_path):
+    """★ The mechanism behind the test above, counted directly.
+
+    ★ This is the case that fails when `_restart_pool()` is removed —
+    verified by removing it (D-166 §K):
+
+    ```
+    the pool was restarted 0 times for 2 accepted axes
+    ```
+
+    The value-equality case above does not catch that reliably, because it
+    only shows when a scored rule reads a column born after the fork.
+    """
+    calls = []
+    *_, made, _, _ = _feature_parallel_pair(synth_table, tmp_path / "fc", 3)
+    n_accepted = sum(1 for _, _, ok in made if ok)
+    assert n_accepted >= 1, made
+
+    import kernelrule.core.loop as loop_mod
+    orig = loop_mod.RoundLoop._restart_pool
+
+    def counting(self):
+        calls.append(1)
+        return orig(self)
+
+    loop_mod.RoundLoop._restart_pool = counting
+    try:
+        _feature_parallel_pair(synth_table, tmp_path / "fd", 3)
+    finally:
+        loop_mod.RoundLoop._restart_pool = orig
+    assert len(calls) == n_accepted, (
+        f"the pool was restarted {len(calls)} times for {n_accepted} "
+        f"accepted axes")
+
+
 def test_workers_default_is_parallel():
     """★ D-163 — the default is **6 workers**, not sequential.
 
