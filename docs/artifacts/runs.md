@@ -73,7 +73,7 @@ F3hg-p8-d75-a  the human_guided seed
 | `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | prod | cma/1/300 | 12 | a6000 | `?` | — | 1.0840 | expressive-regret.json | ⛔ retired — p8 and yet CMA. To be re-measured |
 | `archive` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `06c7c7b` | trace-archive-06c7c7b | — | — | ★ 12 rounds with the archive rebuilt (D-155) — 1 seed, fold 0, 3-term seed. New population, cut line and axes. Do not read its numbers |
 | `ast3000` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `0989b92` | trace-ast3000-0989b92 | — | — | ★ 12 rounds with the AST node cap at 3000 (D-154) — 1 seed, fold 0, 3-term seed. Refusals 3/72, none of them the cap. Do not read its numbers |
-| `dupfix` | 1 | 27/F2 | rule_writer-try01 | none | default | nelder-mead/4/200 | 12 | a6000 | `63b238a` | ★ not uploaded | — | — | |
+| `dupfix` | 1 | 27/F2 | rule_writer-try01 | none | default | nelder-mead/4/200 | 12 | a6000 | `63b238a` | trace-dup-63b238a | — | — | |
 | `full12` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `51af0d9` | trace-full12-51af0d9 | — | — | ★ the first full 12 rounds under the new design (D-153) — 1 seed, fold 0, 3-term seed. ⚠️ 17 of its 18 refusals are the AST node cap. Do not read its numbers |
 | `luna` | 3 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
 | `lunaNAMES` | 6 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |

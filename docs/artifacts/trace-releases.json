@@ -139,6 +139,28 @@
   },
   "uploaded": "2026-09-10"
  },
+ "dupfix": {
+  "bytes_raw": {
+   "dupfix-s0": 3752048
+  },
+  "bytes_zst": {
+   "dupfix-s0": 87061
+  },
+  "commits": {
+   "dupfix-s0": "63b238a"
+  },
+  "events": {
+   "dupfix-s0": 373
+  },
+  "release": "trace-dup-63b238a",
+  "runs": [
+   "dupfix-s0"
+  ],
+  "sha256": {
+   "trace-dupfix-s0.jsonl.zst": "93a0de283abbbcadb42488c35db1e74c3ad2929c70cc15bdbe6b4a626c5b9214"
+  },
+  "uploaded": "2026-09-11"
+ },
  "full12": {
   "bytes_raw": {
    "full12-s0": 1514781
