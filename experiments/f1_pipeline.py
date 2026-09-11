@@ -775,7 +775,8 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                            LoopConfig.max_new_features_per_round),
                        feature_condition=a.condition,
                        use_analyst=not getattr(a, "no_analyst", False),
-                       n_workers=getattr(a, "workers", 0),
+                       n_workers=getattr(a, "workers",
+                                         LoopConfig.n_workers),
                        objective="regret",
                        parameters=getattr(a, "parameters", None),
                        # ★ The fitter is **decided by the parameter count**
@@ -947,10 +948,16 @@ def main() -> None:
                          "automatically")
     # ★ Parallel scoring and fitting (D-95). 0 = sequential (the default).
     #   The results must be identical.
-    ap.add_argument("--workers", type=int, default=0, metavar="N",
-                    help="score and fit in N processes (0=sequential). The "
-                         "result equals the sequential one — "
-                         "test_parallel_matches_sequential pins it")
+    ap.add_argument("--workers", type=int,
+                    default=LoopConfig.n_workers, metavar="N",
+                    help="score and fit in N processes (0=sequential). ★ The "
+                         "default is LoopConfig's (6, D-163). ⚠️ It was 0 "
+                         "here while LoopConfig said 6, so the pipeline kept "
+                         "running sequential — the default has to be set in "
+                         "**both** places (D-164). The result equals the "
+                         "sequential one — "
+                         "test_parallel_matches_sequential_on_the_cma_path "
+                         "pins it")
     ap.add_argument("--max-new-features", type=int,
                     default=LoopConfig.max_new_features_per_round,
                     metavar="N",

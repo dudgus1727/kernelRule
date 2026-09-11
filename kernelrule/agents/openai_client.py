@@ -75,6 +75,13 @@ _VIOLATION_PATTERNS: tuple[tuple[str, str], ...] = (
     ("w0 is empty", "w0_empty"),
     ("abnormally large", "w0_huge"),
     ("banned reference", "banned_substring"),
+    # ★ D-164: the static checks now come back through the retry path, so
+    #   their messages reach here. The two that cost stage 2 of the D-162
+    #   run (7 of 10 tries on the first) get their own codes.
+    ("shape-level value", "prefix_f_for_shape"),
+    ("config-level feature", "prefix_p_for_feature"),
+    ("unregistered feature", "unknown_feature"),
+    ("unregistered shape-level value", "unknown_shape_value"),
     ("def score", "no_def_score"),
     ("code in a hypothesis", "hypothesis_has_code"),
     ("hypotheses", "hypothesis_count"),
@@ -775,8 +782,53 @@ class OpenAILLM:
             settings["openai_reasoning_effort"] = self.cfg.reasoning_effort
         a = Agent(model, output_type=out, instructions=instructions,
                   retries=self.cfg.max_retries, model_settings=settings)
+        if role == "rule_writer":
+            self._add_static_check(a)
         self._agents[role] = a
         return a
+
+    #: ★ The marker every static-check retry carries (D-164). `_harvest`
+    #: looks for it, so "the model was told, and what it was told" stays in
+    #: `violations` — a retry that leaves no record cannot be counted.
+    STATIC_RETRY = "the rule did not pass the static checks"
+
+    def _add_static_check(self, agent) -> None:
+        """★ The static checks, **inside the retry path** (D-164).
+
+        `check_rule` ran in the caller, *after* `Agent.run` returned, so a
+        refusal never reached the model: stage 2 of the D-162 run retried
+        three times with the identical prompt and made the identical mistake
+        each time, and 7 of 10 tries died on the same one (`f.X` for a
+        shape-level axis). Only 3 of 10 seeds survived, and a campaign that
+        starts from a seed carries that spread into every run.
+
+        The fourth of the five surfaces (principle 42) is exactly this one —
+        a validator failure is handed back by `pydantic-ai`. Raising
+        `ModelRetry` here puts the message the checker already writes in
+        front of the model.
+
+        ⚠️ **`rule_writer` only.** The loop's `rule_editor` keeps refusing
+        after the call (`_admit`) — that is what principle 42 pinned down,
+        and loop refusals were 6 of 72 in the D-162 run, too small to pay
+        for a change of condition (D-164 §1-3).
+        """
+        from pydantic_ai import ModelRetry
+
+        from kernelrule.rules.checks import check_rule, limits_for
+
+        @agent.output_validator
+        def _static(out):
+            code = getattr(out, "code", None)
+            w0 = getattr(out, "w0", None)
+            if code is None or w0 is None:
+                return out
+            rep = check_rule(code, feature_names=self.features,
+                             shape_value_names=self.shape_values,
+                             n_weights=len(w0), limits=limits_for())
+            if not rep.ok:
+                raise ModelRetry(f"{self.STATIC_RETRY}:\n  "
+                                 + "\n  ".join(rep.violations))
+            return out
 
     # -- Prompt assembly --------------------------------------------------
     def _feature_block(self) -> str:
@@ -1147,7 +1199,12 @@ class OpenAILLM:
                     raw = getattr(part, "content", "")
                     content = raw if isinstance(raw, str) else str(raw)
                     if ("validation error" in content.lower()
-                            or "Value error" in content):
+                            or "Value error" in content
+                            # ★ D-164: a static-check retry is a retry too.
+                            #   Without this the one path that now reaches
+                            #   the model would be the one path with no
+                            #   record.
+                            or self.STATIC_RETRY in content):
                         self.violations.append(
                             {"round": self.round, "seq": seq_, "role": role,
                              "attempt": i, "code": classify_violation(content),

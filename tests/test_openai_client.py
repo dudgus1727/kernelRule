@@ -762,3 +762,70 @@ def test_cross_hands_the_second_parent_to_the_editor():
     assert "ps[1]" in uses, (
         f"the second parent is not used: {sorted(uses)}")
     assert '"parent2": parent2' in src or "'parent2': parent2" in src
+
+
+# ---------------------------------------------------------------------------
+# ★ D-164 — the static checks have to be inside the retry path
+# ---------------------------------------------------------------------------
+def test_the_rule_writer_agent_retries_on_a_static_violation():
+    """★ D-164 — `check_rule` ran **after** `Agent.run` returned, so stage 2
+    retried three times with the identical prompt and made the identical
+    mistake each time (7 of 10 tries, D-162).
+
+    Checked by behaviour: the validator registered on the agent raises
+    `ModelRetry` — that is the exception `pydantic-ai` turns into a retry
+    prompt — and the message carries what the checker knows.
+    """
+    import os
+
+    import pytest
+    from pydantic_ai import ModelRetry
+
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.features import FeatureRegistry
+
+    os.environ.setdefault("OPENAI_API_KEY", "t")
+    llm = OpenAILLM(LLMConfig(), feature_names=["waves"],
+                    shape_values=["roof"], registry=FeatureRegistry("t"))
+
+    class _Fake:
+        def __init__(self, v):
+            self.validators = []
+            self.v = v
+
+        def output_validator(self, fn):
+            self.validators.append(fn)
+            return fn
+
+    class _Out:
+        def __init__(self, code, w0):
+            self.code, self.w0 = code, w0
+
+    fake = _Fake(None)
+    llm._add_static_check(fake)
+    assert len(fake.validators) == 1
+    check = fake.validators[0]
+
+    good = _Out("def score(f, p, hw, w):\n    return f.waves * w[0]\n", [1.0])
+    assert check(good) is good
+
+    bad = _Out("def score(f, p, hw, w):\n    return f.roof * w[0]\n", [1.0])
+    with pytest.raises(ModelRetry) as ei:
+        check(bad)
+    msg = str(ei.value)
+    assert OpenAILLM.STATIC_RETRY in msg
+    assert "p.roof" in msg and "shape-level" in msg
+
+
+def test_a_static_retry_is_recorded_as_a_violation():
+    """★ D-164 — the one path that now reaches the model must not be the one
+    path with no record. `_harvest` keys on the marker."""
+    import inspect
+
+    from kernelrule.agents.openai_client import OpenAILLM, classify_violation
+
+    src = inspect.getsource(OpenAILLM._run_traced)
+    assert "STATIC_RETRY" in src, "a static retry would leave no record"
+    assert classify_violation(
+        f"{OpenAILLM.STATIC_RETRY}:\n  unregistered feature: f.x. x is a "
+        f"**shape-level value** — write p.x") == "prefix_f_for_shape"
