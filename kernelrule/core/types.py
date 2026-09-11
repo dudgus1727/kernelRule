@@ -157,6 +157,25 @@ class Config:
     spill_bytes: int
     max_blocks_per_sm: int
     pipeline_kind: str       # "pipelined" | "multistage"
+    #: ★ 2026-09-11 (D-161): the operand-buffer stage count, **lifted out of
+    #: `ext`**.
+    #:
+    #: `pipeline_kind` is this value projected onto two levels — measured on
+    #: all four tables, `pipelined` is exactly `stages == 2` and
+    #: `multistage` is exactly `stages >= 3`, with no row disagreeing. So
+    #: the depth was already exposed, flattened.
+    #:
+    #: It stays out of `ext` under the §4.3 rule only if it does not
+    #: transfer, and it does: the value set is {2,3,4,5,6,7,8} on the A6000,
+    #: the 5090, the 4090 and the H100 alike, with **0 missing rows**. The
+    #: `swizzle` fields stay in `ext` — `identity`/`horizontal` are SM80
+    #: words (D-75).
+    #:
+    #: ⚠️ `0` means **the bundle has no `ext_stages` column**. Every bundle
+    #: measured so far has it, and so does the synthetic generator; a
+    #: feature that sees 0 is looking at a table that cannot answer, not at
+    #: a kernel with zero stages.
+    stages: int = 0
     #: SASS instruction count. Known at build time, common across
     #: architectures. GBDT ranked it highly but the hand rule never used it
     #: (§30.6b).
@@ -337,6 +356,9 @@ def config_from_row(row: dict[str, Any]) -> Config:
         spill_bytes=int(row["spill_bytes"]),
         max_blocks_per_sm=int(row["max_blocks_per_sm"]),
         pipeline_kind=str(row["pipeline_kind"]),
+        # ★ D-161. `ext` keeps its copy — `ext` is the raw record of the
+        #   table and nothing that reads it should change.
+        stages=int(row.get("ext_stages") or 0),
         inst_total=int(row.get("inst_total") or 0),
         ext=ext,
     )

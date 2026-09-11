@@ -64,7 +64,7 @@ RAW_FIELDS: dict[str, tuple[str, ...]] = {
     "cfg": ("tile_m", "tile_n", "tile_k", "align_a", "align_b", "align_c",
             "split_k", "split_k_mode", "regs_per_thread", "threads",
             "smem_bytes", "spill_bytes", "max_blocks_per_sm",
-            "pipeline_kind", "inst_total"),
+            "pipeline_kind", "stages", "inst_total"),
 }
 
 _ALLOWED_NP = frozenset({
@@ -154,6 +154,9 @@ FIELD_MEANING: dict[str, str] = {
     "cfg.pipeline_kind":
         "\"pipelined\" (2 stages) or \"multistage\" (3+ stages, cp.async) — "
         "**different kernel families**, not a knob on one (string)",
+    "cfg.stages":
+        "operand-buffer stages the mainloop keeps in flight. 2 means the "
+        "pipelined family; 3 and above is multistage (int)",
     "cfg.inst_total":
         "estimated SASS instruction count of the kernel (int)",
 }
@@ -217,8 +220,8 @@ _CONST_RTOL = 1e-12
 SHAPE_LEVEL_REASON: dict[str, str] = {}
 
 
-def detect_shape_level(f: Feature, table, *, n_shapes: int | None = None
-                       ) -> tuple[bool, str]:
+def detect_shape_level(f: Feature, table, *, n_shapes: int | None = None,
+                       matrix=None) -> tuple[bool, str]:
     """★ A two-layer verdict — `(is it shape level, why)` (§30.12).
 
     ⚠️ 2026-09-10 (D-160): it used to look at **the first 8 shapes**
@@ -245,9 +248,16 @@ def detect_shape_level(f: Feature, table, *, n_shapes: int | None = None
     """
     from kernelrule.core.matrix import FeatureMatrix
 
-    one = FeatureRegistry(f"probe-shape-{f.name}")
-    one.add(f)
-    mat = FeatureMatrix(table, one)
+    # ★ 2026-09-11 (D-161): `matrix` is an already-built matrix holding this
+    #   column over every shape. The caller passes it so the column is not
+    #   computed a second time; without one it is built here as before.
+    if matrix is not None and matrix.has_column(f.name) \
+            and len(matrix.shapes()) == len(list(table.shapes())):
+        mat = matrix
+    else:
+        one = FeatureRegistry(f"probe-shape-{f.name}")
+        one.add(f)
+        mat = FeatureMatrix(table, one)
     shapes = list(table.shapes())
     for p in (shapes if n_shapes is None else shapes[:n_shapes]):
         fe, _ = mat.for_shape(p)
@@ -358,12 +368,28 @@ def _reference_columns(table, matrix, extra: FeatureRegistry,
 
     Asking for a new axis and then not checking duplication against what was
     already built leads to the same thing being repeated under another name.
+
+    ⚠️ 2026-09-11 (D-161): this was **the cost of adding an axis.** It built
+    a second `FeatureMatrix` over the whole registry and **every shape in
+    the table** while only ever reading `n_shapes` of them — and in the loop
+    `extra` *is* `matrix.registry`, so the entire matrix was recomputed to
+    obtain columns the caller already held. Two changes: a registry already
+    covered by `matrix` is skipped, and what must be built is built for
+    those `n_shapes` alone.
     """
     out: dict[str, list] = {}
     shapes = list(table.shapes())[:n_shapes]
-    for reg, mat in ((matrix.registry, matrix),
-                     (extra, FeatureMatrix(table, extra) if extra._items
-                      else None)):
+    extra_mat = None
+    if extra._items and extra is not matrix.registry:
+        # Only what the caller's matrix does not already hold.
+        missing = FeatureRegistry(f"{extra.name}-missing")
+        for n in extra._items:
+            if not matrix.has_column(n):
+                missing.add(extra[n])
+        if missing._items:
+            extra_mat = FeatureMatrix(table, missing, shapes=shapes)
+            extra = missing
+    for reg, mat in ((matrix.registry, matrix), (extra, extra_mat)):
         if mat is None:
             continue
         for p in shapes:
@@ -417,7 +443,9 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
     #   config level.** Then a rule cannot branch with `if p.<x>:`, and a
     #   term that is constant within a shape cannot change the ranking at
     #   all (absolute rule 2). 5 of F1's 21 were in that state (D-65).
-    is_shape, why = detect_shape_level(f, table)
+    # ★ The probe already holds this column over every shape — the
+    #   verdict reads it instead of computing it a second time (D-161).
+    is_shape, why = detect_shape_level(f, table, matrix=probe)
     if is_shape:
         f = replace(f, shape_level=True)
         # ★ The reason is recorded. In particular one that "references cfg
@@ -426,4 +454,16 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
         #   module-level table — the caller writes it into summary.json.
         SHAPE_LEVEL_REASON[name] = why
     registry.add(f)
+    # ★ The caller's matrix takes the column the probe already computed
+    #   (D-161). Without this the same values are computed a third time by
+    #   `invalidate`.
+    if matrix is not None and matrix.registry is registry \
+            and matrix.table is table:
+        if f.shape_level:
+            # The probe computed it as a column; the caller's matrix wants
+            # the scalar. One shape-level pass over the probe, not a third
+            # full column.
+            probe.registry.add(f, replace=True)
+            probe.invalidate(name)
+        matrix.adopt(probe, name)
     return f

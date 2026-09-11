@@ -138,6 +138,12 @@ class MatrixStats:
                 f"{self.build_seconds:.1f}s")
 
 
+def _configs_of(df) -> list:
+    """One shape's rows as `Config` objects. ★ Built once and handed to
+    every feature (D-161) — the conversion is what a column costs."""
+    return [config_from_row(r) for r in df.to_dict("records")]
+
+
 class FeatureMatrix:
     """(shape, config) -> every feature value. Computed once when the table
     is loaded."""
@@ -145,15 +151,42 @@ class FeatureMatrix:
     def __init__(self, table: PerfTable, registry: FeatureRegistry, *,
                  hw: Hardware | None = None,
                  cache_dir: str | Path | None = None,
+                 shapes=None,
                  verbose: bool = False) -> None:
         self.table = table
         self.registry = registry
         self.hw = hw if hw is not None else table.hw
         self.cache_dir = Path(cache_dir) if cache_dir else None
+        #: ★ 2026-09-11 (D-161): which shapes this matrix holds. `None` is
+        #: every shape in the table — what every scoring path wants.
+        #: ⚠️ **Not `_shapes`** — that name is `Split`'s sealed private field
+        #: and `test_nothing_reads_the_private_field` forbids reading it
+        #: anywhere outside `splits.py` (§30.15). A matrix's shape list is a
+        #: different thing and must not weaken that guard.
+        #: A **probe** matrix built to answer one question about a candidate
+        #: feature does not need all of them, and the duplication check only
+        #: ever looks at 4 shapes while paying for 66 (`_reference_columns`).
+        #: ⚠️ A partial matrix is not cached — the cache key does not carry
+        #: the shape list and a partial one would be served as complete.
+        self._held = (list(table.shapes()) if shapes is None
+                        else list(shapes))
+        self.partial = shapes is not None
         self._cols: dict[tuple, dict[str, np.ndarray]] = {}
         self._info: dict[tuple, dict[str, float]] = {}
         self.stats: MatrixStats | None = None
         self._build(verbose=verbose)
+
+    def shapes(self) -> list:
+        """The shapes this matrix actually holds."""
+        return list(self._held)
+
+    def has_column(self, name: str) -> bool:
+        """Is this axis already computed? Used to skip a recomputation that
+        would produce the identical column (D-161)."""
+        if not self._cols:
+            return False
+        k = self._held[0].key
+        return name in self._cols[k] or name in self._info[k]
 
     # -- Lookup -----------------------------------------------------------
     def for_shape(self, p: Problem) -> tuple[Feats, ShapeInfo]:
@@ -195,7 +228,7 @@ class FeatureMatrix:
         `shapes` defaults to every shape in the table. The caller passes the
         **training** shapes so that nothing from the holdout is measured.
         """
-        shapes = list(self.table.shapes() if shapes is None else shapes)
+        shapes = list(self._held if shapes is None else shapes)
         out: dict[str, tuple[float, float]] = {}
         for n in self.registry.names(shape_level=False):
             lo = min(float(self._cols[p.key][n].min()) for p in shapes)
@@ -210,13 +243,35 @@ class FeatureMatrix:
         """The column with every shape concatenated. For the GBDT baseline
         and correlation analysis."""
         return np.concatenate([self._cols[p.key][name]
-                               for p in self.table.shapes()])
+                               for p in self._held])
+
+    def adopt(self, other: FeatureMatrix, name: str) -> None:
+        """Take one already-computed column from another matrix built on the
+        **same table** (D-161).
+
+        Registering an axis used to compute the same column three times: the
+        probe matrix inside `register_generated`, `detect_shape_level`, and
+        then `invalidate` here. The values are identical by construction —
+        same function, same rows — so they are copied instead.
+        """
+        if other.table is not self.table:
+            raise ValueError(
+                "adopt() only works between matrices on the same table — "
+                "copying a column across tables would silently mix two "
+                "measurements")
+        f = self.registry[name]
+        for p in self._held:
+            k = p.key
+            if f.shape_level:
+                self._info[k][name] = other._info[k][name]
+            else:
+                self._cols[k][name] = other._cols[k][name]
 
     def invalidate(self, feature_name: str) -> None:
         """When a feature is added or changed, recompute **only that
         column** (§21.2)."""
         f = self.registry[feature_name]
-        for p in self.table.shapes():
+        for p in self._held:
             df = self.table.frame_for(p)
             info = self._info[p.key]
             if f.shape_level:
@@ -236,8 +291,11 @@ class FeatureMatrix:
 
     def _build(self, *, verbose: bool) -> None:
         t0 = time.perf_counter()
+        # ★ A partial matrix is never cached (D-161) — the key does not
+        #   carry the shape list, so it would later be served as a complete
+        #   one.
         path = (self.cache_dir / f"featmat-{self._cache_key()}.npz"
-                if self.cache_dir else None)
+                if self.cache_dir and not self.partial else None)
         if path is not None and path.exists():
             self._load_cache(path)
             self._finish_stats(t0, from_cache=True)
@@ -245,7 +303,7 @@ class FeatureMatrix:
 
         cfg_feats = self.registry.items(shape_level=False)
         shp_feats = self.registry.items(shape_level=True)
-        for p in self.table.shapes():
+        for p in self._held:
             df = self.table.frame_for(p)
             info: dict[str, float] = dict(zip(
                 INTRINSIC_SHAPE_FIELDS,
@@ -254,8 +312,14 @@ class FeatureMatrix:
             for f in shp_feats:
                 info[f.name] = self._scalar(f, p, df)
             cols: dict[str, np.ndarray] = {}
+            # ★ 2026-09-11 (D-161): the rows are turned into `Config`
+            #   objects **once per shape**, not once per feature. Measured
+            #   on 8 shapes / 124,740 rows: `to_dict` 1.4s + `config_from_row`
+            #   0.8s against 0.02s for the feature function itself — the
+            #   conversion *was* the cost, and every feature paid it again.
+            cfgs = _configs_of(df) if cfg_feats else []
             for f in cfg_feats:
-                cols[f.name] = self._vector(f, p, df, info)
+                cols[f.name] = self._vector(f, p, df, info, cfgs=cfgs)
             self._cols[p.key] = cols
             self._info[p.key] = info
             if verbose:
@@ -281,7 +345,7 @@ class FeatureMatrix:
                 f"Rejected.")
         return v
 
-    def _vector(self, f, p: Problem, df, info: dict) -> np.ndarray:
+    def _vector(self, f, p: Problem, df, info: dict, cfgs=None) -> np.ndarray:
         if f.vec is not None:
             out = np.asarray(f.vec(df, self.hw, ShapeInfo(info)),
                              dtype=np.float64)
@@ -290,9 +354,9 @@ class FeatureMatrix:
                     f"{f.name}: the vectorised implementation produced "
                     f"{out.shape}. It must be ({len(df)},).")
         else:
-            out = np.asarray(
-                [float(f.fn(p, self.hw, config_from_row(r)))
-                 for r in df.to_dict("records")], dtype=np.float64)
+            rows = _configs_of(df) if cfgs is None else cfgs
+            out = np.asarray([float(f.fn(p, self.hw, c)) for c in rows],
+                             dtype=np.float64)
         if not np.all(np.isfinite(out)):
             n_bad = int((~np.isfinite(out)).sum())
             raise ValueError(

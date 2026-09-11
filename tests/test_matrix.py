@@ -162,3 +162,74 @@ def test_scale_invariance_hw_actually_used(synth_table, reg, hw_other):
     fb, _ = b.for_shape(p)
     assert not np.allclose(fa.waves_like, fb.waves_like)
     assert not np.allclose(fa.smem_pressure, fb.smem_pressure)
+
+
+# ---------------------------------------------------------------------------
+# ★ D-161 — adding an axis must not recompute what is already there
+# ---------------------------------------------------------------------------
+_NEW_AXIS = ("def probe_axis(p, hw, cfg) -> float:\n"
+             "    return float(cfg.tile_m) / max(float(cfg.tile_n), 1.0)\n")
+
+
+def _reg_of(names):
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.features import REGISTRY, FeatureRegistry
+
+    r = FeatureRegistry("d161")
+    for n in names:
+        r.add(REGISTRY[n])
+    return r
+
+
+def test_a_partial_matrix_holds_only_the_shapes_asked_for(synth_table):
+    from kernelrule.core.matrix import FeatureMatrix
+
+    reg = _reg_of(["waves", "edge_waste"])
+    want = list(synth_table.shapes())[:2]
+    m = FeatureMatrix(synth_table, reg, shapes=want)
+    assert m.shapes() == want and m.partial
+    assert len(m.column("waves")) == sum(
+        len(synth_table.frame_for(p)) for p in want)
+    # and a full one still holds everything
+    full = FeatureMatrix(synth_table, reg)
+    assert len(full.shapes()) == len(list(synth_table.shapes()))
+    assert not full.partial
+
+
+def test_an_adopted_column_equals_the_recomputed_one(synth_table):
+    """★ The saving is only legitimate if the values are identical."""
+    import numpy as np
+
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features.generated import register_generated
+    from kernelrule.features.validate import alt_hw
+
+    reg = _reg_of(["waves", "edge_waste", "reg_pressure"])
+    m = FeatureMatrix(synth_table, reg)
+    meta = {"unit": "ratio", "expected_range": [0.0, 64.0],
+            "direction": "higher_is_worse", "rationale": "a probe"}
+    f = register_generated(_NEW_AXIS, registry=reg, meta=meta,
+                           table=synth_table, matrix=m,
+                           hw_alt=alt_hw(synth_table.hw))
+    assert m.has_column(f.name), "the caller's matrix did not get the column"
+    adopted = [np.array(m.for_shape(p)[0].probe_axis if not f.shape_level
+                        else getattr(m.for_shape(p)[1], f.name))
+               for p in synth_table.shapes()]
+    m.invalidate(f.name)                       # recompute it the old way
+    for p, before in zip(synth_table.shapes(), adopted, strict=True):
+        after = (np.array(m.for_shape(p)[0].probe_axis) if not f.shape_level
+                 else np.array(getattr(m.for_shape(p)[1], f.name)))
+        assert np.allclose(before, after), f"{p.key}: adopt != recompute"
+
+
+def test_adopt_refuses_a_foreign_table(synth_table, null_table):
+    """⚠️ Copying a column between tables would mix two measurements."""
+    import pytest
+
+    from kernelrule.core.matrix import FeatureMatrix
+
+    reg = _reg_of(["waves"])
+    a = FeatureMatrix(synth_table, reg)
+    b = FeatureMatrix(null_table, reg)
+    with pytest.raises(ValueError, match="same table"):
+        a.adopt(b, "waves")

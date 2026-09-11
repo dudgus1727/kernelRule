@@ -75,11 +75,26 @@ def load_generated(path: str | Path, *, table, only: set[str] | None = None,
     if table is not None:
         from dataclasses import replace
 
+        from kernelrule.core.matrix import FeatureMatrix
+        from kernelrule.features import FeatureRegistry
         from kernelrule.features.generated import detect_shape_level
+
+        # ★ 2026-09-11 (D-161): **one pass, not one per feature.**
+        #   `detect_shape_level` builds a matrix when it is not handed one,
+        #   and since D-160 that matrix covers every shape — so loading 16
+        #   axes cost 265.9s on the A6000 table, paid again at every stage
+        #   that loads them. The verdict is unchanged: the same columns over
+        #   the same shapes, computed together.
+        #   Every candidate goes in as **config level** — the column per
+        #   config is exactly what the verdict reads.
+        probe_reg = FeatureRegistry("probe-shape-level")
+        for f in out:
+            probe_reg.add(replace(f, shape_level=False))
+        probe = FeatureMatrix(table, probe_reg) if out else None
         redone = []
         for f in out:
             is_shape, _ = detect_shape_level(replace(f, shape_level=False),
-                                             table)
+                                             table, matrix=probe)
             redone.append(replace(f, shape_level=is_shape))
         return redone
     return out

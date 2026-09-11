@@ -332,7 +332,13 @@ def _make_dummy():
                   align_c=8, split_k=1, split_k_mode="serial", arch="sm_86",
                   kernel_id="_dummy", regs_per_thread=128, threads=256,
                   smem_bytes=32768, spill_bytes=0, max_blocks_per_sm=2,
-                  pipeline_kind="multistage")
+                  pipeline_kind="multistage",
+                  # ★ D-161: `stages` is a field now. 3 is the smallest
+                  #   multistage depth — it keeps the dummy internally
+                  #   consistent. Nothing reads it here (the roofline needs
+                  #   no stage count); a mismatched 0 would just be a lie
+                  #   waiting to be read.
+                  stages=3)
 
 
 _DUMMY_CFG = _make_dummy()

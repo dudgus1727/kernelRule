@@ -562,3 +562,45 @@ def test_the_feature_writer_is_told_no_hardware_value():
     for banned in ("A6000", "RTX", "sm_86", "101376", "116.1", "729.7",
                    "159.1", "6291456"):
         assert banned not in txt, f"the feature path names {banned!r}"
+
+
+def test_the_stage_count_is_a_config_field_and_it_varies(perf_table):
+    """★ D-161 — `cfg.stages` is exposed, and it is not `pipeline_kind`.
+
+    The Analyst asked for "explicit pipeline stage count" six rounds running
+    under F1, and under F2 the FeatureWriter rebuilt it out of
+    `smem_bytes / stage_bytes` (|pearson| 0.999 with the real value). The
+    depth was already exposed as `pipeline_kind`, flattened to two levels.
+
+    Checked by behaviour on the measured table: more than two distinct
+    values, and `pipeline_kind` is exactly the 2 / 3-and-above split.
+    """
+    from kernelrule.core.types import config_from_row
+    from kernelrule.features.generated import FIELD_MEANING, RAW_FIELDS
+
+    assert "stages" in RAW_FIELDS["cfg"]
+    assert "cfg.stages" in FIELD_MEANING
+
+    seen, pairs = set(), set()
+    for p in list(perf_table.shapes())[:4]:
+        for row in perf_table.frame_for(p).to_dict("records"):
+            c = config_from_row(row)
+            seen.add(c.stages)
+            pairs.add((c.pipeline_kind, c.stages == 2))
+    assert len(seen) > 2, f"stages is flat on this table: {sorted(seen)}"
+    assert pairs <= {("pipelined", True), ("multistage", False)}, (
+        f"pipeline_kind is not the 2 / 3+ split of stages: {sorted(pairs)}")
+
+
+def test_swizzle_stays_out_of_the_raw_fields():
+    """⛔ D-75 — `identity`/`horizontal` are SM80 words and do not transfer.
+    Lifting `stages` out of `ext` is not a licence to lift the rest."""
+    from kernelrule.features.generated import RAW_FIELDS, field_block
+
+    flat = {f"{b}.{n}" for b, ns in RAW_FIELDS.items() for n in ns}
+    for banned in ("cfg.swizzle_type", "cfg.swizzle_n", "cfg.warp_m",
+                   "cfg.warp_n", "cfg.warp_k", "cfg.ext"):
+        assert banned not in flat
+    text = field_block()
+    for word in ("swizzle", "warp_m", "identity", "horizontal"):
+        assert word not in text, f"{word} is in the prompt"

@@ -671,7 +671,13 @@ class RoundLoop:
                                        hw_alt=alt_hw(self.table.hw))
                 # ★ The column is built now. Without it, a rule using the
                 #   name gets a KeyError.
-                self.matrix.invalidate(f.name)
+                # ★ 2026-09-11 (D-161): `register_generated` already handed
+                #   the probe's column to this matrix. Recomputing it here
+                #   produced **the identical values** at the cost of one
+                #   full pass over the table, so it only runs if the column
+                #   is somehow absent.
+                if not self.matrix.has_column(f.name):
+                    self.matrix.invalidate(f.name)
                 self._feats = self.matrix.feature_names()
                 self._fmins = self.matrix.feature_mins()
                 self._shape_vals = self.matrix.shape_value_names()

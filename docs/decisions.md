@@ -102,6 +102,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-158](#d-158-벤더-기준선을-네-gpu-전부에-5090-값은-우리-버그였다-2026-09-10)  벤더 기준선을 네 GPU 전부에 + ⛔ 5090 값은 우리 버그였다 (2026-09-10)
 - [D-159](#d-159-f1-을-처음-끝까지-돌렸다-피처-19개-씨앗-19가중치-12라운드-2026-09-10)  F1 을 처음 끝까지 돌렸다 — 피처 19개 · 씨앗 19가중치 · 12라운드 (2026-09-10)
 - [D-160](#d-160-f1-이-드러낸-다섯을-고치고-f2-를-돌렸다-피처-경로가-처음-살았다-2026-09-10)  F1 이 드러낸 다섯을 고치고 F2 를 돌렸다 — ★ 피처 경로가 처음 살았다 (2026-09-10)
+- [D-161](#d-161-cfgstages-를-노출하고-축-추가-비용을-고쳤다-2026-09-11)  `cfg.stages` 를 노출하고 축 추가 비용을 고쳤다 (2026-09-11)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -6771,3 +6772,202 @@ known5 5+생성 16+루프 9) · 씨앗 · 루프 중 축 생성 · 아카이브 
 ```
 
 F1 을 같은 조건으로 다시 돌릴지는 이 기록을 보고 정한다.
+
+## D-161  `cfg.stages` 를 노출하고 축 추가 비용을 고쳤다 (2026-09-11)
+
+> 재현: `python3 -u <scratch>/axis_cost.py` (0 LLM 호출, 약 15분. 같은 스크립트를
+> `KR_SRC=<worktree at d92c4aa>` 로 한 번 더 돌려 before) ·
+> `python3 -u <scratch>/stages_check.py` (네 표의 `ext_stages`)
+
+### 1. `ext_stages` 를 `Config` 필드로 올렸다
+
+세 조건 전부에서 같은 우회가 나왔다.
+
+```
+F1  Analyst 가 여섯 라운드 연속 "explicit pipeline stage count" 를 요구했다
+    (D-159 — 그리고 그때는 경로가 막혀 있었다)
+F2  경로가 열리자 FeatureWriter 가 두 번에 걸쳐 이것을 만들었다
+      pipeline_stage_count            3.0 if multistage else 2.0
+      actual_multistage_pipeline_depth  smem_bytes / stage_bytes 로 ★ 역산
+    ★ 역산한 쪽은 진짜 ext_stages 와 |pearson| 0.999 · |spearman| 0.986
+F3  최종 규칙이 np.where(p.can_use_cp_async, f.is_two_stage, 0.0) 를 12번 반복
+```
+
+**재료가 없었다.** `Config` 는 `pipeline_kind`(이진)만 노출하고 실제 단수는
+`cfg.ext` 안에 있었다.
+
+⚠️ `ext` 를 안 준 근거(design.md §6.1 · D-75)는 **"전이되지 않는 축은 주지
+않는다"** 이고 그 원칙은 맞다. 그런데 `stages` 는 전이된다 — 네 표 전부를
+확인했다.
+
+```
+표      행수        ext_stages 값 집합          빠진 행
+a6000     980,915   {2,3,4,5,6,7,8}             ★ 0
+5090    1,262,825   {2,3,4,5,6,7,8}             ★ 0
+4090    1,223,195   {2,3,4,5,6,7,8}             ★ 0
+h100    2,246,690   {2,3,4,5,6,7,8}             ★ 0
+★ 네 표 모두 pipeline_kind == "pipelined" ⟺ stages == 2 가 정확히 성립한다
+  (어긋나는 행 0). 즉 깊이는 이미 노출돼 있었고 2/3 으로 뭉개져 있었다
+```
+
+기존 축과의 값 상관 (A6000 앞 4형상):
+
+```
+축                                |pearson| |spearman| 값 종류
+is_two_stage                        0.668    0.642      2   ← 같은 것의 이진판
+pipeline_kind == "multistage"       0.668    0.662      2   ← 같다
+pipeline_stage_count (F2 생성)      0.668    0.662      2   ← 같다
+★ actual_multistage_pipeline_depth  0.999    0.986      8   ← 역산본
+cfg.max_blocks_per_sm               0.314    0.251      4   ← 다른 것
+can_use_cp_async                    0.000    0.036      1   ← 이 표에서 상수
+```
+
+★ **겹치는 것을 지우지 않는다.** `is_two_stage` 는 사람이 쓴 24개의 일부로
+그대로 두고, 겹친다는 사실만 여기 적는다.
+
+```
+한 일
+  Config.stages 필드 (config_from_row 이 ext_stages 를 읽는다. ext 안의
+  사본은 그대로 — ext 는 표의 원본 기록이다)
+  RAW_FIELDS["cfg"] 에 "stages" · FIELD_MEANING 에 한 줄
+  값이 없으면 0 이고 그것은 "표가 답을 못 한다" 는 뜻이다 (네 표와 합성
+  생성기 전부 값이 있다)
+⛔ swizzle 은 그대로 둔다 — identity/horizontal 은 SM80 용어다 (D-75).
+   시험이 프롬프트에 swizzle·warp_* 가 안 들어가는지 본다
+```
+
+⚠️ **조건 변경이다.** 이 뒤의 수치는 D-160 이전과 안 이어진다.
+
+### 2. 축 하나를 더하는 데 288초가 들고 있었다
+
+⚠️ **원인은 "증분이 아니라서" 가 아니었다.** 열 추가는 이미 증분이다
+(`FeatureMatrix.invalidate`). 같은 열을 **세 번 계산하고, 거기에 레지스트리
+전체를 한 번 더 계산**하고 있었다.
+
+측정 (A6000 66형상 · 980,915행 · 생성 축 16개, 0 LLM 호출):
+
+```
+                                    before(d92c4aa)   after
+표 적재                                   2.2s          2.1s
+초기 행렬 (16축)                        238.9s      ★ 23.8s   (10.0배)
+  probe 행렬 (1축 · 전 형상)             16.2s         18.3s   ← 필요한 계산
+  ★ _reference_columns (중복 검사)      238.9s      ★  0.0s
+  detect_shape_level (행렬 안 넘김)       16.4s         18.3s
+  ★ detect_shape_level (probe 넘김)        —        ★  0.0s
+★ register_generated 전 구간          ★ 271.7s     ★ 16.6s   (16.4배)
+  (조각의 합 271.4초와 맞는다 — 따로 한 번에 다시 쟀다)
+★ load_generated (생성 축 16개 적재)   ★ 265.9s     ★ 24.2s   (11.0배)
+```
+
+무엇이었나:
+
+```
+① _reference_columns 가 FeatureMatrix(table, extra) 를 **전 형상**에 대해
+   새로 짓는다. 그런데 읽는 것은 앞 4형상뿐이고, 루프에서는 extra 가
+   matrix.registry **바로 그것**이라 이미 가진 열을 다시 계산한 것이다
+   -> 이미 가진 레지스트리는 건너뛰고, 지어야 하는 것은 그 4형상만 짓는다
+      (FeatureMatrix 에 shapes= 를 받는 길을 냈다. 부분 행렬은 캐시하지
+       않는다 — 캐시 키에 형상 목록이 없어 완전한 것처럼 나갈 수 있다)
+② detect_shape_level 이 같은 열을 또 짓는다
+   -> probe 행렬을 넘겨받아 읽는다
+③ 루프가 matrix.invalidate 로 또 짓는다
+   -> register_generated 가 probe 의 열을 호출자 행렬에 넘긴다 (adopt).
+      루프는 열이 없을 때만 invalidate 한다
+④ ★ 지시서에 없던 것 — **열 하나의 비용은 피처 수식이 아니라 행 변환이다**
+   8형상 124,740행으로 쪼개 재면
+     df.to_dict("records")  1.4초
+     config_from_row        0.8초
+     ★ 피처 함수 자체       0.02초
+   그런데 `_vector` 가 **피처마다** 행을 다시 Config 로 바꾸고 있었다.
+   -> 형상마다 한 번만 바꾸고 모든 피처가 나눠 쓴다 (`_configs_of`).
+      초기 행렬 238.9초 -> 23.8초
+⑤ ★ 그리고 그것이 D-160 의 load_generated 비용도 푼다
+   피처마다 전 형상 행렬을 하나씩 짓던 것을, **한 번 지어서** 판정마다
+   넘긴다 (detect_shape_level(matrix=...)). 265.9초 -> 24.2초.
+   ★ 판정은 그대로다 — 같은 형상 전부, 같은 열
+★ 값이 같아야 정당한 절약이다 — adopt 한 열과 다시 계산한 열이 같은지
+  보는 시험을 넣었다
+```
+
+**라운드 비용의 산술** (실측 아님, 위 수치로 계산):
+
+```
+축당 비용 ≈ 14.7초 x (레지스트리 크기 + 2)   before
+          ≈ 16.6초 (레지스트리 크기와 무관)   after
+F2 실측 r4 = 1479초, 축 3개. 축 없는 라운드가 약 300초이므로
+  축 3개에 약 1179초 = 축당 393초 (레지스트리 24개 기준 계산값 387초와 일치)
+F2 전체 7,262초 중 축 11개에 약 4,300초 -> after 로는 약 180초
+```
+
+⚠️ **한 라운드를 실제로 다시 돌려 재지 않았다** — 이번 지시는 수정과
+프로파일까지다. 위는 조각 실측 + 산술이다.
+
+### 3. ⚠️ 함께 드러난 것 — 고치지 않고 적는다
+
+**① (고쳤다) D-160 이 `load_generated` 를 265.9초로 만들었다.** §2-⑤ 에
+적었다. 판정을 표본으로 되돌리는 것은 D-160 이 고친 바로 그 버그로
+돌아가는 것이라 하지 않았고, **계산을 한 번으로 묶어** 24.2초로 만들었다.
+판정 자체는 안 바뀐다.
+
+**② 중복 검사가 실제로 한 번도 안 돈다.** `validate_feature` 는 후보를 `_sample`
+로 고른 **6형상**에서 재고, `others` 는 **앞 4형상**에서 온다. 그리고
+`if ov.size != all_v.size: continue` 다 — 길이가 다르면 비교를 건너뛴다.
+이 표의 형상은 15,015행 또는 17,325행이라 6형상과 4형상의 합이 같아질 수
+없다.
+
+★ **동작으로 확인했다.** `waves` 를 이름만 바꿔 그대로 복사한 축을
+`validate_feature` 에 넣으면
+
+```
+checks: [('runs','ok'), ('range','ok'), ('vectorised','info'),
+         ('constant','ok'), ★ ('duplication','ok'), ...]
+   duplication 의 최대 min(rho, r) = ★ 0.000  — 한 번도 비교되지 않았다
+```
+
+완전한 복사본조차 통과한다. F2 에서 내부 중복 3쌍(|pearson| 0.953~1.000)이
+검사를 통과한 것이 이것으로 설명된다. **고치면 지금까지 통과하던 축이
+거부되기 시작한다 — 조건 변경이라 지시를 기다린다.**
+
+### 4. F2 가 남긴 관찰 — 기록만 한다
+
+지시서(§3)가 준 수치를 그대로 적는다. 출처가 다른 것은 나눠 적는다.
+
+```
+★ 규칙이 고정 config 하나보다 3% 밖에 안 좋다
+   우리 regret@1 1.0904 · 고정 1개 1.125 · ★ 고정 8개 묶음 1.005
+★ hit@1 0.175 — 82.5% 의 형상에서 구조적으로 다른 곳을 가리킨다
+★ regret@1 1.0904 vs regret@10 1.0874 — 상위 10개를 봐도 거의 같다
+★ r4 이후 제안 48개 중 개선 3 · 동일 13 · 악화 32
+★ 만들어진 축 아홉 중 새 물리는 서넛
+   split_k_factor 는 cfg.split_k 를 감싼 것
+   shape_output_aspect_ratio 는 F3 의 aspect_MN 재발명
+```
+
+내가 같은 트레이스에서 센 것 (정의가 다르므로 나란히 놓지 않는다):
+
+```
+r4~r11 채점 47개 (제안 48개 중 1개는 인덱스 구멍으로 거부)
+  아카이브 채택 14 · made_worse 24 · no_effect 9
+  ★ 전체 최고는 r3 의 1.0904 에서 한 번도 안 내려갔다 (r5·r7·r8 이 동률)
+만들어진 축 9개 중 사람 27개와 값이 겹치는 것 (|pearson|·|spearman| 둘 다
+  0.95 초과) 2개 — output_tile_aspect_mapping_waste ~ tile_aspect_imbalance,
+  그리고 D-160 §6 에 적은 대로 F2 내부 중복 3쌍
+```
+
+### 5. 바꾼 파일
+
+```
+kernelrule/core/types.py       Config.stages + config_from_row
+kernelrule/core/matrix.py      shapes= · shapes() · has_column() · adopt()
+                               ⚠️ 내부 이름은 `_held` 다 — `_shapes` 는
+                               Split 의 봉인된 사유 필드이고 그것을 밖에서
+                               읽는지 보는 시험이 있다 (§30.15)
+kernelrule/core/loop.py        열이 있으면 invalidate 안 한다
+kernelrule/core/matrix.py      ★ _configs_of — 행 변환을 형상마다 한 번
+kernelrule/features/loader.py  ★ 형상 수준 판정을 한 번의 계산으로 묶었다
+kernelrule/core/splits.py      더미 config 에 stages=3 (내부 일관성)
+kernelrule/features/generated.py  RAW_FIELDS·FIELD_MEANING·_reference_columns
+                                  ·detect_shape_level(matrix=)·adopt 호출
+tests/test_features.py         stages 노출 · swizzle 금지
+tests/test_matrix.py           부분 행렬 · adopt == 재계산 · 다른 표 거부
+```
