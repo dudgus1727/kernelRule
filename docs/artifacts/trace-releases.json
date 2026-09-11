@@ -139,6 +139,28 @@
   },
   "uploaded": "2026-09-10"
  },
+ "cap1": {
+  "bytes_raw": {
+   "cap1-s0": 3354053
+  },
+  "bytes_zst": {
+   "cap1-s0": 85217
+  },
+  "commits": {
+   "cap1-s0": "2392169"
+  },
+  "events": {
+   "cap1-s0": 375
+  },
+  "release": "trace-cap1-2392169",
+  "runs": [
+   "cap1-s0"
+  ],
+  "sha256": {
+   "trace-cap1-s0.jsonl.zst": "773c96dceebc065b2aa5986b21cc11c8753a046b31331698ccd4730600495bd6"
+  },
+  "uploaded": "2026-09-11"
+ },
  "dupfix": {
   "bytes_raw": {
    "dupfix-s0": 3752048

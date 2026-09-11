@@ -87,10 +87,16 @@ CANON: dict[str, tuple[str, tuple, str]] = {
     #   report is the one at r11
     "F3rw-p8-nan": ("round-curve-bests.json",
                     ("groups", "F3rw-p8-nan", "curves"), "med@11"),
+    # ⚠️ `cap1` is a **fold 0** run — this is the validation split of fold 0,
+    #    not the `nk11008` holdout every other row reports. The source column
+    #    names the file, and NOTES says it in words (D-165).
+    "cap1": ("cap1-run.json", ("final_val",), "one"),
 }
 #: Tags that are not retired but need an explanation. They go into the status
 #: column as they are.
 NOTES = {
+    "cap1": ("⚠️ **fold 0** — the value is that split's val, **not** the "
+             "`nk11008` holdout the other rows carry. Not comparable to them"),
     "F3rw-p8-nan": "★ the current canonical value — `-nan` means the "
                    "np.errstate guard in `compile_rule` (D-135). The "
                    "campaign before it is `F3rw-p8`. ★ The final score is "

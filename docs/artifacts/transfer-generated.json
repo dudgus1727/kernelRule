@@ -1,0 +1,117 @@
+{
+ "run": "cap1",
+ "src": "a6000",
+ "rule": {
+  "regret_src": 1.033925422275016,
+  "weights": 52,
+  "cell": [
+   0,
+   2,
+   2
+  ]
+ },
+ "src_registry": {
+  "n": 29,
+  "origin": {
+   "edge_waste": "known5",
+   "has_spill": "known5",
+   "occupancy_deficit": "known5",
+   "roofline_ratio": "known5",
+   "tail_waste": "known5",
+   "parallel_reduction_traffic_fraction": "stage1",
+   "pipeline_startup_fraction": "stage1",
+   "register_file_pressure": "stage1",
+   "vector_alignment_deficit": "stage1",
+   "sass_instruction_density": "stage1",
+   "shared_memory_pressure": "stage1",
+   "k_tail_padding_fraction": "stage1",
+   "l2_operand_footprint_fraction": "stage1",
+   "global_memory_traffic_ratio": "stage1",
+   "cta_wave_count": "stage1",
+   "shared_operand_traffic_per_flop": "stage1",
+   "mainloop_iteration_count": "stage1",
+   "spill_traffic_per_flop": "stage1",
+   "total_instruction_work_per_flop": "stage1",
+   "pipeline_family_or_stage_count": "loop r0",
+   "serial_split_k_partition_count": "loop r2",
+   "reduction_path_latency_and_precision_cost": "loop r4",
+   "initial_grid_occupancy_deficit": "loop r4",
+   "output_aspect_ratio_deficit": "loop r5",
+   "reuse_weighted_axis_coalescing_penalty": "loop r6",
+   "warp_distribution_swizzle_residency_cost": "loop r7",
+   "cta_output_tile_geometry_cost": "loop r8",
+   "split_k_parallelism_saturation_deficit": "loop r8",
+   "small_output_axis_cta_count_deficit": "loop r10"
+  },
+  "shape_level": [
+   "output_aspect_ratio_deficit",
+   "roofline_ratio",
+   "vector_alignment_deficit"
+  ],
+  "constant_on_train": [
+   "vector_alignment_deficit"
+  ]
+ },
+ "targets": {
+  "5090": {
+   "n_train": 41,
+   "n_holdout": 20,
+   "t_registry_s": 396.1,
+   "t_matrix_s": 36.0,
+   "n_axes": 29,
+   "shape_level_flipped": [],
+   "constant_new": [],
+   "constant_new_used_by_rule": [],
+   "constant_new_branched_on": [],
+   "static_ok": true,
+   "violations": [],
+   "static_top1": 1.045160782746222,
+   "vendor": 1.1157546636411428,
+   "a_transplant": 1.1292020171884052,
+   "b_refit": 1.0379433890522844,
+   "b_train": 1.0304840576897942,
+   "moved": "2/2",
+   "fitter": "cma"
+  },
+  "4090": {
+   "n_train": 39,
+   "n_holdout": 20,
+   "t_registry_s": 384.1,
+   "t_matrix_s": 34.6,
+   "n_axes": 29,
+   "shape_level_flipped": [],
+   "constant_new": [],
+   "constant_new_used_by_rule": [],
+   "constant_new_branched_on": [],
+   "static_ok": true,
+   "violations": [],
+   "static_top1": 1.040321832198874,
+   "vendor": 1.0646588517827988,
+   "a_transplant": 1.0370898852835613,
+   "b_refit": 1.041128541899604,
+   "b_train": 1.023677114290445,
+   "moved": "2/2",
+   "fitter": "cma"
+  },
+  "h100": {
+   "n_train": 39,
+   "n_holdout": 20,
+   "t_registry_s": 724.4,
+   "t_matrix_s": 65.3,
+   "n_axes": 29,
+   "shape_level_flipped": [],
+   "constant_new": [],
+   "constant_new_used_by_rule": [],
+   "constant_new_branched_on": [],
+   "static_ok": true,
+   "violations": [],
+   "static_top1": 1.192056960744853,
+   "vendor": 1.1521738415950786,
+   "a_transplant": 1.1970003708600696,
+   "b_refit": 1.1565296097716813,
+   "b_train": 1.0359283576108373,
+   "moved": "2/2",
+   "fitter": "cma"
+  }
+ }
+}
