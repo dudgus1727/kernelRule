@@ -87,30 +87,45 @@ def source_registry(table) -> tuple[FeatureRegistry, dict]:
     """
     reg = FeatureRegistry(f"{RUN}-on-{getattr(table, 'bundle', '?')}")
     origin: dict[str, str] = {}
+    # ★ 2026-09-11 (D-166): the shape-level verdict for known5 and the
+    #   loop-built axes is made in **one pass**, not one matrix per axis.
+    #   Per axis it was a full-table matrix — 384s on the 4090 and 724s on
+    #   the H100, ten times the cost of the matrix this function exists to
+    #   enable. It is the same fix D-163 §5 made inside `load_generated`,
+    #   and the verdict is unchanged: same columns, same shapes, computed
+    #   together.
+    pending: list[Feature] = []
     for n in sorted(KNOWN5._items):
-        f = KNOWN5[n]
-        is_shape, _ = detect_shape_level(replace(f, shape_level=False), table)
-        reg.add(replace(f, shape_level=is_shape))
+        pending.append(replace(KNOWN5[n], shape_level=False))
         origin[n] = "known5"
+    made = Path(f"runs/{RUN}-s0/features.jsonl").read_text().splitlines()
+    seen = {f.name for f in pending}
+    for line in made:
+        if not line.strip():
+            continue
+        e = json.loads(line)
+        if not e.get("accepted") or e["name"] in seen:
+            continue
+        name, fn = compile_feature(e["code"], known=frozenset(seen))
+        seen.add(name)
+        pending.append(Feature(name=name, fn=fn, unit="?",
+                               expected_range=(0.0, 1.0),
+                               direction="higher_is_worse", code_hash=name,
+                               source=e["code"]))
+        origin[name] = f"loop r{e['round']}"
+    probe_reg = FeatureRegistry("probe-shape-level")
+    for f in pending:
+        probe_reg.add(f)
+    probe = FeatureMatrix(table, probe_reg) if pending else None
+    for f in pending:
+        is_shape, _ = detect_shape_level(f, table, matrix=probe)
+        reg.add(replace(f, shape_level=is_shape))
+    # ★ `load_generated` already does its own single pass (D-163 §5).
     for f in load_generated(f"runs/{RUN}/stage1-features/proposals.jsonl",
                             table=table):
         if f.name not in reg._items:
             reg.add(f)
             origin[f.name] = "stage1"
-    made = Path(f"runs/{RUN}-s0/features.jsonl").read_text().splitlines()
-    for line in made:
-        if not line.strip():
-            continue
-        e = json.loads(line)
-        if not e.get("accepted") or e["name"] in reg._items:
-            continue
-        name, fn = compile_feature(e["code"], known=frozenset(reg._items))
-        f = Feature(name=name, fn=fn, unit="?", expected_range=(0.0, 1.0),
-                    direction="higher_is_worse", code_hash=name,
-                    source=e["code"])
-        is_shape, _ = detect_shape_level(f, table)
-        reg.add(replace(f, shape_level=is_shape))
-        origin[name] = f"loop r{e['round']}"
     return reg, origin
 
 
@@ -263,6 +278,11 @@ def main() -> None:
         fnB, wsB, moved, tr, meth = _fit(code, rule["w"], B, mB,
                                          list(spB.train.shapes))
         t["b_refit"] = float(_score_on(fnB, wsB, B, mB, hold))
+        # ★ D-166: **the weight vectors go in.** Without them "the rule
+        #   transfers" is a score and nothing else — how far the weights had
+        #   to move to get it cannot be read back at all.
+        t["w_source"] = {k: [float(x) for x in v] for k, v in wsA.items()}
+        t["w_target"] = {k: [float(x) for x in v] for k, v in wsB.items()}
         t["b_train"] = float(geomean(np.array(list(tr.values())))) if tr \
             else float("nan")
         t["moved"] = f"{sum(moved.values())}/{len(moved)}"
