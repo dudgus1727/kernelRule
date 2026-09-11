@@ -102,6 +102,21 @@ def alt_hw(hw: Hardware) -> Hardware:
                    l2_bytes=int(hw.l2_bytes * 2))
 
 
+class ReferenceColumns(dict):
+    """The duplication check's comparison set, **with the shapes it was
+    measured on** (D-162).
+
+    A plain dict lost that, and `validate_feature` then compared a candidate
+    measured on 6 sampled shapes against columns measured on the first 4 —
+    different lengths, and the code skipped every pair it could not line up.
+    The check was there and never fired once. Carrying the shape list makes
+    "measured on the same shapes" checkable instead of assumed.
+    """
+
+    #: The shapes every column in here was measured on, in order.
+    shapes: tuple = ()
+
+
 def _sample(table, n_shapes: int, rng) -> list:
     shapes = table.shapes()
     idx = rng.choice(len(shapes), size=min(n_shapes, len(shapes)),
@@ -236,6 +251,34 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
 
     # -- 5. duplication ---------------------------------------------------
     if others:
+        # ★ 2026-09-11 (D-162): **the candidate is re-measured on the
+        #   comparison set's own shapes.**
+        #
+        #   Before, `all_v` came from `_sample`'s 6 shapes and `others` from
+        #   the first 4, and the loop skipped any pair whose lengths did not
+        #   match — which on this table is every pair (a shape is 15,015 or
+        #   17,325 rows, so 6 of them never sum to 4 of them). A copy of
+        #   `waves` under another name passed with a maximum correlation of
+        #   **0.000**: nothing had been compared.
+        #
+        #   ⚠️ Lining the lengths up would be the wrong fix. Two columns of
+        #   equal length taken from different shapes are still not
+        #   comparable — they must be **the same rows**.
+        dup_shapes = getattr(others, "shapes", None)
+        if not dup_shapes:
+            raise ValueError(
+                "the comparison columns do not say which shapes they were "
+                "measured on. Build them with `_reference_columns` — a "
+                "duplication verdict on unknown rows is not a verdict "
+                "(D-162)")
+        dup_vals = []
+        for q in dup_shapes:
+            fe, info = matrix.for_shape(q)
+            dup_vals.append(
+                np.full(int(info.n_candidates), float(getattr(info, f.name)))
+                if f.shape_level
+                else np.asarray(getattr(fe, f.name), dtype=np.float64))
+        dup_v = np.concatenate(dup_vals)
         # ★ Duplication must not be judged on Spearman alone.
         #
         #   `sm_idle_cost = 1/(1-tail_waste) - 1` is a **monotone transform**
@@ -250,19 +293,31 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
         #   candidate.
         worst = ("", 0.0, 0.0)
         for name, ov in others.items():
-            if name == f.name or ov.size != all_v.size:
+            if name == f.name:
                 continue
-            rho = abs(_spearman(all_v, ov))
-            r = abs(_pearson(all_v, ov))
+            if ov.size != dup_v.size:
+                # ⛔ **Not skipped.** Skipping is how the check came to be
+                #   there without ever running (D-162).
+                raise ValueError(
+                    f"{f.name}: the comparison column {name!r} has "
+                    f"{ov.size} values and the candidate has {dup_v.size} "
+                    f"on the same {len(dup_shapes)} shapes. They are not "
+                    f"the same rows, so no duplication verdict is possible")
+            rho = abs(_spearman(dup_v, ov))
+            r = abs(_pearson(dup_v, ov))
             if min(rho, r) > min(worst[1], worst[2]):
                 worst = (name, rho, r)
         if worst[1] > DUP_RHO and worst[2] > DUP_RHO:
+            # ★ D-162: a **rejection**, not a note. It was a `warn`, and a
+            #   warn is not read by anything — F2 built three internally
+            #   duplicated pairs and every one was registered.
             rep.checks.append(Check(
-                "duplication", "warn",
+                "duplication", "fail",
                 f"Spearman {worst[1]:.3f} / Pearson {worst[2]:.3f} against "
-                f"{worst[0]} — both > {DUP_RHO}, so a deprecation candidate "
-                f"(§8.4)"))
-        elif worst[1] > DUP_RHO:
+                f"{worst[0]} — both > {DUP_RHO}. It is the same axis under "
+                f"another name (§8.4)"))
+            return rep
+        if worst[1] > DUP_RHO:
             rep.checks.append(Check(
                 "duplication", "info",
                 f"a **monotone transform** of {worst[0]} (Spearman "
@@ -374,7 +429,11 @@ def validate_registry(reg: FeatureRegistry, table, matrix, *,
     duplication check."""
     rng = np.random.default_rng(kw.get("seed", 0))
     shapes = _sample(table, kw.get("n_shapes", 6), rng)
-    pool: dict[str, np.ndarray] = {}
+    # ★ D-162: the pool says which shapes it was measured on. Without that
+    #   the duplication check cannot line the candidate up against it, and
+    #   it refuses rather than comparing rows that are not the same rows.
+    pool = ReferenceColumns()
+    pool.shapes = tuple(shapes)
     for name in reg.names(shape_level=False):
         try:
             pool[name] = np.concatenate(

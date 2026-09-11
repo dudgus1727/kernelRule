@@ -103,6 +103,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-159](#d-159-f1-을-처음-끝까지-돌렸다-피처-19개-씨앗-19가중치-12라운드-2026-09-10)  F1 을 처음 끝까지 돌렸다 — 피처 19개 · 씨앗 19가중치 · 12라운드 (2026-09-10)
 - [D-160](#d-160-f1-이-드러낸-다섯을-고치고-f2-를-돌렸다-피처-경로가-처음-살았다-2026-09-10)  F1 이 드러낸 다섯을 고치고 F2 를 돌렸다 — ★ 피처 경로가 처음 살았다 (2026-09-10)
 - [D-161](#d-161-cfgstages-를-노출하고-축-추가-비용을-고쳤다-2026-09-11)  `cfg.stages` 를 노출하고 축 추가 비용을 고쳤다 (2026-09-11)
+- [D-162](#d-162-중복-검사를-실제로-돌게-만들었다-그리고-사람이-쓴-축-넷이-걸렸다-2026-09-11)  중복 검사를 실제로 돌게 만들었다 — 그리고 사람이 쓴 축 넷이 걸렸다 (2026-09-11)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -6971,3 +6972,110 @@ kernelrule/features/generated.py  RAW_FIELDS·FIELD_MEANING·_reference_columns
 tests/test_features.py         stages 노출 · swizzle 금지
 tests/test_matrix.py           부분 행렬 · adopt == 재계산 · 다른 표 거부
 ```
+
+## D-162  중복 검사를 실제로 돌게 만들었다 — 그리고 사람이 쓴 축 넷이 걸렸다 (2026-09-11)
+
+> 재현: `python3 -u <scratch>/dupcheck.py` (복사본이 거부되는가) ·
+> `python3 -u <scratch>/dupsweep.py` (레지스트리 27개 · F2 의 25축 재측정) ·
+> `python3 -u <scratch>/shapecount.py` (형상 수를 4~66 으로 바꿔가며) ·
+> 전부 0 LLM 호출
+
+### 1. 무엇이 고장나 있었나
+
+```python
+if name == f.name or ov.size != all_v.size: continue
+```
+
+후보는 `_sample` 의 **6형상**에서, 비교 대상은 앞 **4형상**에서 왔다. 이 표의
+형상은 15,015행 또는 17,325행이라 6형상 합과 4형상 합이 같아질 수 없다 —
+**모든 쌍이 건너뛰어졌다.** D-161 에서 동작으로 확인한 대로 `waves` 를
+이름만 바꾼 축이 최대 상관 **0.000** 으로 통과했다.
+
+### 2. 고친 것
+
+```
+★ 후보를 ★ 비교 대상이 재어진 그 형상들에서 다시 잰다
+   (길이를 맞추는 것이 아니다 — 같은 행이어야 비교다)
+★ 비교 대상이 "어느 형상에서 쟀는지" 를 들고 다닌다 (ReferenceColumns)
+   말 못 하면 ValueError. 조용히 건너뛰는 것이 검사가 있는 척한 원인이다
+★ 길이가 다르면 ⛔ 오류. continue 하지 않는다
+★ 판정을 warn -> ★ fail 로. warn 은 아무것도 안 읽는다
+   (F2 는 내부 중복 3쌍을 만들고 전부 등록했다)
+```
+
+되돌려 확인:
+
+```
+✅ waves 를 이름만 바꾼 축  -> Spearman 1.000 / Pearson 1.000 으로 ⛔ 거부
+✅ 형상을 말 못 하는 비교 대상 -> ValueError("which shapes")
+✅ 시험 둘을 넣었다 (동작으로 본다)
+```
+
+### 3. ⚠️ 회귀 — 사람이 쓴 27개끼리도 걸린다
+
+지시서 §1-3 이 물은 것이다. **걸린다.**
+
+```
+비교 집합(앞 4형상)에서   4/27 이 서로를 거부한다
+  arith_intensity ~ roofline_ratio ~ reuse_ratio ~ log_flops  전부 rho 1.000
+```
+
+★ 형상 수를 바꿔가며 다시 재면 **둘로 갈린다.**
+
+```
+형상 수   0.95 를 넘는 쌍
+   4      6쌍  (log_flops 포함)
+   8      7쌍  (is_memory_bound ~ log_min_dim 이 여기서만 뜬다)
+  12      5쌍
+  24      4쌍
+  66      ★ 4쌍 — arith_intensity ~ reuse_ratio ~ roofline_ratio (서로 1.000)
+                  has_spill ~ spill_magnitude (1.000 / 0.976)
+```
+
+```
+★ 진짜 중복   arith_intensity · reuse_ratio · roofline_ratio 는 같은 축이다
+              (FLOP/byte 를 상수로 나눈 것들이다). has_spill 과
+              spill_magnitude 도 전 표에서 1.000 / 0.976
+⚠️ 해상도 탓  log_flops · is_memory_bound 는 형상 4~8개에서만 걸리고
+              24·66 에서는 사라진다. ★ 비교 집합이 앞 4형상인데 그 넷이
+              전부 M=1 이다 — 형상 수준 축은 거기서 값이 넷뿐이라
+              가짜 1.000 이 나오기 쉽다
+```
+
+★ **지우지 않는다.** 지금까지의 모든 수치가 이 27개로 잰 것이다. 시험은
+"이미 아는 쌍 말고 새로 걸리는 것이 없다" 만 고정한다
+(`_KNOWN_DUPLICATE_AXES`).
+
+⚠️ **비교 집합의 형상 수(4)는 이 지시서에 없어 안 건드렸다.** 위 표가
+그것이 모자란다는 증거다 — 바꿀지는 지시를 받고 정한다.
+
+### 4. F2 가 만든 25축 재측정 (§1-4)
+
+만들어진 순서대로, 그 시점에 실제로 있던 것만 비교 대상에 넣고 다시 쟀다
+(F2 조건이므로 출발은 known5 다).
+
+```
+⛔ 거부됐을 것 3/25
+  config_roofline_deficit          ~ tiled_input_redundancy        rho 0.960 r 1.000
+  output_tile_aspect_mapping_waste ~ operand_tile_traffic_imbalance rho 1.000 r 0.953
+  per_partition_reduction_amortization ~ serial_split_reduction_work rho 0.973 r 0.964
+✓ 통과한 22개 중 가장 높은 것  absolute_split_k_... ~ resident_wave_count 0.902
+  거부된 것들의 최솟값 0.953 — ★ 0.95 근처에서 깨끗이 갈린다
+```
+
+⚠️ 지시서가 예상한 `pipeline_stage_count ~ is_two_stage` 는 **안 걸린다** —
+F2 조건에서 `is_two_stage` 는 비교 대상에 없다(공개 지식 5개로 시작한다).
+사람 27개 전부를 비교 대상으로 하면 걸린다(D-161 §1: rho 0.662 · r 0.668
+— 실은 그것도 0.95 아래다. `is_two_stage` 와 `pipeline_stage_count` 는 값이
+같지만 앞 4형상에서 둘 다 거의 상수라 상관이 낮게 나온다).
+
+★ 아홉 축은 그대로 둔다. 재측정만 기록한다.
+
+### 5. 검사가 돌기 시작하자 시험 하나가 걸렸다
+
+`test_register_generated_keeps_the_declared_range` 의 탐침이
+`cfg.tile_m / p.M` 이었다. 비교 집합이 표의 앞 4형상이고 **그 넷이 전부
+M=1** 이라 그 식은 거기서 `tile_m` 이고 `edge_waste` 와 1.000 으로 붙는다.
+그 시험의 주제는 **선언한 범위가 보존되는가**이므로 탐침을 다른 것이 안
+재는 축(`cfg.threads / cfg.tile_k`)으로 바꿨다. ★ 검사를 느슨하게 하지
+않았다.

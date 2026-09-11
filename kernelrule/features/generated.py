@@ -38,6 +38,7 @@ import numpy as np
 
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.features import Feature, FeatureRegistry
+from kernelrule.features.validate import ReferenceColumns
 
 __all__ = ["FeatureRejected", "check_feature_code", "compile_feature",
            "register_generated", "RAW_FIELDS", "field_block"]
@@ -362,7 +363,7 @@ def compile_feature(code: str, *, known: frozenset[str]):
 
 
 def _reference_columns(table, matrix, extra: FeatureRegistry,
-                       n_shapes: int = 4) -> dict[str, np.ndarray]:
+                       n_shapes: int = 4) -> ReferenceColumns:
     """The reference columns for the duplication verdict. It looks at
     **both what a human wrote and what has already been built.**
 
@@ -399,7 +400,9 @@ def _reference_columns(table, matrix, extra: FeatureRegistry,
                 v = (np.full(int(info.n_candidates), float(getattr(info, n)))
                      if f.shape_level else np.asarray(getattr(fe, n), float))
                 out.setdefault(n, []).append(v)
-    return {n: np.concatenate(v) for n, v in out.items()}
+    ref = ReferenceColumns({n: np.concatenate(v) for n, v in out.items()})
+    ref.shapes = tuple(shapes)
+    return ref
 
 
 def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,

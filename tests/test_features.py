@@ -82,16 +82,41 @@ def test_all_features_are_short():
     assert not long, f"features that are too long: {long}"
 
 
+#: ★ Axes of the human registry that the duplication check calls duplicates
+#: of each other (D-162). **They are not deleted** — they are what every
+#: number so far was measured with, and deleting them would silently change
+#: the condition. What is pinned here is that the list does not grow.
+#:
+#: Measured on the whole A6000 table (66 shapes, 980,915 rows):
+#:   has_spill ~ spill_magnitude          Spearman 1.000 / Pearson 0.976
+#:   arith_intensity ~ reuse_ratio        1.000 / 1.000
+#:   arith_intensity ~ roofline_ratio     1.000 / 1.000
+#:   reuse_ratio ~ roofline_ratio         1.000 / 1.000
+#: On the synthetic table only the first pair is above the line.
+_KNOWN_DUPLICATE_AXES = {"has_spill", "spill_magnitude"}
+
+
 def test_registry_validates_clean(synth_table, matrix, hw_other):
-    """★ Every feature passes the automatic validation. A single rejection
-    is a failure."""
+    """★ Every feature passes the automatic validation, **except the
+    duplicate pairs that are written down** (D-162).
+
+    ⚠️ Before D-162 the duplication check never ran — the candidate was
+    measured on one set of shapes and the comparison set on another, and
+    every mismatched pair was skipped. Now that it runs, it finds pairs
+    inside the human registry too. They stay; the test pins that no *new*
+    axis joins them.
+    """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         reps = validate_registry(REGISTRY, synth_table, matrix,
                                  hw_alt=hw_other, n_shapes=4)
     failed = {n: [str(c) for c in r.fails()]
               for n, r in reps.items() if r.failed}
-    assert not failed, f"validation rejections: {failed}"
+    unexpected = {n: c for n, c in failed.items()
+                  if not (n in _KNOWN_DUPLICATE_AXES
+                          and all("duplication" in x for x in c))}
+    assert not unexpected, f"validation rejections: {unexpected}"
+    assert set(failed) <= _KNOWN_DUPLICATE_AXES
 
 
 def test_scale_invariance_catches_a_hardcoded_constant(synth_table, matrix,
@@ -436,8 +461,14 @@ def test_register_generated_keeps_the_declared_range(perf_table):
     from kernelrule.features import FeatureRegistry
     from kernelrule.features.generated import register_generated
 
+    # ⚠️ 2026-09-11 (D-162): this was `cfg.tile_m / p.M`, and once the
+    #   duplication check started running it was rejected — the comparison
+    #   set is the table's first 4 shapes and all four have M=1, where that
+    #   formula is `tile_m` and lines up with `edge_waste` at 1.000. The
+    #   subject here is the **declared range**, so the probe is an axis
+    #   nothing else measures.
     code = ("def probe_range(p, hw, cfg) -> float:\n"
-            "    return float(cfg.tile_m) / max(1.0, float(p.M))\n")
+            "    return float(cfg.threads) / max(1.0, float(cfg.tile_k))\n")
     reg = FeatureRegistry("probe")
     meta = {"name": "probe_range", "unit": "dimensionless",
             "direction": "higher_is_worse", "expected_range": [0.0, 7.0]}
@@ -604,3 +635,69 @@ def test_swizzle_stays_out_of_the_raw_fields():
     text = field_block()
     for word in ("swizzle", "warp_m", "identity", "horizontal"):
         assert word not in text, f"{word} is in the prompt"
+
+
+# ---------------------------------------------------------------------------
+# ★ D-162 — the duplication check has to actually run
+# ---------------------------------------------------------------------------
+_WAVES_COPY = ("def waves_copy(p, hw, cfg) -> float:\n"
+               "    tiles_m = (p.M + cfg.tile_m - 1) // max(cfg.tile_m, 1)\n"
+               "    tiles_n = (p.N + cfg.tile_n - 1) // max(cfg.tile_n, 1)\n"
+               "    ctas = tiles_m * tiles_n * max(cfg.split_k, 1)\n"
+               "    return ctas / max(hw.sm_count * cfg.max_blocks_per_sm, 1)\n")
+
+
+def _small(table, names=("waves", "edge_waste", "reg_pressure")):
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import REGISTRY, FeatureRegistry
+
+    reg = FeatureRegistry("dup")
+    for n in names:
+        reg.add(REGISTRY[n])
+    return reg, FeatureMatrix(table, reg)
+
+
+def test_a_copy_of_an_existing_axis_is_rejected(perf_table):
+    """★ D-162 — before this, `waves` under another name passed with a
+    maximum correlation of **0.000**: the candidate was measured on 6
+    sampled shapes and the comparison set on the first 4, and every pair
+    whose lengths did not line up was skipped. On this table they never do.
+    """
+    import pytest
+
+    from kernelrule.features.generated import FeatureRejected, register_generated
+    from kernelrule.features.validate import alt_hw
+
+    reg, m = _small(perf_table)
+    meta = {"unit": "count", "expected_range": [0.0, 1e7],
+            "direction": "higher_is_worse", "rationale": "a copy"}
+    with pytest.raises(FeatureRejected, match="duplication"):
+        register_generated(_WAVES_COPY, registry=reg, meta=meta,
+                           table=perf_table, matrix=m,
+                           hw_alt=alt_hw(perf_table.hw))
+
+
+def test_a_mismatched_comparison_set_is_an_error_not_a_skip(perf_table):
+    """⛔ Skipping is how the check came to be there without ever running.
+    A pool that cannot say which shapes it holds must **stop** the
+    verdict."""
+    import pytest
+
+    from kernelrule.features import Feature
+    from kernelrule.features.generated import compile_feature
+    from kernelrule.features.validate import alt_hw, validate_feature
+
+    reg, m = _small(perf_table)
+    name, fn = compile_feature(_WAVES_COPY, known=frozenset(reg._items))
+    f = Feature(name=name, fn=fn, unit="count", expected_range=(0.0, 1e7),
+                direction="higher_is_worse", code_hash="h",
+                source=_WAVES_COPY)
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import FeatureRegistry
+
+    one = FeatureRegistry("probe-dup")
+    one.add(f)
+    probe = FeatureMatrix(perf_table, one)
+    with pytest.raises(ValueError, match="which shapes"):
+        validate_feature(f, perf_table, probe, hw_alt=alt_hw(perf_table.hw),
+                         others={"waves": m.column("waves")})
