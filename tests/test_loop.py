@@ -777,7 +777,7 @@ def test_borrowed_arm_calls_no_analyst_but_renders_the_section(synth_table,
 # ---------------------------------------------------------------------------
 # D-95 — parallel scoring and fitting
 # ---------------------------------------------------------------------------
-def _parallel_pair(synth_table, tmp_path, workers: int):
+def _parallel_pair(synth_table, tmp_path, workers: int, *, seed_rule=None):
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.features import REGISTRY
@@ -792,11 +792,58 @@ def _parallel_pair(synth_table, tmp_path, workers: int):
     llm = MockLLM("mutate", seed=3, feature_names=fm.feature_names())
     lp = RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
                    llm=llm)
-    lp.seed(*_SEED_RULE)
+    lp.seed(*(seed_rule or _SEED_RULE))
     r = lp.run_round()
     elites = sorted(lp.archive.cells.values(), key=lambda e: e.rule_id)
     return r, [(e.rule_id, e.code, tuple(e.w), e.regret, e.mem_objective,
                 e.comp_objective, e.val_regret) for e in elites]
+
+
+#: ★ A rule with more than `FITTER_SWITCH_DIM` weights — the **CMA** path
+#: (D-163). `_SEED_RULE` has one weight, so the pair test above only ever
+#: exercised Nelder-Mead: measured, `fitter_for` saw len(w0) 1 and 2 and
+#: nothing else.
+_WIDE_SEED = (
+    ("def score(f, p, hw, w):\n"
+     "    s = np.log2(f.traffic_amplification) * w[0]\n"
+     + "".join(f"    s = s + f.{n} * w[{i}]\n" for i, n in enumerate(
+         ("waves", "edge_waste", "tail_waste", "reg_pressure",
+          "smem_pressure", "spill_magnitude", "log_grid_tiles",
+          "log_mainloop_iters", "split_k_cost", "sm_idle_cost",
+          "log_dram_traffic"), start=1))
+     + "    return s\n"), [1.0] * 12)
+
+
+def test_the_parallel_pair_covers_the_cma_path(synth_table, tmp_path):
+    """★ D-163 — the pair test has to reach the fitter the runs actually use.
+
+    Every rule of the last 12-round run was fitted with CMA (64/64), and the
+    pair test only ever saw 1 and 2 weights — Nelder-Mead. A test that
+    passes on a path the campaign never takes proves nothing about the path
+    it does take.
+    """
+    from kernelrule.rules.checks import FITTER_SWITCH_DIM, fitter_for
+
+    assert len(_WIDE_SEED[1]) > FITTER_SWITCH_DIM
+    assert fitter_for(len(_WIDE_SEED[1]))["fit_method"] == "cma"
+
+
+def test_parallel_matches_sequential_on_the_cma_path(synth_table, tmp_path):
+    """★ D-163 — the same values from a **CMA-dimension** seed.
+
+    Turning the workers on must not change what a campaign produces. The
+    fitter is chosen by `fitter_for(len(w0))` in both paths; this is the
+    check that says so by behaviour rather than by reading the code.
+    """
+    seq_r, seq = _parallel_pair(synth_table, tmp_path / "wa", 0,
+                                seed_rule=_WIDE_SEED)
+    par_r, par = _parallel_pair(synth_table, tmp_path / "wb", 3,
+                                seed_rule=_WIDE_SEED)
+    assert seq, "the sequential run produced nothing — the test is meaningless"
+    assert seq == par, "the parallel result differs from the sequential one"
+    for f in ("n_proposed", "n_scored", "n_accepted", "n_fit_moved",
+              "n_rejected_static", "n_rejected_fit", "n_cells"):
+        assert getattr(seq_r, f) == getattr(par_r, f), f
 
 
 def test_parallel_matches_sequential(synth_table, tmp_path):
@@ -821,12 +868,20 @@ def test_parallel_matches_sequential(synth_table, tmp_path):
         assert getattr(seq_r, f) == getattr(par_r, f), f
 
 
-def test_workers_default_is_sequential():
-    """The default is sequential — every run so far is under that
-    condition."""
+def test_workers_default_is_parallel():
+    """★ D-163 — the default is **6 workers**, not sequential.
+
+    ⚠️ It was 0 and every campaign ran that way. 74% of a round's wall clock
+    of the D-162 run was the fitter, and it is the same computation either
+    way: `test_parallel_matches_sequential_on_the_cma_path` is what says the
+    values do not change. 6 = `n_rules_per_round`, so one round's candidates
+    are fitted in a single wave.
+    """
     from kernelrule.core.loop import LoopConfig
 
-    assert LoopConfig(run_id="x").n_workers == 0
+    cfg = LoopConfig(run_id="x")
+    assert cfg.n_workers == 6
+    assert cfg.n_workers == cfg.n_rules_per_round
 
 
 def test_worker_does_not_do_the_sandbox(synth_table):

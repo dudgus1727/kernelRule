@@ -701,3 +701,53 @@ def test_a_mismatched_comparison_set_is_an_error_not_a_skip(perf_table):
     with pytest.raises(ValueError, match="which shapes"):
         validate_feature(f, perf_table, probe, hw_alt=alt_hw(perf_table.hw),
                          others={"waves": m.column("waves")})
+
+
+# ---------------------------------------------------------------------------
+# ★ D-163 — the banned-word scan must not read prose
+# ---------------------------------------------------------------------------
+def test_a_docstring_may_say_execute_important_randomly():
+    """★ D-163 — `'exec'` matched "execute" in a docstring and an axis was
+    refused for it (D-162 run, r6). The same shape as D-73: **the checker
+    banned what it had itself allowed.** "import" is inside "important" and
+    "random" inside "randomly" — prose is full of them.
+    """
+    from kernelrule.features.generated import check_feature_code
+
+    code = ('def probe_prose(p, hw, cfg) -> float:\n'
+            '    """CTAs needed to execute the tiled grid. This is important\n'
+            '    for randomly shaped problems; nothing is imported here."""\n'
+            '    return float(cfg.tile_m) / max(1.0, float(p.M))\n')
+    assert check_feature_code(code, known=frozenset()) == "probe_prose"
+
+
+@pytest.mark.parametrize("code,word", [
+    ("def b(p, hw, cfg) -> float:\n    return float(np.random.rand())\n",
+     "random"),
+    ("def b(p, hw, cfg) -> float:\n    import os\n    return 1.0\n", "import"),
+    ("def b(p, hw, cfg) -> float:\n    return float(cfg.__class__ is int)\n",
+     "__"),
+])
+def test_the_banned_words_still_catch_real_code(code, word):
+    """⚠️ Reading prose is what was wrong, not the ban. An identifier that
+    really contains the word is still refused."""
+    from kernelrule.features.generated import FeatureRejected, check_feature_code
+
+    with pytest.raises(FeatureRejected):
+        check_feature_code(code, known=frozenset())
+
+
+def test_the_comparison_shapes_are_not_all_one_m(perf_table):
+    """★ D-163 — the comparison set was the table's first 4 shapes and all
+    four are `M=1`, so a shape-level axis had four values in the whole set.
+    Measured against the whole table's verdict: 4 shapes gives 5 false
+    positives and misses one, 12 spread by M gives 1 and misses none.
+    """
+    from kernelrule.features.generated import DUP_SHAPES, _spread_shapes
+
+    sh = _spread_shapes(perf_table, DUP_SHAPES)
+    assert len(sh) == DUP_SHAPES
+    assert len({p.M for p in sh}) >= 8, [p.M for p in sh]
+    # and it is reproducible
+    assert [p.key for p in sh] == [
+        p.key for p in _spread_shapes(perf_table, DUP_SHAPES)]

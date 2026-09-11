@@ -537,3 +537,41 @@ def test_identity_check_catches_the_real_archive():
     hit = sum(1 for c in codes if identity_transform_message(c))
     assert hit > 0, ("it catches nothing in the archive — meaning the "
                      "checker does not see the real detours")
+
+
+# ---------------------------------------------------------------------------
+# ★ D-163 — a refusal has to say what to do instead
+# ---------------------------------------------------------------------------
+def test_the_wrong_prefix_is_named_as_such():
+    """★ 7 of 10 RuleWriter tries and one loop proposal of the D-162 run
+    died on `f.X` where X is a shape value, and the retry message said only
+    "unregistered" — three times, and the model repeated it three times.
+    The checker holds both lists; it can say which side the name is on."""
+    from kernelrule.rules.checks import check_rule, limits_for
+
+    r = check_rule("def score(f, p, hw, w):\n    return f.roof * w[0]\n",
+                   feature_names=["waves"], shape_value_names=["roof"],
+                   n_weights=1, limits=limits_for())
+    assert not r.ok
+    assert "p.roof" in r.violations[0] and "shape-level" in r.violations[0]
+
+    r = check_rule("def score(f, p, hw, w):\n    s = 0.0\n"
+                   "    if p.waves > 1.0:\n        s = s + w[0]\n    return s\n",
+                   feature_names=["waves"], shape_value_names=["roof"],
+                   n_weights=1, limits=limits_for())
+    assert not r.ok
+    assert "f.waves" in r.violations[0] and "config-level" in r.violations[0]
+
+
+def test_the_w0_length_message_says_the_number():
+    """★ Five proposals of the D-162 run missed it in **both** directions
+    (53 vs 52, 54 vs 55, 57 vs 58, 50 vs 51). Nobody counts fifty weights by
+    hand. ⚠️ It is not corrected for the model — only stated."""
+    from kernelrule.rules.checks import check_rule, limits_for
+
+    r = check_rule("def score(f, p, hw, w):\n"
+                   "    return f.waves * w[0] + f.waves * w[3]\n",
+                   feature_names=["waves"], shape_value_names=[],
+                   n_weights=3, limits=limits_for())
+    v = next(x for x in r.violations if "W0 length" in x)
+    assert "must hold exactly 4" in v and "you sent 3" in v

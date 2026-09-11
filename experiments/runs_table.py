@@ -275,13 +275,19 @@ def _rows() -> list[dict]:
             "hint": ("prod" if one("product_hint") == "True" else "")
                     + ("pow" if one("power_hint") == "True" else "")
                     or "default",
-            "fitter": f"{one('fit_method')}/{one('fit_restarts')}/"
-                      f"{cfg['loop'].get('max_evals', '?')}",
+            # ★ D-163: when the run recorded `fitter_source`, the fitter
+            #   was chosen per rule and printing the campaign fields would
+            #   be printing something that never ran.
+            "fitter": ("per rule (fitter_for)"
+                       if one("fitter_source") not in ("?", "★split")
+                       else f"{one('fit_method')}/{one('fit_restarts')}/"
+                            f"{cfg['loop'].get('max_evals', '?')}"),
             # ★ Is this run off the §1-6 rule (nelder-mead when p<=8)
             # ★ "none" = no cap (D-160). The fitter is then chosen per
             #   rule from `len(w0)`, so a campaign-level verdict does not
             #   apply — it is not marked as off the rule.
-            "off_rule": (one("parameters") not in ("?", "★split", "none")
+            "off_rule": (one("fitter_source") in ("?", "★split")
+                         and one("parameters") not in ("?", "★split", "none")
                          and one("fit_method") != fitter_for(
                              int(one("parameters")))["fit_method"]),
             "rounds": "~".join(map(str, nr)),

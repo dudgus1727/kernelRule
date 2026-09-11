@@ -102,6 +102,23 @@ def alt_hw(hw: Hardware) -> Hardware:
                    l2_bytes=int(hw.l2_bytes * 2))
 
 
+def _what_it_is(registry, name: str) -> str:
+    """The axis it collides with, **as it already stands in the registry**
+    (D-163). Empty when the registry was not handed in."""
+    if registry is None or name not in getattr(registry, "_items", {}):
+        return ""
+    f = registry[name]
+    doc = (f.physical_meaning or f.doc or "").strip()
+    src = (f.source or "").strip()
+    out = f"\n{name} already measures:"
+    if doc:
+        out += f"\n  {doc[:300]}"
+    if src:
+        out += "\n" + "\n".join(f"  {ln}" for ln in src.splitlines()[:14])
+    return out + ("\nMake something this does not already say, or say why "
+                  "the difference matters.")
+
+
 class ReferenceColumns(dict):
     """The duplication check's comparison set, **with the shapes it was
     measured on** (D-162).
@@ -173,6 +190,7 @@ def _pearson(a: np.ndarray, b: np.ndarray) -> float:
 
 def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
                      others: dict[str, np.ndarray] | None = None,
+                     registry: FeatureRegistry | None = None,
                      n_shapes: int = 6, n_rows: int = 512,
                      seed: int = 0) -> ValidationReport:
     """Validates one feature. **Exceptions are caught and turned into
@@ -311,11 +329,16 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
             # ★ D-162: a **rejection**, not a note. It was a `warn`, and a
             #   warn is not read by anything — F2 built three internally
             #   duplicated pairs and every one was registered.
+            # ★ 2026-09-11 (D-163): **what it overlaps with goes in the
+            #   message.** "it overlaps" alone does not say what to make
+            #   different, and in the D-162 run r6 and r7 built a wave axis
+            #   one after the other. The source is already in the registry —
+            #   no model is asked, nothing is computed.
             rep.checks.append(Check(
                 "duplication", "fail",
                 f"Spearman {worst[1]:.3f} / Pearson {worst[2]:.3f} against "
                 f"{worst[0]} — both > {DUP_RHO}. It is the same axis under "
-                f"another name (§8.4)"))
+                f"another name (§8.4)." + _what_it_is(registry, worst[0])))
             return rep
         if worst[1] > DUP_RHO:
             rep.checks.append(Check(

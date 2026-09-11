@@ -42,6 +42,11 @@ ROOT = Path("runs")
 KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
         "parameters", "product_hint", "power_hint", "hw", "split_kind",
         "feature_condition", "model", "fit_method", "fit_restarts")
+#: ⚠️ `fitter_source` is **deliberately not in KEYS** (D-163). It says how
+#: the record was written, not what ran: every run since D-144 chooses the
+#: fitter per rule, whether or not its `config.json` says so. Putting it in
+#: KEYS would declare a set mixing old and new artefacts "a different
+#: condition" when the behaviour is identical.
 
 #: ★ The **old default** of a newly added key (D-123). Older runs have no
 #: such key in `config.json`, and this is what the code did back then — so
@@ -113,6 +118,11 @@ def run_condition(run: str, root: Path | None = None) -> dict:
             "fit_method", _OLD_DEFAULTS["fit_method"]),
         "fit_restarts": loop.get(
             "fit_restarts", _OLD_DEFAULTS["fit_restarts"]),
+        # ★ 2026-09-11 (D-163): a run that carries `fitter_source` chose the
+        #   fitter **per rule**, and the two fields above are then a leftover
+        #   of the config, not what ran. Old runs have no such key and are
+        #   read exactly as before.
+        "fitter_source": c.get("fitter_source"),
         "seed_source": None, "seed_sha": None,
     }
     ch = r / _campaign(run) / "stage2-rule-writer" / "chosen.json"

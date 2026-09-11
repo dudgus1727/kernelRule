@@ -179,7 +179,20 @@ class LoopConfig:
     #: ★ Parallel scoring and fitting (D-95). At 0 it is sequential — **the
     #: behaviour so far**.
     #: The results must be identical (`test_parallel_matches_sequential`).
-    n_workers: int = 0
+    #: ★ 2026-09-11 (D-163): the default was **0** — sequential — and every
+    #: campaign ran that way. Measured on the D-162 run: 74% of a round's
+    #: wall clock is the fitter, and it grows with the rule (pearson 0.853
+    #: against the sum of `len(w0)`; 25s at 22 weights, 64s at 51).
+    #:
+    #: 6 = `n_rules_per_round`, so one round's candidates are fitted in a
+    #: single wave. The pool is `fork`ed, so the 4.2GB table and matrix are
+    #: shared copy-on-write, not copied.
+    #:
+    #: ⚠️ The values must be **identical** to the sequential path, not
+    #: merely close — `test_parallel_matches_sequential_on_the_cma_path`
+    #: is what says so, and it was extended to the CMA path because the old
+    #: pair test only ever saw 1 and 2 weights (Nelder-Mead).
+    n_workers: int = 6
     #: ★ The §16.1 ablation — with the Analyst off there is neither a
     #: diagnostic report nor hypotheses. The RuleEditor edits from the
     #: parent rule and the feature list alone.
@@ -773,15 +786,19 @@ class RoundLoop:
         if self._pool_exec is None:
             from concurrent.futures import ProcessPoolExecutor
             from multiprocessing import get_context
+            # ★ 2026-09-11 (D-163): `max_evals` / `fit_method` /
+            #   `fit_restarts` used to be handed over here and **the worker
+            #   never read them** — it calls `fitter_for(len(w0))`, the same
+            #   as the sequential path (D-144). Passing them suggested the
+            #   campaign setting decided the fitter, which would have made
+            #   turning the workers on a change of condition. They are gone;
+            #   what the fitter is, is decided in one place.
             _WORKER.update(
                 table=self.table, matrix=self.matrix,
                 train=self.splits.train, val=self.splits.val,
-                max_evals=self.cfg.max_evals,
                 objective=self._objective,
                 rank_top_k=self.cfg.rank_top_k,
                 rank_lambda=self.cfg.rank_lambda,
-                fit_method=self.cfg.fit_method,
-                fit_restarts=self.cfg.fit_restarts,
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
                 max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
@@ -1638,6 +1655,16 @@ class RoundLoop:
                      # ★ The objective switch (D-104). **A condition, so it
                      #   is recorded.**
                      "objective": self.cfg.objective,
+                     # ⚠️ 2026-09-11 (D-163): `fit_method` / `fit_restarts` /
+                     #   `max_evals` are recorded because old runs are read
+                     #   through these keys, but **since D-144 nothing reads
+                     #   them to fit with**: every rule gets
+                     #   `fitter_for(len(w0))`. The D-162 run was 64/64 CMA
+                     #   while these said `nelder-mead/4/200`. The line below
+                     #   is what a reader should believe.
+                     "fitter_source": ("per rule: fitter_for(len(w0)) — "
+                                       "D-144. The fit_method/fit_restarts/"
+                                       "max_evals fields are not read"),
                      "fit_method": self.cfg.fit_method,
                      "fit_restarts": self.cfg.fit_restarts,
                      "objective_switch": self.cfg.objective_switch,

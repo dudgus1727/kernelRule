@@ -104,6 +104,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-160](#d-160-f1-이-드러낸-다섯을-고치고-f2-를-돌렸다-피처-경로가-처음-살았다-2026-09-10)  F1 이 드러낸 다섯을 고치고 F2 를 돌렸다 — ★ 피처 경로가 처음 살았다 (2026-09-10)
 - [D-161](#d-161-cfgstages-를-노출하고-축-추가-비용을-고쳤다-2026-09-11)  `cfg.stages` 를 노출하고 축 추가 비용을 고쳤다 (2026-09-11)
 - [D-162](#d-162-중복-검사를-실제로-돌게-만들었다-그리고-사람이-쓴-축-넷이-걸렸다-2026-09-11)  중복 검사를 실제로 돌게 만들었다 — 그리고 사람이 쓴 축 넷이 걸렸다 (2026-09-11)
+- [D-163](#d-163-적합기를-병렬로-예산은-재고-안-바꿨다-잔가지-여섯-2026-09-11)  적합기를 병렬로 · 예산은 재고 안 바꿨다 · 잔가지 여섯 (2026-09-11)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -7190,4 +7191,206 @@ LLM  analyze 18 · rule_editor 72 · ★ feature 13 = 103회
 않는다 (원칙 42의 다섯 면 중 '검증기 메시지').
 ⚠️ 고치지 않았다 — 이 지시서에 없는 변경이고, 실행 중에 바꾸면 조건이
    갈린다. 기록만 한다
+```
+
+## D-163  적합기를 병렬로 · 예산은 재고 안 바꿨다 · 잔가지 여섯 (2026-09-11)
+
+> 재현: `python3 -u <scratch>/par51.py` (병렬 == 순차, 실제 50~56차원) ·
+> `python3 -u <scratch>/budget.py` (150/300/450) ·
+> `python3 -u <scratch>/spreadsweep.py` (비교 형상 수) · 전부 0 LLM 호출
+
+### 1. 적합기 병렬화 — 켜기 전에 확인한 것 (§1-2)
+
+⚠️ **지시서의 우려 하나는 사실이 아니었다.** 워커가 `config` 의 적합기를
+쓸까 봐 확인했는데, `loop.py:263` 이 이미 이렇게 한다:
+
+```python
+_ft = fitter_for(len(w0))          # ★ 워커 안. 순차 경로와 같은 결정
+```
+
+`_WORKER` 에 `max_evals` · `fit_method` · `fit_restarts` 를 실어 보내고는
+있었지만 **워커가 한 번도 안 읽는다.** 조건이 바뀔 위험은 없었고, 대신
+`parameters: 8` 과 같은 자리였다 — **기록이 거짓말을 한다.**
+
+```
+한 일
+  _WORKER 에서 쓰이지 않는 세 키를 지웠다 (적합기 결정은 한 곳에서만)
+  config.json 에 ★ "fitter_source": "per rule: fitter_for(len(w0)) — ..." 를 넣고
+    runs_table 의 적합기 칸이 그 run 에 대해 ★ "per rule (fitter_for)" 로 찍히게
+    ⚠️ 옛 run 은 그대로 읽힌다. fitter_source 는 runset KEYS 에 안 넣는다 —
+       기록 방식이지 조건이 아니다 (D-144 이후 동작은 같다)
+```
+
+★ **두 번째 우려는 사실이었다.** `test_parallel_matches_sequential` 이
+보는 `len(w0)` 를 세어 보니 **1 과 2 뿐** — Nelder-Mead 만 검사하고 있었다.
+D-162 실행은 64/64 가 CMA 였다. 캠페인이 안 가는 길만 검사하던 것이다.
+
+```
+넣은 것  _WIDE_SEED (12가중치 = CMA) 로 병렬 == 순차를 보는 시험
+        그리고 fitter_for(12)["fit_method"] == "cma" 를 먼저 못 박는다
+```
+
+**실제 차원으로 되돌려 확인** (dupfix 아카이브의 큰 규칙 셋, 실제 표):
+
+```
+차원 56 · 51 · 50 · 전부 CMA
+순차 177.5초 · 워커 3개 66.9초 = ★ 2.65배
+★ 돌아온 모든 필드가 동일 (w · regret · moved · val_regret · mem · comp · all)
+```
+
+`n_workers` 기본값 0 -> **6** (= `n_rules_per_round`, 한 라운드가 한 물결에
+끝난다. 풀은 fork 라 4.2GB 표·행렬은 복사되지 않는다).
+
+### 2. CMA 예산 — ★ 재고 나서 **안 바꿨다** (§2-2)
+
+dupfix 아카이브의 큰 규칙 넷을 150 / 300 / 450 evals 로 각각 적합했다.
+
+```
+차원 popsize     150        300        450      세대수 150/300/450
+ 56    16     1.1332     1.1292   ★ 1.0959        9/18/28
+ 51    15     1.1472     1.1251   ★ 1.1119       10/20/30
+ 50    15   ★ 1.1918     1.2000     1.2262       10/20/30   ← 늘리니 나빠진다
+ 50    15     1.1663     1.1663     1.1663       10/20/30   ← 셋이 같다
+                                                    (moved=True — 수렴했다)
+```
+
+```
+★ 섞였다. 넷 중 둘은 예산을 늘릴수록 좋아지고(+0.033 · +0.013),
+  하나는 ★ 나빠지고, 하나는 세 값이 같다
+-> "300 이 부족하다" 도 "150 으로 충분하다" 도 이 표로는 못 말한다
+⚠️ 그래서 ★ 예산을 안 건드렸다 (지시서: §2-2 가 그렇게 말할 때만 바꾼다)
+정하려면 규칙당 반복이 필요하다 — CMA 는 재시작 난수를 쓰고, 규칙 하나
+안에서의 폭(±0.03)이 예산 간 차이만큼 크다
+```
+
+⚠️ 지시서의 관찰 자체는 맞다 — `maxfevals` 는 차원과 무관하고 세대 수는
+차원이 커질수록 준다(n=8 에 30세대, n=51 에 20세대). 다만 그것이 결과를
+나쁘게 만든다는 증거가 이 표에는 없다.
+
+### 3. 잔가지 여섯
+
+**3-1. `'exec'` 오탐 (고쳤다).** 금지어 검사가 `ast.unparse(tree)` 위에서
+돌았고 거기엔 **docstring 이 그대로 남는다.** "needed to execute the tiled
+grid" 가 `'exec'` 에 걸렸다. `"import"` 는 "important" 에, `"random"` 은
+"randomly" 에 걸린다.
+
+```
+고친 방식  ★ 코드가 실제로 쓰는 이름만 본다 — Name.id · Attribute.attr ·
+          인자 이름. 거기에 Import/ImportFrom 노드를 따로 거부
+되돌려 확인
+  ✅ docstring 에 execute·important·randomly 가 있는 축 -> 통과
+  ⛔ np.random.rand · import os · p.time_ms · cfg.__class__ -> 여전히 거부
+⚠️ 이번 손해는 없었다 — 그 축(cta_grid_wave_count)은 waves 와 spearman
+   0.976 이라 중복으로도 거부됐을 값이다 (지시서 §3-1 의 측정)
+```
+
+**3-2. 접두사 혼동 (메시지를 고쳤다 — 다만 모델에겐 안 닿는다).**
+
+```
+전  "unregistered feature: f.configured_vector_alignment_deficit"
+후  "... configured_vector_alignment_deficit is a **shape-level value** —
+     write p.X (one number per shape), not f.X"
+   반대 방향도: p.X 인데 피처면 "write f.X. It is one number per config,
+   so `if p.X` would raise"
+```
+
+★ **어디에 닿는지 확인했다 — 둘 다 안 닿는다.**
+
+```
+stage 2  check_rule(...).raise_if_bad() 가 llm.complete() ★ 밖에서 돈다.
+         재시도는 같은 프롬프트로 다시 부르는 것이라 모델은 메시지를 못 본다
+         (그래서 3번 다 같은 실수를 했다)
+루프     _admit 이 호출 뒤에 돌고 버린다 — 원칙 42 / D-152 가 적은 그대로
+-> 지금 이 메시지는 ★ 사람이 트레이스에서 읽는 것이다
+   닿게 하려면 검사를 출력 스키마 검증기로 옮겨야 하고, 그러려면
+   rule_output_for 에 레지스트리를 실어야 한다 — 이 지시서에 없는 배선이라
+   제안만 한다
+```
+
+**3-3. 중복 거부가 방향을 준다 (고쳤다).** 겹친 축의 `physical_meaning` 과
+소스를 거부 메시지에 붙인다. 레지스트리에 이미 있는 문자열이고 LLM 은 안
+쓴다.
+
+```
+waves 복사본을 넣으면:
+  duplication: Spearman 1.000 / Pearson 1.000 against waves — ... (§8.4).
+  waves already measures:
+    How many times the grid fills the GPU. Below 1 the GPU idles; ...
+  Make something this does not already say, or say why the difference matters.
+⚠️ 이것도 3-2 와 같은 이유로 ★ 모델에겐 안 닿는다 (FeatureWriter 는 재시도가
+   없고, 다음 라운드 프롬프트에는 요구 문장만 간다 — D-75 조건 1)
+```
+
+**3-4. `W0` 길이 메시지에 수를 넣었다 (고쳤다).**
+
+```
+"... The highest index you used is w[3], so W0 must hold exactly 4 numbers
+ — you sent 3."
+⚠️ 자동으로 고쳐주지 않는다 — 그러면 세는 것을 아예 포기한다
+```
+
+**3-5. 레지스트리의 중복 셋 — 제안만 한다 (안 지웠다).**
+
+```
+전 표(66형상) 기준
+  arith_intensity ~ reuse_ratio ~ roofline_ratio   서로 1.000 / 1.000
+  has_spill ~ spill_magnitude                      1.000 / 0.976
+```
+
+셋은 같은 양이다 — `arith_intensity` = 2MNK/bytes, `roofline_ratio` =
+그것을 `hw.ridge_point`(상수)로 나눈 것, `reuse_ratio` = MNK/(MK+KN+MN) 로
+분모만 다른 같은 비. **제안**:
+
+```
+남길 것  roofline_ratio — 1.0 이라는 ★ 물리적 문턱이 있고 known5 에 든다
+지울 후보 arith_intensity · reuse_ratio (같은 값을 문턱 없이 다시 말한다)
+has_spill ~ spill_magnitude 는 ★ 남기기를 제안한다 — 이진판과 연속판이고
+  has_spill 하나가 1.1637 -> 3.1841 을 움직인 기록이 있다 (§8.2)
+⚠️ 지우면 F3 조건이 바뀌고 지금까지의 모든 수치와 안 이어진다.
+   24실행 직전이므로 ★ 이번에는 안 지운다
+```
+
+**3-6. 비교 형상 4개(전부 M=1) -> ★ 12개(M 을 고르게) (고쳤다).**
+
+근거는 재서 정했다. 전 표(66형상)의 판정을 참으로 두고, M 을 고르게 뽑은
+집합의 크기를 바꿔 가며 거짓양성/누락을 셌다:
+
+```
+n    M 값                                         쌍   거짓양성  누락
+ 4   1,32,128,8                                    8      5       1
+ 8   1,512,32,256,128,384,768,8                    6      2       0
+★12  1,512,32,256,128,1024,1500,384,768,8,1536,1000 5     1       0
+16   ...                                           6      2       0
+24   ...                                           6      2       0
+32   ...                                           6      2       0
+66   (참)                                          4      0       0
+```
+
+★ **12 가 최소 오차점이고, 더 늘려도 나아지지 않는다** — 16 이상에서
+`log_flops ~ log_min_dim` 이 되살아난다. 남는 거짓양성 하나는
+`sm_idle_cost ~ tail_waste`(rho 0.999 · r 0.963)인데, 이것은
+`validate.py` 가 **"단조 변환은 중복이 아니다"의 예로 직접 적어 둔 쌍**이다
+(1/(1-x)-1). 전 표에서는 r 이 0.95 아래로 내려간다.
+
+```
+_KNOWN_DUPLICATE_AXES 는 그대로 has_spill · spill_magnitude 다
+  (합성 표에서 걸리는 것은 여전히 그 쌍뿐 — 시험이 그것을 고정한다)
+```
+
+### 4. 바꾼 파일
+
+```
+kernelrule/core/loop.py           n_workers 기본값 6 · _WORKER 의 죽은 키 제거
+                                  · config 에 fitter_source
+kernelrule/core/runset.py         fitter_source 를 읽는다 (KEYS 에는 안 넣는다)
+experiments/runs_table.py         적합기 칸이 per-rule 을 그렇게 찍는다
+kernelrule/features/generated.py  금지어를 식별자에서만 · DUP_SHAPES=12 ·
+                                  _spread_shapes · registry 를 검증기에 전달
+kernelrule/features/validate.py   중복 거부에 상대 축의 설명/소스를 붙인다
+kernelrule/rules/checks.py        접두사 안내 · W0 길이에 수를 넣는다
+tests/test_loop.py                ★ CMA 경로의 병렬==순차 · 폭넓은 씨앗
+                                  test_workers_default_is_sequential ->
+                                  _is_parallel (옛 기본값을 고정하던 시험)
+tests/test_checks.py              접두사 · W0 메시지
+tests/test_features.py            docstring 오탐 · 금지어 유지 · 비교 형상
 ```

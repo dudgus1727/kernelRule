@@ -327,22 +327,40 @@ def check_feature_code(code: str, *, known: frozenset[str]) -> str:
             raise FeatureRejected(f"unknown name: {node.id}")
 
     src = ast.unparse(tree)
-    # ★ The banned words are searched **after masking the allowed fields**
-    #   (D-73).
+    # ★ The banned words are searched **in identifiers only** (D-73 · D-163).
     #
-    #   `hw.peak_tflops_f16` is a field `RAW_FIELDS` explicitly allows, yet
-    #   the banned word `"tflops"` matched it as a substring. A proposal
+    #   D-73: `hw.peak_tflops_f16` is a field `RAW_FIELDS` explicitly allows,
+    #   yet the banned word `"tflops"` matched it as a substring. A proposal
     #   trying to build a roofline was refused that way — **the checker
     #   banned what it had itself allowed.** The same class as D-37 (failing
     #   `inspect.getsource` was turned into "it uses hw"): a defect of the
     #   checker looks like a failure of the LLM (principle 8).
-    masked = src
-    for base, names in RAW_FIELDS.items():
-        for n in names:
-            masked = masked.replace(f"{base}.{n}", f"{base}.<ok>")
+    #
+    #   ⚠️ D-163: it came back. The scan ran over `ast.unparse(tree)`, which
+    #   keeps **the docstring**, and an axis whose docstring said "needed to
+    #   execute the tiled grid" was refused for `'exec'`. `"import"` is in
+    #   "important" and `"random"` is in "randomly" — prose is full of them.
+    #   So the scan now looks at **names the code actually uses**: `Name`
+    #   ids, attribute names, argument names. Prose cannot trip it, and
+    #   `np.random.rand` still does (the attribute is `random`).
+    names_used: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            names_used.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            names_used.add(node.attr)
+        elif isinstance(node, ast.arg) or isinstance(node, ast.keyword) and node.arg:
+            names_used.add(node.arg)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            raise FeatureRejected("banned reference: 'import' (§3)")
+    allowed = {n for names in RAW_FIELDS.values() for n in names}
     for b in _BANNED:
-        if b in masked:
-            raise FeatureRejected(f"banned reference: {b!r} (§3)")
+        hit = next((u for u in sorted(names_used)
+                    if u not in allowed and b in u), None)
+        if hit is not None:
+            raise FeatureRejected(
+                f"banned reference: {b!r}"
+                + (f" in {hit!r}" if hit != b else "") + " (§3)")
     if (m := _HW_LITERALS.search(src)):
         raise FeatureRejected(
             f"a hardware constant is hardcoded: {m.group()}. Read it from "
@@ -362,8 +380,45 @@ def compile_feature(code: str, *, known: frozenset[str]):
     return name, env[name]
 
 
+#: ★ How many shapes the duplication comparison is measured on (D-163).
+#:
+#: It was **4**, and the table's first four are all `M=1`. A shape-level axis
+#: then has four distinct values across the whole comparison set, and
+#: unrelated axes hit 1.000 by accident: measured on the human registry,
+#: 6 pairs cross the 0.95 line at 4 shapes, 7 at 8, 5 at 12 and **4 at both
+#: 24 and 66**. `log_flops` and `is_memory_bound` appear only at 4~8 and are
+#: gone by 24 — that is the resolution, not a duplicate.
+#:
+#: 12 is the smallest count in that sweep that already gives the answer 24
+#: and 66 give for the config-level axes, and `_spread_shapes` makes sure the
+#: 12 are not all one M. ⚠️ It is **not** the whole table: a partial matrix
+#: over 12 shapes is what makes the check cheap enough to run on every
+#: candidate (D-161).
+DUP_SHAPES = 12
+
+
+def _spread_shapes(table, n: int) -> list:
+    """`n` shapes with **M spread out** (D-163).
+
+    The first `n` of the table are all `M=1` — the sweep above is what that
+    produced. They are taken one per distinct M, largest group first, so the
+    set covers the range instead of one corner.
+    """
+    shapes = list(table.shapes())
+    by_m: dict = {}
+    for p in shapes:
+        by_m.setdefault(p.M, []).append(p)
+    out: list = []
+    while len(out) < n and any(by_m.values()):
+        for m in sorted(by_m):
+            if by_m[m] and len(out) < n:
+                out.append(by_m[m].pop(0))
+    # ★ The order follows the table so the set is reproducible.
+    return sorted(out, key=shapes.index)
+
+
 def _reference_columns(table, matrix, extra: FeatureRegistry,
-                       n_shapes: int = 4) -> ReferenceColumns:
+                       n_shapes: int = DUP_SHAPES) -> ReferenceColumns:
     """The reference columns for the duplication verdict. It looks at
     **both what a human wrote and what has already been built.**
 
@@ -379,7 +434,7 @@ def _reference_columns(table, matrix, extra: FeatureRegistry,
     those `n_shapes` alone.
     """
     out: dict[str, list] = {}
-    shapes = list(table.shapes())[:n_shapes]
+    shapes = _spread_shapes(table, n_shapes)
     extra_mat = None
     if extra._items and extra is not matrix.registry:
         # Only what the caller's matrix does not already hold.
@@ -436,7 +491,10 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
     probe = FeatureMatrix(table, tmp)
     if others is None:
         others = _reference_columns(table, matrix, registry)
-    rep = validate_feature(f, table, probe, hw_alt=hw_alt, others=others)
+    # ★ D-163: the registry goes in so a duplication refusal can name what
+    #   the candidate collides with, in that axis's own words.
+    rep = validate_feature(f, table, probe, hw_alt=hw_alt, others=others,
+                           registry=registry)
     if rep.failed:
         raise FeatureRejected(
             f"{name}: §8.3 validation failed — "

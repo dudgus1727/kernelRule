@@ -829,8 +829,18 @@ def check_rule(code: str, *, feature_names, shape_value_names,
             if base == "f":
                 rep.features_used.add(attr)
                 if attr not in feature_names:
+                    # ★ 2026-09-11 (D-163): if the name exists but on the
+                    #   other side, **say so**. 7 of 10 RuleWriter tries and
+                    #   one loop proposal of the D-162 run died here, and the
+                    #   retry message repeated "unregistered" three times
+                    #   without ever saying the axis is a shape value. The
+                    #   checker holds both lists; withholding half of what it
+                    #   knows is what makes the retry useless.
                     bad(f"unregistered feature: f.{attr}. "
-                        "A typo is not waved through silently")
+                        + (f"{attr} is a **shape-level value** — write "
+                           f"p.{attr} (one number per shape), not f.{attr}"
+                           if attr in shape_value_names else
+                           "A typo is not waved through silently"))
             elif base == "p":
                 rep.shape_values_used.add(attr)
                 # ★ M/N/K are not registered features but **values of the
@@ -838,7 +848,12 @@ def check_rule(code: str, *, feature_names, shape_value_names,
                 #   equality is refused below (D-144).
                 if attr not in shape_value_names and attr not in ("M", "N",
                                                                   "K"):
-                    bad(f"unregistered shape-level value: p.{attr}")
+                    bad(f"unregistered shape-level value: p.{attr}. "
+                        + (f"{attr} is a **config-level feature** — write "
+                           f"f.{attr}. It is one number per config, so `if "
+                           f"p.{attr}` would raise"
+                           if attr in feature_names else
+                           "A typo is not waved through silently"))
             elif base == "hw":
                 pass
             elif base == "np":
@@ -947,8 +962,17 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     #    weight twice) is already caught by the reuse check above.
 
     if rep.max_w_index >= 0 and rep.max_w_index + 1 != rep.n_weights:
+        # ★ 2026-09-11 (D-163): **the number it must be** goes in the
+        #   message. Five proposals of the D-162 run missed it in both
+        #   directions (53 vs 52, 54 vs 55, 57 vs 58, 50 vs 51) — nobody
+        #   counts fifty weights by hand. ⚠️ It is **not** corrected for the
+        #   model: doing that would stop it counting at all, and the count is
+        #   what says the rule is the one it meant to write.
         bad(f"W0 length {rep.n_weights} != the largest referenced index + 1 "
-            f"({rep.max_w_index + 1}). An unused weight is wasted budget")
+            f"({rep.max_w_index + 1}). The highest index you used is "
+            f"w[{rep.max_w_index}], so W0 must hold exactly "
+            f"{rep.max_w_index + 1} numbers — you sent {rep.n_weights}. "
+            f"An unused weight is wasted budget")
     # ★ **There must be no hole in the indices** (D-144).
     #
     #   Under the old combined budget, `len(W0)` itself entered the budget so
