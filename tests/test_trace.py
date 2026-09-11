@@ -47,7 +47,34 @@ def test_trace_does_not_change_the_result(synth_table, tmp_path):
     With the same seed, the same RNG and MockLLM it has to be exactly the
     same. If it differs, the logging had a side effect on the computation
     path (the instruction §4).
+
+    ⚠️ 2026-09-11 (D-167 §P): **a warm-up run goes first.** Without it this
+    test compared the process's *first* loop against its *second* and
+    called the difference "the trace". Measured by reordering the arms:
+
+    ```
+    OFF -> ON    off hypothesis_id ['', 'H5']   on ['', 'H0']   ⛔ differ
+    ON  -> OFF   on  ['', 'H0']   off ['', 'H0']                ✅ same
+    OFF -> OFF   a   ['', 'H0']   b   ['', 'H0']                ✅ same
+    ```
+
+    Only the first loop in a process differs, and only in `hypothesis_id` —
+    the rules, the weights and the scores are identical. So the test was
+    green about the wrong thing: it measured run order, not the trace
+    (principle 38 turned on itself).
+
+    ⛔ The first-loop non-determinism itself is **not** fixed here. It does
+    not move a score, and chasing it means touching the parallel generation
+    path before the campaign. It is written down in D-167 §P as a
+    reservation on "which hypothesis produced which rule".
     """
+    # ★ The warm-up, **the same shape as the arms**. Measured: a 1-round
+    #   warm-up does not do it — the difference appears in round 2's
+    #   hypothesis attribution, so the warm-up has to reach round 2.
+    #
+    #     first 2-round loop in the process   ids ['', 'H5']
+    #     every one after it                  ids ['', 'H0']
+    _run(synth_table, tmp_path / "warmup", trace=False)
     off = _run(synth_table, tmp_path, trace=False)
     on = _run(synth_table, tmp_path, trace=True)
     assert (off / "archive.jsonl").read_text() == \

@@ -290,6 +290,10 @@ def _fit_and_score(job: tuple) -> dict:
                          list(c["train"].shapes), ks=(1, 3))
     return {"i": idx, "w": [float(x) for x in fr.w],
             "regret": fr.fit_regret, "moved": bool(fr.moved),
+            # ★ D-167 §N. It has to come back from the worker too —
+            #   otherwise the counter differs between the parallel and the
+            #   sequential path and that **is** a condition change (D-95).
+            "n_dead": len(fr.dead_terms),
             "rank_loss": _rank_loss_of(fn, c, fr.w),
             "val_regret": fr.val_regret,
             "mem": ev.at(1, mask=c["short_mask"]),
@@ -382,6 +386,20 @@ class RoundResult:
     n_cells: int = 0
     val_gap: float = float("nan")
     n_val_blowups: int = 0
+    #: ★ 2026-09-11 (D-167 §N): terms the fitter left with **no effect** —
+    #: `|w_i| < 1e-3` or sensitivity below 1e-6 (`FittedRule.dead_terms`).
+    #:
+    #: ⚠️ It is the **sum over this round's scored candidates**, not a
+    #: per-rule number and not a maximum. Per rule it is
+    #: `n_dead_terms / n_scored`. The name says terms, and the unit is
+    #: terms-per-round (principle 40 — the metric has to be the question).
+    #:
+    #: Why it is recorded at all: `fit_weights` already computes it and
+    #: threw it away. Axes are generated per run, so their names are no use
+    #: to the next run — but "how much of the rule did nothing" is only
+    #: countable while the run happens. Observed on one F2 run: 6 of the 49
+    #: registered axes, 1~3 per run.
+    n_dead_terms: int = 0
     #: ★ Proposal / duplicate / scored counts per parent kind (exploit /
     #: explore / cross) (D-94).
     #: `{"exploit": {"n": 6, "dup": 1, "scored": 5}, ...}`
@@ -421,7 +439,8 @@ class RoundResult:
             + (f"rank {self.best_rank_loss:.4f} "
                if self.best_rank_loss == self.best_rank_loss else "")
             + f"val {self.best_val_regret:.4f}({gap}{alarm})"
-            f"| cells {self.n_cells:2d} blowups {self.n_val_blowups} | "
+            f"| cells {self.n_cells:2d} blowups {self.n_val_blowups} "
+            f"dead {self.n_dead_terms} | "
             f"{self.seconds:.1f}s")
 
 
@@ -858,6 +877,7 @@ class RoundLoop:
                 continue
             if d["moved"]:
                 res.n_fit_moved += 1
+            res.n_dead_terms += int(d["n_dead"])
             res.n_scored += 1
             elites.append(self._elite_from(prop, rep, d))
         return elites
@@ -960,10 +980,12 @@ class RoundLoop:
 
         if fr.moved:
             res.n_fit_moved += 1
+        res.n_dead_terms += len(fr.dead_terms)
         ev = self._score(fn, fr.w, self.splits.train.shapes)
         res.n_scored += 1
         return self._elite_from(prop, rep, {
             "w": [float(x) for x in fr.w], "regret": fr.fit_regret,
+            "n_dead": len(fr.dead_terms),
             "rank_loss": _rank_loss_of(fn, {
                 "objective": self._objective,
                 "rank_top_k": self.cfg.rank_top_k,

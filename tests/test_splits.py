@@ -76,3 +76,51 @@ def test_nothing_reads_the_private_field(monkeypatch):
                 bad.append(f"  {rel}:{node.lineno}")
     assert not bad, ("`_shapes` is read directly, bypassing the seal "
                      "(§30.15):\n" + "\n".join(bad))
+
+
+# ---------------------------------------------------------------------------
+# ★ D-167 §R — the shape population is one function now
+# ---------------------------------------------------------------------------
+@pytest.mark.needs_bundle
+def test_experiment_shapes_is_61_on_the_a6000_table():
+    """★ The count is pinned because **every number in the repository has
+    it as a denominator.**
+
+    The predicate used to be copied into 36 places across 35 files. Merging
+    them must not move the population by one shape, and a future change to
+    `ALIGNMENT_REQUIRED` has to trip this rather than quietly re-baseline
+    the whole repository.
+    """
+    import warnings
+
+    from kernelrule.core.splits import ALIGNMENT_REQUIRED, experiment_shapes
+    from kernelrule.core.table import PerfTable
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        table = PerfTable.from_bundle("datasets/rtx-a6000-sm_86-c63710df",
+                                      env_hash="c63710df", ok_only=False)
+    assert ALIGNMENT_REQUIRED == 8
+    shapes = experiment_shapes(table)
+    assert len(table.shapes()) == 66
+    assert len(shapes) == 61, "the shape population moved"
+    dropped = {f"{p.M}x{p.N}x{p.K}"
+               for p in table.shapes()} - {f"{p.M}x{p.N}x{p.K}"
+                                           for p in shapes}
+    assert dropped == {"1024x4096x4097", "1024x4096x4098", "1024x4096x4100",
+                       "1024x4098x4096", "1024x4100x4096"}, dropped
+
+
+def test_no_experiment_copies_the_alignment_predicate():
+    """★ Principle 2, counted. 36 copies is what this replaced."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    bad = [f"{f.relative_to(root)}:{i + 1}"
+           for f in sorted((root / "experiments").glob("*.py"))
+           for i, ln in enumerate(f.read_text().splitlines())
+           if "align_a == 8" in ln]
+    assert not bad, (
+        "the alignment predicate was copied again instead of calling "
+        "`kernelrule.core.splits.experiment_shapes` (D-167 §R):\n"
+        + "\n".join(bad))

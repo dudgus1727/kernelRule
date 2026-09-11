@@ -38,7 +38,7 @@ import kernelrule.features.physical  # noqa: F401  — it fills REGISTRY
 from kernelrule.agents.openai_client import Budget, LLMConfig, OpenAILLM
 from kernelrule.core.loop import LoopConfig, RoundLoop
 from kernelrule.core.matrix import FeatureMatrix
-from kernelrule.core.splits import Split, SplitSet, check_balance
+from kernelrule.core.splits import Split, SplitSet, check_balance, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 
@@ -118,12 +118,7 @@ def _install_signal_handlers() -> None:
 
 
 def _splits(table: PerfTable) -> SplitSet:
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     held = [p for p in shapes if 11008 in (p.N, p.K)]
     s = SplitSet(train=Split("train", tuple(p for p in shapes
                                             if p not in held)),

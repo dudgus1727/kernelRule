@@ -68,7 +68,7 @@ def non_llm_breakdown() -> None:
     from kernelrule.core import scoring as scoring_mod
     from kernelrule.core import weights as weights_mod
     from kernelrule.core.matrix import FeatureMatrix
-    from kernelrule.core.splits import Split, SplitSet
+    from kernelrule.core.splits import Split, SplitSet, experiment_shapes
     from kernelrule.core.table import PerfTable
     from kernelrule.features import REGISTRY
 
@@ -79,12 +79,7 @@ def non_llm_breakdown() -> None:
           f"{time.perf_counter() - t0:.1f}s "
           "(it is not redone every round)")
 
-    def aligned(p) -> bool:
-        x = table.frame_for(p)
-        return bool((x.align_a == 8).all() and (x.align_b == 8).all()
-                    and (x.align_c == 8).all())
-
-    sh = [p for p in table.shapes() if aligned(p)]
+    sh = experiment_shapes(table)
     train = [p for p in sh if 11008 not in (p.N, p.K)]
     val = [p for p in sh if 11008 in (p.N, p.K)]
     splits = SplitSet(train=Split("train", tuple(train)),
@@ -185,19 +180,14 @@ def parallel_speedup(workers: int = 6) -> None:
     from kernelrule.agents.mock import MockLLM
     from kernelrule.core.loop import LoopConfig, RoundLoop
     from kernelrule.core.matrix import FeatureMatrix
-    from kernelrule.core.splits import Split, SplitSet
+    from kernelrule.core.splits import Split, SplitSet, experiment_shapes
     from kernelrule.core.table import PerfTable
     from kernelrule.features import REGISTRY
 
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
 
-    def aligned(p) -> bool:
-        x = table.frame_for(p)
-        return bool((x.align_a == 8).all() and (x.align_b == 8).all()
-                    and (x.align_c == 8).all())
-
-    sh = [p for p in table.shapes() if aligned(p)]
+    sh = experiment_shapes(table)
     splits = SplitSet(
         train=Split("train", tuple(p for p in sh if 11008 not in (p.N, p.K))),
         val=Split("val", tuple(p for p in sh if 11008 in (p.N, p.K))))

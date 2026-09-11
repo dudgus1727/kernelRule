@@ -45,6 +45,7 @@ from typing import Literal
 from kernelrule.core.types import Problem
 
 __all__ = ["Split", "SplitSet", "SplitError", "by_predicate",
+           "experiment_shapes", "ALIGNMENT_REQUIRED",
            "stratified_kfold",
            "split_by_M_range", "split_by_K_range", "split_by_alignment",
            "split_by_size", "split_by_waves", "SPLITS",
@@ -457,3 +458,69 @@ def describe(ss: SplitSet, hw, *, axis: str = "size") -> str:
             bal = check_balance(sp, hw, axis=axis)
         lines.append(f"  {sp.role:5s} {bal}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# ★ 2026-09-11 (D-167 §R) — the shape population the experiments run on
+# ---------------------------------------------------------------------------
+#: Every candidate of a shape must have this alignment on all three operands
+#: for the shape to be used. ⛔ Not a knob — changing it changes the shape
+#: population and therefore **every number in the repository**.
+ALIGNMENT_REQUIRED = 8
+
+
+def experiment_shapes(table) -> list:
+    """The shapes the experiments actually run on: **every candidate
+    aligned to 8 on A, B and C**.
+
+    ★ Why this function exists: the predicate was copied into **36 places
+    across 35 files** (every `experiments/*.py` that builds a split). One
+    judgement in 36 copies is the largest instance of principle 2 in this
+    repository, and the vendor-preset case (D-158 fixed one of two copies)
+    showed how that ends. ⛔ Unifying them changed no value — the count is
+    61 before and after.
+
+    ## ⚠️ The grounds are **not recorded anywhere**
+
+    Neither `design.md` nor `decisions.md` says why alignment 8 decides the
+    population. It was in the code from the beginning and no decision
+    entry introduces it. **That is written here as not-known rather than
+    guessed** (principle 39).
+
+    What the 5 excluded shapes of the A6000 table actually look like
+    (measured 2026-09-11, 0 LLM calls — `table.frame_for(p)`):
+
+    ```
+    shape                 candidates  ext_stages  pipeline_kind          align
+    (1024,4096,4097)           4,800     2..2      pipelined only       (1,1,8)
+    (1024,4096,4098)          17,250     2..8      multistage+pipelined (2,2,8)
+    (1024,4096,4100)          17,250     2..8      multistage+pipelined (4,4,8)
+    (1024,4100,4096)          16,315     2..8      multistage+pipelined (8,8,4)
+    (1024,4098,4096)          16,315     2..8      multistage+pipelined (8,8,2)
+    the 61 included            3,465~17,325  2..8  multistage+pipelined (8,8,8)
+    ```
+
+    ★ **4 of the 5 have the same candidate-space shape as the included
+    ones** — same stage range, same kernel families, a comparable candidate
+    count. Only `(1024,4096,4097)` is structurally different (one family,
+    one stage count, a quarter of the candidates). So if "alignment 8" is
+    standing in for "the kernel space is structurally different", it misses
+    on 4 of 5.
+
+    ⚠️ That is **not** an argument to change it here. The population is the
+    denominator of every number in the repository; changing it is the
+    largest condition change available, and it belongs after the campaign
+    and behind a pre-registration.
+
+    ⚠️ 2026-09-11 correction: the audit that first measured this table
+    reported the included shapes as 15,015~17,325 candidates. Re-measured
+    over all 61, the range is **3,465~17,325**. The upper bound and the
+    verdict are unchanged.
+    """
+    def aligned(p) -> bool:
+        d = table.frame_for(p)
+        return bool((d.align_a == ALIGNMENT_REQUIRED).all()
+                    and (d.align_b == ALIGNMENT_REQUIRED).all()
+                    and (d.align_c == ALIGNMENT_REQUIRED).all())
+
+    return [p for p in table.shapes() if aligned(p)]

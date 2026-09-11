@@ -1,0 +1,100 @@
+{
+ "bundle": "datasets/rtx-a6000-sm_86-c63710df",
+ "n_table": 66,
+ "n_used": 61,
+ "excluded_shapes": [
+  "1024x4096x4098",
+  "1024x4096x4097",
+  "1024x4096x4100",
+  "1024x4100x4096",
+  "1024x4098x4096"
+ ],
+ "n_constant_on_used": 6,
+ "n_axes": 6,
+ "axes": [
+  {
+   "run": "cap1",
+   "axis": "vector_alignment_deficit",
+   "shape_level": true,
+   "used_std": 0.0,
+   "used_min": 0.0,
+   "used_max": 0.0,
+   "excluded_std": 0.1545603082582617,
+   "excluded_min": 0.16666666666666663,
+   "excluded_max": 0.5833333333333333,
+   "n_distinct_used": 1,
+   "n_distinct_excluded": 5,
+   "constant_on_used": true
+  },
+  {
+   "run": "dupfix",
+   "axis": "alignment_deficit",
+   "shape_level": true,
+   "used_std": 0.0,
+   "used_min": 0.0,
+   "used_max": 0.0,
+   "excluded_std": 0.4636809247747852,
+   "excluded_min": 0.5,
+   "excluded_max": 1.75,
+   "n_distinct_used": 1,
+   "n_distinct_excluded": 5,
+   "constant_on_used": true
+  },
+  {
+   "run": "dupfix",
+   "axis": "reduction_dimension_padding",
+   "shape_level": false,
+   "used_std": 0.0,
+   "used_min": 0.0,
+   "used_max": 0.0,
+   "excluded_std": 0.005798489187024007,
+   "excluded_min": 0.0,
+   "excluded_max": 0.015144230769230771,
+   "n_distinct_used": 1,
+   "n_distinct_excluded": 7,
+   "constant_on_used": true
+  },
+  {
+   "run": "dupfix",
+   "axis": "configured_vector_alignment_deficit",
+   "shape_level": true,
+   "used_std": 0.0,
+   "used_min": 0.0,
+   "used_max": 0.0,
+   "excluded_std": 0.4636809247747852,
+   "excluded_min": 0.5,
+   "excluded_max": 1.75,
+   "n_distinct_used": 1,
+   "n_distinct_excluded": 5,
+   "constant_on_used": true
+  },
+  {
+   "run": "F2new",
+   "axis": "alignment_deficit",
+   "shape_level": true,
+   "used_std": 0.0,
+   "used_min": 0.0,
+   "used_max": 0.0,
+   "excluded_std": 0.15456030825826175,
+   "excluded_min": 0.16666666666666666,
+   "excluded_max": 0.5833333333333334,
+   "n_distinct_used": 1,
+   "n_distinct_excluded": 5,
+   "constant_on_used": true
+  },
+  {
+   "run": "F2new",
+   "axis": "k_loop_padding_fraction",
+   "shape_level": false,
+   "used_std": 0.0,
+   "used_min": 0.0,
+   "used_max": 0.0,
+   "excluded_std": 0.005798489187024007,
+   "excluded_min": 0.0,
+   "excluded_max": 0.015144230769230771,
+   "n_distinct_used": 1,
+   "n_distinct_excluded": 7,
+   "constant_on_used": true
+  }
+ ]
+}

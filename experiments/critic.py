@@ -74,14 +74,9 @@ def _table_and_matrix():
 
 
 def _train_groups(table):
-    from kernelrule.core.splits import regime_of
+    from kernelrule.core.splits import experiment_shapes, regime_of
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     train = [p for p in shapes if 11008 not in (p.N, p.K)]
     return {n: [p for p in train if regime_of(p, table.hw) == n]
             for n in ("short", "long")}

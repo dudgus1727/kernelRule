@@ -297,6 +297,52 @@ def test_val_blowup_is_reported_not_hidden(loop):
 
 
 # ---------------------------------------------------------------------------
+# ★ D-167 §N — terms the fitter left doing nothing
+#
+#   `fit_weights` computes `dead_terms` and `loop.py` threw it away. The
+#   axes are generated per run, so their **names** are of no use to the
+#   next run — but "how much of the rule did nothing" can only be counted
+#   while the run is happening.
+# ---------------------------------------------------------------------------
+def test_dead_terms_are_counted_per_round(loop):
+    """★ A rule whose second term cannot move the ranking.
+
+    `f.waves * w[0]` decides everything and `w[1]` multiplies a term the
+    fitter drives to 0 — `dead_terms` sees it, and before D-167 nothing
+    wrote that down.
+    """
+    dead = ("def score(f, p, hw, w):\n"
+            "    s = f.waves * w[0]\n"
+            "    s = s + f.edge_waste * w[1] * 0.0\n"
+            "    return s\n")
+    from kernelrule.agents.schemas import RuleProposal
+    from kernelrule.core.loop import RoundResult
+
+    res = RoundResult(round=-1)
+    e = loop._evaluate_candidate(
+        RuleProposal(code=dead, w0=[1.0, 1.0], changes="dead-term"), res)
+    assert e is not None, res.rejections
+    assert res.n_scored == 1
+    assert res.n_dead_terms >= 1, (
+        "the fitter's own `dead_terms` says a term does nothing and the "
+        "round did not record it")
+    assert "dead" in res.line()
+
+
+def test_dead_terms_come_back_from_the_worker_too(synth_table, tmp_path):
+    """★ The counter must not depend on whether the workers are on.
+
+    A counter that only the sequential path fills makes turning the
+    workers on a change of condition (D-95) — the same trap
+    `test_parallel_matches_sequential` exists for.
+    """
+    seq_r, _seq, *_ = _feature_parallel_pair(synth_table, tmp_path / "da", 0)
+    par_r, _par, *_ = _feature_parallel_pair(synth_table, tmp_path / "db", 3)
+    assert sum(r.n_scored for r in seq_r) > 0
+    assert [r.n_dead_terms for r in seq_r] == [r.n_dead_terms for r in par_r]
+
+
+# ---------------------------------------------------------------------------
 # ★ Regime balance (§10.1) — it stops training sacrificing a minority
 # regime
 # ---------------------------------------------------------------------------

@@ -37,7 +37,7 @@ from scipy.stats import kendalltau
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
-from kernelrule.core.splits import Split, SplitSet, regime_of
+from kernelrule.core.splits import Split, SplitSet, experiment_shapes, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
@@ -50,12 +50,7 @@ TOP_N, TAU_SAMPLE, TAU_SEED, N_DRAWS = 100, 4000, 12345, 20
 
 
 def _splits(t: PerfTable) -> SplitSet:
-    def aligned(p) -> bool:
-        d = t.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    sh = [p for p in t.shapes() if aligned(p)]
+    sh = experiment_shapes(t)
     held = [p for p in sh if 11008 in (p.N, p.K)]
     return SplitSet(train=Split("train", tuple(p for p in sh if p not in held)),
                     val=Split("val", tuple(held)), kind="nk11008")

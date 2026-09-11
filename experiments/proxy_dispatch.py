@@ -38,7 +38,7 @@ from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import evaluate, evaluate_scores, geomean
-from kernelrule.core.splits import _DUMMY_CFG, Split
+from kernelrule.core.splits import _DUMMY_CFG, Split, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
@@ -58,12 +58,7 @@ BOUNDARY_MS = 0.5
 def _setup():
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     sol = {p: 2 ** log_sol_ms(p, table.hw, _DUMMY_CFG) for p in shapes}
     best = {p: float(table.times_of(p).min()) for p in shapes}
     return table, shapes, sol, best

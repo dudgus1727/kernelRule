@@ -40,7 +40,7 @@ from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import compare, evaluate, evaluate_scores, geomean
-from kernelrule.core.splits import _DUMMY_CFG, Split
+from kernelrule.core.splits import _DUMMY_CFG, Split, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
@@ -155,12 +155,7 @@ def main() -> None:                                          # noqa: PLR0915
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    all_shapes = [p for p in table.shapes() if aligned(p)]
+    all_shapes = experiment_shapes(table)
     thr = math.log2(SIZE_THRESHOLD_MS)
     short = [p for p in all_shapes
              if log_sol_ms(p, table.hw, _DUMMY_CFG) < thr]

@@ -33,7 +33,7 @@ from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import evaluate, evaluate_scores, geomean
-from kernelrule.core.splits import Split, regime_of
+from kernelrule.core.splits import Split, experiment_shapes, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY, FeatureRegistry
@@ -99,12 +99,7 @@ def main() -> None:
     warnings.simplefilter("ignore")
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     train = [p for p in shapes if 11008 not in (p.N, p.K)]
     held = [p for p in shapes if 11008 in (p.N, p.K)]
 

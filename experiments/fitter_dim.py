@@ -144,18 +144,13 @@ def _init() -> None:
     _G["objective"] = _OBJECTIVE["v"]
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.core.matrix import FeatureMatrix
-    from kernelrule.core.splits import regime_of
+    from kernelrule.core.splits import experiment_shapes, regime_of
     from kernelrule.core.table import PerfTable
     from kernelrule.features import REGISTRY
 
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     train = [p for p in shapes if 11008 not in (p.N, p.K)]
     _G["table"] = table
     _G["matrix"] = FeatureMatrix(table, REGISTRY)

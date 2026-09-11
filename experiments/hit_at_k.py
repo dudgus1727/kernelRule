@@ -52,7 +52,7 @@ import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.crosstable import AXIS_FIELDS
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
-from kernelrule.core.splits import Split, regime_of
+from kernelrule.core.splits import Split, experiment_shapes, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
@@ -66,12 +66,7 @@ PCTS = (0.5, 1.0, 2.0, 5.0, 10.0)
 def _splits(table: PerfTable):
     from kernelrule.core.splits import SplitSet
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     held = [p for p in shapes if 11008 in (p.N, p.K)]
     return SplitSet(train=Split("train", tuple(p for p in shapes
                                                if p not in held)),

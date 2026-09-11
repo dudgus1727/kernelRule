@@ -44,7 +44,7 @@ import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.matrix import FeatureMatrix
-from kernelrule.core.splits import Split, SplitSet
+from kernelrule.core.splits import Split, SplitSet, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 
@@ -57,12 +57,7 @@ AXES = ("tile_m", "tile_n", "tile_k", "ext_stages", "split_k",
 
 
 def _splits(table: PerfTable) -> SplitSet:
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     held = [p for p in shapes if 11008 in (p.N, p.K)]
     return SplitSet(
         train=Split("train", tuple(p for p in shapes if p not in held)),

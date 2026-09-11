@@ -46,7 +46,7 @@ from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import evaluate, evaluate_scores
-from kernelrule.core.splits import Split, SplitSet, check_balance
+from kernelrule.core.splits import Split, SplitSet, check_balance, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
@@ -63,12 +63,7 @@ def main(condition: str, n_tries: int,
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     # ★ The structural split — the whole 11008 layer (the MLP intermediate)
     #   is held out. It is the same split as the first real run, so the
     #   results can be put side by side. A random k-fold is not used for the

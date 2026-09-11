@@ -35,7 +35,7 @@ import kernelrule.features.physical  # noqa: F401
 from kernelrule.core import weights as W
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
-from kernelrule.core.splits import Split, regime_of
+from kernelrule.core.splits import Split, experiment_shapes, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights
 from kernelrule.features import REGISTRY
@@ -78,12 +78,7 @@ def main() -> None:
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
     matrix = FeatureMatrix(table, REGISTRY)
 
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     train = [p for p in shapes if 11008 not in (p.N, p.K)]
     # ★ The default is the 12 committed rules, but it also takes arbitrary
     #   runs — putting a pass condition on a verification run means looking at

@@ -64,7 +64,7 @@ from kernelrule.agents.mock import MockLLM
 from kernelrule.agents.openai_client import DEFAULT_MODEL, Budget, LLMConfig
 from kernelrule.core.loop import LoopConfig, RoundLoop
 from kernelrule.core.matrix import FeatureMatrix
-from kernelrule.core.splits import Split, SplitSet, check_balance
+from kernelrule.core.splits import Split, SplitSet, check_balance, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY, FeatureRegistry
 from kernelrule.features.generated import (
@@ -210,12 +210,36 @@ ARCH_RETRIES = 3
 
 
 def _aligned_shapes(table: PerfTable) -> list:
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
+    """⚠️ 2026-09-11 (D-167 §R): the body moved to
+    `kernelrule.core.splits.experiment_shapes`. The same predicate was
+    copied into 36 places across 35 files; the name is kept here because
+    the artefacts and the documents refer to it. **The value is
+    unchanged** — 61 shapes on the A6000 table before and after.
+    """
+    return experiment_shapes(table)
 
-    return [p for p in table.shapes() if aligned(p)]
+
+def _shape_population(table: PerfTable, splits: SplitSet) -> dict:
+    """★ 2026-09-11 (D-167 §Q): **which shapes the run actually used.**
+
+    `config.json` recorded `split_kind` and stopped there, so a reader saw
+    `kfold0-seed12345` and understood "the 66 shapes in three parts". The
+    run is on 61 — `_aligned_shapes` drops 5 — and nothing said so. A
+    number needs its procedure attached (documentation rule 1).
+
+    ⚠️ Everything here is **computed from `table` and `splits`.** Writing
+    66/61/5 as literals makes the record a lie on the next bundle.
+    """
+    used = _aligned_shapes(table)
+    keep = {p.key for p in used}
+    dropped = [p for p in table.shapes() if p.key not in keep]
+    return {
+        "table": len(table.shapes()), "used": len(used),
+        "excluded": len(dropped),
+        "criterion": ("align_a/b/c == 8 on every candidate "
+                      "(kernelrule.core.splits.experiment_shapes)"),
+        "excluded_shapes": [f"{p.M}x{p.N}x{p.K}" for p in dropped],
+        "n_train": len(splits.train.shapes), "n_val": len(splits.val.shapes)}
 
 
 def _splits(table: PerfTable, *, fold: int | None = None,
@@ -1149,6 +1173,8 @@ def main() -> None:
         "n_features": a.n_features, "n_rule_writer": a.n_rule_writer,
         "bundle": a.bundle, "env_hash": a.env_hash,
         "split_kind": splits.kind,
+        # ★ D-167 §Q — the shape population, not just how it was cut.
+        "shape_population": _shape_population(table, splits),
         "registry": {"name": reg.name, "n": len(reg._items),
                      "names": sorted(reg._items)},
         "human_features_present": sorted(set(reg._items) & set(REGISTRY._items))

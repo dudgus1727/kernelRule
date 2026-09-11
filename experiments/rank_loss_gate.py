@@ -65,7 +65,7 @@ import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import geomean
-from kernelrule.core.splits import Split, SplitSet, regime_of
+from kernelrule.core.splits import Split, SplitSet, experiment_shapes, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
@@ -78,12 +78,7 @@ TEMP = 1.0          # ★ fixed. See the docstring above
 
 
 def _splits(table: PerfTable) -> SplitSet:
-    def aligned(p) -> bool:
-        d = table.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in table.shapes() if aligned(p)]
+    shapes = experiment_shapes(table)
     held = [p for p in shapes if 11008 in (p.N, p.K)]
     return SplitSet(
         train=Split("train", tuple(p for p in shapes if p not in held)),

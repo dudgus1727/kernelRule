@@ -15,7 +15,7 @@ import warnings
 from collections import Counter
 from pathlib import Path
 
-from kernelrule.core.splits import regime_of, stratified_kfold
+from kernelrule.core.splits import experiment_shapes, regime_of, stratified_kfold
 from kernelrule.core.table import PerfTable
 
 BUNDLE = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
@@ -34,12 +34,7 @@ def main() -> None:
 
     T = PerfTable.from_bundle(BUNDLE[0], env_hash=BUNDLE[1], ok_only=False)
 
-    def aligned(p) -> bool:
-        d = T.frame_for(p)
-        return bool((d.align_a == 8).all() and (d.align_b == 8).all()
-                    and (d.align_c == 8).all())
-
-    shapes = [p for p in T.shapes() if aligned(p)]
+    shapes = experiment_shapes(T)
     tot = Counter(regime_of(p, T.hw, axis="roofline") for p in shapes)
     print("=" * 84)
     print(f"stratified {a.k}-fold — split seed {a.split_seed} (separate from "
