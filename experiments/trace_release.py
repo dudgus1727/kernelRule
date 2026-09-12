@@ -6,6 +6,20 @@
                                                                       # and
                                                                       # check
 
+★ 2026-09-12 (D-168): `--tag` takes **several** tags, and then they go into
+**one** release:
+
+    python3 experiments/trace_release.py --tag c21-a6000-f0-s0 c21-... \
+        --release campaign-21-7d30b54 --extra docs/artifacts/campaign-21.json
+
+A campaign of 21 one-seed tags is one experiment, not 21 of them, and 21
+releases would make `runs.md` point 21 rows at 21 places. The ledger still
+gets **one entry per tag** — that is what `runs_table.py` looks up — and
+every one of them names the same release.
+
+`--extra` puts files that are not traces into the same release (the
+aggregate tables, §5 of the campaign order).
+
 ## Why a release
 
 ```
@@ -99,14 +113,18 @@ def _commits(seeds: list[tuple[str, Path]]) -> dict[str, str]:
     return out
 
 
-def _notes(tag: str, rel: str, seeds, work: Path, commits, sizes) -> str:
+def _notes(tags: list[str], rel: str, seeds, work: Path, commits, sizes,
+           extra: list[Path] | None = None) -> str:
     from kernelrule.core.runset import run_condition
     c = run_condition(seeds[0][0])
     # ★ The commits in **time order** — laying them out alphabetically makes
     #   the ordering a lie
     uniq = sorted(set(commits.values()),
                   key=lambda c: int(_sh("git", "show", "-s", "--format=%ct", c)))
-    L = [f"# Run traces — `{tag}` (n={len(seeds)})", "",
+    head = (f"# Run traces — `{tags[0]}` (n={len(seeds)})" if len(tags) == 1
+            else f"# Run traces — {len(tags)} tags, {len(seeds)} runs "
+                 f"(`{rel}`)")
+    L = [head, "",
          ("The raw record of what conversation the loop actually had, held "
           "**in one file in time order** (D-133). Nothing was abridged."), "",
          "## The run condition", "", "```"]
@@ -114,8 +132,17 @@ def _notes(tag: str, rel: str, seeds, work: Path, commits, sizes) -> str:
               "product_hint", "power_hint", "fit_method", "fit_restarts",
               "objective", "hw"):
         L.append(f"{k:18s} {c.get(k)}")
-    L += ["```", "", "It is the same condition as that row of `runs.md`.", "",
-          "## The commits", "", "```"]
+    same = ("It is the same condition as that row of `runs.md`."
+            if len(tags) == 1 else
+            "★ The condition above is **the first run's**. The tags differ in "
+            "table and split — read each row of `runs.md`.")
+    L += ["```", "", same]
+    if len(tags) > 1:
+        L += ["", "## The tags", "", "```"]
+        for x in tags:
+            L.append(x)
+        L.append("```")
+    L += ["", "## The commits", "", "```"]
     for name in sorted(commits):
         L.append(f"{name:20s} {commits[name]}")
     L.append("```")
@@ -142,7 +169,16 @@ def _notes(tag: str, rel: str, seeds, work: Path, commits, sizes) -> str:
     tc = sum(v[1] for v in sizes.values())
     L += ["", (f"total raw {tr / 1e6:.1f} MB -> compressed "
                f"{tc / 1e6:.2f} MB ({tc / tr:.1%})"), "",
-          "Each file has a `.sha256` beside it.", "",
+          "Each file has a `.sha256` beside it.", "",]
+    if extra:
+        L += ["## The aggregate tables", "",
+              ("★ Not traces — the computed result of the campaign, so that "
+               "the release stands on its own."), "",
+              "| file | bytes |", "|---|--:|"]
+        for x in extra:
+            L.append(f"| `{x.name}` | {x.stat().st_size:,} |")
+        L.append("")
+    L += [
           "```bash",
           (f"curl -LO https://github.com/dudgus1727/kernelRule/releases/"
            f"download/{rel}/trace-{seeds[0][0]}.jsonl.zst"),
@@ -174,7 +210,9 @@ def _notes(tag: str, rel: str, seeds, work: Path, commits, sizes) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tag", required=True)
+    ap.add_argument("--tag", required=True, nargs="+",
+                    help="one tag, or several that share one release "
+                         "(D-168)")
     ap.add_argument("--release", default=None,
                     help="the release tag. The default is "
                          "trace-<tag>-<the first commit>")
@@ -183,11 +221,27 @@ def main() -> None:
                     help="**fetch back** the uploaded asset and check the "
                          "sha256")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--extra", nargs="*", default=[],
+                    help="files that are not traces, uploaded as they are")
     a = ap.parse_args()
 
-    seeds = _seeds(a.tag)
+    tags = list(a.tag)
+    if len(tags) > 1 and not a.release:
+        raise SystemExit(
+            "★ several tags go into one release, so --release has to be "
+            "named. It is not derived from the first tag — that name would "
+            "say the release holds only that one (§26.4).")
+    seeds = [s for x in tags for s in _seeds(x)]
     if not seeds:
-        raise SystemExit(f"there is no trace.jsonl for {a.tag}")
+        raise SystemExit(f"there is no trace.jsonl for {tags}")
+    dup = {n for n, _ in seeds}
+    if len(dup) != len(seeds):
+        raise SystemExit("★ the tags overlap — the same run would be "
+                         "uploaded twice.")
+    extra = [Path(x) for x in a.extra]
+    for x in extra:
+        if not x.exists():
+            raise SystemExit(f"{x} does not exist.")
     now = time.time()
     live = [n for n, p in seeds if now - p.stat().st_mtime < LIVE_SECONDS]
     if live and (a.upload or a.verify):
@@ -196,7 +250,7 @@ def main() -> None:
             f"one go after it finishes.")
 
     commits = _commits(seeds)
-    rel = a.release or f"trace-{a.tag}-{commits[seeds[0][0]]}"
+    rel = a.release or f"trace-{tags[0]}-{commits[seeds[0][0]]}"
     work = Path(a.out) if a.out else (
         ROOT / ".trace-release" / rel)
     work.mkdir(parents=True, exist_ok=True)
@@ -213,28 +267,42 @@ def main() -> None:
         print(f"  {name}  {p.stat().st_size / 1e6:5.1f} MB -> "
               f"{z.stat().st_size / 1e6:5.2f} MB  events {nev:,}")
 
+    for x in extra:
+        subprocess.run(["cp", str(x), str(work / x.name)], check=True)
+        (work / f"{x.name}.sha256").write_text(
+            f"{_sha256(work / x.name)}  {x.name}\n")
+        print(f"  extra {x.name}  {x.stat().st_size / 1e6:.2f} MB")
     notes = work / "NOTES.md"
-    notes.write_text(_notes(a.tag, rel, seeds, work, commits, sizes))
+    notes.write_text(_notes(tags, rel, seeds, work, commits, sizes, extra))
     print(f"\n  release tag  {rel}\n  notes        {notes}")
 
     if a.upload:
-        assets = sorted(str(x) for x in work.glob("trace-*"))
-        _sh("gh", "release", "create", rel, "--title",
-            f"Run traces — {a.tag}", "--notes-file", str(notes), *assets)
+        assets = sorted(str(x) for x in work.iterdir()
+                        if x.name != "NOTES.md" and x.is_file())
+        title = (f"Run traces — {tags[0]}" if len(tags) == 1
+                 else f"Run traces — {len(tags)} tags, {len(seeds)} runs")
+        _sh("gh", "release", "create", rel, "--title", title,
+            "--notes-file", str(notes), *assets)
         print(f"  ★ uploaded: {len(assets)} assets")
         m = json.loads(MANIFEST.read_text()) if MANIFEST.exists() else {}
-        m[a.tag] = {
-            "release": rel,
-            "runs": [n for n, _p in seeds],
-            "commits": commits,
-            "sha256": {f"trace-{n}.jsonl.zst":
-                       (work / f"trace-{n}.jsonl.zst.sha256"
-                        ).read_text().split()[0] for n, _p in seeds},
-            "bytes_raw": {n: sizes[n][0] for n, _p in seeds},
-            "bytes_zst": {n: sizes[n][1] for n, _p in seeds},
-            "events": {n: sizes[n][2] for n, _p in seeds},
-            "uploaded": time.strftime("%Y-%m-%d"),
-        }
+        # ★ One entry per tag — `runs_table.py` looks the release up by tag,
+        #   so a shared release has to be named on every one of them.
+        for x in tags:
+            mine = _seeds(x)
+            m[x] = {
+                "release": rel,
+                "runs": [n for n, _p in mine],
+                "commits": {n: commits[n] for n, _p in mine},
+                "sha256": {f"trace-{n}.jsonl.zst":
+                           (work / f"trace-{n}.jsonl.zst.sha256"
+                            ).read_text().split()[0] for n, _p in mine},
+                "bytes_raw": {n: sizes[n][0] for n, _p in mine},
+                "bytes_zst": {n: sizes[n][1] for n, _p in mine},
+                "events": {n: sizes[n][2] for n, _p in mine},
+                "uploaded": time.strftime("%Y-%m-%d"),
+            }
+            if len(tags) > 1:
+                m[x]["shared_release_tags"] = tags
         MANIFEST.write_text(json.dumps(m, ensure_ascii=False, indent=1,
                                        sort_keys=True) + "\n")
         print(f"  ★ {MANIFEST.relative_to(ROOT)} updated")
