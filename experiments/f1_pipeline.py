@@ -618,6 +618,42 @@ def _physics_coverage(table, gen: FeatureRegistry,
     For each seed term it finds the generated feature with the highest
     Spearman and Pearson. The criterion is the same as §8.4 — both must
     exceed 0.95 to count as "covered".
+
+    ## ★ 2026-09-12 (D-169): why both, and what `covered` does not mean
+
+    The criterion was checked against `c21-lib`, where three terms have
+    **Spearman 1.000 and still read as not covered**:
+
+    ```
+    has_spill     <- spill_traffic_ratio            sp 1.000  pe 0.545
+    split_k_cost  <- partial_sum_combine_work_ratio sp 1.000  pe 0.925
+    sm_idle_cost  <- cta_residency_waves            sp 0.949  pe 0.319
+    ```
+
+    **The criterion is right and was not changed.** A rule is a *weighted
+    sum then sorted*, and a fitted weight can only rescale an axis
+    linearly. An axis that orders configs identically but non-linearly
+    ranks the same **alone** and differently **inside a sum with other
+    terms**, so it is not a drop-in replacement for the seed term. Rank
+    agreement alone would say "covered" about an axis the rule cannot
+    actually substitute.
+
+    ⚠️ But two things follow that the single number `_n_covered` hides.
+
+    ```
+    ★ `monotone_only` is already computed and is a real third state —
+      "the library orders configs the same way, but not linearly".
+      `_n_monotone_only` is reported next to `_n_covered` from now on
+    ★ `has_spill` takes **two values** (measured: binary, [0, 1]).
+      Pearson against a continuous axis is then capped by the
+      point-biserial coefficient, so that term is near-uncoverable
+      whatever the library is — `_n_covered` has a structural ceiling
+      below `_n_terms`
+    ```
+
+    ⛔ `_n_covered` is still the strict count. It is not widened to include
+    `monotone_only` — that would change what the number has meant in every
+    earlier artefact.
     """
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.features.generated import _reference_columns
@@ -658,6 +694,10 @@ def _physics_coverage(table, gen: FeatureRegistry,
                      "monotone_only": best[1] > 0.95 and best[2] <= 0.95}
     out["_n_covered"] = sum(1 for v in out.values()
                             if isinstance(v, dict) and v.get("covered"))
+    # ★ D-169 — the third state, beside "covered" and "not covered".
+    out["_n_monotone_only"] = sum(
+        1 for v in out.values()
+        if isinstance(v, dict) and v.get("monotone_only"))
     out["_n_terms"] = len(ref)
     return out
 

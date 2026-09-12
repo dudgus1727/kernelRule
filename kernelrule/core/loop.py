@@ -294,6 +294,8 @@ def _fit_and_score(job: tuple) -> dict:
             #   otherwise the counter differs between the parallel and the
             #   sequential path and that **is** a condition change (D-95).
             "n_dead": len(fr.dead_terms),
+            "n_dead_w": len(fr.dead_by_weight),
+            "n_dead_s": len(fr.dead_by_sensitivity),
             "rank_loss": _rank_loss_of(fn, c, fr.w),
             "val_regret": fr.val_regret,
             "mem": ev.at(1, mask=c["short_mask"]),
@@ -400,6 +402,21 @@ class RoundResult:
     #: countable while the run happens. Observed on one F2 run: 6 of the 49
     #: registered axes, 1~3 per run.
     n_dead_terms: int = 0
+    #: ★ 2026-09-12 (D-169): the same terms, **split by why they are dead.**
+    #: The two do not overlap and they say opposite things.
+    #:
+    #: ```
+    #: n_dead_by_weight  |w| < 1e-3           ★ the fitter removed it — normal
+    #: n_dead_by_sens    sensitivity < 1e-6   ★ it carries a weight and still
+    #:                   and |w| >= 1e-3         cannot move the ranking —
+    #:                                           a library / structure problem
+    #: ```
+    #:
+    #: ⛔ `n_dead_terms` above is kept and still counts the union — the
+    #: 21-run campaign's numbers were recorded through it (D-168) and are
+    #: not recomputed.
+    n_dead_by_weight: int = 0
+    n_dead_by_sens: int = 0
     #: ★ Proposal / duplicate / scored counts per parent kind (exploit /
     #: explore / cross) (D-94).
     #: `{"exploit": {"n": 6, "dup": 1, "scored": 5}, ...}`
@@ -440,7 +457,8 @@ class RoundResult:
                if self.best_rank_loss == self.best_rank_loss else "")
             + f"val {self.best_val_regret:.4f}({gap}{alarm})"
             f"| cells {self.n_cells:2d} blowups {self.n_val_blowups} "
-            f"dead {self.n_dead_terms} | "
+            f"dead {self.n_dead_terms}"
+            f"(w{self.n_dead_by_weight}/s{self.n_dead_by_sens}) | "
             f"{self.seconds:.1f}s")
 
 
@@ -878,6 +896,8 @@ class RoundLoop:
             if d["moved"]:
                 res.n_fit_moved += 1
             res.n_dead_terms += int(d["n_dead"])
+            res.n_dead_by_weight += int(d.get("n_dead_w", 0))
+            res.n_dead_by_sens += int(d.get("n_dead_s", 0))
             res.n_scored += 1
             elites.append(self._elite_from(prop, rep, d))
         return elites
@@ -981,11 +1001,15 @@ class RoundLoop:
         if fr.moved:
             res.n_fit_moved += 1
         res.n_dead_terms += len(fr.dead_terms)
+        res.n_dead_by_weight += len(fr.dead_by_weight)
+        res.n_dead_by_sens += len(fr.dead_by_sensitivity)
         ev = self._score(fn, fr.w, self.splits.train.shapes)
         res.n_scored += 1
         return self._elite_from(prop, rep, {
             "w": [float(x) for x in fr.w], "regret": fr.fit_regret,
             "n_dead": len(fr.dead_terms),
+            "n_dead_w": len(fr.dead_by_weight),
+            "n_dead_s": len(fr.dead_by_sensitivity),
             "rank_loss": _rank_loss_of(fn, {
                 "objective": self._objective,
                 "rank_top_k": self.cfg.rank_top_k,

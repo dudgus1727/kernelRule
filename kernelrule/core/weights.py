@@ -165,9 +165,35 @@ class FittedRule:
     @property
     def dead_terms(self) -> list[int]:
         """Terms that converged near 0 or are insensitive. Candidates for
-        feature cleanup (§29.6)."""
+        feature cleanup (§29.6).
+
+        ⚠️ 2026-09-12 (D-169): this counts **two different things** and the
+        two say opposite things about the library. `dead_by_weight` and
+        `dead_by_sensitivity` split them; this one is kept because
+        `n_dead_terms` of the 21-run campaign was recorded through it and
+        that number must stay reproducible (documentation rule 2).
+        """
         return [i for i in range(len(self.w))
                 if abs(self.w[i]) < 1e-3 or self.sensitivity[i] < 1e-6]
+
+    @property
+    def dead_by_weight(self) -> list[int]:
+        """★ The fitter pushed the weight to ~0. **That is the fitter
+        working** — it found the term useless and removed it."""
+        return [i for i in range(len(self.w)) if abs(self.w[i]) < 1e-3]
+
+    @property
+    def dead_by_sensitivity(self) -> list[int]:
+        """★ The term carries a weight and still cannot move the ranking.
+
+        Perturbing it changes nothing, so the axis had no ordering power
+        here in the first place — that is a statement about the **library
+        or the rule's structure**, not about the fitter. `|w| >= 1e-3`
+        excludes the terms the fitter already zeroed, so the two counts do
+        not overlap.
+        """
+        return [i for i in range(len(self.w))
+                if self.sensitivity[i] < 1e-6 and abs(self.w[i]) >= 1e-3]
 
     def __str__(self) -> str:
         return (f"FittedRule(fit={self.fit_regret:.4f}, "

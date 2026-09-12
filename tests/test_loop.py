@@ -327,6 +327,11 @@ def test_dead_terms_are_counted_per_round(loop):
         "the fitter's own `dead_terms` says a term does nothing and the "
         "round did not record it")
     assert "dead" in res.line()
+    # ★ D-169 — split by why. The two do not overlap and together they are
+    #   the union `n_dead_terms` counts.
+    assert (res.n_dead_by_weight + res.n_dead_by_sens) == res.n_dead_terms, (
+        f"w {res.n_dead_by_weight} + s {res.n_dead_by_sens} != "
+        f"{res.n_dead_terms}")
 
 
 def test_dead_terms_come_back_from_the_worker_too(synth_table, tmp_path):
@@ -340,6 +345,9 @@ def test_dead_terms_come_back_from_the_worker_too(synth_table, tmp_path):
     par_r, _par, *_ = _feature_parallel_pair(synth_table, tmp_path / "db", 3)
     assert sum(r.n_scored for r in seq_r) > 0
     assert [r.n_dead_terms for r in seq_r] == [r.n_dead_terms for r in par_r]
+    for f in ("n_dead_by_weight", "n_dead_by_sens"):
+        assert [getattr(r, f) for r in seq_r] == \
+               [getattr(r, f) for r in par_r], f
 
 
 # ---------------------------------------------------------------------------
