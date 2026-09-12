@@ -237,11 +237,67 @@ def _live_tags() -> set[str]:
     return live
 
 
+def _is_loop_run(d: Path) -> bool:
+    """Is this directory **a loop run**, or a pipeline tag directory?
+
+    ★ 2026-09-12 (D-168): both carry a `config.json` and the 21-run
+    campaign's tags end in `-s<digit>` (`c21-a6000-f0-s0`), so the tag
+    directory matched the seed pattern below and `_rows()` died on its
+    missing `rounds.jsonl`. The two configs are distinguishable: only
+    `RoundLoop.dump()` writes a `"loop"` block.
+
+    ⛔ Not "does `rounds.jsonl` exist" — a run that died before its first
+    round has an empty one, and that run must stay in the table (§26.4).
+    """
+    f = d / "config.json"
+    if not f.exists():
+        return False
+    try:
+        return "loop" in json.loads(f.read_text())
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
+#: ★ The old lookup: `hw_text.sha256` -> table name. **Kept only for runs
+#: that predate `hw_text.gpu`.**
+#:
+#: ⚠️ 2026-09-12 (D-168): this map went stale and the stale answer was
+#: silent. D-166 §E removed the measurement-limits section from the
+#: hardware prompt, so **every** GPU's prompt text — and therefore its
+#: sha256 — changed. The lookup then missed on all four tables and the
+#: fallback said `a6000`, which put 9 runs of the 21-run campaign in
+#: `runs.md` under the wrong table. A default that names a real table
+#: cannot be told from a correct answer (principle 1).
+_HW_SHA_TO_TABLE = {"37762692c36f5ba4": "4090", "cc392ddd72b4902d": "5090"}
+#: The recorded GPU name -> the table name this repository uses.
+_GPU_NAME_TO_TABLE = (("a6000", "a6000"), ("5090", "5090"), ("4090", "4090"),
+                      ("h100", "h100"))
+
+
+def _gpu_of(cfg: dict, hw_sha: str) -> str:
+    """Which table did this run use?
+
+    ★ Read from `llm.hw_text.gpu` — **the name the run itself recorded** —
+    before falling back to the sha256 map above. 79 of the runs carry the
+    name; the 118 older ones do not and still go through the map.
+    """
+    hw = (cfg.get("llm") or {}).get("hw_text")
+    name = hw.get("gpu") if isinstance(hw, dict) else None
+    if name:
+        low = str(name).lower()
+        for needle, table in _GPU_NAME_TO_TABLE:
+            if needle in low:
+                return table
+        return str(name)          # ⛔ a new GPU shows its own name, not "?"
+    return _HW_SHA_TO_TABLE.get(
+        hw_sha, "a6000" if hw_sha and hw_sha != "None" else "?")
+
+
 def _groups() -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for d in sorted(RUNS.iterdir()):
         m = re.match(r"^(.*)-s(\d+)$", d.name) if d.is_dir() else None
-        if not m or not (d / "config.json").exists():
+        if not m or not _is_loop_run(d):
             continue
         if m.group(1).startswith(DROP):
             continue
@@ -268,9 +324,7 @@ def _rows() -> list[dict]:
         cfg = json.loads((RUNS / runs[0] / "config.json").read_text())
         nr = sorted({sum(1 for _ in (RUNS / r / "rounds.jsonl").open())
                      for r in runs})
-        hw = one("hw")
-        gpu = {"37762692c36f5ba4": "4090", "cc392ddd72b4902d": "5090"}.get(
-            hw, "a6000" if hw and hw != "None" else "?")
+        gpu = _gpu_of(cfg, one("hw"))
         val, src = _canon(tag)
         rows.append({
             "tag": tag, "n": len(runs),

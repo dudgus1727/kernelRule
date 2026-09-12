@@ -1,0 +1,116 @@
+{
+ "note": "of each split's holdout, how many shapes were in the training set the shared feature library was built on (stage 1's AUC check reads the answer — D-166 §C-1)",
+ "split_seed": 12345,
+ "k": 3,
+ "chosen_library_split": "nk11008",
+ "a6000": {
+  "fold0": {
+   "n_train": 40,
+   "splits": {
+    "fold0": {
+     "contact": 0,
+     "n_val": 21
+    },
+    "fold1": {
+     "contact": 21,
+     "n_val": 21
+    },
+    "fold2": {
+     "contact": 19,
+     "n_val": 19
+    },
+    "nk11008": {
+     "contact": 13,
+     "n_val": 20
+    }
+   },
+   "total": 53
+  },
+  "fold1": {
+   "n_train": 40,
+   "splits": {
+    "fold0": {
+     "contact": 21,
+     "n_val": 21
+    },
+    "fold1": {
+     "contact": 0,
+     "n_val": 21
+    },
+    "fold2": {
+     "contact": 19,
+     "n_val": 19
+    },
+    "nk11008": {
+     "contact": 13,
+     "n_val": 20
+    }
+   },
+   "total": 53
+  },
+  "fold2": {
+   "n_train": 42,
+   "splits": {
+    "fold0": {
+     "contact": 21,
+     "n_val": 21
+    },
+    "fold1": {
+     "contact": 21,
+     "n_val": 21
+    },
+    "fold2": {
+     "contact": 0,
+     "n_val": 19
+    },
+    "nk11008": {
+     "contact": 14,
+     "n_val": 20
+    }
+   },
+   "total": 56
+  },
+  "nk11008": {
+   "n_train": 41,
+   "splits": {
+    "fold0": {
+     "contact": 14,
+     "n_val": 21
+    },
+    "fold1": {
+     "contact": 14,
+     "n_val": 21
+    },
+    "fold2": {
+     "contact": 13,
+     "n_val": 19
+    },
+    "nk11008": {
+     "contact": 0,
+     "n_val": 20
+    }
+   },
+   "total": 41
+  }
+ },
+ "targets": {
+  "5090": {
+   "n_val": 20,
+   "contact": 0,
+   "n_shapes": 61,
+   "shared_with_a6000": 28
+  },
+  "4090": {
+   "n_val": 20,
+   "contact": 0,
+   "n_shapes": 59,
+   "shared_with_a6000": 25
+  },
+  "h100": {
+   "n_val": 20,
+   "contact": 0,
+   "n_shapes": 59,
+   "shared_with_a6000": 23
+  }
+ }
+}

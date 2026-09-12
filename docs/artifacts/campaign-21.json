@@ -1,0 +1,2536 @@
+{
+ "n_runs": 21,
+ "groups": {
+  "a6000/fold0": {
+   "holdout": [
+    1.0949,
+    1.0579,
+    1.0663
+   ],
+   "median": 1.0663,
+   "spread": 0.03699999999999992,
+   "train": [
+    1.0784,
+    1.0596,
+    1.0561
+   ],
+   "in_sample": [
+    1.062,
+    1.0586,
+    1.0554
+   ]
+  },
+  "a6000/fold1": {
+   "holdout": [
+    1.093,
+    1.1589,
+    1.1625
+   ],
+   "median": 1.1589,
+   "spread": 0.06950000000000012,
+   "train": [
+    1.0378,
+    1.0659,
+    1.0686
+   ],
+   "in_sample": [
+    1.0378,
+    1.0659,
+    1.0684
+   ]
+  },
+  "a6000/fold2": {
+   "holdout": [
+    1.1127,
+    1.0963,
+    1.1132
+   ],
+   "median": 1.1127,
+   "spread": 0.016899999999999915,
+   "train": [
+    1.0547,
+    1.0605,
+    1.0408
+   ],
+   "in_sample": [
+    1.0539,
+    1.0596,
+    1.0402
+   ]
+  },
+  "a6000/nk11008": {
+   "holdout": [
+    1.0998,
+    1.0658,
+    1.0875
+   ],
+   "median": 1.0875,
+   "spread": 0.03400000000000003,
+   "train": [
+    1.0802,
+    1.0538,
+    1.0756
+   ],
+   "in_sample": [
+    1.0773,
+    1.0512,
+    1.0747
+   ]
+  },
+  "5090/nk11008": {
+   "holdout": [
+    1.0579,
+    1.0777,
+    1.0351
+   ],
+   "median": 1.0579,
+   "spread": 0.04260000000000019,
+   "train": [
+    1.0475,
+    1.0502,
+    1.0186
+   ],
+   "in_sample": [
+    1.038,
+    1.0502,
+    1.0174
+   ]
+  },
+  "4090/nk11008": {
+   "holdout": [
+    1.1435,
+    1.0297,
+    1.0274
+   ],
+   "median": 1.0297,
+   "spread": 0.11609999999999987,
+   "train": [
+    1.0248,
+    1.0217,
+    1.0282
+   ],
+   "in_sample": [
+    1.0241,
+    1.0213,
+    1.0275
+   ]
+  },
+  "h100/nk11008": {
+   "holdout": [
+    1.1345,
+    1.0504,
+    1.0693
+   ],
+   "median": 1.0693,
+   "spread": 0.08410000000000006,
+   "train": [
+    1.034,
+    1.0383,
+    1.047
+   ],
+   "in_sample": [
+    1.034,
+    1.0374,
+    1.037
+   ]
+  }
+ },
+ "a6000_kfold": {
+  "seed_spread_per_fold": [
+   0.03699999999999992,
+   0.06950000000000012,
+   0.016899999999999915
+  ],
+  "seed_spread_median": 0.03699999999999992,
+  "split_spread": 0.09260000000000002,
+  "fold_medians": [
+   1.0663,
+   1.1589,
+   1.1127
+  ]
+ },
+ "rule_size": {
+  "best_len_w": [
+   48,
+   35,
+   25,
+   46,
+   23,
+   49,
+   28,
+   21,
+   46,
+   30,
+   28,
+   28,
+   34,
+   22,
+   49,
+   27,
+   48,
+   22,
+   48,
+   45,
+   33
+  ],
+  "holdout": [
+   1.0949,
+   1.0579,
+   1.0663,
+   1.093,
+   1.1589,
+   1.1625,
+   1.1127,
+   1.0963,
+   1.1132,
+   1.0998,
+   1.0658,
+   1.0875,
+   1.0579,
+   1.0777,
+   1.0351,
+   1.1435,
+   1.0297,
+   1.0274,
+   1.1345,
+   1.0504,
+   1.0693
+  ],
+  "pearson_r_size_vs_holdout": -0.0098,
+  "min": 21,
+  "max": 49,
+  "median": 33,
+  "trajectory": {
+   "c21-a6000-f0-s0": {
+    "archive_len_w": [
+     43,
+     44,
+     45,
+     48,
+     50,
+     52,
+     54,
+     56,
+     60
+    ],
+    "best_len_w": 48
+   },
+   "c21-a6000-f0-s1": {
+    "archive_len_w": [
+     29,
+     30,
+     32,
+     33,
+     33,
+     33,
+     35,
+     35,
+     36,
+     36,
+     41
+    ],
+    "best_len_w": 35
+   },
+   "c21-a6000-f0-s2": {
+    "archive_len_w": [
+     20,
+     21,
+     21,
+     22,
+     23,
+     23,
+     23,
+     24,
+     25,
+     25
+    ],
+    "best_len_w": 25
+   },
+   "c21-a6000-f1-s0": {
+    "archive_len_w": [
+     19,
+     22,
+     24,
+     25,
+     29,
+     46
+    ],
+    "best_len_w": 46
+   },
+   "c21-a6000-f1-s1": {
+    "archive_len_w": [
+     18,
+     19,
+     19,
+     20,
+     20,
+     21,
+     22,
+     23,
+     24,
+     24,
+     25,
+     28
+    ],
+    "best_len_w": 23
+   },
+   "c21-a6000-f1-s2": {
+    "archive_len_w": [
+     35,
+     37,
+     43,
+     45,
+     47,
+     47,
+     49
+    ],
+    "best_len_w": 49
+   },
+   "c21-a6000-f2-s0": {
+    "archive_len_w": [
+     21,
+     21,
+     23,
+     25,
+     25,
+     26,
+     27,
+     28
+    ],
+    "best_len_w": 28
+   },
+   "c21-a6000-f2-s1": {
+    "archive_len_w": [
+     20,
+     21,
+     21,
+     21,
+     23,
+     23,
+     24,
+     26
+    ],
+    "best_len_w": 21
+   },
+   "c21-a6000-f2-s2": {
+    "archive_len_w": [
+     26,
+     28,
+     32,
+     36,
+     36,
+     41,
+     46,
+     48
+    ],
+    "best_len_w": 46
+   },
+   "c21-a6000-nk-s0": {
+    "archive_len_w": [
+     22,
+     22,
+     23,
+     24,
+     24,
+     24,
+     26,
+     26,
+     30,
+     36
+    ],
+    "best_len_w": 30
+   },
+   "c21-a6000-nk-s1": {
+    "archive_len_w": [
+     26,
+     26,
+     27,
+     28,
+     28,
+     28,
+     29,
+     29,
+     30,
+     30
+    ],
+    "best_len_w": 28
+   },
+   "c21-a6000-nk-s2": {
+    "archive_len_w": [
+     25,
+     28,
+     31,
+     32,
+     38
+    ],
+    "best_len_w": 28
+   },
+   "c21-5090-nk-s0": {
+    "archive_len_w": [
+     23,
+     27,
+     30,
+     32,
+     33,
+     34,
+     35,
+     36
+    ],
+    "best_len_w": 34
+   },
+   "c21-5090-nk-s1": {
+    "archive_len_w": [
+     19,
+     19,
+     20,
+     22,
+     24,
+     29,
+     29,
+     30
+    ],
+    "best_len_w": 22
+   },
+   "c21-5090-nk-s2": {
+    "archive_len_w": [
+     36,
+     40,
+     42,
+     45,
+     48,
+     49,
+     53,
+     55,
+     58
+    ],
+    "best_len_w": 49
+   },
+   "c21-4090-nk-s0": {
+    "archive_len_w": [
+     18,
+     18,
+     19,
+     20,
+     21,
+     21,
+     22,
+     22,
+     27,
+     27,
+     29
+    ],
+    "best_len_w": 27
+   },
+   "c21-4090-nk-s1": {
+    "archive_len_w": [
+     38,
+     42,
+     45,
+     48,
+     48,
+     50,
+     52,
+     59
+    ],
+    "best_len_w": 48
+   },
+   "c21-4090-nk-s2": {
+    "archive_len_w": [
+     18,
+     18,
+     18,
+     19,
+     19,
+     20,
+     21,
+     22,
+     22,
+     27
+    ],
+    "best_len_w": 22
+   },
+   "c21-h100-nk-s0": {
+    "archive_len_w": [
+     26,
+     32,
+     34,
+     36,
+     39,
+     48,
+     48
+    ],
+    "best_len_w": 48
+   },
+   "c21-h100-nk-s1": {
+    "archive_len_w": [
+     35,
+     36,
+     40,
+     41,
+     45,
+     46,
+     46,
+     50,
+     52
+    ],
+    "best_len_w": 45
+   },
+   "c21-h100-nk-s2": {
+    "archive_len_w": [
+     24,
+     24,
+     28,
+     28,
+     31,
+     31,
+     31,
+     33
+    ],
+    "best_len_w": 33
+   }
+  }
+ },
+ "dead_terms": {
+  "per_run_total": {
+   "c21-a6000-f0-s0": 2016,
+   "c21-a6000-f0-s1": 1177,
+   "c21-a6000-f0-s2": 889,
+   "c21-a6000-f1-s0": 1220,
+   "c21-a6000-f1-s1": 856,
+   "c21-a6000-f1-s2": 1655,
+   "c21-a6000-f2-s0": 1043,
+   "c21-a6000-f2-s1": 911,
+   "c21-a6000-f2-s2": 1097,
+   "c21-a6000-nk-s0": 941,
+   "c21-a6000-nk-s1": 996,
+   "c21-a6000-nk-s2": 1096,
+   "c21-5090-nk-s0": 1338,
+   "c21-5090-nk-s1": 1080,
+   "c21-5090-nk-s2": 1857,
+   "c21-4090-nk-s0": 809,
+   "c21-4090-nk-s1": 1997,
+   "c21-4090-nk-s2": 922,
+   "c21-h100-nk-s0": 1692,
+   "c21-h100-nk-s1": 1823,
+   "c21-h100-nk-s2": 1490
+  },
+  "per_scored_rule": {
+   "c21-a6000-f0-s0": 29.65,
+   "c21-a6000-f0-s1": 17.06,
+   "c21-a6000-f0-s2": 12.88,
+   "c21-a6000-f1-s0": 17.43,
+   "c21-a6000-f1-s1": 12.97,
+   "c21-a6000-f1-s2": 25.08,
+   "c21-a6000-f2-s0": 14.69,
+   "c21-a6000-f2-s1": 12.83,
+   "c21-a6000-f2-s2": 15.45,
+   "c21-a6000-nk-s0": 13.25,
+   "c21-a6000-nk-s1": 14.65,
+   "c21-a6000-nk-s2": 16.61,
+   "c21-5090-nk-s0": 19.68,
+   "c21-5090-nk-s1": 15.43,
+   "c21-5090-nk-s2": 27.72,
+   "c21-4090-nk-s0": 11.56,
+   "c21-4090-nk-s1": 29.81,
+   "c21-4090-nk-s2": 12.99,
+   "c21-h100-nk-s0": 24.88,
+   "c21-h100-nk-s1": 26.81,
+   "c21-h100-nk-s2": 21.29
+  },
+  "median_per_rule": 16.61
+ },
+ "axes": {
+  "requested": {
+   "c21-a6000-f0-s0": 17,
+   "c21-a6000-f0-s1": 11,
+   "c21-a6000-f0-s2": 16,
+   "c21-a6000-f1-s0": 11,
+   "c21-a6000-f1-s1": 14,
+   "c21-a6000-f1-s2": 13,
+   "c21-a6000-f2-s0": 17,
+   "c21-a6000-f2-s1": 13,
+   "c21-a6000-f2-s2": 14,
+   "c21-a6000-nk-s0": 7,
+   "c21-a6000-nk-s1": 17,
+   "c21-a6000-nk-s2": 16,
+   "c21-5090-nk-s0": 10,
+   "c21-5090-nk-s1": 8,
+   "c21-5090-nk-s2": 11,
+   "c21-4090-nk-s0": 7,
+   "c21-4090-nk-s1": 18,
+   "c21-4090-nk-s2": 14,
+   "c21-h100-nk-s0": 11,
+   "c21-h100-nk-s1": 8,
+   "c21-h100-nk-s2": 9
+  },
+  "accepted": {
+   "c21-a6000-f0-s0": 6,
+   "c21-a6000-f0-s1": 6,
+   "c21-a6000-f0-s2": 11,
+   "c21-a6000-f1-s0": 8,
+   "c21-a6000-f1-s1": 9,
+   "c21-a6000-f1-s2": 9,
+   "c21-a6000-f2-s0": 12,
+   "c21-a6000-f2-s1": 7,
+   "c21-a6000-f2-s2": 9,
+   "c21-a6000-nk-s0": 5,
+   "c21-a6000-nk-s1": 12,
+   "c21-a6000-nk-s2": 13,
+   "c21-5090-nk-s0": 7,
+   "c21-5090-nk-s1": 6,
+   "c21-5090-nk-s2": 10,
+   "c21-4090-nk-s0": 4,
+   "c21-4090-nk-s1": 11,
+   "c21-4090-nk-s2": 9,
+   "c21-h100-nk-s0": 9,
+   "c21-h100-nk-s1": 6,
+   "c21-h100-nk-s2": 9
+  },
+  "used_by_best": {
+   "c21-a6000-f0-s0": 3,
+   "c21-a6000-f0-s1": 3,
+   "c21-a6000-f0-s2": 4,
+   "c21-a6000-f1-s0": 6,
+   "c21-a6000-f1-s1": 3,
+   "c21-a6000-f1-s2": 6,
+   "c21-a6000-f2-s0": 5,
+   "c21-a6000-f2-s1": 2,
+   "c21-a6000-f2-s2": 6,
+   "c21-a6000-nk-s0": 2,
+   "c21-a6000-nk-s1": 4,
+   "c21-a6000-nk-s2": 3,
+   "c21-5090-nk-s0": 4,
+   "c21-5090-nk-s1": 2,
+   "c21-5090-nk-s2": 7,
+   "c21-4090-nk-s0": 2,
+   "c21-4090-nk-s1": 4,
+   "c21-4090-nk-s2": 2,
+   "c21-h100-nk-s0": 5,
+   "c21-h100-nk-s1": 3,
+   "c21-h100-nk-s2": 6
+  },
+  "names": {
+   "c21-a6000-f0-s0": [
+    "serial_split_k_roundtrip_traffic_and_synchronization_cost",
+    "cta_order_partition_reuse_distance",
+    "multistage_cp_async_family_indicator",
+    "cta_geometry_mismatch",
+    "split_k_parallel_supply_benefit",
+    "sm_partition_balance_cost"
+   ],
+   "c21-a6000-f0-s1": [
+    "cta_ordering_coalescing_deficit",
+    "skinny_dimension_ratio",
+    "serial_split_k_roundtrip_ratio",
+    "cta_compute_granularity",
+    "pipeline_family_deficit",
+    "output_contiguous_run_fragmentation"
+   ],
+   "c21-a6000-f0-s2": [
+    "shared_memory_access_concentration",
+    "shared_memory_service_demand_per_thread",
+    "split_k_turnover_fraction",
+    "pipeline_stage_depth_overhead",
+    "shared_memory_mapping_proxy",
+    "output_axis_aspect_deficit",
+    "shared_memory_bank_stride_proxy",
+    "serial_accumulator_roundtrip_cost",
+    "tile_output_axis_granularity_mismatch",
+    "shared_memory_lane_span_ratio",
+    "serial_split_k_parallelism_deficit"
+   ],
+   "c21-a6000-f1-s0": [
+    "split_k_saturation_loss",
+    "pipeline_stage_family",
+    "serial_split_k_partition_count",
+    "shape_slenderness_deficit",
+    "pipeline_stage_sync_residency_work",
+    "cta_wave_reuse_distance",
+    "tile_aspect_mismatch",
+    "grid_order_jump_exposure"
+   ],
+   "c21-a6000-f1-s1": [
+    "pipeline_family_indicator",
+    "serial_split_k_partition_count",
+    "shape_aspect_ratio_and_k_to_tile_depth_regime",
+    "l2_operand_panel_reuse_distance_ratio",
+    "final_wave_sm_coverage_deficit",
+    "split_k_parallelism_deficit",
+    "cta_thread_work_dilution",
+    "output_tile_grid_supply_deficit",
+    "pipeline_stage_depth"
+   ],
+   "c21-a6000-f1-s2": [
+    "split_k_turnover_cost_ratio",
+    "extra_pipeline_buffer_fraction",
+    "pipeline_family_sync_cost",
+    "output_grid_supply_before_split_k",
+    "pipeline_family_indicator",
+    "serial_split_k_partition_count",
+    "post_split_grid_supply_deficit",
+    "output_tile_geometry_pressure",
+    "serial_partition_k_work"
+   ],
+   "c21-a6000-f2-s0": [
+    "cta_wave_locality_cost",
+    "shape_aspect_ratio",
+    "serial_split_k_partition_count",
+    "cta_traversal_reuse_distance",
+    "cta_reuse_signature_asymmetry",
+    "serial_coverage_gain_deficit",
+    "multistage_pipeline_indicator",
+    "cta_tile_aspect_imbalance",
+    "panel_reuse_sequence_deficit",
+    "pipeline_stage_count",
+    "cta_swizzle_reuse_transition_deficit",
+    "swizzle_panel_transition_cost"
+   ],
+   "c21-a6000-f2-s1": [
+    "shared_memory_layout_overhead_ratio",
+    "serial_split_k_occupancy_and_roundtrip_cost",
+    "shared_memory_bank_conflict_or_swizzle_access_efficiency",
+    "pipeline_family_or_stage_count",
+    "tile_shape_aspect_ratio_and_tile_area",
+    "direct_warp_shared_memory_transaction_and_dependency_cost",
+    "output_grid_residency_waves"
+   ],
+   "c21-a6000-f2-s2": [
+    "serial_split_k_roundtrip_traffic_and_synchronization_cost",
+    "swizzle_dependent_cta_locality_and_l2_reuse",
+    "output_grid_narrowness",
+    "multistage_family_indicator",
+    "resident_ctas_per_sm_after_register_and_shared_memory_allocation",
+    "serial_split_k_supply_ratio",
+    "output_aspect_imbalance",
+    "swizzle_transaction_fragmentation",
+    "swizzle_operand_direction_conflict"
+   ],
+   "c21-a6000-nk-s0": [
+    "shared_access_conflict_exposure",
+    "pipeline_stage_count",
+    "output_tile_shape_or_mn_aspect_ratio",
+    "baseline_unsplit_grid_deficit",
+    "serial_split_k_partition_count"
+   ],
+   "c21-a6000-nk-s1": [
+    "serial_split_k_partition_count",
+    "warp_instruction_occupancy",
+    "synchronous_staging_mode",
+    "cta_reuse_distance_l2_pressure",
+    "serial_split_k_roundtrip_ratio",
+    "output_grid_aspect_imbalance",
+    "pipeline_stage_overhead_ratio",
+    "small_output_dimension_indicator",
+    "swizzle_locality_fragmentation",
+    "worst_axis_boundary_fraction",
+    "linear_mapping_coalescing_stride",
+    "serial_partition_amortization_burden"
+   ],
+   "c21-a6000-nk-s2": [
+    "serial_split_k_roundtrip_and_precision_cost",
+    "swizzle_reuse_distance_pressure",
+    "initial_wave_parallelism_deficit",
+    "cp_async_eligibility_deficit",
+    "split_k_parallelism_gain_or_grid_parallelism_deficit",
+    "split_k_wave_coverage_deficit",
+    "warp_partition_aspect_mismatch",
+    "traversal_reuse_cadence_imbalance",
+    "layout_traversal_transaction_fragmentation",
+    "unsplit_output_grid_residency_ratio",
+    "steady_state_stage_sync_density",
+    "swizzle_locality_bias",
+    "output_grid_orientation_traversal_mismatch"
+   ],
+   "c21-5090-nk-s0": [
+    "multistage_family_indicator",
+    "tile_shape_aspect_mismatch",
+    "pipeline_stage_count",
+    "output_tile_granularity_ratio",
+    "serial_split_k_roundtrip_ratio",
+    "swizzle_coalescing_deficit",
+    "reduction_critical_path_depth"
+   ],
+   "c21-5090-nk-s1": [
+    "parallel_split_coverage_deficit",
+    "interior_tile_amortization_deficit",
+    "pipeline_stage_count",
+    "split_k_reduction_protocol_precision_ratio",
+    "tile_warp_mapping_aspect_penalty",
+    "output_aspect_ratio"
+   ],
+   "c21-5090-nk-s2": [
+    "tile_output_aspect_mismatch",
+    "split_k_partition_count_and_serial_roundtrip_cost",
+    "pipeline_family_or_cp_async_eligibility",
+    "wave_row_boundary_fraction",
+    "minimum_output_dimension_deficit",
+    "traversal_reuse_distance_l2_ratio",
+    "split_k_sync_latency_ratio",
+    "contiguous_axis_lane_deficit",
+    "warp_swizzle_traversal_coalescing_or_reuse_cost",
+    "pipeline_stage_count"
+   ],
+   "c21-4090-nk-s0": [
+    "warp_specialization_or_warp_role_overlap",
+    "serial_fp16_d_roundtrip_loss",
+    "ordinary_schedule_family_indicator",
+    "tile_shape_aspect_mismatch"
+   ],
+   "c21-4090-nk-s1": [
+    "async_operand_service_time",
+    "warp_specialization_mode",
+    "pipeline_stage_family",
+    "tile_shape_aspect_ratio_and_extent",
+    "warp_specialization_width",
+    "warp_policy_scheduling_pressure",
+    "register_allocation_quantization_overhead",
+    "cta_grid_shape_imbalance",
+    "serial_split_k_d_roundtrip_cost",
+    "short_output_dimension_relative_to_candidate_tile_extent",
+    "warp_policy_mode"
+   ],
+   "c21-4090-nk-s2": [
+    "steady_state_stage_overlap_deficit",
+    "split_wave_work_deficit",
+    "output_tile_aspect_mismatch",
+    "serial_split_k_partial_output_roundtrip_ratio",
+    "shallow_pipeline_family_indicator",
+    "serial_split_k_precision_loss_or_accumulation_error",
+    "useful_output_tile_area_fraction",
+    "useful_output_ctas_per_sm",
+    "short_reduction_length_deficit"
+   ],
+   "c21-h100-nk-s0": [
+    "split_k_wave_fill_loss",
+    "row_tile_utilization_deficit",
+    "serial_split_serialization_fraction",
+    "multistage_pipeline_family_indicator",
+    "tile_shape_aspect_mismatch",
+    "row_grid_tile_count",
+    "shape_compute_time_at_peak",
+    "row_extent_overcoverage_ratio",
+    "cta_swizzle_reuse_distance"
+   ],
+   "c21-h100-nk-s1": [
+    "skinny_m_inverse",
+    "stage_family_scheduling_cost",
+    "split_k_critical_path_fraction",
+    "stage_family_issue_fraction",
+    "k_tile_resident_wave_cost",
+    "tile_grid_aspect_imbalance"
+   ],
+   "c21-h100-nk-s2": [
+    "skinny_m_ratio",
+    "baseline_grid_underfill",
+    "multistage_pipeline_indicator",
+    "row_tile_parallelism_deficit",
+    "k_tile_stage_bytes",
+    "operand_tile_aspect_ratio",
+    "selected_split_k_marginal_grid_capacity_gain",
+    "serial_reduction_round_trips",
+    "reduction_depth_per_output"
+   ]
+  },
+  "repeated_across_runs": {
+   "serial_split_k_roundtrip_traffic_and_synchronization_cost": 2,
+   "serial_split_k_roundtrip_ratio": 3,
+   "pipeline_stage_family": 2,
+   "serial_split_k_partition_count": 6,
+   "pipeline_family_indicator": 2,
+   "multistage_pipeline_indicator": 2,
+   "pipeline_stage_count": 5,
+   "multistage_family_indicator": 2,
+   "tile_shape_aspect_mismatch": 3
+  }
+ },
+ "lineage": {
+  "mutation": 18,
+  "cross": 3
+ },
+ "hypotheses": {
+  "n": 1125,
+  "with_cases": 1125,
+  "wants_feature": 336
+ },
+ "cost": {
+  "tokens_in": 18483067,
+  "tokens_out": 4360051,
+  "llm_calls": 2170,
+  "round_minutes_total": 750.2
+ },
+ "per_run": {
+  "c21-a6000-f0-s0": {
+   "tag": "c21-a6000-f0-s0",
+   "gpu": "a6000",
+   "split": "kfold0-seed12345",
+   "holdout": 1.0949,
+   "in_sample": 1.062,
+   "by_regime": {
+    "short": 1.112,
+    "long": 1.0613
+   },
+   "n_holdout": 21,
+   "train_best": 1.0784,
+   "val_best": 1.0986,
+   "len_w_best": 48,
+   "round_best": 8,
+   "len_w_archive": [
+    43,
+    44,
+    45,
+    48,
+    50,
+    52,
+    54,
+    56,
+    60
+   ],
+   "n_cells": 9,
+   "minutes": 35.8,
+   "n_dead_terms": [
+    46,
+    73,
+    96,
+    141,
+    110,
+    169,
+    211,
+    240,
+    230,
+    227,
+    211,
+    262
+   ],
+   "n_scored": 68,
+   "n_accepted": 31,
+   "rejections": {
+    "static": 2
+   },
+   "axes_requested": 17,
+   "axes_accepted": [
+    "serial_split_k_roundtrip_traffic_and_synchronization_cost",
+    "cta_order_partition_reuse_distance",
+    "multistage_cp_async_family_indicator",
+    "cta_geometry_mismatch",
+    "split_k_parallel_supply_benefit",
+    "sm_partition_balance_cost"
+   ],
+   "axes_used_by_best": [
+    "cta_order_partition_reuse_distance",
+    "multistage_cp_async_family_indicator",
+    "split_k_parallel_supply_benefit"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 6
+   },
+   "lineage_best": "Added a distinct split-K parallel supply-benefit term in eac",
+   "llm_calls": 107,
+   "roles": {
+    "rule_editor": 72,
+    "feature": 17,
+    "analyze": 17,
+    "null": 1
+   },
+   "tokens_in": 871760,
+   "tokens_out": 238007
+  },
+  "c21-a6000-f0-s1": {
+   "tag": "c21-a6000-f0-s1",
+   "gpu": "a6000",
+   "split": "kfold0-seed12345",
+   "holdout": 1.0579,
+   "in_sample": 1.0586,
+   "by_regime": {
+    "short": 1.0664,
+    "long": 1.0411
+   },
+   "n_holdout": 21,
+   "train_best": 1.0596,
+   "val_best": 1.0579,
+   "len_w_best": 35,
+   "round_best": 9,
+   "len_w_archive": [
+    29,
+    30,
+    32,
+    33,
+    33,
+    33,
+    35,
+    35,
+    36,
+    36,
+    41
+   ],
+   "n_cells": 11,
+   "minutes": 30.0,
+   "n_dead_terms": [
+    53,
+    52,
+    65,
+    89,
+    85,
+    77,
+    108,
+    124,
+    143,
+    104,
+    135,
+    142
+   ],
+   "n_scored": 69,
+   "n_accepted": 29,
+   "rejections": {
+    "static": 1
+   },
+   "axes_requested": 11,
+   "axes_accepted": [
+    "cta_ordering_coalescing_deficit",
+    "skinny_dimension_ratio",
+    "serial_split_k_roundtrip_ratio",
+    "cta_compute_granularity",
+    "pipeline_family_deficit",
+    "output_contiguous_run_fragmentation"
+   ],
+   "axes_used_by_best": [
+    "cta_ordering_coalescing_deficit",
+    "serial_split_k_roundtrip_ratio",
+    "output_contiguous_run_fragmentation"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 6
+   },
+   "lineage_best": "Added three high-roofline split-K terms without removing the",
+   "llm_calls": 100,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 16,
+    "null": 1,
+    "feature": 11
+   },
+   "tokens_in": 783201,
+   "tokens_out": 194913
+  },
+  "c21-a6000-f0-s2": {
+   "tag": "c21-a6000-f0-s2",
+   "gpu": "a6000",
+   "split": "kfold0-seed12345",
+   "holdout": 1.0663,
+   "in_sample": 1.0554,
+   "by_regime": {
+    "short": 1.0791,
+    "long": 1.0411
+   },
+   "n_holdout": 21,
+   "train_best": 1.0561,
+   "val_best": 1.0664,
+   "len_w_best": 25,
+   "round_best": 11,
+   "len_w_archive": [
+    20,
+    21,
+    21,
+    22,
+    23,
+    23,
+    23,
+    24,
+    25,
+    25
+   ],
+   "n_cells": 10,
+   "minutes": 32.7,
+   "n_dead_terms": [
+    32,
+    44,
+    58,
+    61,
+    58,
+    60,
+    93,
+    85,
+    87,
+    97,
+    122,
+    92
+   ],
+   "n_scored": 69,
+   "n_accepted": 26,
+   "rejections": {
+    "static": 1
+   },
+   "axes_requested": 16,
+   "axes_accepted": [
+    "shared_memory_access_concentration",
+    "shared_memory_service_demand_per_thread",
+    "split_k_turnover_fraction",
+    "pipeline_stage_depth_overhead",
+    "shared_memory_mapping_proxy",
+    "output_axis_aspect_deficit",
+    "shared_memory_bank_stride_proxy",
+    "serial_accumulator_roundtrip_cost",
+    "tile_output_axis_granularity_mismatch",
+    "shared_memory_lane_span_ratio",
+    "serial_split_k_parallelism_deficit"
+   ],
+   "axes_used_by_best": [
+    "shared_memory_access_concentration",
+    "split_k_turnover_fraction",
+    "output_axis_aspect_deficit",
+    "tile_output_axis_granularity_mismatch"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 11
+   },
+   "lineage_best": "Kept the parent structure and all existing terms, but revers",
+   "llm_calls": 108,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 19,
+    "feature": 16,
+    "null": 1
+   },
+   "tokens_in": 905711,
+   "tokens_out": 191721
+  },
+  "c21-a6000-f1-s0": {
+   "tag": "c21-a6000-f1-s0",
+   "gpu": "a6000",
+   "split": "kfold1-seed12345",
+   "holdout": 1.093,
+   "in_sample": 1.0378,
+   "by_regime": {
+    "short": 1.1074,
+    "long": 1.0481
+   },
+   "n_holdout": 21,
+   "train_best": 1.0378,
+   "val_best": 1.093,
+   "len_w_best": 46,
+   "round_best": 11,
+   "len_w_archive": [
+    19,
+    22,
+    24,
+    25,
+    29,
+    46
+   ],
+   "n_cells": 6,
+   "minutes": 34.9,
+   "n_dead_terms": [
+    70,
+    67,
+    72,
+    108,
+    83,
+    87,
+    85,
+    79,
+    134,
+    131,
+    163,
+    141
+   ],
+   "n_scored": 70,
+   "n_accepted": 26,
+   "rejections": {
+    "static": 2
+   },
+   "axes_requested": 11,
+   "axes_accepted": [
+    "split_k_saturation_loss",
+    "pipeline_stage_family",
+    "serial_split_k_partition_count",
+    "shape_slenderness_deficit",
+    "pipeline_stage_sync_residency_work",
+    "cta_wave_reuse_distance",
+    "tile_aspect_mismatch",
+    "grid_order_jump_exposure"
+   ],
+   "axes_used_by_best": [
+    "split_k_saturation_loss",
+    "serial_split_k_partition_count",
+    "shape_slenderness_deficit",
+    "pipeline_stage_sync_residency_work",
+    "cta_wave_reuse_distance",
+    "tile_aspect_mismatch"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 8
+   },
+   "lineage_best": "Reversed the global partial_sum_combine_work_ratio coefficie",
+   "llm_calls": 103,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 19,
+    "null": 1,
+    "feature": 11
+   },
+   "tokens_in": 918277,
+   "tokens_out": 211035
+  },
+  "c21-a6000-f1-s1": {
+   "tag": "c21-a6000-f1-s1",
+   "gpu": "a6000",
+   "split": "kfold1-seed12345",
+   "holdout": 1.1589,
+   "in_sample": 1.0659,
+   "by_regime": {
+    "short": 1.1853,
+    "long": 1.0785
+   },
+   "n_holdout": 21,
+   "train_best": 1.0659,
+   "val_best": 1.1589,
+   "len_w_best": 23,
+   "round_best": 8,
+   "len_w_archive": [
+    18,
+    19,
+    19,
+    20,
+    20,
+    21,
+    22,
+    23,
+    24,
+    24,
+    25,
+    28
+   ],
+   "n_cells": 12,
+   "minutes": 32.8,
+   "n_dead_terms": [
+    79,
+    74,
+    75,
+    73,
+    78,
+    71,
+    58,
+    47,
+    59,
+    89,
+    69,
+    84
+   ],
+   "n_scored": 66,
+   "n_accepted": 17,
+   "rejections": {},
+   "axes_requested": 14,
+   "axes_accepted": [
+    "pipeline_family_indicator",
+    "serial_split_k_partition_count",
+    "shape_aspect_ratio_and_k_to_tile_depth_regime",
+    "l2_operand_panel_reuse_distance_ratio",
+    "final_wave_sm_coverage_deficit",
+    "split_k_parallelism_deficit",
+    "cta_thread_work_dilution",
+    "output_tile_grid_supply_deficit",
+    "pipeline_stage_depth"
+   ],
+   "axes_used_by_best": [
+    "pipeline_family_indicator",
+    "serial_split_k_partition_count",
+    "final_wave_sm_coverage_deficit"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 9
+   },
+   "lineage_best": "Added f.pipeline_family_indicator as a separate fitted basel",
+   "llm_calls": 105,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 18,
+    "feature": 14,
+    "null": 1
+   },
+   "tokens_in": 872511,
+   "tokens_out": 172331
+  },
+  "c21-a6000-f1-s2": {
+   "tag": "c21-a6000-f1-s2",
+   "gpu": "a6000",
+   "split": "kfold1-seed12345",
+   "holdout": 1.1625,
+   "in_sample": 1.0684,
+   "by_regime": {
+    "short": 1.1901,
+    "long": 1.0785
+   },
+   "n_holdout": 21,
+   "train_best": 1.0686,
+   "val_best": 1.1613,
+   "len_w_best": 49,
+   "round_best": 11,
+   "len_w_archive": [
+    35,
+    37,
+    43,
+    45,
+    47,
+    47,
+    49
+   ],
+   "n_cells": 7,
+   "minutes": 45.0,
+   "n_dead_terms": [
+    85,
+    79,
+    75,
+    112,
+    140,
+    98,
+    89,
+    184,
+    170,
+    198,
+    216,
+    209
+   ],
+   "n_scored": 66,
+   "n_accepted": 25,
+   "rejections": {
+    "static": 4
+   },
+   "axes_requested": 13,
+   "axes_accepted": [
+    "split_k_turnover_cost_ratio",
+    "extra_pipeline_buffer_fraction",
+    "pipeline_family_sync_cost",
+    "output_grid_supply_before_split_k",
+    "pipeline_family_indicator",
+    "serial_split_k_partition_count",
+    "post_split_grid_supply_deficit",
+    "output_tile_geometry_pressure",
+    "serial_partition_k_work"
+   ],
+   "axes_used_by_best": [
+    "split_k_turnover_cost_ratio",
+    "extra_pipeline_buffer_fraction",
+    "pipeline_family_sync_cost",
+    "output_grid_supply_before_split_k",
+    "serial_split_k_partition_count",
+    "post_split_grid_supply_deficit"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 9
+   },
+   "lineage_best": "Added a generalized 256-to-512 boundary regime using shape-g",
+   "llm_calls": 105,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 19,
+    "feature": 13,
+    "null": 1
+   },
+   "tokens_in": 1085681,
+   "tokens_out": 271954
+  },
+  "c21-a6000-f2-s0": {
+   "tag": "c21-a6000-f2-s0",
+   "gpu": "a6000",
+   "split": "kfold2-seed12345",
+   "holdout": 1.1127,
+   "in_sample": 1.0539,
+   "by_regime": {
+    "short": 1.0949,
+    "long": 1.1377
+   },
+   "n_holdout": 19,
+   "train_best": 1.0547,
+   "val_best": 1.1184,
+   "len_w_best": 28,
+   "round_best": 9,
+   "len_w_archive": [
+    21,
+    21,
+    23,
+    25,
+    25,
+    26,
+    27,
+    28
+   ],
+   "n_cells": 8,
+   "minutes": 33.8,
+   "n_dead_terms": [
+    45,
+    77,
+    89,
+    79,
+    83,
+    72,
+    85,
+    86,
+    90,
+    111,
+    122,
+    104
+   ],
+   "n_scored": 71,
+   "n_accepted": 23,
+   "rejections": {},
+   "axes_requested": 17,
+   "axes_accepted": [
+    "cta_wave_locality_cost",
+    "shape_aspect_ratio",
+    "serial_split_k_partition_count",
+    "cta_traversal_reuse_distance",
+    "cta_reuse_signature_asymmetry",
+    "serial_coverage_gain_deficit",
+    "multistage_pipeline_indicator",
+    "cta_tile_aspect_imbalance",
+    "panel_reuse_sequence_deficit",
+    "pipeline_stage_count",
+    "cta_swizzle_reuse_transition_deficit",
+    "swizzle_panel_transition_cost"
+   ],
+   "axes_used_by_best": [
+    "cta_wave_locality_cost",
+    "multistage_pipeline_indicator",
+    "cta_tile_aspect_imbalance",
+    "pipeline_stage_count",
+    "cta_swizzle_reuse_transition_deficit"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 12
+   },
+   "lineage_best": "Added one dimensionless interaction term for exact excess pi",
+   "llm_calls": 109,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 19,
+    "null": 1,
+    "feature": 17
+   },
+   "tokens_in": 943247,
+   "tokens_out": 188466
+  },
+  "c21-a6000-f2-s1": {
+   "tag": "c21-a6000-f2-s1",
+   "gpu": "a6000",
+   "split": "kfold2-seed12345",
+   "holdout": 1.0963,
+   "in_sample": 1.0596,
+   "by_regime": {
+    "short": 1.1076,
+    "long": 1.0809
+   },
+   "n_holdout": 19,
+   "train_best": 1.0605,
+   "val_best": 1.1271,
+   "len_w_best": 21,
+   "round_best": 5,
+   "len_w_archive": [
+    20,
+    21,
+    21,
+    21,
+    23,
+    23,
+    24,
+    26
+   ],
+   "n_cells": 8,
+   "minutes": 31.7,
+   "n_dead_terms": [
+    56,
+    73,
+    69,
+    80,
+    71,
+    79,
+    83,
+    66,
+    81,
+    85,
+    72,
+    96
+   ],
+   "n_scored": 71,
+   "n_accepted": 29,
+   "rejections": {},
+   "axes_requested": 13,
+   "axes_accepted": [
+    "shared_memory_layout_overhead_ratio",
+    "serial_split_k_occupancy_and_roundtrip_cost",
+    "shared_memory_bank_conflict_or_swizzle_access_efficiency",
+    "pipeline_family_or_stage_count",
+    "tile_shape_aspect_ratio_and_tile_area",
+    "direct_warp_shared_memory_transaction_and_dependency_cost",
+    "output_grid_residency_waves"
+   ],
+   "axes_used_by_best": [
+    "shared_memory_layout_overhead_ratio",
+    "shared_memory_bank_conflict_or_swizzle_access_efficiency"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 7
+   },
+   "lineage_best": "Added a compute-bound-only log-compressed term for shared_me",
+   "llm_calls": 103,
+   "roles": {
+    "rule_editor": 72,
+    "feature": 13,
+    "analyze": 17,
+    "null": 1
+   },
+   "tokens_in": 845593,
+   "tokens_out": 184260
+  },
+  "c21-a6000-f2-s2": {
+   "tag": "c21-a6000-f2-s2",
+   "gpu": "a6000",
+   "split": "kfold2-seed12345",
+   "holdout": 1.1132,
+   "in_sample": 1.0402,
+   "by_regime": {
+    "short": 1.0615,
+    "long": 1.1885
+   },
+   "n_holdout": 19,
+   "train_best": 1.0408,
+   "val_best": 1.0956,
+   "len_w_best": 46,
+   "round_best": 11,
+   "len_w_archive": [
+    26,
+    28,
+    32,
+    36,
+    36,
+    41,
+    46,
+    48
+   ],
+   "n_cells": 8,
+   "minutes": 35.5,
+   "n_dead_terms": [
+    57,
+    60,
+    66,
+    70,
+    101,
+    90,
+    93,
+    100,
+    116,
+    113,
+    120,
+    111
+   ],
+   "n_scored": 71,
+   "n_accepted": 39,
+   "rejections": {
+    "static": 1
+   },
+   "axes_requested": 14,
+   "axes_accepted": [
+    "serial_split_k_roundtrip_traffic_and_synchronization_cost",
+    "swizzle_dependent_cta_locality_and_l2_reuse",
+    "output_grid_narrowness",
+    "multistage_family_indicator",
+    "resident_ctas_per_sm_after_register_and_shared_memory_allocation",
+    "serial_split_k_supply_ratio",
+    "output_aspect_imbalance",
+    "swizzle_transaction_fragmentation",
+    "swizzle_operand_direction_conflict"
+   ],
+   "axes_used_by_best": [
+    "serial_split_k_roundtrip_traffic_and_synchronization_cost",
+    "swizzle_dependent_cta_locality_and_l2_reuse",
+    "resident_ctas_per_sm_after_register_and_shared_memory_allocation",
+    "serial_split_k_supply_ratio",
+    "output_aspect_imbalance",
+    "swizzle_operand_direction_conflict"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 9
+   },
+   "lineage_best": "Added the swizzle_operand_direction_conflict feature as sepa",
+   "llm_calls": 106,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 19,
+    "feature": 14,
+    "null": 1
+   },
+   "tokens_in": 885086,
+   "tokens_out": 217718
+  },
+  "c21-a6000-nk-s0": {
+   "tag": "c21-a6000-nk-s0",
+   "gpu": "a6000",
+   "split": "nk11008",
+   "holdout": 1.0998,
+   "in_sample": 1.0773,
+   "by_regime": {
+    "short": 1.0954,
+    "long": 1.1063
+   },
+   "n_holdout": 20,
+   "train_best": 1.0802,
+   "val_best": 1.0978,
+   "len_w_best": 30,
+   "round_best": 10,
+   "len_w_archive": [
+    22,
+    22,
+    23,
+    24,
+    24,
+    24,
+    26,
+    26,
+    30,
+    36
+   ],
+   "n_cells": 10,
+   "minutes": 30.2,
+   "n_dead_terms": [
+    63,
+    74,
+    74,
+    74,
+    70,
+    81,
+    84,
+    77,
+    73,
+    87,
+    83,
+    101
+   ],
+   "n_scored": 71,
+   "n_accepted": 22,
+   "rejections": {
+    "static": 1
+   },
+   "axes_requested": 7,
+   "axes_accepted": [
+    "shared_access_conflict_exposure",
+    "pipeline_stage_count",
+    "output_tile_shape_or_mn_aspect_ratio",
+    "baseline_unsplit_grid_deficit",
+    "serial_split_k_partition_count"
+   ],
+   "axes_used_by_best": [
+    "pipeline_stage_count",
+    "baseline_unsplit_grid_deficit"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 5
+   },
+   "lineage_best": "Combined the first parent's explicit memory/compute regime t",
+   "llm_calls": 96,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 16,
+    "null": 1,
+    "feature": 7
+   },
+   "tokens_in": 1000749,
+   "tokens_out": 223297
+  },
+  "c21-a6000-nk-s1": {
+   "tag": "c21-a6000-nk-s1",
+   "gpu": "a6000",
+   "split": "nk11008",
+   "holdout": 1.0658,
+   "in_sample": 1.0512,
+   "by_regime": {
+    "short": 1.0278,
+    "long": 1.1254
+   },
+   "n_holdout": 20,
+   "train_best": 1.0538,
+   "val_best": 1.0658,
+   "len_w_best": 28,
+   "round_best": 8,
+   "len_w_archive": [
+    26,
+    26,
+    27,
+    28,
+    28,
+    28,
+    29,
+    29,
+    30,
+    30
+   ],
+   "n_cells": 10,
+   "minutes": 33.6,
+   "n_dead_terms": [
+    69,
+    71,
+    77,
+    82,
+    79,
+    70,
+    72,
+    83,
+    71,
+    106,
+    107,
+    109
+   ],
+   "n_scored": 68,
+   "n_accepted": 26,
+   "rejections": {
+    "static": 2
+   },
+   "axes_requested": 17,
+   "axes_accepted": [
+    "serial_split_k_partition_count",
+    "warp_instruction_occupancy",
+    "synchronous_staging_mode",
+    "cta_reuse_distance_l2_pressure",
+    "serial_split_k_roundtrip_ratio",
+    "output_grid_aspect_imbalance",
+    "pipeline_stage_overhead_ratio",
+    "small_output_dimension_indicator",
+    "swizzle_locality_fragmentation",
+    "worst_axis_boundary_fraction",
+    "linear_mapping_coalescing_stride",
+    "serial_partition_amortization_burden"
+   ],
+   "axes_used_by_best": [
+    "serial_split_k_partition_count",
+    "cta_reuse_distance_l2_pressure",
+    "serial_split_k_roundtrip_ratio",
+    "pipeline_stage_overhead_ratio"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 12
+   },
+   "lineage_best": "In the compute-bound path, changed the accumulator-state sta",
+   "llm_calls": 107,
+   "roles": {
+    "rule_editor": 72,
+    "null": 1,
+    "analyze": 17,
+    "feature": 17
+   },
+   "tokens_in": 849542,
+   "tokens_out": 197835
+  },
+  "c21-a6000-nk-s2": {
+   "tag": "c21-a6000-nk-s2",
+   "gpu": "a6000",
+   "split": "nk11008",
+   "holdout": 1.0875,
+   "in_sample": 1.0747,
+   "by_regime": {
+    "short": 1.0686,
+    "long": 1.1166
+   },
+   "n_holdout": 20,
+   "train_best": 1.0756,
+   "val_best": 1.0875,
+   "len_w_best": 28,
+   "round_best": 6,
+   "len_w_archive": [
+    25,
+    28,
+    31,
+    32,
+    38
+   ],
+   "n_cells": 5,
+   "minutes": 32.8,
+   "n_dead_terms": [
+    69,
+    79,
+    74,
+    94,
+    76,
+    90,
+    103,
+    110,
+    81,
+    117,
+    94,
+    109
+   ],
+   "n_scored": 66,
+   "n_accepted": 19,
+   "rejections": {
+    "static": 4
+   },
+   "axes_requested": 16,
+   "axes_accepted": [
+    "serial_split_k_roundtrip_and_precision_cost",
+    "swizzle_reuse_distance_pressure",
+    "initial_wave_parallelism_deficit",
+    "cp_async_eligibility_deficit",
+    "split_k_parallelism_gain_or_grid_parallelism_deficit",
+    "split_k_wave_coverage_deficit",
+    "warp_partition_aspect_mismatch",
+    "traversal_reuse_cadence_imbalance",
+    "layout_traversal_transaction_fragmentation",
+    "unsplit_output_grid_residency_ratio",
+    "steady_state_stage_sync_density",
+    "swizzle_locality_bias",
+    "output_grid_orientation_traversal_mismatch"
+   ],
+   "axes_used_by_best": [
+    "serial_split_k_roundtrip_and_precision_cost",
+    "cp_async_eligibility_deficit",
+    "split_k_wave_coverage_deficit"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 13
+   },
+   "lineage_best": "Preserved all existing terms and the roofline split. In the ",
+   "llm_calls": 111,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 22,
+    "feature": 16,
+    "null": 1
+   },
+   "tokens_in": 902110,
+   "tokens_out": 195130
+  },
+  "c21-5090-nk-s0": {
+   "tag": "c21-5090-nk-s0",
+   "gpu": "5090",
+   "split": "nk11008",
+   "holdout": 1.0579,
+   "in_sample": 1.038,
+   "by_regime": {
+    "short": 1.0572,
+    "long": 1.0594
+   },
+   "n_holdout": 20,
+   "train_best": 1.0475,
+   "val_best": 1.0636,
+   "len_w_best": 34,
+   "round_best": 11,
+   "len_w_archive": [
+    23,
+    27,
+    30,
+    32,
+    33,
+    34,
+    35,
+    36
+   ],
+   "n_cells": 8,
+   "minutes": 35.0,
+   "n_dead_terms": [
+    75,
+    76,
+    84,
+    124,
+    106,
+    104,
+    122,
+    144,
+    111,
+    93,
+    141,
+    158
+   ],
+   "n_scored": 68,
+   "n_accepted": 26,
+   "rejections": {
+    "static": 3
+   },
+   "axes_requested": 10,
+   "axes_accepted": [
+    "multistage_family_indicator",
+    "tile_shape_aspect_mismatch",
+    "pipeline_stage_count",
+    "output_tile_granularity_ratio",
+    "serial_split_k_roundtrip_ratio",
+    "swizzle_coalescing_deficit",
+    "reduction_critical_path_depth"
+   ],
+   "axes_used_by_best": [
+    "tile_shape_aspect_mismatch",
+    "pipeline_stage_count",
+    "swizzle_coalescing_deficit",
+    "reduction_critical_path_depth"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 7
+   },
+   "lineage_best": "Added four regime-specific reduction-depth terms without rem",
+   "llm_calls": 100,
+   "roles": {
+    "rule_editor": 72,
+    "feature": 10,
+    "null": 1,
+    "analyze": 17
+   },
+   "tokens_in": 831148,
+   "tokens_out": 219893
+  },
+  "c21-5090-nk-s1": {
+   "tag": "c21-5090-nk-s1",
+   "gpu": "5090",
+   "split": "nk11008",
+   "holdout": 1.0777,
+   "in_sample": 1.0502,
+   "by_regime": {
+    "short": 1.0856,
+    "long": 1.0595
+   },
+   "n_holdout": 20,
+   "train_best": 1.0502,
+   "val_best": 1.0777,
+   "len_w_best": 22,
+   "round_best": 4,
+   "len_w_archive": [
+    19,
+    19,
+    20,
+    22,
+    24,
+    29,
+    29,
+    30
+   ],
+   "n_cells": 8,
+   "minutes": 31.4,
+   "n_dead_terms": [
+    66,
+    90,
+    87,
+    85,
+    91,
+    87,
+    91,
+    104,
+    99,
+    109,
+    68,
+    103
+   ],
+   "n_scored": 70,
+   "n_accepted": 17,
+   "rejections": {
+    "static": 2
+   },
+   "axes_requested": 8,
+   "axes_accepted": [
+    "parallel_split_coverage_deficit",
+    "interior_tile_amortization_deficit",
+    "pipeline_stage_count",
+    "split_k_reduction_protocol_precision_ratio",
+    "tile_warp_mapping_aspect_penalty",
+    "output_aspect_ratio"
+   ],
+   "axes_used_by_best": [
+    "interior_tile_amortization_deficit",
+    "pipeline_stage_count"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 6
+   },
+   "lineage_best": "Retained every parent term and added an explicit log2 pipeli",
+   "llm_calls": 97,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 16,
+    "null": 1,
+    "feature": 8
+   },
+   "tokens_in": 749563,
+   "tokens_out": 188014
+  },
+  "c21-5090-nk-s2": {
+   "tag": "c21-5090-nk-s2",
+   "gpu": "5090",
+   "split": "nk11008",
+   "holdout": 1.0351,
+   "in_sample": 1.0174,
+   "by_regime": {
+    "short": 1.0488,
+    "long": 1.0037
+   },
+   "n_holdout": 20,
+   "train_best": 1.0186,
+   "val_best": 1.0359,
+   "len_w_best": 49,
+   "round_best": 8,
+   "len_w_archive": [
+    36,
+    40,
+    42,
+    45,
+    48,
+    49,
+    53,
+    55,
+    58
+   ],
+   "n_cells": 9,
+   "minutes": 37.5,
+   "n_dead_terms": [
+    85,
+    111,
+    136,
+    123,
+    135,
+    150,
+    149,
+    181,
+    175,
+    202,
+    161,
+    249
+   ],
+   "n_scored": 67,
+   "n_accepted": 25,
+   "rejections": {
+    "static": 5
+   },
+   "axes_requested": 11,
+   "axes_accepted": [
+    "tile_output_aspect_mismatch",
+    "split_k_partition_count_and_serial_roundtrip_cost",
+    "pipeline_family_or_cp_async_eligibility",
+    "wave_row_boundary_fraction",
+    "minimum_output_dimension_deficit",
+    "traversal_reuse_distance_l2_ratio",
+    "split_k_sync_latency_ratio",
+    "contiguous_axis_lane_deficit",
+    "warp_swizzle_traversal_coalescing_or_reuse_cost",
+    "pipeline_stage_count"
+   ],
+   "axes_used_by_best": [
+    "tile_output_aspect_mismatch",
+    "split_k_partition_count_and_serial_roundtrip_cost",
+    "pipeline_family_or_cp_async_eligibility",
+    "wave_row_boundary_fraction",
+    "minimum_output_dimension_deficit",
+    "traversal_reuse_distance_l2_ratio",
+    "contiguous_axis_lane_deficit"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 10
+   },
+   "lineage_best": "Added orientation-dependent aspect-mismatch interactions in ",
+   "llm_calls": 103,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 19,
+    "feature": 11,
+    "null": 1
+   },
+   "tokens_in": 922454,
+   "tokens_out": 233764
+  },
+  "c21-4090-nk-s0": {
+   "tag": "c21-4090-nk-s0",
+   "gpu": "4090",
+   "split": "nk11008",
+   "holdout": 1.1435,
+   "in_sample": 1.0241,
+   "by_regime": {
+    "short": 1.0745,
+    "long": 1.2553
+   },
+   "n_holdout": 20,
+   "train_best": 1.0248,
+   "val_best": 1.1442,
+   "len_w_best": 27,
+   "round_best": 10,
+   "len_w_archive": [
+    18,
+    18,
+    19,
+    20,
+    21,
+    21,
+    22,
+    22,
+    27,
+    27,
+    29
+   ],
+   "n_cells": 11,
+   "minutes": 24.9,
+   "n_dead_terms": [
+    72,
+    60,
+    58,
+    57,
+    74,
+    61,
+    67,
+    65,
+    70,
+    77,
+    68,
+    80
+   ],
+   "n_scored": 70,
+   "n_accepted": 24,
+   "rejections": {
+    "static": 1
+   },
+   "axes_requested": 7,
+   "axes_accepted": [
+    "warp_specialization_or_warp_role_overlap",
+    "serial_fp16_d_roundtrip_loss",
+    "ordinary_schedule_family_indicator",
+    "tile_shape_aspect_mismatch"
+   ],
+   "axes_used_by_best": [
+    "serial_fp16_d_roundtrip_loss",
+    "ordinary_schedule_family_indicator"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 4
+   },
+   "lineage_best": "Added a distinct log-compressed penalty for serial_fp16_d_ro",
+   "llm_calls": 96,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 16,
+    "null": 1,
+    "feature": 7
+   },
+   "tokens_in": 681174,
+   "tokens_out": 159199
+  },
+  "c21-4090-nk-s1": {
+   "tag": "c21-4090-nk-s1",
+   "gpu": "4090",
+   "split": "nk11008",
+   "holdout": 1.0297,
+   "in_sample": 1.0213,
+   "by_regime": {
+    "short": 1.0399,
+    "long": 1.0146
+   },
+   "n_holdout": 20,
+   "train_best": 1.0217,
+   "val_best": 1.0302,
+   "len_w_best": 48,
+   "round_best": 10,
+   "len_w_archive": [
+    38,
+    42,
+    45,
+    48,
+    48,
+    50,
+    52,
+    59
+   ],
+   "n_cells": 8,
+   "minutes": 36.0,
+   "n_dead_terms": [
+    62,
+    104,
+    124,
+    181,
+    170,
+    149,
+    211,
+    159,
+    228,
+    213,
+    142,
+    254
+   ],
+   "n_scored": 67,
+   "n_accepted": 26,
+   "rejections": {},
+   "axes_requested": 18,
+   "axes_accepted": [
+    "async_operand_service_time",
+    "warp_specialization_mode",
+    "pipeline_stage_family",
+    "tile_shape_aspect_ratio_and_extent",
+    "warp_specialization_width",
+    "warp_policy_scheduling_pressure",
+    "register_allocation_quantization_overhead",
+    "cta_grid_shape_imbalance",
+    "serial_split_k_d_roundtrip_cost",
+    "short_output_dimension_relative_to_candidate_tile_extent",
+    "warp_policy_mode"
+   ],
+   "axes_used_by_best": [
+    "warp_specialization_mode",
+    "pipeline_stage_family",
+    "warp_specialization_width",
+    "warp_policy_mode"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 11
+   },
+   "lineage_best": "Added a direct warp-policy coverage interaction in each exis",
+   "llm_calls": 111,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 20,
+    "feature": 18,
+    "null": 1
+   },
+   "tokens_in": 872538,
+   "tokens_out": 199684
+  },
+  "c21-4090-nk-s2": {
+   "tag": "c21-4090-nk-s2",
+   "gpu": "4090",
+   "split": "nk11008",
+   "holdout": 1.0274,
+   "in_sample": 1.0275,
+   "by_regime": {
+    "short": 1.0386,
+    "long": 1.0109
+   },
+   "n_holdout": 20,
+   "train_best": 1.0282,
+   "val_best": 1.0268,
+   "len_w_best": 22,
+   "round_best": 9,
+   "len_w_archive": [
+    18,
+    18,
+    18,
+    19,
+    19,
+    20,
+    21,
+    22,
+    22,
+    27
+   ],
+   "n_cells": 10,
+   "minutes": 33.1,
+   "n_dead_terms": [
+    51,
+    70,
+    93,
+    68,
+    54,
+    90,
+    92,
+    93,
+    70,
+    69,
+    84,
+    88
+   ],
+   "n_scored": 71,
+   "n_accepted": 15,
+   "rejections": {
+    "static": 1
+   },
+   "axes_requested": 14,
+   "axes_accepted": [
+    "steady_state_stage_overlap_deficit",
+    "split_wave_work_deficit",
+    "output_tile_aspect_mismatch",
+    "serial_split_k_partial_output_roundtrip_ratio",
+    "shallow_pipeline_family_indicator",
+    "serial_split_k_precision_loss_or_accumulation_error",
+    "useful_output_tile_area_fraction",
+    "useful_output_ctas_per_sm",
+    "short_reduction_length_deficit"
+   ],
+   "axes_used_by_best": [
+    "steady_state_stage_overlap_deficit",
+    "shallow_pipeline_family_indicator"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 9
+   },
+   "lineage_best": "Added the discrete shallow_pipeline_family_indicator so stag",
+   "llm_calls": 105,
+   "roles": {
+    "rule_editor": 72,
+    "feature": 14,
+    "null": 1,
+    "analyze": 18
+   },
+   "tokens_in": 829831,
+   "tokens_out": 180886
+  },
+  "c21-h100-nk-s0": {
+   "tag": "c21-h100-nk-s0",
+   "gpu": "h100",
+   "split": "nk11008",
+   "holdout": 1.1345,
+   "in_sample": 1.034,
+   "by_regime": {
+    "short": 1.1688,
+    "long": 1.0072
+   },
+   "n_holdout": 20,
+   "train_best": 1.034,
+   "val_best": 1.1345,
+   "len_w_best": 48,
+   "round_best": 11,
+   "len_w_archive": [
+    26,
+    32,
+    34,
+    36,
+    39,
+    48,
+    48
+   ],
+   "n_cells": 7,
+   "minutes": 50.4,
+   "n_dead_terms": [
+    110,
+    109,
+    142,
+    134,
+    140,
+    156,
+    125,
+    120,
+    127,
+    199,
+    170,
+    160
+   ],
+   "n_scored": 68,
+   "n_accepted": 25,
+   "rejections": {
+    "static": 4
+   },
+   "axes_requested": 11,
+   "axes_accepted": [
+    "split_k_wave_fill_loss",
+    "row_tile_utilization_deficit",
+    "serial_split_serialization_fraction",
+    "multistage_pipeline_family_indicator",
+    "tile_shape_aspect_mismatch",
+    "row_grid_tile_count",
+    "shape_compute_time_at_peak",
+    "row_extent_overcoverage_ratio",
+    "cta_swizzle_reuse_distance"
+   ],
+   "axes_used_by_best": [
+    "row_tile_utilization_deficit",
+    "serial_split_serialization_fraction",
+    "row_grid_tile_count",
+    "shape_compute_time_at_peak",
+    "cta_swizzle_reuse_distance"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 9
+   },
+   "lineage_best": "Added log2(1 + f.row_grid_tile_count) as a distinct absolute",
+   "llm_calls": 102,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 18,
+    "null": 1,
+    "feature": 11
+   },
+   "tokens_in": 968984,
+   "tokens_out": 235308
+  },
+  "c21-h100-nk-s1": {
+   "tag": "c21-h100-nk-s1",
+   "gpu": "h100",
+   "split": "nk11008",
+   "holdout": 1.0504,
+   "in_sample": 1.0374,
+   "by_regime": {
+    "short": 1.0575,
+    "long": 1.0223
+   },
+   "n_holdout": 20,
+   "train_best": 1.0383,
+   "val_best": 1.0504,
+   "len_w_best": 45,
+   "round_best": 11,
+   "len_w_archive": [
+    35,
+    36,
+    40,
+    41,
+    45,
+    46,
+    46,
+    50,
+    52
+   ],
+   "n_cells": 9,
+   "minutes": 47.5,
+   "n_dead_terms": [
+    103,
+    113,
+    139,
+    141,
+    145,
+    154,
+    127,
+    152,
+    150,
+    194,
+    220,
+    185
+   ],
+   "n_scored": 68,
+   "n_accepted": 34,
+   "rejections": {
+    "static": 4
+   },
+   "axes_requested": 8,
+   "axes_accepted": [
+    "skinny_m_inverse",
+    "stage_family_scheduling_cost",
+    "split_k_critical_path_fraction",
+    "stage_family_issue_fraction",
+    "k_tile_resident_wave_cost",
+    "tile_grid_aspect_imbalance"
+   ],
+   "axes_used_by_best": [
+    "skinny_m_inverse",
+    "stage_family_scheduling_cost",
+    "stage_family_issue_fraction"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 6
+   },
+   "lineage_best": "Added separate nonlinear multistage-family penalties in both",
+   "llm_calls": 97,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 16,
+    "feature": 8,
+    "null": 1
+   },
+   "tokens_in": 902852,
+   "tokens_out": 230461
+  },
+  "c21-h100-nk-s2": {
+   "tag": "c21-h100-nk-s2",
+   "gpu": "h100",
+   "split": "nk11008",
+   "holdout": 1.0693,
+   "in_sample": 1.037,
+   "by_regime": {
+    "short": 1.0814,
+    "long": 1.0223
+   },
+   "n_holdout": 20,
+   "train_best": 1.047,
+   "val_best": 1.0756,
+   "len_w_best": 33,
+   "round_best": 11,
+   "len_w_archive": [
+    24,
+    24,
+    28,
+    28,
+    31,
+    31,
+    31,
+    33
+   ],
+   "n_cells": 8,
+   "minutes": 45.6,
+   "n_dead_terms": [
+    109,
+    120,
+    112,
+    120,
+    129,
+    135,
+    108,
+    134,
+    122,
+    136,
+    115,
+    150
+   ],
+   "n_scored": 70,
+   "n_accepted": 24,
+   "rejections": {
+    "static": 2
+   },
+   "axes_requested": 9,
+   "axes_accepted": [
+    "skinny_m_ratio",
+    "baseline_grid_underfill",
+    "multistage_pipeline_indicator",
+    "row_tile_parallelism_deficit",
+    "k_tile_stage_bytes",
+    "operand_tile_aspect_ratio",
+    "selected_split_k_marginal_grid_capacity_gain",
+    "serial_reduction_round_trips",
+    "reduction_depth_per_output"
+   ],
+   "axes_used_by_best": [
+    "skinny_m_ratio",
+    "baseline_grid_underfill",
+    "row_tile_parallelism_deficit",
+    "selected_split_k_marginal_grid_capacity_gain",
+    "serial_reduction_round_trips",
+    "reduction_depth_per_output"
+   ],
+   "registry": {
+    "F2": 5,
+    "stage1": 17,
+    "loop": 9
+   },
+   "lineage_best": "Moved the serial-boundary term into the bottleneck branches ",
+   "llm_calls": 99,
+   "roles": {
+    "rule_editor": 72,
+    "analyze": 17,
+    "null": 1,
+    "feature": 9
+   },
+   "tokens_in": 861055,
+   "tokens_out": 226175
+  }
+ }
+}

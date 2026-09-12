@@ -97,7 +97,10 @@ def test_live_tags_uses_mtime_only(tmp_path, monkeypatch):
 
     d = tmp_path / "runs" / "ZZfake-p8-s0"
     d.mkdir(parents=True)
-    (d / "config.json").write_text("{}")
+    # ★ 2026-09-12 (D-168): a run directory is one whose `config.json`
+    #   carries a `"loop"` block — `RoundLoop.dump()` writes it and a
+    #   pipeline tag directory does not. The stub used to be `{}`.
+    (d / "config.json").write_text('{"loop": {"run_id": "ZZfake-p8-s0"}}')
     (d / "rounds.jsonl").write_text("{}\n")
     monkeypatch.setattr(rt, "RUNS", tmp_path / "runs")
     assert "ZZfake-p8" in rt._live_tags()
@@ -105,3 +108,67 @@ def test_live_tags_uses_mtime_only(tmp_path, monkeypatch):
     old = time.time() - rt.LIVE_SECONDS - 60
     os.utime(d / "rounds.jsonl", (old, old))
     assert "ZZfake-p8" not in rt._live_tags()
+
+
+def test_a_pipeline_tag_directory_is_not_a_run(tmp_path, monkeypatch):
+    """★ D-168 — the 21-run campaign's tags end in `-s<digit>`.
+
+    `runs/c21-a6000-f0-s0/` is the **pipeline** directory (config, stage 1,
+    stage 2) and `runs/c21-a6000-f0-s0-s0/` is the loop run. Both carry a
+    `config.json` and both match the seed pattern, so the table builder
+    took the tag directory for a run and died on its missing
+    `rounds.jsonl`. Only the loop's config has a `"loop"` block.
+    """
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "experiments"))
+    import runs_table as rt
+
+    runs = tmp_path / "runs"
+    tag = runs / "ZZpipe-nk-s0"          # the pipeline tag directory
+    tag.mkdir(parents=True)
+    (tag / "config.json").write_text(
+        '{"condition": "F2", "bundle": "datasets/x", "registry": {"n": 3}}')
+
+    run = runs / "ZZpipe-nk-s0-s0"       # the loop run under it
+    run.mkdir()
+    (run / "config.json").write_text('{"loop": {"run_id": "ZZpipe-nk-s0-s0"}}')
+    (run / "rounds.jsonl").write_text("{}\n")
+
+    monkeypatch.setattr(rt, "RUNS", runs)
+    groups = rt._groups()
+    assert "ZZpipe-nk-s0" in groups, groups
+    assert groups["ZZpipe-nk-s0"] == ["ZZpipe-nk-s0-s0"]
+    assert "ZZpipe-nk" not in groups, (
+        "the pipeline tag directory was counted as a run")
+
+
+def test_the_table_column_comes_from_the_recorded_gpu_name(tmp_path,
+                                                           monkeypatch):
+    """★ D-168 — the GPU column must not default to a real table name.
+
+    It used to be a `hw_text.sha256` lookup with `a6000` as the fallback.
+    D-166 §E changed the hardware prompt, so every sha256 changed, the
+    lookup missed on all four tables and 9 campaign runs were filed under
+    `a6000`. A wrong table name is indistinguishable from a right one.
+    """
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "experiments"))
+    import runs_table as rt
+
+    def cfg(name):
+        return {"llm": {"hw_text": {"gpu": name, "sha256": "deadbeef"}}}
+
+    assert rt._gpu_of(cfg("NVIDIA H100 NVL (sm_90)"), "deadbeef") == "h100"
+    assert rt._gpu_of(cfg("NVIDIA GeForce RTX 4090 (sm_89)"), "x") == "4090"
+    assert rt._gpu_of(cfg("NVIDIA RTX A6000 (sm_86)"), "x") == "a6000"
+    # ★ an unknown GPU shows its own name — it is not silently a6000
+    assert rt._gpu_of(cfg("NVIDIA B200"), "x") == "NVIDIA B200"
+    # runs from before `hw_text.gpu` still go through the sha map
+    assert rt._gpu_of({}, "37762692c36f5ba4") == "4090"
+    assert rt._gpu_of({}, "None") == "?"

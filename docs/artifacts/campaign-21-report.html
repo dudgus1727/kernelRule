@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>:root{color-scheme:light dark}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>kernelRule 21실행 캠페인</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+</head>
+<body>
+<style>
+:root{
+  --ground:#f6f7f9; --panel:#ffffff; --ink:#161b22; --muted:#5b6673;
+  --rule:#dfe3e9; --rule-soft:#eceff3;
+  --accent:#0b6e5f; --accent-soft:#e3f1ee;
+  --ok:#1c7a4f; --warn:#8a6212; --crit:#a13333;
+  --warn-soft:#f6efdd; --crit-soft:#f7e7e7;
+  --shadow:0 1px 2px rgba(22,27,34,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0f1317; --panel:#151a20; --ink:#e4e9ee; --muted:#96a2b0;
+    --rule:#242c35; --rule-soft:#1c232a;
+    --accent:#4fd1b5; --accent-soft:#123029;
+    --ok:#62c48e; --warn:#d6ab52; --crit:#e08585;
+    --warn-soft:#2b2415; --crit-soft:#2d1b1b;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0f1317; --panel:#151a20; --ink:#e4e9ee; --muted:#96a2b0;
+  --rule:#242c35; --rule-soft:#1c232a;
+  --accent:#4fd1b5; --accent-soft:#123029;
+  --ok:#62c48e; --warn:#d6ab52; --crit:#e08585;
+  --warn-soft:#2b2415; --crit-soft:#2d1b1b;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.65; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:960px; margin:0 auto; padding:0 24px 96px}
+header.top{padding:56px 0 28px; border-bottom:2px solid var(--ink)}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muted); margin:0 0 14px;
+}
+h1{
+  font-family:Newsreader,Georgia,serif; font-weight:600; font-size:clamp(34px,5.2vw,52px);
+  line-height:1.08; margin:0 0 14px; text-wrap:balance; letter-spacing:-.01em;
+}
+.dek{font-size:17px; color:var(--muted); max-width:62ch; margin:0}
+
+.facts{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px; background:var(--rule); border:1px solid var(--rule);
+  margin:28px 0 0;
+}
+.fact{background:var(--ground); padding:14px 16px}
+.fact dt{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--muted); margin:0 0 5px;
+}
+.fact dd{
+  margin:0; font-family:"IBM Plex Mono",monospace; font-weight:600;
+  font-size:21px; font-variant-numeric:tabular-nums; letter-spacing:-.01em;
+}
+.fact dd small{font-size:12px; font-weight:400; color:var(--muted); letter-spacing:0}
+
+section{padding-top:52px}
+h2{
+  font-family:Newsreader,Georgia,serif; font-weight:600; font-size:27px;
+  margin:0 0 6px; line-height:1.25; text-wrap:balance;
+}
+h2 .num{
+  font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:500;
+  color:var(--accent); margin-right:12px; vertical-align:3px;
+}
+.sub{color:var(--muted); margin:0 0 22px; max-width:64ch}
+h3{font-size:14px; font-weight:600; margin:26px 0 8px; letter-spacing:.01em}
+p{max-width:68ch}
+code,.mono{font-family:"IBM Plex Mono",monospace; font-size:.9em}
+code{background:var(--rule-soft); padding:1px 5px; border-radius:3px}
+strong{font-weight:600}
+.hl{color:var(--accent); font-weight:600}
+
+.scroll{overflow-x:auto; margin:18px 0; border:1px solid var(--rule); background:var(--panel)}
+table{border-collapse:collapse; width:100%; font-family:"IBM Plex Mono",monospace; font-size:12.5px}
+th,td{padding:7px 12px; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+thead th{
+  font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);
+  font-weight:500; border-bottom:1px solid var(--rule); background:var(--panel);
+  position:sticky; top:0;
+}
+tbody tr+tr td{border-top:1px solid var(--rule-soft)}
+tbody tr:hover td{background:var(--rule-soft)}
+td.grp{color:var(--muted)}
+.tag{color:var(--accent)}
+.bad{color:var(--crit); font-weight:600}
+.good{color:var(--ok); font-weight:600}
+caption{
+  caption-side:bottom; text-align:left; padding:9px 12px; color:var(--muted);
+  font-family:"IBM Plex Sans",sans-serif; font-size:12.5px; border-top:1px solid var(--rule-soft);
+}
+
+.note{
+  border-left:3px solid var(--accent); background:var(--accent-soft);
+  padding:14px 18px; margin:20px 0; max-width:72ch;
+}
+.note.warn{border-left-color:var(--warn); background:var(--warn-soft)}
+.note.crit{border-left-color:var(--crit); background:var(--crit-soft)}
+.note p{margin:0; max-width:none}
+.note p+p{margin-top:9px}
+.note .lbl{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.1em;
+  text-transform:uppercase; display:block; margin-bottom:6px; opacity:.85;
+}
+
+ul.plain{list-style:none; padding:0; margin:16px 0}
+ul.plain li{
+  padding:11px 0 11px 0; border-top:1px solid var(--rule-soft);
+  display:grid; grid-template-columns:130px 1fr; gap:16px; align-items:baseline;
+}
+ul.plain li:last-child{border-bottom:1px solid var(--rule-soft)}
+ul.plain .k{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent); font-weight:500;
+}
+ul.plain .v{max-width:60ch}
+@media (max-width:620px){
+  ul.plain li{grid-template-columns:1fr; gap:3px}
+}
+
+.chart{margin:22px 0; border:1px solid var(--rule); background:var(--panel); padding:18px 8px 8px}
+.chart svg{display:block; width:100%; height:auto}
+
+.timeline{margin:18px 0; border-top:1px solid var(--rule)}
+.tl-row{
+  display:grid; grid-template-columns:64px 1fr 92px 78px;
+  gap:14px; padding:10px 0; border-bottom:1px solid var(--rule-soft); align-items:baseline;
+}
+.tl-row .b{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent); font-weight:600}
+.tl-row .what{font-size:13.5px}
+.tl-row .when,.tl-row .dur{
+  font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted);
+  text-align:right; font-variant-numeric:tabular-nums;
+}
+.tl-row.head{border-bottom:1px solid var(--rule)}
+.tl-row.head span{
+  font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted);
+}
+@media (max-width:620px){
+  .tl-row{grid-template-columns:52px 1fr; gap:6px}
+  .tl-row .when,.tl-row .dur{text-align:left; grid-column:2}
+}
+
+footer{margin-top:64px; padding-top:22px; border-top:1px solid var(--rule); color:var(--muted); font-size:13px}
+footer code{background:none; padding:0}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">kernelRule · 본체 수치 캠페인 · 2026-09-11 → 09-12</p>
+  <h1>21실행 캠페인</h1>
+  <p class="dek">F2 조건에서 네 GPU 표 · 네 분할로 21실행. 규칙을 LLM 이 쓰고, 미리 잰 표가 채점하고, 진화 루프가 12라운드를 돈다. 이 페이지는 캠페인 전 정비부터 집계까지의 기록이다.</p>
+
+  <dl class="facts">
+    <div class="fact"><dt>완주</dt><dd>21<small> / 21</small></dd></div>
+    <div class="fact"><dt>분할 / 시드 산포</dt><dd>2.5<small>×</small></dd></div>
+    <div class="fact"><dt>LLM 호출</dt><dd>2,170</dd></div>
+    <div class="fact"><dt>토큰 입력</dt><dd>18.5<small>M</small></dd></div>
+    <div class="fact"><dt>벤더 대비</dt><dd>4<small> / 7 그룹</small></dd></div>
+    <div class="fact"><dt>죽은 실행</dt><dd>1<small> · 재실행 완주</small></dd></div>
+  </dl>
+</header>
+
+<section>
+  <h2><span class="num">01</span>캠페인 전에 고친 것</h2>
+  <p class="sub">세 건의 감사(D-165 · D-166 · D-167)에서 나온 수정 열여덟. 전부 계산·프롬프트·채점 절차를 바꾸지 않는 것들이고, 안 고쳤으면 캠페인이 끝난 뒤 되짚을 수 없었을 기록 장치가 둘 들어 있다.</p>
+
+  <ul class="plain">
+    <li><span class="k">D-166 §M</span><span class="v"><code>export_rules</code>/<code>verify_rules</code> 가 실행의 생성 레지스트리를 못 싣던 것. F2 규칙이 통째로 “검증 안 함” 바구니로 들어가면서 화면에는 초록색 “all matched” 가 찍히고 있었다. 공용 로더를 두고 검증 통을 셋(검증 / 실패 / 옛 레지스트리)으로 갈랐다.</span></li>
+    <li><span class="k">D-167 §N</span><span class="v"><code>n_dead_terms</code> — 적합기가 이미 계산해 놓고 루프가 버리던 값. 축은 실행마다 새로 생기므로 이름은 다음 실행에 쓸모가 없지만, <strong>죽은 항이 몇 개였는지는 그 실행이 도는 동안에만 셀 수 있다.</strong></span></li>
+    <li><span class="k">D-167 §Q</span><span class="v"><code>config.json</code> 에 형상 모집단. 이전에는 <code>split_kind</code> 만 남아 읽는 사람이 “66형상을 3등분” 으로 이해했다. 실제로는 61형상이고 5개가 조용히 빠진다.</span></li>
+    <li><span class="k">D-167 §R</span><span class="v">형상 모집단을 정하는 술어가 <strong>35개 파일 36곳</strong>에 복사돼 있던 것을 <code>experiment_shapes()</code> 하나로. 값은 61 그대로.</span></li>
+    <li><span class="k">D-167 §P</span><span class="v"><code>test_trace</code> 가 트레이스가 아니라 <strong>실행 순서를 재고 있었다.</strong> 고친 뒤 정직하게 통과한다.</span></li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">02</span>시작 전에 바뀐 설계 둘</h2>
+  <p class="sub">원안대로 돌렸으면 논문의 헤드라인 비교가 성립하지 않았을 자리 둘. 배치를 하나도 시작하기 전에 찾았다.</p>
+
+  <h3>stage 2 를 “표마다 한 번” 에서 “(표 × 분할) 일곱 번” 으로</h3>
+  <p>씨앗은 <strong>학습 분할의 regret 으로</strong> 고르고, 그 분할의 <code>TableFacts</code> 가 프롬프트에 들어간다. A6000 은 분할이 넷이므로 fold0 에서 고른 씨앗을 fold1 이 쓰면 fold1 의 검증 형상이 씨앗 선택에 쓰인 셈이 된다. 추가 비용은 RuleWriter 30호출뿐이었다.</p>
+
+  <h3>공유 피처 라이브러리를 어느 분할에서 만드나</h3>
+  <p>전이를 하려면 소스와 대상이 같은 축을 알아야 해서 라이브러리는 한 번만 만들어 21실행이 공유한다. 그런데 stage 1 의 AUC 검사는 <strong>답을 읽는다.</strong> 그래서 라이브러리를 만든 분할의 학습 형상은, 다른 분할에게는 “피처 선별 단계에서 읽힌 홀드아웃” 이 된다. 몇 개인지 셌다.</p>
+
+  <div class="scroll">
+    <table>
+      <caption>각 분할의 홀드아웃 중 라이브러리 학습 집합에 들어 있던 형상 수 · <code>python3 experiments/library_contact.py</code> · LLM 0회</caption>
+      <thead><tr><th>라이브러리 출처</th><th>fold0</th><th>fold1</th><th>fold2</th><th>nk11008</th><th>합</th></tr></thead>
+      <tbody>
+        <tr><td>fold0 <span class="mono" style="color:var(--muted)">(처음 시작한 것)</span></td><td>0/21</td><td class="bad">21/21</td><td class="bad">19/19</td><td>13/20</td><td>53</td></tr>
+        <tr><td>fold1</td><td>21/21</td><td>0/21</td><td>19/19</td><td>13/20</td><td>53</td></tr>
+        <tr><td>fold2</td><td>21/21</td><td>21/21</td><td>0/19</td><td>14/20</td><td>56</td></tr>
+        <tr><td class="tag">nk11008 (채택)</td><td class="good">14/21</td><td class="good">14/21</td><td class="good">13/19</td><td class="good">0/20</td><td class="good">41</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">왜 nk11008 인가</span>
+    <p>3-fold 이므로 <strong>fold0 의 학습 40 = fold1 의 검증 21 + fold2 의 검증 19</strong> 다. fold0 에서 만들면 두 fold 의 홀드아웃이 100% 읽힌다. 세 fold 가 61형상을 분할하므로 <code>Σ|val ∩ T| = |T|</code> — <strong>총량은 못 줄이고 분포만 바꾼다.</strong> nk11008 은 셋을 동시에 좋게 한다: 오염이 상수(14·14·13)라 분할 비교가 성립하고, 전이 소스와 대상 넷이 모두 0/20 이며, 총 접촉도 53 → 41 로 가장 낮다.</p>
+    <p>fold0 으로 시작했던 stage 1 은 <code>runs/x-c21-lib-fold0/</code> 에 <code>WHY-DISCARDED.md</code> 와 함께 남겼다.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">03</span>배치 일곱</h2>
+  <p class="sub">배치마다 표가 하나. 배치 4부터는 한 프로세스가 <code>wait</code> 로 이어 돌려 사이 유휴가 0초다.</p>
+
+  <div class="timeline">
+    <div class="tl-row head"><span>배치</span><span>내용</span><span>시각</span><span>소요</span></div>
+    <div class="tl-row"><span class="b">준비</span><span class="what">stage 1 공유 라이브러리 (nk11008) — 20제안 중 <strong>17 채택</strong></span><span class="when">20:07</span><span class="dur">13분</span></div>
+    <div class="tl-row"><span class="b">준비</span><span class="what">stage 2 씨앗 일곱 (표 × 분할) — 전부 <strong>10/10 · 거부 0</strong></span><span class="when">20:30</span><span class="dur">9분</span></div>
+    <div class="tl-row"><span class="b">1</span><span class="what">A6000 fold0 s0 — cap1 과 같은 분할, 정상성 확인</span><span class="when">20:54</span><span class="dur">38분</span></div>
+    <div class="tl-row"><span class="b">2</span><span class="what">A6000 fold0 s1·s2 + fold1 s0·s1 <span class="mono" style="color:var(--warn)">· 뒤에 2h45m 유휴</span></span><span class="when">21:33</span><span class="dur">36분</span></div>
+    <div class="tl-row"><span class="b">3</span><span class="what">A6000 fold1 s2 + fold2 s0·s1·s2 <span class="mono" style="color:var(--warn)">· 뒤에 31m 유휴</span></span><span class="when">00:54</span><span class="dur">37분</span></div>
+    <div class="tl-row"><span class="b">4</span><span class="what">A6000 nk11008 s0·s1·s2</span><span class="when">02:02</span><span class="dur">35분</span></div>
+    <div class="tl-row"><span class="b">5</span><span class="what">RTX 5090 nk11008 s0·s1·s2</span><span class="when">02:37</span><span class="dur">39분</span></div>
+    <div class="tl-row"><span class="b">6</span><span class="what">RTX 4090 nk11008 s0·s1·s2</span><span class="when">03:16</span><span class="dur">37분</span></div>
+    <div class="tl-row"><span class="b">7</span><span class="what">H100 NVL nk11008 s0·s1·s2 — <span class="bad">s0 가 r3 에서 죽었다</span></span><span class="when">03:54</span><span class="dur">50분</span></div>
+    <div class="tl-row"><span class="b">재실행</span><span class="what">H100 s0 을 <strong>같은 시드</strong>로 다시 — <span class="good">12라운드 완주</span></span><span class="when">07:54</span><span class="dur">50분</span></div>
+  </div>
+
+  <div class="note warn">
+    <span class="lbl">제 잘못 둘</span>
+    <p><strong>배치 2·3 뒤에 기계가 3시간 16분 놀았다.</strong> 배치가 끝난 것을 사람이 확인해야 다음이 시작되는 구조였기 때문이다. 배치 4부터는 구동기가 이어 돌려 유휴가 없다.</p>
+    <p><strong>배치 7 의 진행 확인이 틀렸다.</strong> 로그에서 <code>grep -c '^r[0-9]'</code> 로 라운드를 셌는데 다른 줄까지 잡혀 12/12 로 보였다. 실제로는 3줄이었다. <code>rounds.jsonl</code> 의 줄 수를 세는 것이 맞다.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">04</span>21실행 전부</h2>
+  <p class="sub"><code>canonical_score</code> 는 체제별로 학습 분할에서 재적합해 홀드아웃에서 잰 값 — 논문에 쓰는 수치다. <code>train</code>/<code>val</code> 은 루프가 스스로 기록한 것.</p>
+
+  <div class="scroll">
+    <table>
+      <caption>21실행 전부. <code>c21-h100-nk-s0</code> 은 3라운드에서 죽어 같은 시드로 다시 돌린 것이다(굵게). · <code>python3 experiments/campaign21.py</code></caption>
+      <thead><tr>
+        <th>실행</th><th>표</th><th>분할</th><th>holdout</th><th>in-sample</th><th>train</th><th>val</th><th>w</th><th>분</th><th>축</th><th>호출</th>
+      </tr></thead>
+      <tbody id="runs"></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">05</span>분할이 시드보다 크다</h2>
+  <p class="sub">A6000 에 12실행을 쓴 이유가 이 비교다. 같은 분할의 세 시드가 벌어지는 폭과, 분할을 바꿨을 때 벌어지는 폭 중 무엇이 큰가.</p>
+
+  <div class="chart">
+    <svg id="spread" viewBox="0 0 760 300" role="img" aria-label="분할별 canonical holdout 산포"></svg>
+  </div>
+
+  <div class="note">
+    <span class="lbl">A6000 k-fold</span>
+    <p>시드 산포(fold 안) <span class="mono">0.0169 · 0.0370 · 0.0695</span> — 중앙 <strong>0.0370</strong><br>
+    분할 산포(fold 중앙값 사이) <span class="mono">1.0663 ~ 1.1589</span> — <strong class="hl">0.0926</strong></p>
+    <p><strong>분할이 시드보다 2.5배 크다.</strong> 이 비교가 성립하는 근거가 02절의 접촉표다 — 세 fold 의 오염이 14·14·13 으로 상수이기 때문에, 차이가 나는 것은 분할 때문이라고 말할 수 있다. fold0 에서 라이브러리를 만들었다면 fold0 만 0/21 이라 이 결론을 못 냈다.</p>
+  </div>
+
+  <div class="note warn">
+    <span class="lbl">빼지 않은 것 — 그리고 둘이 같은 모양이다</span>
+    <p>대상 GPU 두 곳의 <code>s0</code> 가 같은 방식으로 무너졌다. <strong>학습에서 가장 좋은 규칙이 홀드아웃에서 가장 나쁘다.</strong></p>
+    <p><span class="mono">4090 s0 &nbsp;train 1.0248 → holdout 1.1435</span> &nbsp;(같은 분할의 다른 둘 1.0297 · 1.0274)<br>
+    <span class="mono">H100 s0 &nbsp;train 1.0340 → holdout 1.1345</span> &nbsp;(같은 분할의 다른 둘 1.0504 · 1.0693)</p>
+    <p>두 실행의 최종 규칙은 각각 27·48차원이고 in-sample 이 해당 표에서 가장 낮다. 시드를 골라내지 않는다는 규칙대로 그대로 둔다 — 이 둘이 4090·H100 의 시드 산포(0.1161 · 0.0841)를 만든다.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">06</span>벤더 휴리스틱과 나란히</h2>
+  <p class="sub">NVIDIA <code>nvMatmulHeuristics</code> 의 형상별 추천을 같은 홀드아웃 형상에서 <code>regret@1</code> 기하평균으로 잰다. ⛔ 벤더 기준선은 <strong>커밋된 파일을 읽기만 했고 다시 뽑지 않았다</strong>(D-158).</p>
+
+  <div class="scroll">
+    <table>
+      <caption>같은 형상 · 같은 분모 · 같은 집계(regret@1 기하평균). <code>nearest</code> 는 우리 공간에 없는 조합을 로그축 최근접으로 대체한 것, <code>strict</code> 는 정확히 일치할 때만. · <code>python3 experiments/campaign21_baselines.py</code></caption>
+      <thead><tr><th>표 / 분할</th><th>n</th><th>벤더 nearest</th><th>벤더 strict</th><th>정적 top-1 ★</th><th>우리 중앙</th><th>우리 최고</th><th>Δ 중앙−벤더</th></tr></thead>
+      <tbody>
+        <tr><td>A6000 fold0</td><td>21</td><td>1.0702</td><td>1.0777</td><td>1.0963</td><td class="good">1.0663</td><td>1.0579</td><td class="good">−0.0039</td></tr>
+        <tr><td>A6000 fold1</td><td>21</td><td>1.0918</td><td>1.0918</td><td>1.1604</td><td class="bad">1.1589</td><td>1.0930</td><td class="bad">+0.0671</td></tr>
+        <tr><td>A6000 fold2</td><td>19</td><td>1.0771</td><td>1.1411</td><td>1.0872</td><td class="bad">1.1127</td><td>1.0963</td><td class="bad">+0.0356</td></tr>
+        <tr><td>A6000 nk11008</td><td>20</td><td>1.0737</td><td>1.0737</td><td>1.0636</td><td class="bad">1.0875</td><td>1.0658</td><td class="bad">+0.0138</td></tr>
+        <tr><td>5090 nk11008</td><td>20</td><td>1.1158</td><td>1.1158</td><td>1.0452</td><td class="good">1.0579</td><td>1.0351</td><td class="good">−0.0579</td></tr>
+        <tr><td>4090 nk11008</td><td>20</td><td>1.0647</td><td>1.0647</td><td>1.0403</td><td class="good">1.0297</td><td>1.0274</td><td class="good">−0.0350</td></tr>
+        <tr><td>H100 nk11008</td><td>20</td><td>1.1522</td><td>1.1522</td><td>1.1921</td><td class="good">1.0693</td><td>1.0504</td><td class="good">−0.0829</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">읽는 법</span>
+    <p><strong>일곱 그룹 중 넷에서 우리 중앙값이 벤더보다 낮다.</strong> 그런데 갈리는 자리가 깔끔하다 — <strong class="hl">대상 GPU 셋(5090 · 4090 · H100)은 전부 우리가 낫고</strong>, A6000 은 fold0 하나만 이긴다.</p>
+    <p>A6000 이 불리한 것은 벤더가 A6000 에서 특별히 잘해서가 아니라 <strong>A6000 의 k-fold 홀드아웃이 어려운 쪽</strong>이기 때문이다 — 05절의 분할 산포가 그것이다. fold1·fold2 는 우리 쪽 중앙값이 1.11~1.16 으로 올라가는 분할이고, 벤더는 분할과 무관하게 1.07~1.09 를 낸다(벤더는 학습하지 않으므로 분할이 의미가 없다).</p>
+  </div>
+
+  <div class="note warn">
+    <span class="lbl">이 표로 말하지 않는 것 셋</span>
+    <p><strong>①</strong> 이것은 <strong>기하평균 비교</strong>다. 실험 계획서가 주 지표로 정한 것은 <strong>형상별 승패의 부호검정</strong>이고, 그것은 21실행을 전부 재적합해 형상별 regret 을 뽑아야 한다. 아직 안 했다.</p>
+    <p><strong>②</strong> <span class="mono">정적 top-1 ★</span> 열은 경쟁자가 아니라 <strong>천장</strong>이다 — 그 홀드아웃 형상들 자신에서 고른 최선의 단일 config 이므로, 자기가 채점받을 형상에서 뽑혔다. “한 config 로 전부 덮으면 최대 이만큼” 을 읽는 열이다. H100 에서 이 천장(1.1921)이 벤더(1.1522)보다 나쁜 것은 그 표가 단일 config 로는 특히 안 덮인다는 뜻이다.</p>
+    <p><strong>③</strong> 벤더 파일은 61형상이 아니라 표 전체(64~66형상)에서 만들어졌다. 여기서는 <strong>홀드아웃 형상만 골라 썼으므로</strong> 비교는 성립하지만, 벤더 기준선 자체를 61형상에 맞추는 일은 캠페인 밖으로 남아 있다.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">07</span>안 남겼으면 못 봤을 것들</h2>
+  <p class="sub">한 번 돌리고 다시 못 돌리는 것들. 실행이 도는 동안에만 셀 수 있는 값들이다.</p>
+
+  <h3>규칙 크기 — 상한을 없앤 것이 옳았나</h3>
+  <p>최종 규칙의 가중치 수는 <strong>21~49 (중앙 33)</strong>. 크기와 홀드아웃 성능의 상관은 <strong class="hl">r = −0.010</strong> (n=21) — <strong>사실상 0</strong>이다. “클수록 좋다” 도 “클수록 나쁘다” 도 아니다. 상한을 없앤 것이 성능을 올리지도 내리지도 않았다는 것이 21실행의 답이다.</p>
+
+  <div class="note">
+    <span class="lbl">D-167 §N 이 첫 배치부터 값을 냈다</span>
+    <p>채점된 규칙 하나당 <strong>죽은 항 중앙 16.6개</strong> (11.6 ~ 29.8). 33차원 규칙의 절반이 순위에 기여하지 않는다. 적합기가 이미 계산하던 값을 라운드마다 적기 시작한 것이 캠페인 직전이었다 — 이 수치는 그 수정이 없었으면 영영 못 봤다.</p>
+  </div>
+
+  <h3>축 생성 — 독립 실행들이 같은 것을 발견한다</h3>
+  <p>루프가 요청한 축 262개 중 178개 채택, 그중 <strong>82개를 최고 규칙이 실제로 쓴다.</strong> 서로 모르는 실행들이 같은 이름을 반복해서 만들었다.</p>
+
+  <div class="scroll">
+    <table>
+      <caption>둘 이상의 실행에서 같은 이름으로 만들어진 축</caption>
+      <thead><tr><th>축 이름</th><th>만든 실행 수</th><th>무엇인가</th></tr></thead>
+      <tbody>
+        <tr><td class="tag">serial_split_k_partition_count</td><td>6</td><td style="text-align:left">split-K 직렬 분할 수</td></tr>
+        <tr><td class="tag">pipeline_stage_count</td><td>5</td><td style="text-align:left">파이프라인 단수</td></tr>
+        <tr><td class="tag">serial_split_k_roundtrip_ratio</td><td>3</td><td style="text-align:left">split-K 왕복 비용 비율</td></tr>
+        <tr><td class="tag">tile_shape_aspect_mismatch</td><td>3</td><td style="text-align:left">타일 가로세로비 불일치</td></tr>
+        <tr><td class="tag">multistage_pipeline_indicator</td><td>2</td><td style="text-align:left">multistage 커널 여부</td></tr>
+        <tr><td class="tag">serial_split_k_roundtrip_…_cost</td><td>2</td><td style="text-align:left">왕복 트래픽 + 동기화 비용</td></tr>
+        <tr><td class="tag">pipeline_stage_family</td><td>2</td><td style="text-align:left">단수 · 패밀리 결합</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p><strong>split-K 왕복과 파이프라인 단수</strong> 로 수렴한다. 이름이 겹친다는 것은 우연이 아니라 같은 물리를 서로 다른 실행이 각자 집어냈다는 뜻이다.</p>
+
+  <h3>계보와 가설</h3>
+  <ul class="plain">
+    <li><span class="k">계보</span><span class="v">최종 규칙의 출처 — mutation 18 · cross 3 · <strong>explore 0</strong>. F3 에서 0, F2 에서 1이던 것이 21실행에서도 0이다.</span></li>
+    <li><span class="k">가설</span><span class="v">1,125건. <code>evidence_cases</code> 인용률 <strong>100%</strong>, 새 축을 요구한 비율 <strong>30%</strong> (336건).</span></li>
+    <li><span class="k">비용</span><span class="v">LLM 2,170 호출 · 토큰 입력 18,483,067 / 출력 4,360,051 · 라운드 벽시계 합 12.5시간 (동시 3~4로 실제 경과 약 4시간).</span></li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">08</span>죽은 실행 하나, 그리고 재실행</h2>
+  <p class="sub">21실행 중 하나가 3라운드에서 멈췄다. 지우지 않고 <code>x-</code> 로 남기고 같은 시드로 다시 돌려 완주시켰다.</p>
+
+  <div class="note crit">
+    <span class="lbl">c21-h100-nk-s0 · r3</span>
+    <p><code>UnexpectedModelBehavior: Exceeded maximum output retries (3)</code></p>
+    <p>pydantic-ai 가 <strong>출력 검증을 3회 연속 실패</strong>했을 때 내는 예외다. D-164 가 <code>check_rule</code> 을 그 재시도 경로에 넣었으므로, 모델이 정적 검사를 세 번 연속 못 넘기면 그 호출이 예외가 되고 루프 전체가 멈춘다.</p>
+    <p><strong>D-164 이전</strong>에는 정적 검사 실패가 <code>n_rejected_static</code> 으로 세어지고 루프는 계속됐다. 거부 하나가 실행을 죽이는 것은 의도가 아니었다 — 21실행 중 1건(약 5%). 고치는 것은 캠페인 밖의 일이라 기록만 남긴다.</p>
+  </div>
+
+  <div class="note">
+    <span class="lbl">재실행 결과 · 같은 시드 k=0</span>
+    <p>12라운드 완주. <span class="mono">train 1.0340 · holdout 1.1345 · w 48 · 50분 · 축 9/11</span></p>
+    <p>⚠️ 죽은 실행이 3라운드에서 갖고 있던 값은 <span class="mono">train 1.0474 / val 1.0793</span> 이었다. 재실행은 학습에서 더 내려갔지만 홀드아웃에서는 더 나쁘다 — 위 05절의 “학습에서 가장 좋은 규칙이 홀드아웃에서 가장 나쁘다” 에 이 실행이 해당한다. <strong>죽은 실행의 값을 12라운드 실행들과 나란히 놓지 않는다</strong>(문서 규칙 3). 재실행 값만 쓴다.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">09</span>붙는 유보와 남은 일</h2>
+
+  <h3>논문 한계 절에 그대로 들어갈 문장</h3>
+  <div class="note">
+    <p>피처 라이브러리는 nk11008 분할의 학습 41형상에서 한 번 만들어져 모든 실행이 공유한다. 축을 공유해야 규칙을 다른 GPU 로 옮길 수 있기 때문이다. <strong>그 결과 세 fold 의 홀드아웃 중 13~14 형상이 피처 선별 단계에서 읽혔다</strong>(각 19~21 중). nk11008 홀드아웃과 대상 GPU 셋은 접촉이 없다. 회피하려면 분할마다 라이브러리를 따로 만들어야 하고, 그러면 전이가 불가능해진다.</p>
+  </div>
+
+  <ul class="plain">
+    <li><span class="k">예산 300</span><span class="v">차원에 종속되지 않는다. 7~8차원은 25 평가/차원, 37~52차원은 5.8~8.1. 캠페인 뒤에 다시 잰다. <span class="mono" style="color:var(--muted)">pending_fixes 16</span></span></li>
+    <li><span class="k">라운드 12</span><span class="v">수렴점이 아니라 정한 정지점이다. 12도 24도 마지막 4라운드에서 계속 움직인다. <span class="mono" style="color:var(--muted)">round-curve.md</span></span></li>
+    <li><span class="k">align == 8</span><span class="v">형상 모집단을 정하는 기준인데 <strong>근거가 기록된 적이 없다.</strong> 제외되는 5형상 중 4개는 커널 공간이 포함된 형상과 같다. <span class="mono" style="color:var(--muted)">D-167 §R</span></span></li>
+    <li><span class="k">hypothesis_id</span><span class="v">프로세스 첫 실행에서 귀속이 달라진다. 점수는 안 바뀌지만 “어느 가설이 어느 규칙을 만들었나” 에 유보가 붙는다. <span class="mono" style="color:var(--muted)">D-167 §P</span></span></li>
+  </ul>
+
+  <h3>남은 작업</h3>
+  <ul class="plain">
+    <li><span class="k">다음</span><span class="v">형상별 부호검정 — 21실행 재적합이 필요하다(06절 ①)</span></li>
+    <li><span class="k">다음</span><span class="v">릴리즈 <code>campaign-21-&lt;커밋&gt;</code> (트레이스·config·생성축·아카이브 + 집계표, 축약 없이 sha256 대조)</span></li>
+    <li><span class="k">그 다음</span><span class="v"><code>runs.md</code> 21행 · <code>decisions.md</code> D 항목 — 이것이 논문의 본체 수치다</span></li>
+    <li><span class="k">캠페인 밖</span><span class="v">전이 실험(따로) · 벤더 기준선 61형상 재정렬 · D-164 재시도가 실행을 죽이는 문제</span></li>
+  </ul>
+</section>
+
+<footer>
+  <p>모든 수치는 <code>docs/artifacts/campaign-21.json</code> · <code>campaign-21-baselines.json</code> · <code>library-contact.json</code> 에서 나왔고 LLM 호출 없이 재현된다.<br>
+  <code>python3 experiments/campaign21.py</code> · <code>python3 experiments/campaign21_baselines.py</code> · <code>python3 experiments/library_contact.py</code></p>
+</footer>
+
+</div>
+
+<script>
+const RUNS = [
+ ["c21-a6000-f0-s0","A6000","fold0",1.0949,1.0620,1.0784,1.0986,48,36,"6/17",107],
+ ["c21-a6000-f0-s1","A6000","fold0",1.0579,1.0586,1.0596,1.0579,35,30,"6/11",100],
+ ["c21-a6000-f0-s2","A6000","fold0",1.0663,1.0554,1.0561,1.0664,25,33,"11/16",108],
+ ["c21-a6000-f1-s0","A6000","fold1",1.0930,1.0378,1.0378,1.0930,46,35,"8/11",103],
+ ["c21-a6000-f1-s1","A6000","fold1",1.1589,1.0659,1.0659,1.1589,23,33,"9/14",105],
+ ["c21-a6000-f1-s2","A6000","fold1",1.1625,1.0684,1.0686,1.1613,49,45,"9/13",105],
+ ["c21-a6000-f2-s0","A6000","fold2",1.1127,1.0539,1.0547,1.1184,28,34,"12/17",109],
+ ["c21-a6000-f2-s1","A6000","fold2",1.0963,1.0596,1.0605,1.1271,21,32,"7/13",103],
+ ["c21-a6000-f2-s2","A6000","fold2",1.1132,1.0402,1.0408,1.0956,46,36,"9/14",106],
+ ["c21-a6000-nk-s0","A6000","nk11008",1.0998,1.0773,1.0802,1.0978,30,30,"5/7",96],
+ ["c21-a6000-nk-s1","A6000","nk11008",1.0658,1.0512,1.0538,1.0658,28,34,"12/17",107],
+ ["c21-a6000-nk-s2","A6000","nk11008",1.0875,1.0747,1.0756,1.0875,28,33,"13/16",111],
+ ["c21-5090-nk-s0","5090","nk11008",1.0579,1.0380,1.0475,1.0636,34,35,"7/10",100],
+ ["c21-5090-nk-s1","5090","nk11008",1.0777,1.0502,1.0502,1.0777,22,31,"6/8",97],
+ ["c21-5090-nk-s2","5090","nk11008",1.0351,1.0174,1.0186,1.0359,49,38,"10/11",103],
+ ["c21-4090-nk-s0","4090","nk11008",1.1435,1.0241,1.0248,1.1442,27,25,"4/7",96],
+ ["c21-4090-nk-s1","4090","nk11008",1.0297,1.0213,1.0217,1.0302,48,36,"11/18",111],
+ ["c21-4090-nk-s2","4090","nk11008",1.0274,1.0275,1.0282,1.0268,22,33,"9/14",105],
+ ["c21-h100-nk-s0","H100","nk11008",1.1345,1.0340,1.0340,1.1345,48,50,"9/11",102],
+ ["c21-h100-nk-s1","H100","nk11008",1.0504,1.0374,1.0383,1.0504,45,48,"6/8",97],
+ ["c21-h100-nk-s2","H100","nk11008",1.0693,1.0370,1.0470,1.0756,33,46,"9/9",99]
+];
+const tb = document.getElementById("runs");
+for (const r of RUNS) {
+  const tr = document.createElement("tr");
+  const worst = r[3] > 1.13;
+  tr.innerHTML =
+    `<td class="tag">${r[0].replace("c21-","")}</td>` +
+    `<td class="grp">${r[1]}</td><td class="grp">${r[2]}</td>` +
+    `<td${worst ? ' class="bad"' : ""}>${r[3].toFixed(4)}</td>` +
+    `<td>${r[4].toFixed(4)}</td><td>${r[5].toFixed(4)}</td><td>${r[6].toFixed(4)}</td>` +
+    `<td>${r[7]}</td><td class="grp">${r[8]}</td><td class="grp">${r[9]}</td><td class="grp">${r[10]}</td>`;
+  tb.appendChild(tr);
+}
+
+const GROUPS = [
+  ["A6000 fold0",  [1.0949,1.0579,1.0663], 1.0663, false],
+  ["A6000 fold1",  [1.0930,1.1589,1.1625], 1.1589, false],
+  ["A6000 fold2",  [1.1127,1.0963,1.1132], 1.1127, false],
+  ["A6000 nk11008",[1.0998,1.0658,1.0875], 1.0875, false],
+  ["5090 nk11008", [1.0579,1.0777,1.0351], 1.0579, false],
+  ["4090 nk11008", [1.1435,1.0297,1.0274], 1.0297, false],
+  ["H100 nk11008", [1.1345,1.0504,1.0693], 1.0693, false]
+];
+const LO = 1.02, HI = 1.17, X0 = 152, X1 = 724, Y0 = 40, DY = 32;
+const svg = document.getElementById("spread");
+const NS = "http://www.w3.org/2000/svg";
+const px = v => X0 + (v - LO) / (HI - LO) * (X1 - X0);
+const add = (n, a) => { const e = document.createElementNS(NS, n);
+  for (const k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; };
+const txt = (x, y, s, a) => { const e = add("text", Object.assign(
+  {x, y, fill:"currentColor", "font-family":"IBM Plex Mono, monospace"}, a));
+  e.textContent = s; return e; };
+
+for (let v = 1.02; v <= 1.171; v += 0.03) {
+  const x = px(v);
+  add("line", {x1:x, y1:Y0 - 14, x2:x, y2:Y0 + DY*GROUPS.length - 14,
+    stroke:"currentColor", "stroke-opacity":.13});
+  txt(x, Y0 + DY*GROUPS.length + 4, v.toFixed(2),
+    {"font-size":11, "text-anchor":"middle", "fill-opacity":.55});
+}
+txt((X0+X1)/2, Y0 + DY*GROUPS.length + 26, "canonical holdout  (낮을수록 좋다)",
+  {"font-size":11, "text-anchor":"middle", "fill-opacity":.55, "letter-spacing":".08em"});
+
+GROUPS.forEach((g, i) => {
+  const y = Y0 + i*DY;
+  txt(12, y + 4, g[0], {"font-size":12, "fill-opacity":.85});
+  const xs = g[1].map(px);
+  add("line", {x1:Math.min(...xs), y1:y, x2:Math.max(...xs), y2:y,
+    stroke:"currentColor", "stroke-opacity":.28, "stroke-width":1.5});
+  g[1].forEach(v => add("circle", {cx:px(v), cy:y, r:4.5,
+    fill:"var(--accent)", "fill-opacity":g[3] ? .45 : .9}));
+  if (g[2] !== null) {
+    add("line", {x1:px(g[2]), y1:y - 9, x2:px(g[2]), y2:y + 9,
+      stroke:"var(--ink)", "stroke-width":2});
+    txt(X1 + 8, y + 4, (Math.max(...g[1]) - Math.min(...g[1])).toFixed(4),
+      {"font-size":11, "fill-opacity":.6});
+  } else {
+    txt(X1 + 8, y + 4, "2/3", {"font-size":11, "fill-opacity":.45});
+  }
+});
+txt(X1 + 8, Y0 - 16, "산포", {"font-size":10, "fill-opacity":.5, "letter-spacing":".08em"});
+txt(12, Y0 - 16, "굵은 세로선 = 중앙값",
+  {"font-size":10, "fill-opacity":.5, "letter-spacing":".08em"});
+</script>
+
+</body>
+</html>
