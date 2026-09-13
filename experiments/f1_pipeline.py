@@ -835,18 +835,38 @@ def _physics_coverage(table, gen: FeatureRegistry,
     if not made:
         return {"note": "there are no generated features"}
 
+    from kernelrule.features.generated import DUP_SHAPES, _spread_shapes
+
+    # ★ 2026-09-13 (D-170) — **build the columns only on the shapes that are
+    #   read.**
+    #
+    #   `FeatureMatrix(table, reg)` is not lazy: it computes every column of
+    #   every shape at construction. `_reference_columns` then reads
+    #   `_spread_shapes(table, DUP_SHAPES)` — 21 of the 66 — so two thirds of
+    #   the work was thrown away, and this function built such a matrix
+    #   **once per generated axis** (20 registries of one feature). D-161
+    #   fixed exactly this shape of waste inside `_reference_columns`
+    #   ("what must be built is built for those n_shapes alone") and did not
+    #   look at its callers (principle 23).
+    #
+    #   ⚠️ One matrix for 20 axes and 20 matrices for one axis cost the
+    #   **same** — the saving is `shapes=`, not the merge. Measured on the
+    #   13-library comparison table: 22 minutes and still running, against
+    #   `n_covered` values that are unchanged.
+    look_at = _spread_shapes(table, DUP_SHAPES)
     human = FeatureRegistry("seed-terms")
     for n in _SEED_TERMS:
         if n in REGISTRY._items:
             human.add(REGISTRY[n])
-    ref = _reference_columns(table, FeatureMatrix(table, human),
+    ref = _reference_columns(table, FeatureMatrix(table, human,
+                                                  shapes=look_at),
                              FeatureRegistry("empty"))
-    mine: dict = {}
+    all_made = FeatureRegistry("generated")
     for n in made:
-        one = FeatureRegistry(f"c-{n}")
-        one.add(gen[n])
-        mine.update(_reference_columns(table, FeatureMatrix(table, one),
-                                       FeatureRegistry("empty")))
+        all_made.add(gen[n])
+    mine = _reference_columns(table, FeatureMatrix(table, all_made,
+                                                   shapes=look_at),
+                              FeatureRegistry("empty"))
 
     out: dict = {}
     for name, rv in ref.items():
