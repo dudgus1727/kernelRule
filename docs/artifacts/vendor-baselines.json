@@ -9,6 +9,20 @@
   "shapes_without_vendor": [],
   "static_top1": 1.115053148466877,
   "random": 1.6454941810280768,
+  "population_family": {
+   "n": 65,
+   "vendor_nearest": 1.0814881835880117,
+   "vendor_strict": 1.1024088963407657,
+   "static_top1": 1.115053148466877,
+   "random": 1.6362858492324748
+  },
+  "population_align8": {
+   "n": 61,
+   "vendor_nearest": 1.079743050531059,
+   "vendor_strict": 1.1020136729131287,
+   "static_top1": 1.115053148466877,
+   "random": 1.6174478960021517
+  },
   "holdout": {
    "n": 20,
    "vendor_nearest": 1.073678657949583,
@@ -26,6 +40,20 @@
   "shapes_without_vendor": [],
   "static_top1": 1.0806532897245698,
   "random": 1.3243059901358445,
+  "population_family": {
+   "n": 65,
+   "vendor_nearest": 1.1459564771426554,
+   "vendor_strict": 1.1512981301024654,
+   "static_top1": 1.0806532897245698,
+   "random": 1.321770903473946
+  },
+  "population_align8": {
+   "n": 61,
+   "vendor_nearest": 1.142672702417377,
+   "vendor_strict": 1.1483491834553976,
+   "static_top1": 1.0806532897245698,
+   "random": 1.3235083130992598
+  },
   "holdout": {
    "n": 20,
    "vendor_nearest": 1.1157546636411428,
@@ -43,6 +71,20 @@
   "shapes_without_vendor": [],
   "static_top1": 1.0577311107901266,
   "random": 1.3866515039307252,
+  "population_family": {
+   "n": 63,
+   "vendor_nearest": 1.0782356458737932,
+   "vendor_strict": 1.0840952604388148,
+   "static_top1": 1.0577311107901266,
+   "random": 1.3901963994201882
+  },
+  "population_align8": {
+   "n": 59,
+   "vendor_nearest": 1.0793060892204274,
+   "vendor_strict": 1.085570329282369,
+   "static_top1": 1.0577311107901266,
+   "random": 1.3661836100768419
+  },
   "holdout": {
    "n": 20,
    "vendor_nearest": 1.0646588517827988,
@@ -60,6 +102,20 @@
   "shapes_without_vendor": [],
   "static_top1": 1.2008611859441864,
   "random": 2.1582428541735372,
+  "population_family": {
+   "n": 63,
+   "vendor_nearest": 1.1207325679240618,
+   "vendor_strict": 1.1288926234136623,
+   "static_top1": 1.2008611859441864,
+   "random": 2.1686342309963695
+  },
+  "population_align8": {
+   "n": 59,
+   "vendor_nearest": 1.1077998118999566,
+   "vendor_strict": 1.1164146650613305,
+   "static_top1": 1.2008611859441864,
+   "random": 2.161144779723413
+  },
   "holdout": {
    "n": 20,
    "vendor_nearest": 1.1521738415950786,

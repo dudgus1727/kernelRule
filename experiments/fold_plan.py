@@ -15,7 +15,12 @@ import warnings
 from collections import Counter
 from pathlib import Path
 
-from kernelrule.core.splits import experiment_shapes, regime_of, stratified_kfold
+from kernelrule.core.splits import (
+    aligned_shapes,
+    experiment_shapes,
+    regime_of,
+    stratified_kfold,
+)
 from kernelrule.core.table import PerfTable
 
 BUNDLE = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
@@ -29,20 +34,36 @@ def main() -> None:
     ap.add_argument("--k", type=int, default=3)
     ap.add_argument("--split-seed", type=int, default=SPLIT_SEED)
     ap.add_argument("--out", default="docs/artifacts/fold-plan.json")
+    # ★ 2026-09-13 (D-170 §1): the population criterion changed (61 -> 65),
+    #   so the folds changed with it. The 21-run campaign's folds were built
+    #   on the **old** population and its runs record only `n_train/n_val`
+    #   — without this switch that layout is not reproducible at all.
+    ap.add_argument("--population", choices=("family", "align8"),
+                    default="family",
+                    help="family = the current criterion (65 on the A6000); "
+                         "align8 = the pre-2026-09-13 criterion (61), kept "
+                         "so the recorded campaign folds can be rebuilt")
     a = ap.parse_args()
     warnings.simplefilter("ignore")
 
     T = PerfTable.from_bundle(BUNDLE[0], env_hash=BUNDLE[1], ok_only=False)
 
-    shapes = experiment_shapes(T)
+    shapes = (experiment_shapes(T) if a.population == "family"
+              else aligned_shapes(T))
     tot = Counter(regime_of(p, T.hw, axis="roofline") for p in shapes)
     print("=" * 84)
     print(f"stratified {a.k}-fold — split seed {a.split_seed} (separate from "
           f"the evolution seed)")
     print("=" * 84)
-    print(f"  aligned-8 shapes {len(shapes)}   {dict(tot)}")
+    print(f"  population [{a.population}] {len(shapes)} shapes   {dict(tot)}")
     folds = stratified_kfold(shapes, T.hw, k=a.k, seed=a.split_seed)
     out: dict = {"bundle": BUNDLE[0], "k": a.k, "split_seed": a.split_seed,
+                 "population": a.population,
+                 "population_note": (
+                     "family = at least 2 pipeline_kind in the candidate "
+                     "space (D-170 §1, 2026-09-13 onwards); align8 = "
+                     "align_a/b/c == 8 on every candidate (what every run "
+                     "recorded before that date used)"),
                  "n_shapes": len(shapes), "totals": dict(tot), "folds": []}
     print(f"\n  {'fold':6s} {'train':>6s} {'mem/comp':>10s}   "
           f"{'val':>4s} {'mem/comp':>10s}")
@@ -71,8 +92,8 @@ def main() -> None:
           f"{set(seen.values()) == {1} and len(seen) == len(shapes)}")
     print("  ⚠️ a limit — each of the three folds' val is in another fold's "
           "**train**.")
-    print("     And we have looked at all 61 shapes. They are not 'entirely "
-          "new shapes',")
+    print(f"     And we have looked at all {len(shapes)} shapes. They are "
+          f"not 'entirely new shapes',")
     print("     so the claim reaches only as far as **'it does not depend on "
           "one particular split'**.")
     Path(a.out).write_text(json.dumps(out, ensure_ascii=False, indent=1))

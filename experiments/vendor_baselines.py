@@ -42,6 +42,7 @@ from kernelrule.baselines.vendor import (
     vendor_order_fn,
 )
 from kernelrule.core.scoring import evaluate, geomean
+from kernelrule.core.splits import aligned_shapes, experiment_shapes
 from kernelrule.core.table import PerfTable
 
 OUT = "docs/artifacts/vendor-baselines.json"
@@ -61,6 +62,29 @@ def _vendor(table, vend, shapes, mapping):
     ev = evaluate(vendor_order_fn(table, vend, mapping=mapping),
                   table, shapes, ks=(1,), label="vendor")
     return ev, geomean(ev.regret[:, 0])
+
+
+def _random(table, shapes) -> float:
+    """The random baseline. **One place** — it was written inline twice
+    below once the population block was added (principle 2)."""
+    rng = np.random.default_rng(0)
+    rr = []
+    for p in shapes:
+        t = table.times_of(p)
+        rr.append(float(np.median([t[i] / t.min() for i in
+                                   rng.integers(len(t), size=64)])))
+    return float(geomean(np.array(rr)))
+
+
+def _scope(table, vend, shapes) -> dict:
+    """vendor / strict / static top-1 / random over one shape set."""
+    _, g_near = _vendor(table, vend, shapes, "nearest")
+    _, g_strict = _vendor(table, vend, shapes, "strict")
+    st = StaticTopK(table, shapes, coverage="union").run(ks=(1,))
+    return {"n": len(shapes), "vendor_nearest": float(g_near),
+            "vendor_strict": float(g_strict),
+            "static_top1": float(st.by_k[1]["all"]),
+            "random": _random(table, shapes)}
 
 
 def main() -> None:
@@ -83,12 +107,6 @@ def main() -> None:
         _, g_strict = _vendor(table, vend, shapes, "strict")
         mr = match_report(table, vend)
         st = StaticTopK(table, shapes, coverage="union").run(ks=(1,))
-        rng = np.random.default_rng(0)
-        rr = []
-        for p in shapes:
-            t = table.times_of(p)
-            rr.append(float(np.median([t[i] / t.min() for i in
-                                       rng.integers(len(t), size=64)])))
         per_shape[name] = {f"{p.M}x{p.N}x{p.K}": float(ev.regret[i, 0])
                            for i, p in enumerate(ev.shapes)}
         res[name] = {
@@ -99,12 +117,32 @@ def main() -> None:
             "exact_frac": mr["frac"],
             "shapes_without_vendor": mr["shapes_without_vendor"],
             "static_top1": float(st.by_k[1]["all"]),
-            "random": float(geomean(np.array(rr)))}
+            "random": _random(table, shapes),
+            # ★ 2026-09-13 (D-170 §1): the row above is the **whole table**
+            #   (66 / 64 shapes) and always was. The experiments never ran on
+            #   that set. These two are the populations that are actually
+            #   used — the current one and the one every pre-2026-09-13
+            #   number has as its denominator.
+            "population_family": _scope(table, vend,
+                                        experiment_shapes(table)),
+            "population_align8": _scope(table, vend, aligned_shapes(table))}
         r = res[name]
         print(f"  {name:7s} {r['preset']:10s} {r['n_shapes']:6d} "
               f"{r['vendor_nearest']:8.4f} {r['vendor_strict']:8.4f} "
               f"{len(r['shapes_without_vendor']):7d} {r['exact_frac']:7.1%} "
               f"{r['static_top1']:8.4f} {r['random']:8.4f}")
+
+    # -- ★ the two populations (D-170 §1) ----------------------------------
+    print("\n  ★ the shape populations — current (kernel family) vs the "
+          "pre-2026-09-13 one (alignment 8)")
+    print(f"  {'gpu':7s} {'n':>4} {'vendor':>8} {'top-1':>8} {'random':>8}"
+          f"    {'n':>4} {'vendor':>8} {'top-1':>8} {'random':>8}")
+    for name in FILES:
+        f_, o_ = res[name]["population_family"], res[name]["population_align8"]
+        print(f"  {name:7s} {f_['n']:4d} {f_['vendor_nearest']:8.4f} "
+              f"{f_['static_top1']:8.4f} {f_['random']:8.4f}    "
+              f"{o_['n']:4d} {o_['vendor_nearest']:8.4f} "
+              f"{o_['static_top1']:8.4f} {o_['random']:8.4f}")
 
     # -- per split ---------------------------------------------------------
     print("\n  the transfer holdout of each table (nk11008 val)")

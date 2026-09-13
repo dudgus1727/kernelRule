@@ -82,18 +82,47 @@ def test_nothing_reads_the_private_field(monkeypatch):
 # ★ D-167 §R — the shape population is one function now
 # ---------------------------------------------------------------------------
 @pytest.mark.needs_bundle
-def test_experiment_shapes_is_61_on_the_a6000_table():
+def test_experiment_shapes_is_65_on_the_a6000_table():
     """★ The count is pinned because **every number in the repository has
     it as a denominator.**
 
     The predicate used to be copied into 36 places across 35 files. Merging
-    them must not move the population by one shape, and a future change to
-    `ALIGNMENT_REQUIRED` has to trip this rather than quietly re-baseline
-    the whole repository.
+    them (D-167 §R) had to move the population by zero shapes.
+
+    ⚠️ 2026-09-13 (D-170 §1): the criterion changed from alignment to kernel
+    family and the population **did** move, 61 -> 65. This test now pins the
+    new number, and `test_aligned_shapes_still_reproduces_the_old_61` pins
+    the old one — a recorded number needs its population reproducible.
     """
     import warnings
 
-    from kernelrule.core.splits import ALIGNMENT_REQUIRED, experiment_shapes
+    from kernelrule.core.splits import MIN_KERNEL_FAMILIES, experiment_shapes
+    from kernelrule.core.table import PerfTable
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        table = PerfTable.from_bundle("datasets/rtx-a6000-sm_86-c63710df",
+                                      env_hash="c63710df", ok_only=False)
+    assert MIN_KERNEL_FAMILIES == 2
+    shapes = experiment_shapes(table)
+    assert len(table.shapes()) == 66
+    assert len(shapes) == 65, "the shape population moved"
+    dropped = {f"{p.M}x{p.N}x{p.K}"
+               for p in table.shapes()} - {f"{p.M}x{p.N}x{p.K}"
+                                           for p in shapes}
+    assert dropped == {"1024x4096x4097"}, dropped
+
+
+@pytest.mark.needs_bundle
+def test_aligned_shapes_still_reproduces_the_old_61():
+    """⛔ The 21-run campaign and everything before 2026-09-13 is scored on
+    the **alignment-8** population. Those numbers are not recomputed
+    (D-170 §9), so the set they were measured on has to stay reachable —
+    otherwise the record cannot be reproduced, only believed.
+    """
+    import warnings
+
+    from kernelrule.core.splits import ALIGNMENT_REQUIRED, aligned_shapes
     from kernelrule.core.table import PerfTable
 
     with warnings.catch_warnings():
@@ -101,14 +130,39 @@ def test_experiment_shapes_is_61_on_the_a6000_table():
         table = PerfTable.from_bundle("datasets/rtx-a6000-sm_86-c63710df",
                                       env_hash="c63710df", ok_only=False)
     assert ALIGNMENT_REQUIRED == 8
-    shapes = experiment_shapes(table)
-    assert len(table.shapes()) == 66
-    assert len(shapes) == 61, "the shape population moved"
+    old = aligned_shapes(table)
+    assert len(old) == 61
     dropped = {f"{p.M}x{p.N}x{p.K}"
-               for p in table.shapes()} - {f"{p.M}x{p.N}x{p.K}"
-                                           for p in shapes}
+               for p in table.shapes()} - {f"{p.M}x{p.N}x{p.K}" for p in old}
     assert dropped == {"1024x4096x4097", "1024x4096x4098", "1024x4096x4100",
                        "1024x4098x4096", "1024x4100x4096"}, dropped
+
+
+@pytest.mark.needs_bundle
+def test_the_dropped_shape_really_has_one_kernel_family():
+    """★ The criterion is a physical statement, so it is checked against the
+    table rather than against the shape's name (D-170 §1).
+
+    `(1024,4096,4097)` is dropped because its candidate space holds one
+    `pipeline_kind` — **not** because its K is odd. Every kept shape has
+    two.
+    """
+    import warnings
+
+    from kernelrule.core.splits import experiment_shapes, kernel_families
+    from kernelrule.core.table import PerfTable
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        table = PerfTable.from_bundle("datasets/rtx-a6000-sm_86-c63710df",
+                                      env_hash="c63710df", ok_only=False)
+    kept = {p.key for p in experiment_shapes(table)}
+    for p in table.shapes():
+        fams = kernel_families(table, p)
+        if p.key in kept:
+            assert len(fams) == 2, (p, fams)
+        else:
+            assert fams == ["pipelined"], (p, fams)
 
 
 def test_no_experiment_copies_the_alignment_predicate():

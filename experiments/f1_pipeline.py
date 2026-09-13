@@ -213,10 +213,31 @@ def _aligned_shapes(table: PerfTable) -> list:
     """⚠️ 2026-09-11 (D-167 §R): the body moved to
     `kernelrule.core.splits.experiment_shapes`. The same predicate was
     copied into 36 places across 35 files; the name is kept here because
-    the artefacts and the documents refer to it. **The value is
-    unchanged** — 61 shapes on the A6000 table before and after.
+    the artefacts and the documents refer to it. That move changed no value
+    — 61 shapes on the A6000 table before and after.
+
+    ⚠️ 2026-09-13 (D-170 §1): **the criterion behind that function changed**
+    — alignment 8 became "more than one kernel family", and the A6000
+    population went 61 -> 65. The name `_aligned_shapes` is now a
+    misnomer kept for the artefacts that refer to it; it is not renamed
+    because the recorded runs point at it. What it returns is whatever
+    `experiment_shapes` says today.
     """
     return experiment_shapes(table)
+
+
+def _population_criterion() -> str:
+    """The population criterion **as the library states it today** (D-170
+    §1). A run records this string, so a run recorded before 2026-09-13 and
+    one recorded after can be told apart without guessing."""
+    from kernelrule.core.splits import (
+        KERNEL_FAMILY_COLUMN,
+        MIN_KERNEL_FAMILIES,
+    )
+
+    return (f"at least {MIN_KERNEL_FAMILIES} distinct "
+            f"{KERNEL_FAMILY_COLUMN} in the candidate space "
+            f"(kernelrule.core.splits.experiment_shapes, D-170 §1)")
 
 
 def _shape_population(table: PerfTable, splits: SplitSet) -> dict:
@@ -236,8 +257,10 @@ def _shape_population(table: PerfTable, splits: SplitSet) -> dict:
     return {
         "table": len(table.shapes()), "used": len(used),
         "excluded": len(dropped),
-        "criterion": ("align_a/b/c == 8 on every candidate "
-                      "(kernelrule.core.splits.experiment_shapes)"),
+        # ★ Read out of the library, not written here. When the criterion
+        #   changed (D-170 §1) a literal here would have kept claiming the
+        #   old one.
+        "criterion": _population_criterion(),
         "excluded_shapes": [f"{p.M}x{p.N}x{p.K}" for p in dropped],
         "n_train": len(splits.train.shapes), "n_val": len(splits.val.shapes)}
 

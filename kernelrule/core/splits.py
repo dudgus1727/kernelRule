@@ -45,7 +45,9 @@ from typing import Literal
 from kernelrule.core.types import Problem
 
 __all__ = ["Split", "SplitSet", "SplitError", "by_predicate",
-           "experiment_shapes", "ALIGNMENT_REQUIRED",
+           "experiment_shapes", "aligned_shapes", "kernel_families",
+           "ALIGNMENT_REQUIRED", "MIN_KERNEL_FAMILIES",
+           "KERNEL_FAMILY_COLUMN",
            "stratified_kfold",
            "split_by_M_range", "split_by_K_range", "split_by_alignment",
            "split_by_size", "split_by_waves", "SPLITS",
@@ -462,60 +464,36 @@ def describe(ss: SplitSet, hw, *, axis: str = "size") -> str:
 
 # ---------------------------------------------------------------------------
 # ★ 2026-09-11 (D-167 §R) — the shape population the experiments run on
+# ★ 2026-09-13 (D-170 §1) — **the criterion changed**: alignment -> kernel
+#   family. 61 -> 65 on the A6000 table.
 # ---------------------------------------------------------------------------
-#: Every candidate of a shape must have this alignment on all three operands
-#: for the shape to be used. ⛔ Not a knob — changing it changes the shape
-#: population and therefore **every number in the repository**.
+#: ★ The **old** criterion (D-167 §R, superseded 2026-09-13). Every candidate
+#: of a shape had to carry this alignment on all three operands.
+#:
+#: ⛔ It is kept, not deleted: every number recorded before 2026-09-13 — the
+#: 21-run campaign included — has the 61-shape population as its denominator,
+#: and `aligned_shapes()` below is what reproduces it. Nothing in the
+#: experiment path calls it any more.
 ALIGNMENT_REQUIRED = 8
 
+#: ★ The **current** criterion (D-170 §1). A shape is used unless its
+#: candidate space holds fewer than this many kernel families.
+MIN_KERNEL_FAMILIES = 2
 
-def experiment_shapes(table) -> list:
-    """The shapes the experiments actually run on: **every candidate
-    aligned to 8 on A, B and C**.
+#: What counts as a kernel family. `pipeline_kind` is `multistage` /
+#: `pipelined` — the two mainloop structures, which differ in whether
+#: `cp.async` is used at all, not in a parameter.
+KERNEL_FAMILY_COLUMN = "pipeline_kind"
 
-    ★ Why this function exists: the predicate was copied into **36 places
-    across 35 files** (every `experiments/*.py` that builds a split). One
-    judgement in 36 copies is the largest instance of principle 2 in this
-    repository, and the vendor-preset case (D-158 fixed one of two copies)
-    showed how that ends. ⛔ Unifying them changed no value — the count is
-    61 before and after.
 
-    ## ⚠️ The grounds are **not recorded anywhere**
+def aligned_shapes(table) -> list:
+    """★ The **old** shape population — every candidate aligned to 8 on A, B
+    and C (D-167 §R). 61 of the A6000 table's 66.
 
-    Neither `design.md` nor `decisions.md` says why alignment 8 decides the
-    population. It was in the code from the beginning and no decision
-    entry introduces it. **That is written here as not-known rather than
-    guessed** (principle 39).
-
-    What the 5 excluded shapes of the A6000 table actually look like
-    (measured 2026-09-11, 0 LLM calls — `table.frame_for(p)`):
-
-    ```
-    shape                 candidates  ext_stages  pipeline_kind          align
-    (1024,4096,4097)           4,800     2..2      pipelined only       (1,1,8)
-    (1024,4096,4098)          17,250     2..8      multistage+pipelined (2,2,8)
-    (1024,4096,4100)          17,250     2..8      multistage+pipelined (4,4,8)
-    (1024,4100,4096)          16,315     2..8      multistage+pipelined (8,8,4)
-    (1024,4098,4096)          16,315     2..8      multistage+pipelined (8,8,2)
-    the 61 included            3,465~17,325  2..8  multistage+pipelined (8,8,8)
-    ```
-
-    ★ **4 of the 5 have the same candidate-space shape as the included
-    ones** — same stage range, same kernel families, a comparable candidate
-    count. Only `(1024,4096,4097)` is structurally different (one family,
-    one stage count, a quarter of the candidates). So if "alignment 8" is
-    standing in for "the kernel space is structurally different", it misses
-    on 4 of 5.
-
-    ⚠️ That is **not** an argument to change it here. The population is the
-    denominator of every number in the repository; changing it is the
-    largest condition change available, and it belongs after the campaign
-    and behind a pre-registration.
-
-    ⚠️ 2026-09-11 correction: the audit that first measured this table
-    reported the included shapes as 15,015~17,325 candidates. Re-measured
-    over all 61, the range is **3,465~17,325**. The upper bound and the
-    verdict are unchanged.
+    ⛔ Superseded by `experiment_shapes` on 2026-09-13 (D-170 §1). It stays
+    so that a number recorded under the old condition can still be
+    reproduced — the 21-run campaign is scored on exactly this set. **Do not
+    call it from a new experiment.**
     """
     def aligned(p) -> bool:
         d = table.frame_for(p)
@@ -524,3 +502,97 @@ def experiment_shapes(table) -> list:
                     and (d.align_c == ALIGNMENT_REQUIRED).all())
 
     return [p for p in table.shapes() if aligned(p)]
+
+
+def kernel_families(table, p) -> list[str]:
+    """The distinct kernel families in one shape's candidate space."""
+    return sorted(set(table.frame_for(p)[KERNEL_FAMILY_COLUMN].tolist()))
+
+
+def experiment_shapes(table) -> list:
+    """The shapes the experiments run on: **every shape whose candidate
+    space holds more than one kernel family**.
+
+    ★ Why this function exists: the predicate was copied into **36 places
+    across 35 files** (every `experiments/*.py` that builds a split). One
+    judgement in 36 copies is the largest instance of principle 2 in this
+    repository, and the vendor-preset case (D-158 fixed one of two copies)
+    showed how that ends. Unifying them (D-167 §R) changed no value; **this
+    change of criterion does** — see below.
+
+    ## ★ 2026-09-13 (D-170 §1) — from alignment to kernel family
+
+    The old criterion was `align_a == align_b == align_c == 8` on every
+    candidate. Its grounds were **never recorded anywhere** — not in
+    `design.md`, not in `decisions.md`; it was in the code from the first
+    commit and no decision entry introduces it (that absence is itself
+    written down here rather than guessed, principle 39).
+
+    What D-167 §R measured is what made it untenable:
+
+    ```
+    shape                 candidates  ext_stages  kernel families      align
+    (1024,4096,4097)           4,800     2..2      pipelined  ★ one   (1,1,8)
+    (1024,4096,4098)          17,250     2..8      multistage+pipelined (2,2,8)
+    (1024,4096,4100)          17,250     2..8      multistage+pipelined (4,4,8)
+    (1024,4100,4096)          16,315     2..8      multistage+pipelined (8,8,4)
+    (1024,4098,4096)          16,315     2..8      multistage+pipelined (8,8,2)
+    the 61 old-included    3,465~17,325  2..8      multistage+pipelined (8,8,8)
+    ```
+
+    **4 of the 5 excluded shapes have the same candidate-space shape as the
+    included ones** — same stage range, same two families, a comparable
+    candidate count. Only `(1024,4096,4097)` is structurally different: one
+    family, one stage count, a quarter of the candidates. Alignment 8 was
+    standing in for "the kernel space is structurally different" and missing
+    on 4 of 5, so the criterion now says that directly.
+
+    Two things followed from the old criterion that were not intended:
+
+    ```
+    scoring        excluded the 5   (61)
+    feature check  included them    (66)
+    -> ★ a shape that is never scored was deciding what went into the library
+    ```
+
+    and the vendor heuristic — which knows nothing of our splits — is **not
+    worse** on the excluded shapes than on the included ones:
+
+    ```
+    vendor geomean   61 included 1.0797   /   5 excluded 1.1238
+      (1024,4096,4100) 1.2031   (1024,4096,4097) 1.1875  (1024,4096,4098) 1.1565
+      (1024,4100,4096) 1.0432 ★ better than the 61-shape mean
+      (1024,4098,4096) 1.0400 ★ better
+    ★ the worst included shape is (1024,4096,256) at 1.2703 — worse than any
+      excluded one. The excluded five are not a "special zone"; the
+      difficulty ranges overlap.
+    ```
+
+    ⚠️ K alignment and N alignment are not the same thing physically. K
+    misalignment touches what the mainloop reads on every iteration; N
+    misalignment touches only the epilogue (writing C out). The two N-side
+    shapes are the two the vendor does best on.
+
+    ## What this costs
+
+    The population is the denominator of every number in the repository.
+    ⛔ Numbers recorded before 2026-09-13 are **not** recomputed — they are
+    marked as the old condition and left standing (D-170 §9). `aligned_shapes`
+    reproduces that population exactly.
+
+    ## Measured on all four tables (2026-09-13, 0 LLM calls)
+
+    ```
+    table   table shapes   old (align 8)   ★ new (family)   dropped
+    a6000        66             61              65          (1024,4096,4097)
+    5090         66             61              65          (1024,4096,4097)
+    4090         64             59              63          (1024,4096,4097)
+    h100         64             59              63          (1024,4096,4097)
+    ```
+
+    ★ The same one shape in all four tables, and in all four it is both the
+    only one-family shape and the only one-stage-count shape. The judgement
+    is made per table (`table.frame_for`), not by copying the A6000 list.
+    """
+    return [p for p in table.shapes()
+            if len(kernel_families(table, p)) >= MIN_KERNEL_FAMILIES]
