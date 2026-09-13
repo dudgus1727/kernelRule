@@ -8858,5 +8858,90 @@ python3 -m experiments.vendor_baselines
 python3 -m pytest tests/test_splits.py tests/test_features.py \
                   tests/test_no_old_names.py tests/test_prompt_layout.py -q
 python3 experiments/f1_pipeline.py F2 --stage 1 --seed K --tag k7-K   # §6 확인 실행
-python3 experiments/stage1_sweep.py --tags k7-0 k7-1 k7-2 s1sw-0 ...  # 비교표
+python3 experiments/stage1_sweep.py --compare-only \
+    --tags k7-0 k7-1 k7-2 s1sw-0 ... --out docs/artifacts/known7-sweep
 ```
+
+---
+
+### §6  확인 실행 세 번 — 65형상 · known7 · 재시도 · 분기축 3 요구
+
+```
+       채택     분기축  그중 정렬  초    재시도                   덮임(오늘)
+k7-0  20/20    ★ 4        1     1454  9회/5슬롯 ★ 다섯 다 통과   1 (+mono 2)
+k7-1  20/20    ★ 4        1     1253  2회/2슬롯 ★ 둘 다 통과     2 (+mono 1)
+k7-2  19/20    ★ 4        1     1415  9회/4슬롯 ★ 소진 1회       1 (+mono 1)
+s1sw-*  13~20/20  1       ★ 1   632~808  ★ 없음 (거부 = 빈 자리)  1~2
+```
+
+**① 분기 재료** — 열 개의 옛 라이브러리는 65형상에서도 분기축이 **1개**이고
+그 하나는 **매번 정렬 축**이다. 세 새 라이브러리는 **4개**이고 정렬은 하나뿐이다.
+축이 형상을 얼마나 가르는지까지 보면 차이가 더 분명하다:
+
+```
+k7-*   l2_working_set_* 49~51값 · output_aspect_imbalance 38값
+       output_work_per_sm / output_parallelism_deficit / gemm_dimension_imbalance 38~43값
+       ★ 65형상을 38~51 값으로 가른다 — 문턱을 놓을 수 있는 연속 축이다
+정렬축 3~5값 · ★ 가장 작은 묶음이 65 중 1~2개
+       -> 옛 열 개의 "유일한 분기축" 은 형상 한둘을 떼어내는 축이다
+```
+
+**② 정렬 변주로 채워지지 않았다** (§4-3 의 함정). 세 실행 모두 정렬 축은
+하나씩만 들어왔고, 나머지 셋은 `cfg` 를 아예 참조하지 않는 **코드 보장**
+형상축이다. 두 번째 정렬 변주는 §2-④ 의 중복 검사가 막는다.
+
+**③ 재시도가 양쪽으로 확인된다.**
+
+```
+돈다    k7-0 다섯 슬롯 · k7-1 두 슬롯이 거부 -> 재시도 -> ★ 통과
+        채택 16/20 (s1sw-3) -> ★ 20/20 · 영구 거부 0
+멈춘다  k7-2 에서 retries_exhausted 1회 · ★ 그 슬롯만 비고 실행은 안 죽었다
+        ⚠️ 21실행에서는 같은 예외가 h100 실행 하나를 통째로 죽였다 (D-168)
+```
+
+**④ 세 실행 사이에 반복된 축** — 서로 독립인데 같은 것을 만든다.
+
+```
+3회  output_aspect_imbalance · register_file_pressure · shared_memory_pressure
+2회  l2_working_set_pressure · mainloop_iteration_count
+     parallel_reduction_traffic_fraction · pipeline_fill_drain_fraction
+반복 7개 / 전체 서로 다른 이름 49개
+★ output_aspect_imbalance 는 세 실행이 전부 ★ 분기축으로 만들었다
+```
+
+**⑤** 덮임은 13행 전부에서 **기록값과 오늘 값이 같다** — §2-④ 가 중복 비교
+집합을 12형상에서 21형상으로 바꿨는데도 `_n_covered` 는 한 행도 움직이지
+않았다. 두 열은 여전히 다른 절차이므로 나란히 읽을 것은 오늘 열이다.
+
+⛔ 고르지 않았다. 조건이 둘인 표에서 순위는 의미가 없고, D-169 §3 의 선택은
+그대로다.
+
+---
+
+### §7  릴리즈
+
+`known7-c4c76c4` · 자산 7개 + `.sha256` 각각 + NOTES.md
+<https://github.com/dudgus1727/kernelRule/releases/tag/known7-c4c76c4>
+★ 일곱 개 전부 다시 받아 sha256 대조했다.
+
+---
+
+### §8  그 과정에서 고친 성능 결함 (D-161 을 호출부에)
+
+13행 비교표가 22분 돌고도 안 끝났다. ⚠️ **첫 진단이 틀렸다** — "축 하나마다
+`FeatureMatrix` 를 만든다"를 원인으로 봤는데, `FeatureMatrix` 는 생성 시점에
+전부 미리 계산하므로 축 20개짜리 하나든 1개짜리 스무 개든 일의 양이 같다
+(합쳐도 45.5s 그대로였다).
+
+진짜 원인은 **읽는 것은 21형상인데 66형상을 계산**한 것이다.
+
+```
+FeatureMatrix(table, reg, shapes=look_at)
+45.5s -> ★ 18.1s (2.5배) · 값 동일 (k7-0 덮임 1 · mono 2 — 그 실행이 옛
+코드로 자기 summary.json 에 남긴 값과 같다)
+```
+
+★ D-161 이 `_reference_columns` **안에서** 고친 것이 정확히 이 형태다
+("읽을 `n_shapes` 에 대해서만 만든다"). 함수는 고쳐졌고 호출부는 안 봤다
+(원칙 23). §2 가 비교 집합을 12 -> 21 형상으로 키웠으므로 그대로 뒀으면 이
+함수는 앞으로도 계속 1.75배를 더 썼다.
