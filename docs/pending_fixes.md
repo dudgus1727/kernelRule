@@ -638,3 +638,32 @@ F3rw-p8-nan   1475/1579 93.4%  (시드별 86.0 · 92.7 · 93.1 · 94.7 · 95.5 �
 ⛔ 예산 300 은 **사용자가 정한 조건이다** (D-166). 위 실측은 그 결정을
 바꾸자는 것이 아니라, 결정을 유지한 채 붙는 유보다. D-163 §2 의 엇갈린
 실측과 "21실행 전에는 조건을 덜 바꾼다" 는 판단은 그대로다.
+
+---
+
+## 19. §8.3 거부 사유가 `violations` 에서 `other` 하나로 뭉친다 (D-170 §3)
+
+**무엇** — `classify_violation` 의 패턴 표에 피처 거부 사유가 없다. D-170 §3
+이 FeatureWriter 의 거부를 재시도 경로에 올렸으므로 그 메시지들이 이제
+`violations` 에 들어오는데, 전부 `other` 로 찍힌다.
+
+```
+k7-0 실측   total 9 · by_code {"other": 9} · n_calls_with_violation 5
+★ "상수라서 거부" 가 몇 번인지 셀 수 없다 — 그것이 §2 의 효과를 말하는 숫자다
+```
+
+**왜 지금 안 고쳤나** — 고치는 중에 k7-0 이 이미 끝나 있었다. 코드 표를 바꾸면
+k7-0 과 k7-1·k7-2 의 `by_code` 가 **다른 절차**가 되고, 세 행을 나란히 놓을 수
+없게 된다. 확인 실행 도중에 기록 절차를 바꾸지 않는다.
+
+**어떻게** — 둘을 같이 한다.
+
+```
+1. classify_violation 에 feature_constant · feature_duplicate ·
+   feature_scale_invariance · feature_too_long · feature_unknown_name ·
+   feature_name_taken 을 더한다
+2. ★ summary.json 이 violations 의 **원문**도 남기게 한다 — 라벨은 나중에
+   다시 붙일 수 있어야 한다. 지금은 집계만 남아서 k7-0 은 재분류가 불가능하다
+```
+
+★ 세 실행이 끝난 뒤에. ⛔ k7-* 의 기록을 고쳐 쓰지 마라 — 옛 라벨로 둔다.
