@@ -34,7 +34,11 @@ NEW_AXES = {"compute_k_underfill_fraction", "instruction_overhead_fraction",
             "roofline_memory_gap", "sm_resource_pressure",
             "tiled_global_traffic_ratio"}
 
-KNOWN5 = {"tail_waste", "occupancy_deficit", "roofline_ratio",
+#: ★ The **five** of the F2 runs this script reads (`known5`, D-170 §4).
+#: Deliberately not `known7`: those runs were given five, and D-170 §4 added
+#: `log_min_dim` and `log_flops` afterwards. Reading them against seven
+#: would count axes the runs never had.
+KNOWN5 = {"tail_waste", "occupancy_deficit", "roofline_ratio",   # D-170
           "edge_waste", "has_spill"}
 
 
@@ -126,7 +130,7 @@ def main(tag: str = "F2rw-p8") -> None:
         best = min(rows, key=lambda e: e["regret"])
         st = structure(best["code"])
         print(f"   s{s}  new axes {len(st['feats'] & NEW_AXES)}  "
-              f"known5 {len((st['feats'] | st['shape_vals']) & KNOWN5)}  "
+              f"known5 {len((st['feats'] | st['shape_vals']) & KNOWN5)}  "  # D-170
               f"{sorted(st['feats'] & NEW_AXES)}")
         used |= st["feats"] & NEW_AXES
     print(f"\n   -> new axes used in the best rule of the 6 runs "

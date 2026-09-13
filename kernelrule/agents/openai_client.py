@@ -110,7 +110,7 @@ _CONDITIONS = frozenset({"F1", "F2", "F3"})
 #: ★ The condition selects the prompt **example** — moving it wrongly gives
 #: the model a different example, and that is a change of condition (the
 #: spot most carefully watched during the D-128 rename).
-_EXAMPLES = {"F1": "other_domain", "F2": "known5", "F3": "known5"}
+_EXAMPLES = {"F1": "other_domain", "F2": "known7", "F3": "known7"}
 
 #: The features `examples/rule_known.md` **calls by name**.
 #: All four must be in the registry for that example to be usable (§30.20).
@@ -645,6 +645,11 @@ class OpenAILLM:
         #: is not in the loop, left here, reads as "to be switched on some
         #: day".
         self._extra: dict[str, tuple] = {}
+        #: ★ The FeatureWriter's validation hook (D-170 §3). `None` means the
+        #: pre-2026-09-13 behaviour — the caller validates *after* the call
+        #: and a refusal never reaches the model. `set_feature_check` wires
+        #: it in.
+        self._feature_check = None
         # ⚠️ 2026-09-09 (D-150): there is no term budget. The field is kept
         #   because `config.json` records it and old configs carry it; it is
         #   **passed nowhere that refuses anything** any more.
@@ -784,8 +789,61 @@ class OpenAILLM:
                   retries=self.cfg.max_retries, model_settings=settings)
         if role == "rule_writer":
             self._add_static_check(a)
+        if role == "feature" and self._feature_check is not None:
+            self._add_feature_check(a)
         self._agents[role] = a
         return a
+
+    #: ★ The marker every §8.3 feature retry carries (D-170 §3). Same role
+    #: as `STATIC_RETRY` — `_harvest` looks for it, so "the model was told,
+    #: and what it was told" stays in `violations`.
+    FEATURE_RETRY = "the feature did not pass the §8.3 validation"
+
+    def set_feature_check(self, fn) -> None:
+        """★ Hand the FeatureWriter its refusal path (D-170 §3).
+
+        `fn(name, code, meta)` returns `None` when the candidate would be
+        accepted and **raises** with the reason otherwise. The reason is
+        handed back to the model as a `ModelRetry`, so "this axis is
+        constant on the shapes you are scored on" is something the model
+        reads and can act on.
+
+        Until 2026-09-13 stage 1 caught `FeatureRejected` in the caller and
+        **moved to the next slot**. Fixing the constant check (D-170 §2)
+        without this would not have produced different axes — it would have
+        produced a smaller library.
+
+        ⚠️ The check must not have side effects. It runs once per attempt
+        and an attempt may be thrown away.
+        """
+        if "feature" in self._agents:
+            # The agent is built once and cached, and a validator can only
+            # be attached at build time. Silently doing nothing here is the
+            # kind of "recorded but not in force" the repository keeps
+            # tripping on (§26.4).
+            raise RuntimeError(
+                "the `feature` agent is already built — a validator "
+                "attached now would not be in force. Call "
+                "`set_feature_check` before the first feature call.")
+        self._feature_check = fn
+
+    def _add_feature_check(self, agent) -> None:
+        """★ §8.3 validation **inside the retry path** (D-170 §3), the same
+        wiring D-164 gave RuleWriter."""
+        from pydantic_ai import ModelRetry
+
+        @agent.output_validator
+        def _feature(out):
+            code = getattr(out, "code", None)
+            if code is None or self._feature_check is None:
+                return out
+            try:
+                self._feature_check(getattr(out, "name", ""), code,
+                                    out.model_dump()
+                                    if hasattr(out, "model_dump") else {})
+            except Exception as e:                      # noqa: BLE001
+                raise ModelRetry(f"{self.FEATURE_RETRY}:\n  {e}") from None
+            return out
 
     #: ★ The marker every static-check retry carries (D-164). `_harvest`
     #: looks for it, so "the model was told, and what it was told" stays in
@@ -1039,12 +1097,16 @@ class OpenAILLM:
     def _feature_prompt(self, *, condition: str = "F1", task: str = "",
                         registry=None, **_kw) -> str:
         """F1~F3 — the condition is **how many features are given**.
-        0 -> 5 -> 24.
+        0 -> 7 -> 24. (0 -> 5 -> 24 until 2026-09-13 — D-170 §4 added
+        `log_min_dim` and `log_flops`, the two the evolution picked for
+        itself in D-156, so that F2 has more than one axis a rule can
+        branch on.)
 
             F1  start from 0    can it build derived quantities  ★ the
                                 fundamental question
-            F2  5 public facts  can it build on top of them
-                                (`F1-K` before the D-128 rename)
+            F2  7 public facts  can it build on top of them
+                                (`F1-K` before the D-128 rename;
+                                `known5` before D-170 §4)
             F3  the human 24    combination only (= every run so far)
 
         ⚠️ The shape example is **something unrelated to this problem**. The
@@ -1204,7 +1266,10 @@ class OpenAILLM:
                             #   Without this the one path that now reaches
                             #   the model would be the one path with no
                             #   record.
-                            or self.STATIC_RETRY in content):
+                            or self.STATIC_RETRY in content
+                            # ★ D-170 §3: a §8.3 feature refusal is a retry
+                            #   too.
+                            or self.FEATURE_RETRY in content):
                         self.violations.append(
                             {"round": self.round, "seq": seq_, "role": role,
                              "attempt": i, "code": classify_violation(content),

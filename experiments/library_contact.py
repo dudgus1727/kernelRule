@@ -66,7 +66,8 @@ def main() -> None:
                                   ok_only=False)
     spec = {"fold0": {"fold": 0}, "fold1": {"fold": 1}, "fold2": {"fold": 2},
             "nk11008": {}}
-    sp = {k: _splits(a6000, split_seed=12345, k=3, **v)
+    # ⛔ D-170 §1 — the campaign's own population (61). Not recomputed.
+    sp = {k: _splits(a6000, split_seed=12345, k=3, population="align8", **v)
           for k, v in spec.items()}
 
     rows = {}
@@ -95,7 +96,7 @@ def main() -> None:
         tb = PerfTable.from_bundle(TABLES[g]["bundle"],
                                    env_hash=TABLES[g]["env_hash"],
                                    ok_only=False)
-        s = _splits(tb, split_seed=12345, k=3)
+        s = _splits(tb, split_seed=12345, k=3, population="align8")
         val, train = keys(s.val.shapes), keys(s.train.shapes)
         targets[g] = {"n_val": len(val), "contact": len(val & lib_train),
                       "n_shapes": len(val | train),

@@ -191,7 +191,7 @@ def test_feature_examples_are_from_another_domain():
 
     For F2/F3, giving public knowledge is the definition of the condition,
     so they show the real features down to the code (§30.17) — those use
-    `examples/known5.md` and are not the subject of this check.
+    `examples/known7.md` and are not the subject of this check.
     """
     import kernelrule.features.physical  # noqa: F401
     from kernelrule.features import REGISTRY
@@ -290,15 +290,15 @@ def test_known_by_design_files_never_reach_f1():
 def _feature_prompt(condition: str):
     import os
 
-    import kernelrule.features.known5 as K
+    import kernelrule.features.known7 as K
     from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
     from kernelrule.features import FeatureRegistry
 
     os.environ.setdefault("OPENAI_API_KEY", "t")
     reg = FeatureRegistry(condition)
     if condition not in ("F0", "F1"):
-        for n in sorted(K.KNOWN5._items):
-            reg.add(K.KNOWN5[n])
+        for n in sorted(K.KNOWN7._items):
+            reg.add(K.KNOWN7[n])
     llm = OpenAILLM(LLMConfig(), feature_names=[], shape_values=[],
                     registry=reg)
     return llm._user_prompt("feature", "", condition=condition, registry=reg)
@@ -306,7 +306,7 @@ def _feature_prompt(condition: str):
 
 #: Files that contain real feature names **deliberately**.
 #:
-#:   examples/known5.md      the feature example for the conditions that give
+#:   examples/known7.md      the feature example for the conditions that give
 #:                           public knowledge (§30.17)
 #:   examples/rule_known.md  the **rule** example for the same conditions
 #:                           (§30.20)
@@ -315,7 +315,7 @@ def _feature_prompt(condition: str):
 #: `test_rule_example_never_names_a_feature_outside_the_registry` and
 #: `test_known_by_design_files_never_reach_f0_or_f1` — **the exception is
 #: made and whether it leaks is checked alongside.**
-_KNOWN_BY_DESIGN = {"examples/known5.md", "examples/rule_known.md"}
+_KNOWN_BY_DESIGN = {"examples/known7.md", "examples/rule_known.md"}
 
 
 #: Statements knowable only from the table. One of them in the prompt is a
@@ -339,10 +339,10 @@ def test_f2_prompt_has_no_measurement():
 
 
 def test_f2_shows_the_five_with_sources():
-    import kernelrule.features.known5 as K
+    import kernelrule.features.known7 as K
 
     body = _feature_prompt("F2")
-    for n in K.KNOWN5._items:
+    for n in K.KNOWN7._items:
         assert f"f.{n}" in body or f"p.{n}" in body, f"{n} does not appear"
     assert body.count("Source:") >= 5, "there are fewer than five sources"
 
@@ -351,11 +351,11 @@ def test_f2_does_not_leak_the_other_nineteen():
     """★ The other 19 are the F3 condition."""
     import re
 
-    import kernelrule.features.known5 as K
+    import kernelrule.features.known7 as K
     from kernelrule.features import REGISTRY
 
     body = _feature_prompt("F2")
-    rest = sorted(set(REGISTRY._items) - set(K.KNOWN5._items))
+    rest = sorted(set(REGISTRY._items) - set(K.KNOWN7._items))
     leak = [n for n in rest if re.search(rf"\b{re.escape(n)}\b", body)]
     assert not leak, f"the other 19 leaked: {leak}"
 
@@ -384,21 +384,21 @@ def test_areas_are_fixed_and_do_not_name_features():
         assert banned not in areas, banned
 
 
-def test_known5_values_are_identical_to_physical(perf_table_for_known5):
+def test_known7_values_are_identical_to_physical(perf_table_for_known7):
     """★ The cleaned-up version must produce **the same values** as the
     original for "the known features were given" to be true."""
     import numpy as np
 
-    import kernelrule.features.known5 as K
+    import kernelrule.features.known7 as K
     from kernelrule.core.matrix import FeatureMatrix
     from kernelrule.features import REGISTRY, FeatureRegistry
 
-    t = perf_table_for_known5
+    t = perf_table_for_known7
     shapes = list(t.shapes())[:3]
-    for n in sorted(K.KNOWN5._items):
+    for n in sorted(K.KNOWN7._items):
         ra, rb = FeatureRegistry("a"), FeatureRegistry("b")
         ra.add(REGISTRY[n])
-        rb.add(K.KNOWN5[n])
+        rb.add(K.KNOWN7[n])
         ma, mb = FeatureMatrix(t, ra), FeatureMatrix(t, rb)
         sl = REGISTRY[n].shape_level
         for p in shapes:
@@ -410,7 +410,7 @@ def test_known5_values_are_identical_to_physical(perf_table_for_known5):
 
 
 @pytest.fixture(scope="module")
-def perf_table_for_known5():
+def perf_table_for_known7():
     import warnings
 
     from kernelrule.core.table import PerfTable
@@ -470,14 +470,14 @@ def _reg(names):
 
 
 def test_rule_example_is_chosen_by_registry_contents():
-    import kernelrule.features.known5 as K
+    import kernelrule.features.known7 as K
     from kernelrule.agents.openai_client import _rule_example_for
     from kernelrule.features import REGISTRY, FeatureRegistry
 
     human = _reg(sorted(REGISTRY._items))
     k5 = FeatureRegistry("k5")
-    for n in sorted(K.KNOWN5._items):
-        k5.add(K.KNOWN5[n])
+    for n in sorted(K.KNOWN7._items):
+        k5.add(K.KNOWN7[n])
 
     assert "f.tail_waste" in _rule_example_for(human)
     assert "f.tail_waste" in _rule_example_for(k5)
@@ -491,14 +491,14 @@ def test_rule_example_never_names_a_feature_outside_the_registry():
     it leaks**."""
     import re
 
-    import kernelrule.features.known5 as K
+    import kernelrule.features.known7 as K
     from kernelrule.agents.openai_client import _rule_example_for
     from kernelrule.features import REGISTRY, FeatureRegistry
 
     k5 = FeatureRegistry("k5")
-    for n in sorted(K.KNOWN5._items):
-        k5.add(K.KNOWN5[n])
-    cases = {"human24": _reg(sorted(REGISTRY._items)), "known5": k5,
+    for n in sorted(K.KNOWN7._items):
+        k5.add(K.KNOWN7[n])
+    cases = {"human24": _reg(sorted(REGISTRY._items)), "known7": k5,
              "empty": FeatureRegistry("empty"),
              "partial": _reg(["waves", "edge_waste"])}
     for tag, r in cases.items():

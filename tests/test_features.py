@@ -743,14 +743,63 @@ def test_the_comparison_shapes_are_not_all_one_m(perf_table):
     Measured against the whole table's verdict: 4 shapes gives 5 false
     positives and misses one, 12 spread by M gives 1 and misses none.
     """
-    from kernelrule.features.generated import DUP_SHAPES, _spread_shapes
+    from kernelrule.features.generated import (
+        DUP_SHAPES,
+        _spread_shapes,
+        _structural_key,
+    )
 
     sh = _spread_shapes(perf_table, DUP_SHAPES)
-    assert len(sh) == DUP_SHAPES
+    # ★ 2026-09-13 (D-170 §2): `DUP_SHAPES` is a **lower bound** now. The
+    #   key became (M, alignment), and every group has to appear — on this
+    #   table every non-8 alignment sits at M=1024, so one shape per M drew
+    #   an aligned one every time and **an alignment axis was constant
+    #   across the whole comparison set**. `_spearman` returns 0 for a
+    #   constant column, not 1, so two alignment axes under different names
+    #   could not be caught as duplicates at all.
+    assert len(sh) >= DUP_SHAPES
     assert len({p.M for p in sh}) >= 8, [p.M for p in sh]
+    groups = {_structural_key(perf_table, p) for p in perf_table.shapes()}
+    picked = {_structural_key(perf_table, p) for p in sh}
+    from kernelrule.core.splits import experiment_shapes
+    in_population = {_structural_key(perf_table, p)
+                     for p in experiment_shapes(perf_table)}
+    assert picked == in_population, sorted(in_population - picked)
+    # ⛔ And it is drawn from the population, not the whole table.
+    assert picked <= groups
     # and it is reproducible
     assert [p.key for p in sh] == [
         p.key for p in _spread_shapes(perf_table, DUP_SHAPES)]
+
+
+@pytest.mark.needs_bundle
+def test_alignment_axes_can_now_collide_in_the_duplication_check(perf_table):
+    """★ D-170 §2 — the trap the population change opens, and its guard.
+
+    With four misaligned shapes in the population an alignment axis really
+    varies, so the FeatureWriter can satisfy "make branchable axes" with
+    nothing but alignment variants. They must then be caught as duplicates
+    of one another. Before the comparison set carried an alignment group,
+    they could not be: every alignment column was constant there, and a
+    constant column scores Spearman 0.
+    """
+    import numpy as np
+
+    from kernelrule.features.generated import (
+        DUP_SHAPES,
+        _spread_shapes,
+        _structural_key,
+    )
+
+    sh = _spread_shapes(perf_table, DUP_SHAPES)
+    aligns = {_structural_key(perf_table, p)[1:] for p in sh}
+    assert len(aligns) > 1, (
+        "every comparison shape has the same alignment, so no alignment "
+        "axis can ever be compared against another (D-170 §2)")
+    # The column an alignment axis would produce is not constant here.
+    col = np.array([float(min(_structural_key(perf_table, p)[1:]))
+                    for p in sh])
+    assert col.std() > 0
 
 
 # ---------------------------------------------------------------------------
@@ -795,10 +844,17 @@ def test_a_rebuilt_run_registry_rescores_that_run_s_archive(perf_table):
         "the loop's own axes are missing from the rebuilt registry — that "
         f"is the D-165 §1 trap. layers: {sorted(layers)}")
 
-    from experiments.f1_pipeline import _splits
+    from experiments.f1_pipeline import _population_of, _splits
     cfg = json.loads(Path(f"runs/{run}/config.json").read_text())
     assert cfg["split_kind"] == "kfold0-seed12345", cfg["split_kind"]
-    splits = _splits(perf_table, fold=0, split_seed=12345, k=3)
+    # ★ D-170 §1 — on **the population that run was scored on**. The folds
+    #   are built from the shape list, so re-scoring a 61-shape run on the
+    #   65-shape population is a different split and the regret moves
+    #   (measured: 1.033925 -> 1.046923) with nothing saying so.
+    pop = _population_of(cfg)
+    assert pop == "align8", pop
+    splits = _splits(perf_table, fold=0, split_seed=12345, k=3,
+                     population=pop)
     matrix = FeatureMatrix(perf_table, reg)
 
     rows = [json.loads(ln) for ln in arc.open() if ln.strip()]

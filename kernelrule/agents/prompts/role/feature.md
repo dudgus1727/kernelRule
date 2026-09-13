@@ -76,6 +76,39 @@ bad    "tile_m * split_k / K"
 and Pearson correlation exceed 0.95, it measures the same thing.
 **Find a different axis.**
 
+## ★ Branchable axes — make at least three
+
+A rule can branch:
+
+```python
+if p.<name> < threshold:
+    ...one weighting...
+else:
+    ...another...
+```
+
+That is only possible for a feature **computed from `p` and `hw` alone**. As
+soon as `cfg` enters, the value differs from candidate to candidate within
+the same shape, and there is nothing left to branch on — such a feature can
+only be a term in the sum.
+
+A branchable axis must also **actually differ between shapes**. One that
+comes out the same for every shape is a constant: it is rejected, and it
+would not separate anything even if it were not.
+
+```
+branchable      def aspect(p, hw, cfg): return math.log2(p.M / p.N)
+                -> depends on the shape only. A rule can split on it
+
+not branchable  def waste(p, hw, cfg): return cfg.tile_m / p.M
+                -> cfg is in it. It is a term, not a switch
+```
+
+★ **Across this session, make at least three branchable axes.** Without them
+a rule has one weighting for every shape, and a weighting good for a tall
+thin problem is not the one good for a large square one. The task block
+below says how many you have so far.
+
 {area_block}
 
 ---

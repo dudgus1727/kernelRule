@@ -509,6 +509,22 @@ def kernel_families(table, p) -> list[str]:
     return sorted(set(table.frame_for(p)[KERNEL_FAMILY_COLUMN].tolist()))
 
 
+#: ★ The population per table, memoised (D-170 §1).
+#:
+#: `table.frame_for(p)` materialises a ~17,000 x 68 slice, so walking every
+#: shape costs **0.69s**. Since D-170 §2 the validation asks for the
+#: population on **every candidate feature**, twice (the retry check and the
+#: registration), and `_spread_shapes` asks again — measured at about +2.8s
+#: per proposal, which is most of the cost the population change appeared to
+#: add.
+#:
+#: ⚠️ Keyed on the table **object**. A `PerfTable` is loaded once and never
+#: mutated (`from_bundle` builds it whole), so identity is the right key; a
+#: second `from_bundle` of the same bundle is a different object and is
+#: computed again, which is correct rather than merely safe.
+_POPULATION: dict[int, tuple[object, list]] = {}
+
+
 def experiment_shapes(table) -> list:
     """The shapes the experiments run on: **every shape whose candidate
     space holds more than one kernel family**.
@@ -594,5 +610,12 @@ def experiment_shapes(table) -> list:
     only one-family shape and the only one-stage-count shape. The judgement
     is made per table (`table.frame_for`), not by copying the A6000 list.
     """
-    return [p for p in table.shapes()
-            if len(kernel_families(table, p)) >= MIN_KERNEL_FAMILIES]
+    hit = _POPULATION.get(id(table))
+    # The table is held alongside the answer so that a recycled `id()`
+    # cannot hand back another table's population.
+    if hit is not None and hit[0] is table:
+        return list(hit[1])
+    out = [p for p in table.shapes()
+           if len(kernel_families(table, p)) >= MIN_KERNEL_FAMILIES]
+    _POPULATION[id(table)] = (table, out)
+    return list(out)

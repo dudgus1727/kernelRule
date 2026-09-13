@@ -90,8 +90,18 @@ def _measure(tag: str, table) -> dict:
 
     # -- 1st: shape level and not constant -------------------------------
     from kernelrule.core.splits import experiment_shapes
-    used = experiment_shapes(table)          # ★ 61, not the table's 66
+    # ★ 2026-09-13 (D-170 §1): this is **65** now, and the criterion behind
+    #   it is "more than one kernel family", not alignment. Every row of the
+    #   table below — the ten older libraries included — is re-measured on
+    #   it, so the column is comparable across rows. The numbers recorded in
+    #   `stage1-sweep.md` on 2026-09-12 were on the 61.
+    used = experiment_shapes(table)
     shape_level, not_const, not_const_table = [], [], []
+    #: ★ How thin a "varying" axis is: name -> (distinct values, the size of
+    #: the smallest group). An axis that takes a second value on 4 of 65
+    #: shapes is not the same material as one that separates 30 from 35, and
+    #: a bare count of varying axes hides that.
+    spread: dict = {}
     for f in feats:
         if not f.shape_level:
             continue
@@ -100,6 +110,8 @@ def _measure(tag: str, table) -> dict:
                          for p in used])
         if len(np.unique(np.round(vals, 12))) > 1:
             not_const.append(f.name)
+            _, counts = np.unique(np.round(vals, 12), return_counts=True)
+            spread[f.name] = [int(len(counts)), int(counts.min())]
         vt = np.array([float(getattr(matrix.for_shape(p)[1], f.name))
                        for p in table.shapes()])
         if len(np.unique(np.round(vt, 12))) > 1:
@@ -124,6 +136,8 @@ def _measure(tag: str, table) -> dict:
                 worst = (float(sp), a, b)
 
     pc = summary.get("physics_coverage") or {}
+    from experiments.f1_pipeline import _physics_coverage
+    cov = _physics_coverage(table, reg, FeatureRegistry("empty"))
     rej = Counter(r.get("error", "?").split(":")[0]
                   for r in props if not r.get("accepted"))
     rng = ranges.get("features") or {}
@@ -135,10 +149,19 @@ def _measure(tag: str, table) -> dict:
         "n_shape_level_varying": len(not_const),
         "n_shape_level_varying_table": len(not_const_table),
         "n_covered": pc.get("_n_covered", 0),
+        # ★ D-170 §2 changed the duplication comparison set (12 shapes all
+        #   aligned -> 21 covering every (M, alignment) group), so the
+        #   coverage recorded in a run's own summary.json and one computed
+        #   today are **different procedures**. Both are carried: `n_covered`
+        #   is what that run recorded, `n_covered_now` is every library put
+        #   through today's procedure.
+        "n_covered_now": cov.get("_n_covered", 0),
+        "n_monotone_only_now": cov.get("_n_monotone_only", 0),
         "max_spearman": round(worst[0], 4),
         # what they are, so the table can be read
         "shape_level": shape_level,
         "shape_level_varying": not_const,
+        "shape_level_varying_spread": spread,
         "shape_level_varying_table_only": sorted(
             set(not_const_table) - set(not_const)),
         "n_constant_columns": n_const_cols,
@@ -178,7 +201,18 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tags", nargs="+",
                     default=[f"s1sw-{k}" for k in range(10)])
+    # ★ D-170 §6: the known7 confirmation runs are **compared** against the
+    #   ten, not ranked with them. The choice of D-169 §3 stands, and a
+    #   ranking across two conditions would read as a new one.
+    ap.add_argument("--compare-only", action="store_true",
+                    help="write the table, choose nothing (two conditions "
+                         "in one table cannot be ranked against each other)")
+    ap.add_argument("--out", default=None,
+                    help="artefact stem; default docs/artifacts/stage1-sweep")
     a = ap.parse_args()
+    global OUT_JSON, OUT_MD
+    if a.out:
+        OUT_JSON, OUT_MD = Path(f"{a.out}.json"), Path(f"{a.out}.md")
 
     from kernelrule.core.table import PerfTable
     table = PerfTable.from_bundle(BUNDLE, env_hash=ENV, ok_only=False)
@@ -194,7 +228,7 @@ def main() -> None:
               f"  최대 sp {r['max_spearman']:.4f}"
               f"  채택 {r['n_accepted']}/{r['n_planned']}")
 
-    ranked = _rank(rows)
+    ranked = rows if a.compare_only else _rank(rows)
     best = ranked[0]
     names = Counter(n for r in rows for n in r["names"])
     repeated = {k: v for k, v in names.items() if v > 1}
@@ -203,15 +237,21 @@ def main() -> None:
                         "max_spearman (asc)", "seed (asc)"],
            "fixed_before_results": True,
            "bundle": BUNDLE, "split": "nk11008 train (21실행과 같다)",
-           "chosen": best["tag"], "ranked": [r["tag"] for r in ranked],
+           "chosen": (None if a.compare_only else best["tag"]),
+           "compare_only": bool(a.compare_only),
+           "ranked": [r["tag"] for r in ranked],
            "repeated_axis_names": dict(
                sorted(repeated.items(), key=lambda kv: (-kv[1], kv[0]))),
            "libraries": rows}
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
     OUT_JSON.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n")
-    print(f"\n  ★ 고른 것: {best['tag']}  "
-          f"(형상축 {best['n_shape_level_varying']} · "
-          f"덮임 {best['n_covered']} · 최대 sp {best['max_spearman']:.4f})")
+    if a.compare_only:
+        print("\n  ★ 비교만 한다 — 고르지 않는다 (D-169 §3 의 선택이 "
+              "유효하고, 조건이 둘인 표에서 순위는 의미가 없다)")
+    else:
+        print(f"\n  ★ 고른 것: {best['tag']}  "
+              f"(형상축 {best['n_shape_level_varying']} · "
+              f"덮임 {best['n_covered']} · 최대 sp {best['max_spearman']:.4f})")
     print(f"  recorded: {OUT_JSON}")
     _write_md(out, ranked, repeated)
 

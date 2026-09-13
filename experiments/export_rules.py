@@ -60,7 +60,7 @@ from pathlib import Path
 import kernelrule.features.physical  # noqa: F401
 from kernelrule.core.canonical import canonical_score
 from kernelrule.core.matrix import FeatureMatrix
-from kernelrule.core.splits import Split, SplitSet, experiment_shapes
+from kernelrule.core.splits import Split, SplitSet
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 from kernelrule.features.loader import registry_spec, run_registry
@@ -76,16 +76,26 @@ def setup():
     return table, FeatureMatrix(table, REGISTRY), _splits_of(table, "nk11008")
 
 
-def _splits_of(table, kind: str) -> SplitSet:
+def _splits_of(table, kind: str, *, population: str = "align8") -> SplitSet:
     """The split **the run itself used**. `nk11008` is the structural one.
 
     ★ The rule has to be scored on its own holdout. Exporting an F2 rule
     under `nk11008` when it evolved on `kfold0-seed12345` would put a
     number in `index.json` that `verify_rules` then reproduces exactly —
     both wrong in the same way (principle 38).
+
+    ⚠️ 2026-09-13 (D-170 §1): the same argument applies to the **shape
+    population**, which changed from 61 to 65 that day. `population`
+    defaults to `align8` because every rule exported so far ran on it; a
+    run that recorded the kernel-family criterion must be passed
+    `population="family"` (`f1_pipeline._population_of` reads it out of the
+    run's `config.json`). A wrong value here does not raise — it silently
+    scores on the wrong shapes.
     """
+    from experiments.f1_pipeline import _population_shapes
+
     if kind == "nk11008":
-        shapes = experiment_shapes(table)
+        shapes = _population_shapes(table, population)
         held = [p for p in shapes if 11008 in (p.N, p.K)]
         return SplitSet(
             train=Split("train", tuple(p for p in shapes if p not in held)),
@@ -95,7 +105,21 @@ def _splits_of(table, kind: str) -> SplitSet:
         raise SystemExit(f"unknown split_kind {kind!r}. It is not guessed "
                          f"— the holdout would silently be the wrong set.")
     from experiments.f1_pipeline import _splits
-    return _splits(table, fold=int(m.group(1)), split_seed=int(m.group(2)))
+    return _splits(table, fold=int(m.group(1)), split_seed=int(m.group(2)),
+                   population=population)
+
+
+def _population_name(splits: SplitSet, table) -> str:
+    """Which population a built split is on — read from the split, not
+    remembered."""
+    from experiments.f1_pipeline import _population_shapes
+
+    n = len(splits.train) + len(splits.val) + (len(splits.test)
+                                               if splits.test else 0)
+    for name in ("family", "align8"):
+        if n == len(_population_shapes(table, name)):
+            return name
+    return f"unknown({n})"
 
 
 def _pipeline_dir(run: str) -> Path | None:
@@ -119,14 +143,19 @@ def _registry_for(run: str, table):
         spec = registry_spec(
             REGISTRY, dict.fromkeys(REGISTRY._items, "human"),
             run=None, condition=None)
-        return REGISTRY, spec, _splits_of(table, "nk11008")
+        # ★ A run with no pipeline directory is a `luna-*` one, all of them
+        #   from long before the population change (D-170 §1).
+        return REGISTRY, spec, _splits_of(table, "nk11008",
+                                          population="align8")
     cfg = json.loads((d / "config.json").read_text())
     seed = int(re.fullmatch(r"(.+)-s(\d+)", run).group(2))
     reg, origin = run_registry(d.name, table=table, seed=seed,
                                human=REGISTRY)
     spec = registry_spec(reg, origin, run=d.name,
                          condition=cfg.get("condition"))
-    return reg, spec, _splits_of(table, cfg.get("split_kind", "nk11008"))
+    from experiments.f1_pipeline import _population_of
+    return reg, spec, _splits_of(table, cfg.get("split_kind", "nk11008"),
+                                 population=_population_of(cfg))
 
 
 def main() -> None:
@@ -215,6 +244,10 @@ def main() -> None:
                 "file": (f"{run}.registry.json"
                          if any(a["source"] for a in spec["axes"]) else None)},
             "split_kind": splits.kind,
+            # ★ D-170 §1 — the shape population this number is on. Without
+            #   it `verify_rules` cannot tell a 61-shape rule from a
+            #   65-shape one and reproduces whichever the code does today.
+            "population": _population_name(splits, table),
             "by_regime": {k: round(v, 6) for k, v in r.by_regime.items()},
             "n_holdout": r.n_holdout, "llm": cfg,
             "weights": {k: [round(x, 6) for x in v]

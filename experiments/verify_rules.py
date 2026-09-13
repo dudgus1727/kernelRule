@@ -141,7 +141,12 @@ def main() -> None:
             print(f"  {run:16s} {row['holdout']:10.4f} {'-':>12}  "
                   f"❌ the axis list could not be loaded")
             continue
-        splits = _splits_of(table, row.get("split_kind", "nk11008"))
+        # ★ D-170 §1: a row exported before 2026-09-13 has no `population`
+        #   key and ran on the 61-shape one. Defaulting to today's would
+        #   re-score every old rule on a different shape set and call the
+        #   difference a verification failure.
+        splits = _splits_of(table, row.get("split_kind", "nk11008"),
+                            population=row.get("population", "align8"))
         reg = {}
         try:
             for name in ("short", "long"):

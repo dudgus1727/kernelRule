@@ -78,7 +78,11 @@ def main() -> None:
                 TABLES[gpu]["bundle"], env_hash=TABLES[gpu]["env_hash"],
                 ok_only=False)
         t = tables[gpu]
-        sp = _splits(t, split_seed=12345, k=3, **kw)
+        # ⛔ D-170 §1 — the campaign ran on the **61-shape** population and
+        #   its results are not recomputed. Left at today's default this
+        #   baseline would be on 65 shapes while the runs it is compared
+        #   against are on 61.
+        sp = _splits(t, split_seed=12345, k=3, population="align8", **kw)
         hold = list(sp.val.shapes)
 
         vpath = Path(f"datasets/baselines/"

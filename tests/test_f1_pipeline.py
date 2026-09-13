@@ -32,19 +32,29 @@ def test_f0_f1_start_from_an_empty_registry(pipe, cond):
         f"the {cond} starting registry is not empty: {sorted(r._items)}")
 
 
-def test_f2_is_the_public_knowledge_five(pipe):
-    """★ F2 = **the five public facts**
+def test_f2_is_the_public_knowledge_seven(pipe):
+    """★ F2 = **the seven public facts**
     (before the D-128 rename its name was `F1-K`).
 
     The old `F2` (5 raw physical quantities, `F2_BASE`) had 0 runs and was
     deleted. The name is the same, so **what F2 is** is pinned by a test —
     a change is caught here.
+
+    ⚠️ 2026-09-13 (D-170 §4): **it was five until this date.** `log_min_dim`
+    and `log_flops` were added so that F2 has more than one axis a rule can
+    branch on. The condition name did not change and the content did, so a
+    number from before and a number from after are not on the same
+    condition — which is exactly what this test exists to make visible.
+    ⛔ The two are shape-level, so `_base_registry("F2")` now hands the
+    pipeline three branchable axes rather than one.
     """
-    from kernelrule.features.known5 import KNOWN5
+    from kernelrule.features.known7 import KNOWN7
 
     r = pipe._base_registry("F2")
-    assert sorted(r._items) == sorted(KNOWN5._items)
-    assert len(r._items) == 5
+    assert sorted(r._items) == sorted(KNOWN7._items)
+    assert len(r._items) == 7
+    assert {"log_min_dim", "log_flops"} <= set(r._items)
+    assert sum(1 for n in r._items if r[n].shape_level) == 3
     # The names are among the 24, but it is the **cleaned-up version** —
     # docstrings with the table observations removed (§12.3)
     assert set(r._items) <= set(REGISTRY._items)

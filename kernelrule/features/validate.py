@@ -36,7 +36,8 @@ import numpy as np
 from kernelrule.core.types import Hardware, config_from_row
 from kernelrule.features import Feature, FeatureRegistry
 
-__all__ = ["Check", "ValidationReport", "validate_feature", "validate_registry"]
+__all__ = ["Check", "ValidationReport", "validation_shapes",
+           "validate_feature", "validate_registry"]
 
 #: A Spearman correlation above this makes it a duplication candidate
 #: (§8.4)
@@ -134,16 +135,90 @@ class ReferenceColumns(dict):
     shapes: tuple = ()
 
 
+def validation_shapes(table) -> list:
+    """★ The shapes every validation check looks at — **the experiment
+    population** (D-170 §2).
+
+    ## What this replaced
+
+    Until 2026-09-13 the config-level pass drew **6 shapes with
+    `seed=0`** out of the table's 66. The seed was fixed, so every feature
+    of every run saw the identical 6:
+
+    ```
+    (1, 4096, 11008)    (32, 12288, 4096)   (256, 4096, 11008)
+    (1024, 4096, 1024)  ★ (1024, 4096, 4097)  (4096, 11008, 4096)
+    ```
+
+    One of those six is `(1024,4096,4097)` — **the most extreme shape in the
+    table and one the experiments never scored** (the alignment criterion
+    excluded it; D-170 §1 excludes it too, for being one kernel family).
+    So:
+
+    ```
+    an alignment axis     differs only on that one shape  -> ★ passed every time
+    a K-tail axis         only that shape has K % tile_k  -> ★ passed every time
+    the scored population never contains it               -> ★ the axis is constant there
+    ```
+
+    That is why all ten libraries of the stage-1 sweep registered an
+    alignment axis and all ten had it constant on the scored shapes — **not
+    sample luck, a deterministic consequence of `seed=0`**.
+
+    And the error runs the other way too: 6 of 66 is 9%, so an axis that
+    varies only outside those 6 was **rejected as constant** when it was
+    not.
+
+    ## Why the whole population rather than a bigger sample or a per-feature seed
+
+    ```
+    per-feature seed   fixes the "always the same 6" half and keeps the 9%.
+                       ★ Acceptance would then depend on the draw — the same
+                       axis is in or out depending on its slot index. The
+                       library's composition must not be a dice roll
+    bigger sample      the same objection, weaker
+    ★ whole population the check asks "does this axis have explanatory power
+                       on the shapes we score". That is a property of the
+                       population, not of a sample
+    ```
+
+    And it is **nearly free**, because the pass was already being paid for:
+    `detect_shape_level` (D-160) walks every shape of the same probe matrix
+    immediately afterwards, and a column it already computed is cached.
+    Measured end to end on `register_generated` with a scalar (non-vectorised)
+    alignment axis, which is the worst case:
+
+    ```
+    6 sampled shapes then 66 for the shape-level verdict   18.9s / 19.0s
+    ★ 65 population shapes then 1 left for the verdict     21.1s / 20.2s
+    ```
+
+    +2s, ~11%. A vectorised axis costs 0.00s either way. The only genuinely
+    new cost is on a feature rejected before the shape-level walk, which
+    used to stop early.
+
+    ⚠️ The **answer-reading** check (item 7, the standalone AUC) is not
+    widened by this. It keeps `train_shapes`, so it sees the training split
+    and nothing else (D-166).
+    """
+    from kernelrule.core.splits import experiment_shapes
+
+    return experiment_shapes(table)
+
+
 def _sample(table, n_shapes: int, rng, train_shapes=None) -> list:
     """`n_shapes` shapes. ★ 2026-09-11 (D-166): with `train_shapes` the draw
     is **from the training split only**.
 
-    ⛔ The default is the whole table — what every recorded run did. Changing
-    it silently could flip an acceptance, so the narrowing is plumbing here
-    and a decision elsewhere (D-166 §C-2).
+    ⚠️ 2026-09-13 (D-170 §2): `validate_feature` no longer calls this — it
+    looks at the whole population (`validation_shapes`). What remains here
+    is `validate_registry`'s comparison pool, and its default pool is now
+    **the population** rather than `table.shapes()`: a pool drawn from
+    shapes the experiments never score cannot say whether two axes are the
+    same axis where it matters.
     """
     shapes = list(train_shapes) if train_shapes is not None \
-        else table.shapes()
+        else validation_shapes(table)
     idx = rng.choice(len(shapes), size=min(n_shapes, len(shapes)),
                      replace=False)
     return [shapes[int(i)] for i in sorted(idx)]
@@ -206,18 +281,21 @@ def validate_feature(f: Feature, table, matrix, *, hw_alt: Hardware,
     `fail`.**"""
     rep = ValidationReport(f.name)
     rng = np.random.default_rng(seed)
-    # ★ A shape-level feature is looked at over **every shape**. With a
-    #   sample, a binary feature such as `is_memory_bound` can happen to draw
-    #   only one class and be rejected as "constant" — a sampling problem,
-    #   not a feature problem. There are only dozens of shapes, so it costs
-    #   nothing.
-    # ⚠️ D-166 §C-3: the shape-level pass stays over **every** shape. Narrowing
-    #    it risks the D-160 regression (a feature constant on the training
-    #    shapes but not on the others); `design.md §30.12` says why.
-    shapes = (list(table.shapes()) if f.shape_level
-              else _sample(table, n_shapes, rng,
-                           train_shapes=(train_shapes if sample_from_train
-                                         else None)))
+    # ★ 2026-09-13 (D-170 §2): **both levels look at the whole experiment
+    #   population.** The shape-level pass already did (a sample can draw one
+    #   class of a binary axis such as `is_memory_bound` and reject it as
+    #   "constant" — a sampling problem, not a feature problem); the
+    #   config-level pass drew 6 shapes with a fixed seed, and one of those
+    #   six was a shape the experiments never score. `validation_shapes`
+    #   says what that cost.
+    # ⚠️ D-166 §C-3: it is **not** narrowed to the training split. A feature
+    #    constant on the training shapes but not on the others is the D-160
+    #    regression; `design.md §30.12` says why. `sample_from_train` is kept
+    #    so a caller can still ask for the narrow behaviour explicitly, and
+    #    `n_shapes` then says how many.
+    shapes = (_sample(table, n_shapes, rng, train_shapes=train_shapes)
+              if sample_from_train and train_shapes is not None
+              else validation_shapes(table))
 
     # -- 1. does it run ---------------------------------------------------
     vals: list[np.ndarray] = []

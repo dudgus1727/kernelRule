@@ -40,7 +40,8 @@ from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.features import Feature, FeatureRegistry
 from kernelrule.features.validate import ReferenceColumns
 
-__all__ = ["FeatureRejected", "check_feature_code", "compile_feature",
+__all__ = ["FeatureRejected", "check_feature_code", "check_generated",
+           "compile_feature",
            "register_generated", "RAW_FIELDS", "field_block"]
 
 
@@ -394,26 +395,76 @@ def compile_feature(code: str, *, known: frozenset[str]):
 #: 12 are not all one M. ⚠️ It is **not** the whole table: a partial matrix
 #: over 12 shapes is what makes the check cheap enough to run on every
 #: candidate (D-161).
+#:
+#: ⚠️ 2026-09-13 (D-170 §2): this is a **lower bound** now, not the count.
+#: `_spread_shapes` returns at least one shape per structural group, so on a
+#: table with more groups than this it returns more.
 DUP_SHAPES = 12
 
 
+#: ★ `frame_for` materialises a ~17,000-row slice, and the spread asks for
+#: one per shape on **every proposal** (D-170 §2). Memoised on (table
+#: object, shape) — a `PerfTable` is built whole and never mutated.
+_STRUCT: dict[tuple[int, tuple], tuple] = {}
+
+
+def _structural_key(table, p) -> tuple:
+    """The group a shape belongs to for the spread — **M and the operand
+    alignment** (D-170 §2).
+
+    M alone was the key, and on this table every alignment other than 8 sits
+    at M=1024. One shape per M therefore drew one M=1024 shape, always an
+    aligned one, and **every alignment axis was constant across the whole
+    comparison set** — two alignment axes under different names could not be
+    caught as duplicates, because `_spearman` returns 0 for a constant
+    column rather than 1.
+    """
+    ck = (id(table), p.key)
+    hit = _STRUCT.get(ck)
+    if hit is not None:
+        return hit
+    d = table.frame_for(p)
+    out = (p.M, int(d["align_a"].min()), int(d["align_b"].min()),
+           int(d["align_c"].min()))
+    _STRUCT[ck] = out
+    return out
+
+
 def _spread_shapes(table, n: int, train_shapes=None) -> list:
-    """`n` shapes with **M spread out** (D-163).
+    """`n` shapes with the **structural groups spread out** (D-163, D-170
+    §2).
 
     The first `n` of the table are all `M=1` — the sweep above is what that
-    produced. They are taken one per distinct M, largest group first, so the
-    set covers the range instead of one corner.
+    produced. They are taken one per group, so the set covers the range
+    instead of one corner.
+
+    ★ Every group is represented even when there are more groups than `n`:
+    a group left out is an axis that cannot be compared at all, and on this
+    table that silently exempted every alignment axis from the duplication
+    check. The extra shapes are free — the columns are vectorised (measured
+    0.01s for the human registry at 12, 21 and 30 shapes).
+
+    ⚠️ 2026-09-13: the pool is drawn from the **experiment population**, not
+    from `table.shapes()`. A duplication verdict decided on shapes that are
+    never scored is not the verdict we need (D-170 §2).
     """
+    from kernelrule.core.splits import experiment_shapes
+
     shapes = list(train_shapes) if train_shapes is not None \
-        else list(table.shapes())
-    by_m: dict = {}
+        else experiment_shapes(table)
+    by_g: dict = {}
     for p in shapes:
-        by_m.setdefault(p.M, []).append(p)
+        by_g.setdefault(_structural_key(table, p), []).append(p)
     out: list = []
-    while len(out) < n and any(by_m.values()):
-        for m in sorted(by_m):
-            if by_m[m] and len(out) < n:
-                out.append(by_m[m].pop(0))
+    # ★ One pass per round: every group gives one before any group gives a
+    #   second, and the loop does not stop at `n` until every group has been
+    #   round once.
+    first_round = True
+    while (first_round or len(out) < n) and any(by_g.values()):
+        for g in sorted(by_g):
+            if by_g[g] and (first_round or len(out) < n):
+                out.append(by_g[g].pop(0))
+        first_round = False
     # ★ The order follows the given list so the set is reproducible.
     return sorted(out, key=shapes.index)
 
@@ -465,18 +516,45 @@ def _reference_columns(table, matrix, extra: FeatureRegistry,
     return ref
 
 
-def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
-                       table, matrix, hw_alt,
-                       others: dict | None = None,
-                       train_shapes=None,
-                       sample_from_train: bool = False) -> Feature:
-    """Check -> sandbox -> §8.3 validation -> registration. One failure
-    raises.
+def check_generated(code: str, *, registry: FeatureRegistry, meta: dict,
+                    table, matrix, hw_alt,
+                    others: dict | None = None,
+                    train_shapes=None,
+                    sample_from_train: bool = False) -> None:
+    """★ Would this candidate be accepted? **It registers nothing** (D-170
+    §3).
 
-    `others` are the reference columns for the duplication verdict. Without
-    them they are recomputed every time; the 24 a human wrote do not change,
-    so it is better for the caller to build them once and pass them in (at 20
-    proposals that is 30 seconds x 20).
+    This is what `LLMClient.set_feature_check` is handed, so that a refusal
+    reaches the model as a `ModelRetry` instead of emptying the slot. It has
+    to be side-effect free: an attempt whose validator raises is thrown
+    away, and a registry mutated on the way would keep the leftovers.
+
+    ⚠️ The cost is that an **accepted** candidate is validated twice — once
+    here, once in `register_generated` right after. Measured per candidate
+    on the worst case (a scalar, non-vectorised axis over the 65-shape
+    population): about 20s, so an accepted feature costs about 40s instead
+    of 20s. A cache keyed on the code would remove it and would also make
+    the duplication verdict depend on when the cache was filled; the
+    duplicate cost is paid instead.
+    """
+    _build_and_validate(code, registry=registry, meta=meta, table=table,
+                        matrix=matrix, hw_alt=hw_alt, others=others,
+                        train_shapes=train_shapes,
+                        sample_from_train=sample_from_train)
+
+
+def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
+                        table, matrix, hw_alt,
+                        others: dict | None = None,
+                        train_shapes=None,
+                        sample_from_train: bool = False):
+    """compile -> §8.3 validation -> the shape-level verdict. **Nothing is
+    registered.** Returns `(feature, probe matrix, shape-level reason)`.
+
+    ★ Split out of `register_generated` (D-170 §3) so that the check and the
+    registration are the same code. Two copies of "is this candidate
+    acceptable" is how the duplication check came to exist without ever
+    running (D-162).
     """
     from kernelrule.features.validate import validate_feature
 
@@ -519,6 +597,28 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
     is_shape, why = detect_shape_level(f, table, matrix=probe)
     if is_shape:
         f = replace(f, shape_level=True)
+    return f, probe, (why if is_shape else None)
+
+
+def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
+                       table, matrix, hw_alt,
+                       others: dict | None = None,
+                       train_shapes=None,
+                       sample_from_train: bool = False) -> Feature:
+    """Check -> sandbox -> §8.3 validation -> registration. One failure
+    raises.
+
+    `others` are the reference columns for the duplication verdict. Without
+    them they are recomputed every time; the 24 a human wrote do not change,
+    so it is better for the caller to build them once and pass them in (at 20
+    proposals that is 30 seconds x 20).
+    """
+    f, probe, why = _build_and_validate(
+        code, registry=registry, meta=meta, table=table, matrix=matrix,
+        hw_alt=hw_alt, others=others, train_shapes=train_shapes,
+        sample_from_train=sample_from_train)
+    name = f.name
+    if f.shape_level:
         # ★ The reason is recorded. In particular one that "references cfg
         #   yet is constant in this table" **must be re-judged when the
         #   bundle changes.** It is a frozen dataclass, so it goes into a

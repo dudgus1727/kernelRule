@@ -35,7 +35,7 @@ from kernelrule.features.generated import (
     _reference_columns,
     register_generated,
 )
-from kernelrule.features.known5 import KNOWN5
+from kernelrule.features.known7 import KNOWN7
 from kernelrule.features.validate import alt_hw
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
@@ -61,7 +61,7 @@ def _verdict(code: str, meta: dict, table, matrix, base_names, train_shapes,
              others) -> tuple[bool, str]:
     reg = FeatureRegistry("ab")
     for n in base_names:
-        reg.add(KNOWN5[n])
+        reg.add(KNOWN7[n])
     try:
         register_generated(code, registry=reg, meta=meta, table=table,
                            matrix=matrix, hw_alt=alt_hw(table.hw),
@@ -77,9 +77,9 @@ def _verdict(code: str, meta: dict, table, matrix, base_names, train_shapes,
 def main() -> None:
     warnings.simplefilter("ignore")
     table = PerfTable.from_bundle(BUNDLE, env_hash=ENV, ok_only=False)
-    base = FeatureRegistry("known5")
-    for n in sorted(KNOWN5._items):
-        base.add(KNOWN5[n])
+    base = FeatureRegistry("known7")
+    for n in sorted(KNOWN7._items):
+        base.add(KNOWN7[n])
     m0 = FeatureMatrix(table, base)
     res: dict = {"bundle": BUNDLE, "runs": {}}
     print("=" * 84)
@@ -108,9 +108,9 @@ def main() -> None:
             meta = {k: r.get(k) for k in
                     ("unit", "expected_range", "direction", "rationale")}
             ok_all, why_all = _verdict(r["code"], meta, table, m0,
-                                       sorted(KNOWN5._items), None, ref_all)
+                                       sorted(KNOWN7._items), None, ref_all)
             ok_tr, why_tr = _verdict(r["code"], meta, table, m0,
-                                     sorted(KNOWN5._items), train, ref_tr)
+                                     sorted(KNOWN7._items), train, ref_tr)
             same = ok_all == ok_tr
             total_diff += not same
             out.append({"name": r.get("name"), "recorded": r.get("accepted"),

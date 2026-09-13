@@ -274,7 +274,7 @@ def test_n_candidates_is_described_as_enumeration_not_performance():
 #   Everything above scans `prompts/**/*.md` and the pydantic field
 #   descriptions. But the "Existing features" block that goes into every
 #   prompt is built by `render_features()` out of strings held in
-#   `features/known5.py` (`annotate`) and `features/physical.py` (`_PHYSICS`).
+#   `features/known7.py` (`annotate`) and `features/physical.py` (`_PHYSICS`).
 #   Writing "in this table X was never optimal" in one of those would have
 #   reached the model with nothing to catch it — `physical_meaning` appeared
 #   in no test at all.
@@ -285,11 +285,11 @@ def test_n_candidates_is_described_as_enumeration_not_performance():
 def test_rendered_feature_block_has_no_table_derived_claim():
     import kernelrule.features.physical  # noqa: F401  — it fills REGISTRY
     from kernelrule.features import REGISTRY, render_features
-    from kernelrule.features.known5 import KNOWN5
+    from kernelrule.features.known7 import KNOWN7
 
     hits = []
     for label, reg in (("REGISTRY (F3's 24)", REGISTRY),
-                       ("KNOWN5 (F2's 5)", KNOWN5)):
+                       ("KNOWN7 (F2's 5)", KNOWN7)):
         text = render_features(reg, include_observed=False)
         for i, line in enumerate(text.splitlines(), 1):
             if _HW_OK.search(line):
@@ -301,7 +301,7 @@ def test_rendered_feature_block_has_no_table_derived_claim():
                     break
     assert not hits, (
         "a table-derived claim is in the feature block every prompt "
-        "receives (§12.3b). It is built from `known5.annotate(...)` and "
+        "receives (§12.3b). It is built from `known7.annotate(...)` and "
         "`physical._PHYSICS`, which no test used to read:\n" + "\n".join(hits))
 
 

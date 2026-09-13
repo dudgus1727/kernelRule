@@ -131,7 +131,9 @@ def base_registry(condition: str, *,
                   human: FeatureRegistry | None = None) -> FeatureRegistry:
     """The **starting registry** the condition decides. `F1` is empty.
 
-    ★ There are three conditions (D-128). A 0 -> 5 -> 24 ladder, with no
+    ★ There are three conditions (D-128). A 0 -> 7 -> 24 ladder (it was
+    0 -> 5 -> 24 until 2026-09-13; D-170 §4 added `log_min_dim` and
+    `log_flops` to F2), with no
     aliases.
 
     ⚠️ `F3` is the human-written list, and **the library does not reach for
@@ -144,15 +146,15 @@ def base_registry(condition: str, *,
     if condition == "F1":
         return FeatureRegistry("F1-empty")
     if condition == "F2":
-        # ★ The five public facts (§30.17). Not `physical.py`'s originals
+        # ★ The seven public facts (§30.17). Not `physical.py`'s originals
         #   but the **cleaned-up version with the table observations
         #   removed** — the original docstrings carry measurement results
         #   such as "in this table a spilling kernel was optimal 0 times"
         #   (§12.3).
-        from kernelrule.features.known5 import KNOWN5
-        r = FeatureRegistry("F2-known5")
-        for n in sorted(KNOWN5._items):
-            r.add(KNOWN5[n])
+        from kernelrule.features.known7 import KNOWN7
+        r = FeatureRegistry("F2-known7")
+        for n in sorted(KNOWN7._items):
+            r.add(KNOWN7[n])
         return r
     if condition == "F3":
         if human is None:
@@ -176,7 +178,10 @@ def run_registry(run: str, *, table, seed: int = 0, root: str | Path = "runs",
     Three layers, in the order the run itself built them:
 
     ```
-    the condition   F1 nothing · F2 known5 · F3 the 24 human ones
+    the condition   F1 nothing · F2 known7 · F3 the 24 human ones
+                    ⚠️ `F2-known5` (D-170 §4) in a record from before
+                    2026-09-13 is the **five**-axis version of this same
+                    condition name
     stage 1         what the FeatureWriter made before the loop
                       runs/<run>/stage1-features/proposals.jsonl
     the loop        what it made during the loop (D-160)

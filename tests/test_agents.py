@@ -343,7 +343,7 @@ def test_feature_prompt_example_uses_no_real_feature(monkeypatch):
 
     The conditions that give public knowledge (F2/F3) show the real features
     down to the code — that is the definition of the condition (§30.17).
-    Those use `examples/known5.md`.
+    Those use `examples/known7.md`.
     """
     from kernelrule.agents.openai_client import load_prompt
     from kernelrule.features import REGISTRY

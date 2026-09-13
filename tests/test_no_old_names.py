@@ -38,7 +38,14 @@ OLD = {
     "architect-try": "rule_writer-try",
     "rule_budget": "parameters",
     "literal_budget_message": "literal_parameter_message",
+    # ★ 2026-09-13 (D-170 §4)
+    "known5": "known7", "KNOWN5": "KNOWN7",
 }
+
+#: ★ Which decision a line has to cite to be allowed to keep an old name.
+#: It was `D-128` for every entry; the D-170 rename needed its own, and a
+#: single hardcoded id would have made the new old-name unenforceable.
+DECISION = {"known5": "D-170", "KNOWN5": "D-170"}
 
 #: ★ The files that carry the correction history — the old names **have to
 #: stay** in them.
@@ -50,7 +57,7 @@ HISTORY = {
     "docs/pending_fixes.md",
     "kernelrule/rules/human_guided.py",   # the rename history is in the
                                           # docstring
-    "kernelrule/features/known5.py",      # the same reason
+    "kernelrule/features/known7.py",      # the same reason
     "kernelrule/core/runset.py",          # where the old key is read
     "tests/test_no_old_names.py",         # this file itself
 }
@@ -78,9 +85,10 @@ def test_old_name_is_gone(old):
            for i, line in enumerate(p.read_text().splitlines(), 1)
            # ★ An old name may remain **only when the renaming decision is
            #   cited alongside it**
-           if old in line and "D-128" not in line]
+           if old in line and DECISION.get(old, "D-128") not in line]
     assert not bad, (
-        f"the old name {old!r} is still there (-> {OLD[old]}): {bad[:8]}\n"
+        f"the old name {old!r} is still there (-> {OLD[old]}, cite "
+        f"{DECISION.get(old, 'D-128')}): {bad[:8]}\n"
         "★ Do not keep an alias. If it is correction history, put it in the "
         "HISTORY list.")
 

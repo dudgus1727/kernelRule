@@ -1,11 +1,42 @@
-"""★ The starting library of condition F2 — **the five public facts**
+"""★ The starting library of condition F2 — **the seven public facts**
 (§30.17).
 
-★ Renamed 2026-09-04: this condition's old name was `F1-K` (D-128). The
-module name is unchanged — its content is "the 5 public facts", separate from
-the condition's name.
+★ Renamed 2026-09-04: this condition's old name was `F1-K` (D-128).
+★ Renamed 2026-09-13 (D-170 §4): `known5` -> `known7`, `KNOWN5` -> `KNOWN7`,
+  `F2-known5` -> `F2-known7`, `examples/known5.md` -> `examples/known7.md`.
+  **The old names are not deleted from the record** — every run recorded
+  before that date says `F2-known5` and its library really is the five.
+  ⚠️ F2 is the same condition *name* with **different content**; a number
+  from before and a number from after are not on the same condition.
 
-## Why five are given
+## ★ Why two were added (D-170 §4)
+
+The question is what the model builds on top of what is known, and a rule
+branches with `if p.<x>:`. Counting the axes that can actually carry a
+branch — shape level **and** not constant on the scored population:
+
+```
+F3 (the human 24)  ★ 8   arith_intensity · aspect_MN · can_use_cp_async
+                         is_memory_bound · log_flops · log_min_dim
+                         reuse_ratio · roofline_ratio
+F2 (known5)        ★ 1   roofline_ratio
+                         + whatever stage 1 generated -> ★ 10/10 libraries
+                           of the sweep had 0 that varied -> effectively 1
+```
+
+So "F3 does better than F2" may be a statement about **branching material,
+1 against 8**, and not about library size at all. That is a hypothesis for
+the next experiment, written down before it is run.
+
+Which two: **the two the evolution picked for itself** when D-156 removed
+our SOL axis — `log_min_dim` 7 times and `log_flops` 7 times, with the
+branch threshold stable from r0 to r11 (the SOL-based D-155 wandered
+20 -> 40 -> 30). The model chose them; we are not inventing a pair.
+
+Both are shape arithmetic — `log2(min(M,N,K))` and `log2(2MNK)` — so they
+break no part of the "knowable without this table" condition.
+
+## Why the base library is given at all
 
 In F1 (starting from 0), nearly half the budget went into **re-inventing
 physics that is already known** — of 21, 6 strict rediscoveries + 3 monotone
@@ -19,14 +50,20 @@ occupancy calculation  CUDA Occupancy Calculator
 arithmetic intensity   Williams et al. (2009) roofline
 tile edge waste        CUTLASS documentation, predication
 register spilling      CUDA C++ Best Practices, Register Pressure
+★ problem dimensions   the GEMM shape itself — M, N, K are the inputs
+★ problem size         2MNK is the definition of GEMM's flop count
 ```
+
+★ The last two are not "knowledge" in the same sense as the first five —
+they are **the arithmetic of the inputs**, available to anyone holding the
+shape. That is precisely why giving them costs the condition nothing.
 
 **That knowledge is there when porting to a new GPU too.** "Does the LLM
 rediscover these on its own" has been answered (largely, it reproduces them),
 and what we want to know is **"what does it build on top of what is
 known"**.
 
-## Which five — **ones of different shapes**
+## Which seven — **ones of different shapes**
 
 ```
 tail_waste          ratio      normalised to 0~1 with a physical upper bound
@@ -35,10 +72,13 @@ roofline_ratio      threshold  ★ shape level (p.*). Read against 1
 edge_waste          absolute   unbounded (0~300). Compression must be
                                considered
 has_spill           binary     once on, the magnitude changes
+★ log_min_dim       log        shape level. The shortest axis — it is what
+                               separates M=1 from M=4096 on this table
+★ log_flops         log        shape level. The absolute problem size
 ```
 
-`roofline_ratio` being shape-level is deliberate too — it shows that a rule
-can branch with `if p.<x>:`.
+The three shape-level ones are deliberate — a rule branches with
+`if p.<x>:`, and one such axis is not a regime, it is a switch.
 
 ## ★ The docstrings are a cleaned-up version — not the original
 
@@ -82,11 +122,11 @@ from kernelrule.features import FeatureRegistry
 from kernelrule.features import feature as _feature
 from kernelrule.features import shape_feature as _shape_feature
 
-__all__ = ["KNOWN5", "SOURCES", "source_of"]
+__all__ = ["KNOWN7", "SOURCES", "source_of"]
 
-#: The starting registry of F2. **Only five go in** — the other 19 are
+#: The starting registry of F2. **Only seven go in** — the other 17 are
 #: condition F3.
-KNOWN5 = FeatureRegistry("known5")
+KNOWN7 = FeatureRegistry("known7")
 
 #: Feature -> public source. It is appended to the description in the
 #: prompt.
@@ -96,6 +136,14 @@ SOURCES: dict[str, str] = {
     "roofline_ratio": 'Williams, Waterman, Patterson (2009), "Roofline"',
     "edge_waste": "CUTLASS documentation, predication",
     "has_spill": 'CUDA C++ Best Practices Guide, "Register Pressure"',
+    # ★ D-170 §4. The source is the problem statement itself: a GEMM is
+    #   given as (M, N, K), and 2MNK is the flop count in its definition
+    #   (BLAS level-3 GEMM; NVIDIA's Matrix Multiplication Background User
+    #   Guide states both). Nothing here needs this table.
+    "log_min_dim": ("the GEMM problem statement — M, N, K are the inputs "
+                    "(NVIDIA Matrix Multiplication Background User Guide)"),
+    "log_flops": ("the definition of GEMM's flop count, 2MNK (NVIDIA "
+                  "Matrix Multiplication Background User Guide)"),
 }
 
 
@@ -126,7 +174,7 @@ def _v_tail(df, hw):
     return (full - w) / full
 
 
-@_feature(registry=KNOWN5, expected_range=(0.0, 1.0),
+@_feature(registry=KNOWN7, expected_range=(0.0, 1.0),
           direction="higher_is_worse",
           vec=lambda df, hw, p: _v_tail(df, hw))
 def tail_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
@@ -145,7 +193,7 @@ def tail_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
     return (full - w) / full
 
 
-@_feature(registry=KNOWN5, expected_range=(0.0, 1.0),
+@_feature(registry=KNOWN7, expected_range=(0.0, 1.0),
           direction="higher_is_worse",
           vec=lambda df, hw, p: 1.0 - np.clip(
               df["max_blocks_per_sm"].to_numpy(np.float64)
@@ -162,7 +210,7 @@ def occupancy_deficit(p: Problem, hw: Hardware, cfg: Config) -> float:
     return 1.0 - min(1.0, max(0.0, used))
 
 
-@_shape_feature(registry=KNOWN5, expected_range=(0.0, 1e4),
+@_shape_feature(registry=KNOWN7, expected_range=(0.0, 1e4),
                 direction="neutral")
 def roofline_ratio(p: Problem, hw: Hardware, cfg: Config) -> float:
     """Arithmetic intensity / ridge point. Below 1 it is memory-bound.
@@ -190,7 +238,7 @@ def _v_edge(df):
                  / df["N"].to_numpy(np.float64)) - 1.0
 
 
-@_feature(registry=KNOWN5, expected_range=(0.0, 300.0),
+@_feature(registry=KNOWN7, expected_range=(0.0, 300.0),
           direction="higher_is_worse", vec=lambda df, hw, p: _v_edge(df))
 def edge_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
     """The multiple of work thrown away where a tile crosses the shape
@@ -207,7 +255,7 @@ def edge_waste(p: Problem, hw: Hardware, cfg: Config) -> float:
     return (gm * cfg.tile_m / p.M) * (gn * cfg.tile_n / p.N) - 1.0
 
 
-@_feature(registry=KNOWN5, expected_range=(0.0, 1.0),
+@_feature(registry=KNOWN7, expected_range=(0.0, 1.0),
           direction="higher_is_worse",
           vec=lambda df, hw, p: (df["spill_bytes"].to_numpy(np.float64) > 0
                                  ).astype(np.float64))
@@ -220,6 +268,36 @@ def has_spill(p: Problem, hw: Hardware, cfg: Config) -> float:
     Source: CUDA C++ Best Practices Guide, "Register Pressure"
     """
     return 1.0 if cfg.spill_bytes > 0 else 0.0
+
+
+@_shape_feature(registry=KNOWN7, expected_range=(0.0, 30.0),
+                direction="neutral")
+def log_min_dim(p: Problem, hw: Hardware, cfg: Config) -> float:
+    """log2 of the shortest of M, N, K. It separates skinny shapes from
+    square ones.
+
+    A GEMM is given as three dimensions, and when one of them is small the
+    problem is a different shape of problem — a tile that is wider than the
+    dimension it covers throws work away no matter what else is chosen. **It
+    is shape level, so it can be used to branch, as in
+    `if p.log_min_dim < 4.0:`.**
+    Source: the GEMM problem statement — M, N, K are the inputs
+    """
+    return math.log2(max(1.0, float(min(p.M, p.N, p.K))))
+
+
+@_shape_feature(registry=KNOWN7, expected_range=(0.0, 80.0),
+                direction="neutral")
+def log_flops(p: Problem, hw: Hardware, cfg: Config) -> float:
+    """log2(2·M·N·K) — the absolute size of the problem.
+
+    2MNK is the flop count in the definition of GEMM. It says nothing about
+    which config is good; it says **how large the problem is**, which is the
+    axis along which fixed overheads stop mattering. **Shape level, so it
+    can be used to branch.**
+    Source: the definition of GEMM's flop count, 2MNK
+    """
+    return math.log2(max(1.0, 2.0 * float(p.M) * float(p.N) * float(p.K)))
 
 
 # ★ The descriptions and ranges are attached for the prompt. Those of
@@ -243,5 +321,12 @@ for _n, _text in {
     "has_spill": ("Registers overflow into local memory (= DRAM). If a "
                   "register access is one cycle, local is hundreds, and it "
                   "happens on every iteration inside the mainloop"),
+    "log_min_dim": ("log2 of the shortest of M, N, K. It is shape level, so "
+                    "it can be used to branch. A dimension shorter than the "
+                    "tile that covers it throws work away whatever else is "
+                    "chosen"),
+    "log_flops": ("log2(2MNK), the absolute size of the problem. It is "
+                  "shape level, so it can be used to branch. It is the axis "
+                  "along which fixed overheads stop mattering"),
 }.items():
-    KNOWN5.annotate(_n, physical_meaning=f"{_text}. Source: {source_of(_n)}")
+    KNOWN7.annotate(_n, physical_meaning=f"{_text}. Source: {source_of(_n)}")

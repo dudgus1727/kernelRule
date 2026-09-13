@@ -176,6 +176,54 @@ def _plan(cats: list[dict], n_features: int, per_cat: int) -> list[str | None]:
     return plan
 
 
+#: ★ How many **branchable** axes the FeatureWriter is asked for over a
+#: session — shape level (computed from `p`/`hw` alone) and not constant on
+#: the scored shapes (D-170 §4-3).
+#:
+#: **3.** known7 already carries three (`roofline_ratio`, `log_min_dim`,
+#: `log_flops`), so three generated ones bring F2 to six, against F3's
+#: eight. The point is to get within reach of the human library's branching
+#: material, not past it.
+#:
+#: ⛔ Not raised above 3. There is a cheap way to satisfy a large quota —
+#: alignment has four distinct values on this table, so any number of
+#: "alignment variants" would count while measuring one thing. The
+#: duplication check refuses them one by one; a bigger quota just pays the
+#: model to keep trying.
+MIN_BRANCHABLE = 3
+
+
+def _n_branchable(gen: FeatureRegistry, base: FeatureRegistry) -> int:
+    """How many branchable axes have been built **so far in this session**.
+
+    ★ "not constant on the scored shapes" needs no measurement here: since
+    D-170 §2 the constant check runs over the whole experiment population,
+    so a shape-level feature that survived registration necessarily varies
+    on it. Before that change this count would have been a lie — the ten
+    libraries of the stage-1 sweep each registered a shape-level axis and
+    every one of them was constant on the scored shapes.
+    """
+    return sum(1 for n in set(gen._items) - set(base._items)
+               if gen[n].shape_level)
+
+
+def _branch_block(gen: FeatureRegistry, base: FeatureRegistry) -> str:
+    """The live branchable-axis count for the prompt (D-170 §4-3)."""
+    n = _n_branchable(gen, base)
+    names = sorted(n_ for n_ in set(gen._items) - set(base._items)
+                   if gen[n_].shape_level)
+    if n >= MIN_BRANCHABLE:
+        return (f"\n\n★ Branchable axes so far: **{n}** of the "
+                f"{MIN_BRANCHABLE} asked for ({names}). The quota is met — "
+                f"build whatever this area needs.")
+    return (f"\n\n★ Branchable axes so far: **{n}** of the "
+            f"{MIN_BRANCHABLE} asked for"
+            + (f" ({names})." if names else ".")
+            + " A branchable axis is computed from `p` and `hw` only — no "
+              "`cfg` — so a rule can split on it. If this area admits one, "
+              "make this one branchable.")
+
+
 def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
           gen: FeatureRegistry, base: FeatureRegistry) -> str:
     """The instruction for this proposal. With an area, it builds within
@@ -184,7 +232,8 @@ def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
         made = sorted(set(gen._items) - set(base._items))
         tail = (f"\n\nBuilt so far: {made}. Find an axis different from "
                 "these." if made else "")
-        return "## What to build now\n\nPropose one feature." + tail
+        return ("## What to build now\n\nPropose one feature." + tail
+                + _branch_block(gen, base))
     desc = next(c["description"] for c in cats if c["name"] == cat)
     mine = made_in.get(cat, [])
     other = sorted(set(gen._items) - set(base._items) - set(mine))
@@ -194,8 +243,24 @@ def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
             f"from other areas (for duplicate checking): {other or 'none'}\n"
             "```\n\n"
             "★ Stay **within this area**. Wandering into another area leaves "
-            "nothing to build\nwhen that area's turn comes.")
+            "nothing to build\nwhen that area's turn comes."
+            + _branch_block(gen, base))
 
+
+#: ★ How many times the FeatureWriter is asked again when §8.3 refuses its
+#: candidate (D-170 §3).
+#:
+#: **3, the same as everywhere else** (`LLMConfig.max_retries`, and what
+#: D-164 gave RuleWriter). The evidence we have for a number is D-164's:
+#: with the refusal fed back at 3 retries, stage 2 went from 3/10 seeds
+#: surviving to 10/10. Picking a different number here would mean claiming
+#: something that measurement has not said.
+#:
+#: ⛔ Not unlimited. A slot that is refused 4 times **stays empty** — the
+#: library gets smaller and that fact is recorded (`rejections` in
+#: summary.json). An axis the model cannot express after four tries is a
+#: result, not something to spend budget on.
+FEATURE_RETRIES = 3
 
 #: How many times to call again when a RuleWriter output is caught by the
 #: static checks.
@@ -240,6 +305,33 @@ def _population_criterion() -> str:
             f"(kernelrule.core.splits.experiment_shapes, D-170 §1)")
 
 
+def _wire_feature_retry(llm, *, table, matrix, hw_alt, gen, train_shapes
+                        ) -> bool:
+    """★ Put the §8.3 refusal **inside the retry path** (D-170 §3).
+
+    `f1_pipeline.py:535` caught `FeatureRejected` and moved to the next
+    slot, so a refusal never reached the model and the slot simply emptied.
+    Fixing what the constant check looks at (D-170 §2) without this would
+    not have produced different axes — it would have produced a smaller
+    library.
+
+    Returns whether it was wired (a `MockLLM` has no hook — a dry run is not
+    silently treated as if it had one).
+    """
+    from kernelrule.features.generated import check_generated
+
+    if not hasattr(llm, "set_feature_check"):
+        return False
+
+    def check(name: str, code: str, meta: dict) -> None:
+        check_generated(code, registry=gen, meta=meta, table=table,
+                        matrix=matrix, hw_alt=hw_alt,
+                        train_shapes=train_shapes)
+
+    llm.set_feature_check(check)
+    return True
+
+
 def _shape_population(table: PerfTable, splits: SplitSet) -> dict:
     """★ 2026-09-11 (D-167 §Q): **which shapes the run actually used.**
 
@@ -265,8 +357,42 @@ def _shape_population(table: PerfTable, splits: SplitSet) -> dict:
         "n_train": len(splits.train.shapes), "n_val": len(splits.val.shapes)}
 
 
+#: ★ Which shape population a run was scored on (D-170 §1).
+#:
+#:   "family"  the current criterion — more than one kernel family (65 on
+#:             the A6000 table)
+#:   "align8"  the criterion until 2026-09-13 — alignment 8 everywhere (61)
+#:
+#: ⛔ A **recorded** run must be re-scored on the population it ran on.
+#: `_population_of` reads that out of the run's own `config.json`, so
+#: re-scoring an old rule does not silently move its number.
+POPULATIONS = ("family", "align8")
+
+
+def _population_of(cfg: dict) -> str:
+    """Which population a recorded run used, from its `config.json`.
+
+    A run from before 2026-09-11 has no `shape_population` block at all
+    (D-167 §Q added it) and a run from before 2026-09-13 records the
+    alignment criterion — **both are `align8`**. Only the string naming the
+    kernel-family criterion means `family`.
+    """
+    crit = ((cfg.get("shape_population") or {}).get("criterion") or "")
+    return "family" if "pipeline_kind" in crit else "align8"
+
+
+def _population_shapes(table: PerfTable, population: str) -> list:
+    from kernelrule.core.splits import aligned_shapes
+
+    if population not in POPULATIONS:
+        raise ValueError(f"unknown population: {population!r}. {POPULATIONS}")
+    return (experiment_shapes(table) if population == "family"
+            else aligned_shapes(table))
+
+
 def _splits(table: PerfTable, *, fold: int | None = None,
-            split_seed: int = 12345, k: int = 3) -> SplitSet:
+            split_seed: int = 12345, k: int = 3,
+            population: str = "family") -> SplitSet:
     """The split. The default is the **structural split** (the 11008 layer
     held out whole, §10.1).
 
@@ -284,7 +410,12 @@ def _splits(table: PerfTable, *, fold: int | None = None,
     it from the loop's evolution seed is what lets "because the split
     differed" be told from "because the evolution differed".
     """
-    shapes = _aligned_shapes(table)
+    # ⚠️ 2026-09-13 (D-170 §1): the default population is the **current**
+    #   one (65). Re-scoring a rule from a recorded run needs
+    #   `population=_population_of(cfg)` — the folds are built from the
+    #   shape list, so a different population is a different split, and the
+    #   number would move with no sign of it.
+    shapes = _population_shapes(table, population)
     if fold is not None:
         from kernelrule.core.splits import stratified_kfold
 
@@ -350,6 +481,11 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
     #   metric (D-118 · D-121).
     return OpenAILLM(LLMConfig(model=a.model, concurrency=6,
                                objective="regret",
+                               # ★ D-170 §3 — stated rather than inherited.
+                               #   The FeatureWriter's §8.3 refusals now use
+                               #   this path, so the number belongs where it
+                               #   can be read.
+                               max_retries=FEATURE_RETRIES,
                                parameters=getattr(a, "parameters", None),
                                product_hint=getattr(
                                    a, "product_hint", False),
@@ -419,6 +555,13 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry,
     llm = _make_llm(a, registry=gen, budget=Budget(max_calls=a.n_features * 4),
                     table=table)
     hw_alt = alt_hw(table.hw)
+    # ★ D-170 §3 — a refusal is handed back to the model instead of
+    #   emptying the slot.
+    retry_wired = _wire_feature_retry(llm, table=table, matrix=matrix,
+                                      hw_alt=hw_alt, gen=gen,
+                                      train_shapes=train_shapes)
+    print(f"  ★ §8.3 refusals go back to the model: {retry_wired} "
+          f"(up to {FEATURE_RETRIES} retries per slot, D-170 §3)")
     rejects: dict[str, int] = {}
     t0 = time.perf_counter()
 
@@ -499,6 +642,12 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry,
             "n_accepted": len(made) - n_prior,  # ★ only what was built now
             "n_total": len(made),               # including carried-over
             "rejections": rejects, "seconds": round(time.perf_counter() - t0, 1),
+            # ★ D-170 §3: did the refusal actually reach the model, and how
+            #   often. A retry that leaves no record cannot be counted.
+            "feature_retry_wired": retry_wired,
+            "feature_retries_allowed": FEATURE_RETRIES,
+            "violations": (llm.violation_report()
+                           if hasattr(llm, "violation_report") else None),
             "feature_names": made,
             "physics_coverage": _physics_coverage(table, gen, base)})
         (out / "features.py").write_text(_features_module(gen, base))
