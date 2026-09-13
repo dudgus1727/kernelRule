@@ -273,30 +273,49 @@ def _write_md(out: dict, ranked: list[dict], repeated: dict) -> None:
          "★ 셋 다 stage 1 산출물만으로 계산되고 답을 안 읽는다",
          "```", "",
          "## 비교표", "",
-         ("| 라이브러리 | ★1 형상축(비상수) | ★2 덮임 | ★3 최대 sp | "
-          "채택/제안 | range 기본값 | 범위비 중앙 | 범위비 최대 | "
-          "rationale 빈 | recheck | 초 |"),
-         "|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|"]
+         ("| 라이브러리 | ★1 형상축(비상수) | 갈라짐 | ★2 덮임(기록) | "
+          "덮임(오늘) | ★3 최대 sp | 채택/제안 | range 기본값 | "
+          "범위비 중앙 | 범위비 최대 | rationale 빈 | recheck | 초 |"),
+         "|---|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|"]
     for r in ranked:
         mark = " ★" if r["tag"] == out["chosen"] else ""
         sm = (f"{r['span_ratio_median']:.3g}"
               if r["span_ratio_median"] is not None else "—")
         sx = (f"{r['span_ratio_max']:.3g}"
               if r["span_ratio_max"] is not None else "—")
+        sp_ = r.get("shape_level_varying_spread") or {}
+        split = ("—" if not sp_ else
+                 " ".join(f"{v[0]}값/최소{v[1]}" for v in sp_.values()))
         L.append(
             f"| `{r['tag']}`{mark} | {r['n_shape_level_varying']} | "
-            f"{r['n_covered']}/{r['n_terms']} | {r['max_spearman']:.4f} | "
+            f"{split} | "
+            f"{r['n_covered']}/{r['n_terms']} | "
+            f"{r.get('n_covered_now', '—')}/{r['n_terms']} | "
+            f"{r['max_spearman']:.4f} | "
             f"{r['n_accepted']}/{r['n_planned']} | {r['n_default_range']} | "
             f"{sm} | {sx} | {r['n_empty_rationale']} | "
             f"{len(r['needs_recheck'])} | {r['seconds']:.0f} |")
     best = ranked[0]
-    L += ["", (f"★ 고른 것은 **`{best['tag']}`** — 형상 수준이면서 상수가 "
+    L += ["",
+          ("⚠️ **덮임(기록)** 은 각 실행이 자기 `summary.json` 에 남긴 값이고 "
+           "**덮임(오늘)** 은 전부를 오늘의 절차로 다시 잰 값이다. D-170 §2 가 "
+           "중복 비교 집합을 바꿨으므로 (12형상 전부 정렬8 -> 21형상, 모든 "
+           "(M,정렬) 묶음) 두 열은 **다른 절차**다 — 나란히 읽을 것은 "
+           "오늘 열이다."),
+          ("★ **갈라짐** 은 그 형상축이 65형상을 몇 값으로 나누는가와 가장 작은 "
+           "쪽의 크기다. 65형상 중 4개에서만 다른 값을 갖는 축은 30 대 35 로 "
+           "가르는 축과 같은 재료가 아니다."), ""]
+    if out.get("compare_only"):
+        L += [("★ **고르지 않는다** — 조건이 둘인 표이고, D-169 §3 의 선택은 "
+               "그대로다."), ""]
+    else:
+        L += [(f"★ 고른 것은 **`{best['tag']}`** — 형상 수준이면서 상수가 "
                f"아닌 축이 {best['n_shape_level_varying']}개로 가장 많다."), ""]
-    L += ["그 축들:", "", "```"]
-    for n in best["shape_level_varying"]:
-        L.append(n)
-    L += ["```", "",
-          "## 10개 사이에 반복된 축 이름", "",
+        L += ["그 축들:", "", "```"]
+        for n in best["shape_level_varying"]:
+            L.append(n)
+        L += ["```", ""]
+    L += ["## 라이브러리 사이에 반복된 축 이름", "",
           "★ 21실행에서 독립 실행들이 같은 축을 만든 것과 같은 관찰이다.", "",
           "| 축 | 몇 개 라이브러리에 |", "|---|--:|"]
     for k, v in list(repeated.items())[:20]:
