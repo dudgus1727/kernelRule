@@ -100,6 +100,14 @@ def _splits_of(table, kind: str, *, population: str = "align8") -> SplitSet:
         return SplitSet(
             train=Split("train", tuple(p for p in shapes if p not in held)),
             val=Split("val", tuple(held)), kind="nk11008")
+    # ★ D-171 §1 — the (N,K) group design. It carries no seed: the
+    #   assignment is deterministic, so the kind records the fold and k only.
+    m = re.fullmatch(r"nkgroup(\d+)-k(\d+)", kind)
+    if m:
+        from experiments.f1_pipeline import _splits
+
+        return _splits(table, fold=int(m.group(1)), k=int(m.group(2)),
+                       design="nkgroup", population=population)
     m = re.fullmatch(r"kfold(\d+)-seed(\d+)", kind)
     if not m:
         raise SystemExit(f"unknown split_kind {kind!r}. It is not guessed "

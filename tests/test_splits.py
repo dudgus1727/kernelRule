@@ -178,3 +178,68 @@ def test_no_experiment_copies_the_alignment_predicate():
         "the alignment predicate was copied again instead of calling "
         "`kernelrule.core.splits.experiment_shapes` (D-167 §R):\n"
         + "\n".join(bad))
+
+
+# ---------------------------------------------------------------------------
+# ★ D-171 §1 — the (N,K) group split
+# ---------------------------------------------------------------------------
+@pytest.mark.needs_bundle
+def test_nk_group_folds_layout_on_the_a6000():
+    """★ The layout is pinned: **fold 0 is the layer holdout**.
+
+    Those 20 shapes are exactly the `nk11008` structural split, so the split
+    this repository has used since §10.1 is one fold of this design rather
+    than a separate experiment. If a change moves it, every transfer number
+    stops lining up with the earlier ones.
+    """
+    import warnings
+
+    from kernelrule.core.splits import (
+        NK_LAYER,
+        experiment_shapes,
+        nk_group_folds,
+    )
+    from kernelrule.core.table import PerfTable
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        table = PerfTable.from_bundle("datasets/rtx-a6000-sm_86-c63710df",
+                                      env_hash="c63710df", ok_only=False)
+    shapes = experiment_shapes(table)
+    folds = nk_group_folds(shapes, k=4)
+    assert [len(f.val.shapes) for f in folds] == [20, 17, 14, 14]
+    f0 = {(p.N, p.K) for p in folds[0].val.shapes}
+    assert f0 == {(4096, NK_LAYER), (NK_LAYER, 4096)}, f0
+    # ★ the same 20 shapes as the structural split
+    old = {p.key for p in shapes if NK_LAYER in (p.N, p.K)}
+    assert {p.key for p in folds[0].val.shapes} == old
+    assert {(p.N, p.K) for p in folds[1].val.shapes} == {(4096, 4096)}
+
+
+@pytest.mark.needs_bundle
+def test_nk_group_folds_keep_a_group_whole_and_cover_everything():
+    """★ The two checks that must hold before anything runs (D-171 §1-4).
+
+    ⛔ A `(N,K)` sibling in training means the holdout is not a layer
+    holdout at all. Coverage means every shape is validated exactly once.
+    """
+    import warnings
+
+    from kernelrule.core.splits import experiment_shapes, nk_group_folds
+    from kernelrule.core.table import PerfTable
+
+    for bundle, env in (("datasets/rtx-a6000-sm_86-c63710df", "c63710df"),
+                        ("datasets/h100-nvl-sm_90-63684546", "63684546")):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            table = PerfTable.from_bundle(bundle, env_hash=env,
+                                          ok_only=False)
+        shapes = experiment_shapes(table)
+        folds = nk_group_folds(shapes, k=4)
+        seen: list = []
+        for f in folds:
+            tr = {(p.N, p.K) for p in f.train.shapes}
+            for p in f.val.shapes:
+                assert (p.N, p.K) not in tr, (bundle, p)
+                seen.append(p.key)
+        assert sorted(seen) == sorted(p.key for p in shapes), bundle

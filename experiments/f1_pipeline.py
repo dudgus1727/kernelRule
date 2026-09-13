@@ -392,7 +392,8 @@ def _population_shapes(table: PerfTable, population: str) -> list:
 
 def _splits(table: PerfTable, *, fold: int | None = None,
             split_seed: int = 12345, k: int = 3,
-            population: str = "family") -> SplitSet:
+            population: str = "family",
+            design: str = "kfold") -> SplitSet:
     """The split. The default is the **structural split** (the 11008 layer
     held out whole, §10.1).
 
@@ -416,6 +417,23 @@ def _splits(table: PerfTable, *, fold: int | None = None,
     #   shape list, so a different population is a different split, and the
     #   number would move with no sign of it.
     shapes = _population_shapes(table, population)
+    if design not in ("kfold", "nkgroup"):
+        raise ValueError(f"unknown split design: {design!r}")
+    if design == "nkgroup":
+        # ★ D-171 §1 — a whole (N,K) group on one side. `fold` picks which.
+        #   ⚠️ It takes **no seed**: the assignment is deterministic, so
+        #   there is no split randomness to separate from the evolution
+        #   seed here.
+        from kernelrule.core.splits import nk_group_folds
+
+        if fold is None:
+            raise ValueError(
+                "the nkgroup design has no default fold — state --fold. "
+                "Guessing one would put a different holdout under the same "
+                "name (§26.4)")
+        s = nk_group_folds(shapes, k=k)[fold]
+        check_balance(s.train, table.hw)
+        return s
     if fold is not None:
         from kernelrule.core.splits import stratified_kfold
 
@@ -1245,6 +1263,12 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     # ★ The split (D-144). With `--fold` it is a stratified 3-fold;
     #   without it, the structural split.
+    ap.add_argument("--split-design", choices=("kfold", "nkgroup"),
+                    default="kfold",
+                    help="★ D-171 §1: `nkgroup` keeps a whole (N,K) group "
+                         "on one side — the layer is the unit a deployment "
+                         "changes, and a random cut puts the neighbours of "
+                         "one sweep on both sides. Needs --fold")
     ap.add_argument("--fold", type=int, default=None,
                     help="which fold of the stratified k-fold (0..k-1). "
                          "Without it, the structural split (11008)")
@@ -1317,7 +1341,8 @@ def main() -> None:
                                   ok_only=False)
     splits = _splits(table, fold=getattr(a, "fold", None),
                      split_seed=getattr(a, "split_seed", 12345),
-                     k=getattr(a, "folds", 3))
+                     k=getattr(a, "folds", 3),
+                     design=getattr(a, "split_design", "kfold"))
     base = _base_registry(a.condition)
 
     print("=" * 78)

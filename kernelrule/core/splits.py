@@ -45,6 +45,7 @@ from typing import Literal
 from kernelrule.core.types import Problem
 
 __all__ = ["Split", "SplitSet", "SplitError", "by_predicate",
+           "nk_groups", "nk_group_folds", "NK_LAYER",
            "experiment_shapes", "aligned_shapes", "kernel_families",
            "ALIGNMENT_REQUIRED", "MIN_KERNEL_FAMILIES",
            "KERNEL_FAMILY_COLUMN",
@@ -619,3 +620,125 @@ def experiment_shapes(table) -> list:
            if len(kernel_families(table, p)) >= MIN_KERNEL_FAMILIES]
     _POPULATION[id(table)] = (table, out)
     return list(out)
+
+
+# ---------------------------------------------------------------------------
+# ★ 2026-09-13 (D-171) — the (N, K) group split
+# ---------------------------------------------------------------------------
+#: ★ The layer dimension that decides fold 0 (D-171 §1-2). It is the same
+#: 11008 the `nk11008` structural split has always used — the FFN width of
+#: the model this grid was built around. ⛔ Not a knob: changing it changes
+#: which shapes are the layer holdout, and with it every transfer number.
+NK_LAYER = 11008
+
+
+def nk_groups(shapes: Sequence[Problem]) -> dict[tuple[int, int], list]:
+    """Shapes grouped by `(N, K)`, in the order they first appear.
+
+    ★ It looks at the **shape definition only**. `best_ms` is `ANSWER_COLS`,
+    so a split built from the answer contaminates the holdout (§10.1).
+    """
+    out: dict[tuple[int, int], list] = {}
+    for p in shapes:
+        out.setdefault((p.N, p.K), []).append(p)
+    return out
+
+
+def nk_group_folds(shapes: Sequence[Problem], *, k: int = 4,
+                   name: str = "nkgroup") -> list[SplitSet]:
+    """★ k folds in which **a whole `(N, K)` group is on one side**
+    (D-171 §1).
+
+    ## Why not a random k-fold
+
+    This table is **not a sample, it is a designed grid.** Every shape is a
+    probe placed on purpose:
+
+    ```
+    a_workload  40 shapes   (N,K) 4 kinds x M 10 kinds
+    b_kvary     12 shapes   M in {128,1024}, a K sweep
+    c_waves     11 shapes   N=K=4096, ★ a fine M sweep (aimed at wave
+                            quantisation)
+    d_alignment  4 shapes   misaligned
+    e_square     5 shapes   M=N=K
+    ```
+
+    Cut at random and the neighbours of one sweep land on both sides —
+    M=1500 in training and M=1536 in validation. The layer `(N, K)` is the
+    unit a deployment actually changes, so it is the unit the split uses.
+
+    ## The layout on the A6000's 65 shapes
+
+    ```
+    ★ fold 0   (4096,11008) + (11008,4096)      val 20
+      fold 1   (4096,4096)  17 shapes           val 17
+      fold 2~3 the remaining 15 groups          val 14 · 14
+    ```
+
+    ★ Fold 0 is **exactly the old `nk11008` holdout** — those 20 shapes are
+    two groups, so the structural split we have been using all along is one
+    fold of this design rather than a separate experiment.
+
+    ⚠️ `(4096,4096)` holds 17 shapes and **cannot be split**, so raising `k`
+    does not improve the balance: at k=5 a 9-shape fold appears. k=4 is the
+    largest k whose smallest fold still holds 14.
+
+    ## How the rest is assigned
+
+    Groups are sorted by size (descending, ties by `(N, K)`) and each goes to
+    the fold holding the fewest shapes so far, ties to the lowest index —
+    after folds 0 and 1 are claimed by the two fixed groups above. It is
+    deterministic and takes no randomness at all, so there is **no split
+    seed** to separate from the evolution seed.
+
+    ⚠️ What this measures is **"a layer shape never seen"**, not "a shape
+    never seen". A validation shape has no `(N, K)` sibling in training by
+    construction, but its **M siblings remain** — M=1024 appears in almost
+    every group. That limit is unavoidable on this grid and is stated rather
+    than papered over.
+    """
+    if k < 2:
+        raise SplitError(f"folds cannot be built with k={k}")
+    groups = nk_groups(shapes)
+    if len(groups) < k:
+        raise SplitError(
+            f"there are only {len(groups)} (N,K) groups and {k} folds were "
+            f"asked for. A fold would be empty (§26.4)")
+    assigned: list[list] = [[] for _ in range(k)]
+    # ★ Fold 0 is **the 11008 layer, both orientations together** — the two
+    #   groups `(4096,11008)` and `(11008,4096)`. That is not a greedy
+    #   choice: those 20 shapes are exactly the `nk11008` holdout this
+    #   repository has been using since §10.1, so pinning them as fold 0
+    #   makes the structural split **one fold of this design** instead of a
+    #   separate experiment (D-171 §1-2).
+    fixed0 = [g for g in groups if NK_LAYER in g]
+    if not fixed0:
+        raise SplitError(
+            f"no (N,K) group carries {NK_LAYER}, so fold 0 cannot be the "
+            f"layer holdout. Groups: {sorted(groups)}")
+    for g in fixed0:
+        assigned[0].extend(groups[g])
+    rest_groups = {g: v for g, v in groups.items() if g not in fixed0}
+    order = sorted(rest_groups, key=lambda g: (-len(rest_groups[g]), g))
+    # ★ Fold 1 takes the largest remaining group whole — `(4096,4096)` with
+    #   17 shapes on this table. It cannot be split (that is what caps `k`),
+    #   so it decides a fold rather than being spread over several.
+    if k >= 2 and order:
+        assigned[1].extend(rest_groups[order[0]])
+        order = order[1:]
+    groups = rest_groups
+    for g in order:
+        i = min(range(k), key=lambda j: (len(assigned[j]), j))
+        assigned[i].extend(groups[g])
+    out: list[SplitSet] = []
+    for i in range(k):
+        val = tuple(p for p in shapes if p in assigned[i])
+        vk = {p.key for p in val}
+        train = tuple(p for p in shapes if p.key not in vk)
+        if not train or not val:
+            raise SplitError(f"fold {i} left one side empty (§26.4)")
+        out.append(SplitSet(
+            train=Split("train", train, name=f"{name}{i}:train"),
+            val=Split("val", val, name=f"{name}{i}:val"),
+            kind=f"{name}{i}-k{k}"))
+    return out
