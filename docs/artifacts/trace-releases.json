@@ -1172,6 +1172,838 @@
   },
   "uploaded": "2026-09-10"
  },
+ "nk4-4090-f0": {
+  "bytes_raw": {
+   "nk4-4090-f0-s0": 3254900,
+   "nk4-4090-f0-s1": 2937375,
+   "nk4-4090-f0-s2": 3332239
+  },
+  "bytes_zst": {
+   "nk4-4090-f0-s0": 74952,
+   "nk4-4090-f0-s1": 67211,
+   "nk4-4090-f0-s2": 77063
+  },
+  "commits": {
+   "nk4-4090-f0-s0": "d77b3c1",
+   "nk4-4090-f0-s1": "d77b3c1",
+   "nk4-4090-f0-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-4090-f0-s0": 366,
+   "nk4-4090-f0-s1": 353,
+   "nk4-4090-f0-s2": 364
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-4090-f0-s0",
+   "nk4-4090-f0-s1",
+   "nk4-4090-f0-s2"
+  ],
+  "sha256": {
+   "trace-nk4-4090-f0-s0.jsonl.zst": "481f662defe67fd7253fd88c1a935eb451f1dbc19e2d307ed776a13840b69159",
+   "trace-nk4-4090-f0-s1.jsonl.zst": "bea186837a54e43fd3c0be918f1a643dae4bd036496436c572951a8ea729e25c",
+   "trace-nk4-4090-f0-s2.jsonl.zst": "4c3f2f7d9b654319e7cc35062d33b3f97b3110503f638afff1fde9ea3f2d1937"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-4090-f1": {
+  "bytes_raw": {
+   "nk4-4090-f1-s0": 3307130,
+   "nk4-4090-f1-s1": 2996162,
+   "nk4-4090-f1-s2": 3003773
+  },
+  "bytes_zst": {
+   "nk4-4090-f1-s0": 79444,
+   "nk4-4090-f1-s1": 74105,
+   "nk4-4090-f1-s2": 75661
+  },
+  "commits": {
+   "nk4-4090-f1-s0": "d77b3c1",
+   "nk4-4090-f1-s1": "d77b3c1",
+   "nk4-4090-f1-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-4090-f1-s0": 361,
+   "nk4-4090-f1-s1": 353,
+   "nk4-4090-f1-s2": 353
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-4090-f1-s0",
+   "nk4-4090-f1-s1",
+   "nk4-4090-f1-s2"
+  ],
+  "sha256": {
+   "trace-nk4-4090-f1-s0.jsonl.zst": "4e7c1d946ec3a51c96b36c6e3daecca0c0eb710f9a5979c4980c2e5af454857d",
+   "trace-nk4-4090-f1-s1.jsonl.zst": "02df13c52d74fc9b458d521b8d583cd512a99afd4184620f0a932ebc9c1aef96",
+   "trace-nk4-4090-f1-s2.jsonl.zst": "07255f3abf3bf87e69e8cd1325768636c4975452a84935fe6e67a6f1b3f72ec1"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-4090-f2": {
+  "bytes_raw": {
+   "nk4-4090-f2-s0": 3367367,
+   "nk4-4090-f2-s1": 3453004,
+   "nk4-4090-f2-s2": 3283809
+  },
+  "bytes_zst": {
+   "nk4-4090-f2-s0": 81998,
+   "nk4-4090-f2-s1": 78212,
+   "nk4-4090-f2-s2": 75463
+  },
+  "commits": {
+   "nk4-4090-f2-s0": "d77b3c1",
+   "nk4-4090-f2-s1": "d77b3c1",
+   "nk4-4090-f2-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-4090-f2-s0": 375,
+   "nk4-4090-f2-s1": 358,
+   "nk4-4090-f2-s2": 349
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-4090-f2-s0",
+   "nk4-4090-f2-s1",
+   "nk4-4090-f2-s2"
+  ],
+  "sha256": {
+   "trace-nk4-4090-f2-s0.jsonl.zst": "ea02a182df65a75466318a4b144713e104f30ff3c86b73ab0c6825b5b567cd62",
+   "trace-nk4-4090-f2-s1.jsonl.zst": "6d5279e49f532d4a3629abd6993f7830e312860eda97e7e766bee460085103bb",
+   "trace-nk4-4090-f2-s2.jsonl.zst": "e9d743679aa7c8caffc79d166e6bd82c1e132079d2c95321ec1a9fc56f181fe8"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-4090-f3": {
+  "bytes_raw": {
+   "nk4-4090-f3-s0": 2786386,
+   "nk4-4090-f3-s1": 2758206,
+   "nk4-4090-f3-s2": 3321991
+  },
+  "bytes_zst": {
+   "nk4-4090-f3-s0": 70512,
+   "nk4-4090-f3-s1": 75905,
+   "nk4-4090-f3-s2": 77370
+  },
+  "commits": {
+   "nk4-4090-f3-s0": "d77b3c1",
+   "nk4-4090-f3-s1": "d77b3c1",
+   "nk4-4090-f3-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-4090-f3-s0": 354,
+   "nk4-4090-f3-s1": 353,
+   "nk4-4090-f3-s2": 358
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-4090-f3-s0",
+   "nk4-4090-f3-s1",
+   "nk4-4090-f3-s2"
+  ],
+  "sha256": {
+   "trace-nk4-4090-f3-s0.jsonl.zst": "4147e6c0aeb115ac1e7e64fe9a785f6059d74212374078a4cba26407e9f4a0d9",
+   "trace-nk4-4090-f3-s1.jsonl.zst": "b43a0271e8a0f28c6641c3fd6d3d98540e3b3362c31f146c8ccfd861109d4084",
+   "trace-nk4-4090-f3-s2.jsonl.zst": "3c0df08a902e536ebac8dea51ba16f0689f3049729bcf15e1dadee077e437027"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-5090-f0": {
+  "bytes_raw": {
+   "nk4-5090-f0-s0": 3099408,
+   "nk4-5090-f0-s1": 3105986,
+   "nk4-5090-f0-s2": 3473830
+  },
+  "bytes_zst": {
+   "nk4-5090-f0-s0": 78802,
+   "nk4-5090-f0-s1": 74552,
+   "nk4-5090-f0-s2": 79184
+  },
+  "commits": {
+   "nk4-5090-f0-s0": "2bde324",
+   "nk4-5090-f0-s1": "2bde324",
+   "nk4-5090-f0-s2": "2bde324"
+  },
+  "events": {
+   "nk4-5090-f0-s0": 364,
+   "nk4-5090-f0-s1": 348,
+   "nk4-5090-f0-s2": 350
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-5090-f0-s0",
+   "nk4-5090-f0-s1",
+   "nk4-5090-f0-s2"
+  ],
+  "sha256": {
+   "trace-nk4-5090-f0-s0.jsonl.zst": "e42ad0946727348bf0f7b8d12102a4c3ef6cda209deb017a5900530e49b2ad2f",
+   "trace-nk4-5090-f0-s1.jsonl.zst": "87b5ef195e53e5e60e885b9cdcff9e29223b443b0cb1ab2c9e3663c7b28adca8",
+   "trace-nk4-5090-f0-s2.jsonl.zst": "6ab27f31aa56765138c5c37e49e609dc8c722d91fa3ab04f1b68d8edcedd9e63"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-5090-f1": {
+  "bytes_raw": {
+   "nk4-5090-f1-s0": 3293851,
+   "nk4-5090-f1-s1": 3095975,
+   "nk4-5090-f1-s2": 3021399
+  },
+  "bytes_zst": {
+   "nk4-5090-f1-s0": 85643,
+   "nk4-5090-f1-s1": 70943,
+   "nk4-5090-f1-s2": 75185
+  },
+  "commits": {
+   "nk4-5090-f1-s0": "2bde324",
+   "nk4-5090-f1-s1": "2bde324",
+   "nk4-5090-f1-s2": "2bde324"
+  },
+  "events": {
+   "nk4-5090-f1-s0": 367,
+   "nk4-5090-f1-s1": 346,
+   "nk4-5090-f1-s2": 346
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-5090-f1-s0",
+   "nk4-5090-f1-s1",
+   "nk4-5090-f1-s2"
+  ],
+  "sha256": {
+   "trace-nk4-5090-f1-s0.jsonl.zst": "ecb04149d398a45845af4b838104aa858cf51b61fd739faa9a6fba41eb73fa0f",
+   "trace-nk4-5090-f1-s1.jsonl.zst": "555076c4819553f5ab4f119b33869635b0b6589e506328244437f2ec14615f1f",
+   "trace-nk4-5090-f1-s2.jsonl.zst": "59ad125d5341b0c854041518ba3e919b9e704480933cec11ed1cc84f3a5871d7"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-5090-f2": {
+  "bytes_raw": {
+   "nk4-5090-f2-s0": 3149729,
+   "nk4-5090-f2-s1": 3188634,
+   "nk4-5090-f2-s2": 2874392
+  },
+  "bytes_zst": {
+   "nk4-5090-f2-s0": 75438,
+   "nk4-5090-f2-s1": 78988,
+   "nk4-5090-f2-s2": 71117
+  },
+  "commits": {
+   "nk4-5090-f2-s0": "2bde324",
+   "nk4-5090-f2-s1": "2bde324",
+   "nk4-5090-f2-s2": "2bde324"
+  },
+  "events": {
+   "nk4-5090-f2-s0": 355,
+   "nk4-5090-f2-s1": 358,
+   "nk4-5090-f2-s2": 349
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-5090-f2-s0",
+   "nk4-5090-f2-s1",
+   "nk4-5090-f2-s2"
+  ],
+  "sha256": {
+   "trace-nk4-5090-f2-s0.jsonl.zst": "f94f8fd3b5cd21e5ce72dc396ca6e2b115c83f5dae2548e620262c7c5dfe2077",
+   "trace-nk4-5090-f2-s1.jsonl.zst": "ebb74b0ff0bcda5ece4c21c28c5771325a5ceda20020c38e5c842d0cf20f9388",
+   "trace-nk4-5090-f2-s2.jsonl.zst": "12e4c9d7695a9ce8649c2ba9a343300d6efeb25db2e4660a08523b51dc4e87ca"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-5090-f3": {
+  "bytes_raw": {
+   "nk4-5090-f3-s0": 3017028,
+   "nk4-5090-f3-s1": 3238589,
+   "nk4-5090-f3-s2": 3134502
+  },
+  "bytes_zst": {
+   "nk4-5090-f3-s0": 79376,
+   "nk4-5090-f3-s1": 77574,
+   "nk4-5090-f3-s2": 72693
+  },
+  "commits": {
+   "nk4-5090-f3-s0": "2bde324",
+   "nk4-5090-f3-s1": "2bde324",
+   "nk4-5090-f3-s2": "2bde324"
+  },
+  "events": {
+   "nk4-5090-f3-s0": 358,
+   "nk4-5090-f3-s1": 356,
+   "nk4-5090-f3-s2": 350
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-5090-f3-s0",
+   "nk4-5090-f3-s1",
+   "nk4-5090-f3-s2"
+  ],
+  "sha256": {
+   "trace-nk4-5090-f3-s0.jsonl.zst": "15a5bb1801fe0962f48accd325606d768a9361bfb60a1d13c0f460b631e7c84a",
+   "trace-nk4-5090-f3-s1.jsonl.zst": "af0d339ca36acd9574b55788461ddddb4f708a50d23557a674c4d07c64d4096b",
+   "trace-nk4-5090-f3-s2.jsonl.zst": "90234838e38d1f5d512aede42a534afda9700d0f8781378b65b36d08015dfa9f"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-a6000-f0": {
+  "bytes_raw": {
+   "nk4-a6000-f0-s0": 3427102,
+   "nk4-a6000-f0-s1": 2955277,
+   "nk4-a6000-f0-s2": 3669872
+  },
+  "bytes_zst": {
+   "nk4-a6000-f0-s0": 78144,
+   "nk4-a6000-f0-s1": 63197,
+   "nk4-a6000-f0-s2": 74574
+  },
+  "commits": {
+   "nk4-a6000-f0-s0": "2bde324",
+   "nk4-a6000-f0-s1": "2bde324",
+   "nk4-a6000-f0-s2": "2bde324"
+  },
+  "events": {
+   "nk4-a6000-f0-s0": 367,
+   "nk4-a6000-f0-s1": 344,
+   "nk4-a6000-f0-s2": 349
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-a6000-f0-s0",
+   "nk4-a6000-f0-s1",
+   "nk4-a6000-f0-s2"
+  ],
+  "sha256": {
+   "trace-nk4-a6000-f0-s0.jsonl.zst": "6276c2bcaf4f6976640f9b966df76b29a2c086b5de3fc74cbd82b9a6654992d4",
+   "trace-nk4-a6000-f0-s1.jsonl.zst": "0540adad9e4be84ca33cc9f1e0737e41166a2a312d4df3a508db07aec4983ac8",
+   "trace-nk4-a6000-f0-s2.jsonl.zst": "3aa43a29a91f8296754d47ca3de11b062cadfa92ab4ba2bad348069403b6f955"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-a6000-f1": {
+  "bytes_raw": {
+   "nk4-a6000-f1-s0": 3788393,
+   "nk4-a6000-f1-s1": 3895154,
+   "nk4-a6000-f1-s2": 3288599
+  },
+  "bytes_zst": {
+   "nk4-a6000-f1-s0": 86937,
+   "nk4-a6000-f1-s1": 76063,
+   "nk4-a6000-f1-s2": 73580
+  },
+  "commits": {
+   "nk4-a6000-f1-s0": "2bde324",
+   "nk4-a6000-f1-s1": "2bde324",
+   "nk4-a6000-f1-s2": "2bde324"
+  },
+  "events": {
+   "nk4-a6000-f1-s0": 376,
+   "nk4-a6000-f1-s1": 350,
+   "nk4-a6000-f1-s2": 348
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-a6000-f1-s0",
+   "nk4-a6000-f1-s1",
+   "nk4-a6000-f1-s2"
+  ],
+  "sha256": {
+   "trace-nk4-a6000-f1-s0.jsonl.zst": "78d7ab8bea13f03a479ee98a58ac9931c8e2a1643bac0cccde49f822672f0ca6",
+   "trace-nk4-a6000-f1-s1.jsonl.zst": "6158a789cc865b47b5232ae94ab623be9e5cfaae7530086ae1ee0cd23f2912fe",
+   "trace-nk4-a6000-f1-s2.jsonl.zst": "19f522384df44add8bb43b3f9ca30bdc3e08b42f0f740556fe140a187c198e51"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-a6000-f2": {
+  "bytes_raw": {
+   "nk4-a6000-f2-s0": 2821350,
+   "nk4-a6000-f2-s1": 3619506,
+   "nk4-a6000-f2-s2": 3824794
+  },
+  "bytes_zst": {
+   "nk4-a6000-f2-s0": 71100,
+   "nk4-a6000-f2-s1": 80136,
+   "nk4-a6000-f2-s2": 77667
+  },
+  "commits": {
+   "nk4-a6000-f2-s0": "2bde324",
+   "nk4-a6000-f2-s1": "2bde324",
+   "nk4-a6000-f2-s2": "2bde324"
+  },
+  "events": {
+   "nk4-a6000-f2-s0": 364,
+   "nk4-a6000-f2-s1": 379,
+   "nk4-a6000-f2-s2": 370
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-a6000-f2-s0",
+   "nk4-a6000-f2-s1",
+   "nk4-a6000-f2-s2"
+  ],
+  "sha256": {
+   "trace-nk4-a6000-f2-s0.jsonl.zst": "a800db8026f5300f09ff071d463c500977bfa34bde74a308d8f51afc08aa1d59",
+   "trace-nk4-a6000-f2-s1.jsonl.zst": "8ac701597e97afc52b28549ccae981749e21bf6e8389207e132603d92feaa407",
+   "trace-nk4-a6000-f2-s2.jsonl.zst": "9b62af8dda3192ff0e159bb8ce4ec6445c61f8bb7fa3c67e9e808b02404cc8ca"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-a6000-f3": {
+  "bytes_raw": {
+   "nk4-a6000-f3-s0": 3834439,
+   "nk4-a6000-f3-s1": 3614735,
+   "nk4-a6000-f3-s2": 3519181
+  },
+  "bytes_zst": {
+   "nk4-a6000-f3-s0": 85097,
+   "nk4-a6000-f3-s1": 82189,
+   "nk4-a6000-f3-s2": 75590
+  },
+  "commits": {
+   "nk4-a6000-f3-s0": "2bde324",
+   "nk4-a6000-f3-s1": "2bde324",
+   "nk4-a6000-f3-s2": "2bde324"
+  },
+  "events": {
+   "nk4-a6000-f3-s0": 378,
+   "nk4-a6000-f3-s1": 351,
+   "nk4-a6000-f3-s2": 350
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-a6000-f3-s0",
+   "nk4-a6000-f3-s1",
+   "nk4-a6000-f3-s2"
+  ],
+  "sha256": {
+   "trace-nk4-a6000-f3-s0.jsonl.zst": "99ef10dbcd84425440d88314439436d553488a80dab667a4a102907bbbfc090f",
+   "trace-nk4-a6000-f3-s1.jsonl.zst": "4236c1f193c618ca39e6a2f638569abe111353f37938e6cabb433257899f6889",
+   "trace-nk4-a6000-f3-s2.jsonl.zst": "6a5b44e4a1c3836622da81795457bb057d3bffe4c1b6cfdd59fa2e51f598e6e2"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-h100-f0": {
+  "bytes_raw": {
+   "nk4-h100-f0-s0": 3452342,
+   "nk4-h100-f0-s1": 3126809,
+   "nk4-h100-f0-s2": 3052084
+  },
+  "bytes_zst": {
+   "nk4-h100-f0-s0": 82569,
+   "nk4-h100-f0-s1": 75274,
+   "nk4-h100-f0-s2": 74530
+  },
+  "commits": {
+   "nk4-h100-f0-s0": "d77b3c1",
+   "nk4-h100-f0-s1": "d77b3c1",
+   "nk4-h100-f0-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-h100-f0-s0": 359,
+   "nk4-h100-f0-s1": 348,
+   "nk4-h100-f0-s2": 361
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-h100-f0-s0",
+   "nk4-h100-f0-s1",
+   "nk4-h100-f0-s2"
+  ],
+  "sha256": {
+   "trace-nk4-h100-f0-s0.jsonl.zst": "b407aaa04c27def88d6757454aa9c58b987ca054a69f988fc19ec98c44f30c81",
+   "trace-nk4-h100-f0-s1.jsonl.zst": "30729c20a063d3fa1adfca071b0be7271246e592c8e31d62a69e81fe5582c7f9",
+   "trace-nk4-h100-f0-s2.jsonl.zst": "0bf758b771989dfddf6dacd0f75cf1ba31037e0358333d4c86ed4687463cec68"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-h100-f1": {
+  "bytes_raw": {
+   "nk4-h100-f1-s0": 3297976,
+   "nk4-h100-f1-s1": 3927129,
+   "nk4-h100-f1-s2": 3504873
+  },
+  "bytes_zst": {
+   "nk4-h100-f1-s0": 76120,
+   "nk4-h100-f1-s1": 75931,
+   "nk4-h100-f1-s2": 74335
+  },
+  "commits": {
+   "nk4-h100-f1-s0": "d77b3c1",
+   "nk4-h100-f1-s1": "d77b3c1",
+   "nk4-h100-f1-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-h100-f1-s0": 361,
+   "nk4-h100-f1-s1": 356,
+   "nk4-h100-f1-s2": 346
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-h100-f1-s0",
+   "nk4-h100-f1-s1",
+   "nk4-h100-f1-s2"
+  ],
+  "sha256": {
+   "trace-nk4-h100-f1-s0.jsonl.zst": "26ca04fd7a41796bf9372068644ee01431ddb92b2572afb4ac8900f6d01491ef",
+   "trace-nk4-h100-f1-s1.jsonl.zst": "28a18d04debedca281b082c67503577ef779b3dc75c446a110881afff725aad0",
+   "trace-nk4-h100-f1-s2.jsonl.zst": "a46062a65b0e84c8d7be7315452261e097e1f549c93e47aa3559292a7aefd237"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-h100-f2": {
+  "bytes_raw": {
+   "nk4-h100-f2-s0": 3802654,
+   "nk4-h100-f2-s1": 3166467,
+   "nk4-h100-f2-s2": 3181087
+  },
+  "bytes_zst": {
+   "nk4-h100-f2-s0": 86041,
+   "nk4-h100-f2-s1": 72703,
+   "nk4-h100-f2-s2": 72149
+  },
+  "commits": {
+   "nk4-h100-f2-s0": "d77b3c1",
+   "nk4-h100-f2-s1": "d77b3c1",
+   "nk4-h100-f2-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-h100-f2-s0": 363,
+   "nk4-h100-f2-s1": 347,
+   "nk4-h100-f2-s2": 349
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-h100-f2-s0",
+   "nk4-h100-f2-s1",
+   "nk4-h100-f2-s2"
+  ],
+  "sha256": {
+   "trace-nk4-h100-f2-s0.jsonl.zst": "f4448f701fb6e094183c8bcb46438cda569e4b5fcbfc88757a409b35cc40a35a",
+   "trace-nk4-h100-f2-s1.jsonl.zst": "9b0dffdbb599e2820552c120e37ee4ede2d713f82637c158a4f89e9f740e27d1",
+   "trace-nk4-h100-f2-s2.jsonl.zst": "82bcdffd361e85784f42ecd7c1d26ed2a6808af73a8363897530f65c83fe0ee3"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
+ "nk4-h100-f3": {
+  "bytes_raw": {
+   "nk4-h100-f3-s0": 2736697,
+   "nk4-h100-f3-s1": 2982603,
+   "nk4-h100-f3-s2": 3292229
+  },
+  "bytes_zst": {
+   "nk4-h100-f3-s0": 69774,
+   "nk4-h100-f3-s1": 67271,
+   "nk4-h100-f3-s2": 74052
+  },
+  "commits": {
+   "nk4-h100-f3-s0": "d77b3c1",
+   "nk4-h100-f3-s1": "d77b3c1",
+   "nk4-h100-f3-s2": "d77b3c1"
+  },
+  "events": {
+   "nk4-h100-f3-s0": 354,
+   "nk4-h100-f3-s1": 352,
+   "nk4-h100-f3-s2": 351
+  },
+  "release": "campaign-nk4-334d779",
+  "runs": [
+   "nk4-h100-f3-s0",
+   "nk4-h100-f3-s1",
+   "nk4-h100-f3-s2"
+  ],
+  "sha256": {
+   "trace-nk4-h100-f3-s0.jsonl.zst": "8dbfff67a3acf3de5f217e315c5afef223af5100a846ac3a9425c7cb9638d6ce",
+   "trace-nk4-h100-f3-s1.jsonl.zst": "d09b86a742319f4476a67eecd80f946e874a8b7df0edd2f12d6ba8fccd057c03",
+   "trace-nk4-h100-f3-s2.jsonl.zst": "458021f9ab9dcb83041b746a828e4d2d5a677b4db0c963a5c6d5ab5dab85bc15"
+  },
+  "shared_release_tags": [
+   "nk4-a6000-f0",
+   "nk4-a6000-f1",
+   "nk4-a6000-f2",
+   "nk4-a6000-f3",
+   "nk4-5090-f0",
+   "nk4-5090-f1",
+   "nk4-5090-f2",
+   "nk4-5090-f3",
+   "nk4-4090-f0",
+   "nk4-4090-f1",
+   "nk4-4090-f2",
+   "nk4-4090-f3",
+   "nk4-h100-f0",
+   "nk4-h100-f1",
+   "nk4-h100-f2",
+   "nk4-h100-f3"
+  ],
+  "uploaded": "2026-09-14"
+ },
  "nocap": {
   "bytes_raw": {
    "nocap-s0": 198836

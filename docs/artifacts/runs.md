@@ -99,6 +99,22 @@ F3hg-p8-d75-a  the human_guided seed
 | `full12` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `51af0d9` | trace-full12-51af0d9 | — | — | ★ the first full 12 rounds under the new design (D-153) — 1 seed, fold 0, 3-term seed. ⚠️ 17 of its 18 refusals are the AST node cap. Do not read its numbers |
 | `luna` | 3 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
 | `lunaNAMES` | 6 | 19/? | ? | ? | default | nelder-mead/4/200 | 12 | a6000 | `?` | — | — | — | |
+| `nk4-4090-f0` | 3 | 25/F2 | rule_writer-try02 | none | default | per rule (fitter_for) | 12 | 4090 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
+| `nk4-4090-f1` | 3 | 24/F2 | rule_writer-try04 | none | default | per rule (fitter_for) | 12 | 4090 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
+| `nk4-4090-f2` | 3 | 28/F2 | rule_writer-try06 | none | default | per rule (fitter_for) | 12 | 4090 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
+| `nk4-4090-f3` | 3 | 22/F2 | rule_writer-try08 | none | default | per rule (fitter_for) | 12 | 4090 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
+| `nk4-5090-f0` | 3 | 24/F2 | rule_writer-try05 | none | default | per rule (fitter_for) | 12 | 5090 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-5090-f1` | 3 | 26/F2 | rule_writer-try05 | none | default | per rule (fitter_for) | 12 | 5090 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-5090-f2` | 3 | 24/F2 | rule_writer-try03 | none | default | per rule (fitter_for) | 12 | 5090 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-5090-f3` | 3 | 23/F2 | rule_writer-try04 | none | default | per rule (fitter_for) | 12 | 5090 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-a6000-f0` | 3 | 27/F2 | rule_writer-try05 | none | default | per rule (fitter_for) | 12 | a6000 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-a6000-f1` | 3 | 29/F2 | rule_writer-try04 | none | default | per rule (fitter_for) | 12 | a6000 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-a6000-f2` | 3 | 25/F2 | rule_writer-try07 | none | default | per rule (fitter_for) | 12 | a6000 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-a6000-f3` | 3 | 29/F2 | rule_writer-try01 | none | default | per rule (fitter_for) | 12 | a6000 | `2bde324` | campaign-nk4-334d779 | — | — | |
+| `nk4-h100-f0` | 3 | 25/F2 | rule_writer-try08 | none | default | per rule (fitter_for) | 12 | h100 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
+| `nk4-h100-f1` | 3 | 26/F2 | rule_writer-try03 | none | default | per rule (fitter_for) | 12 | h100 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
+| `nk4-h100-f2` | 3 | 27/F2 | rule_writer-try08 | none | default | per rule (fitter_for) | 12 | h100 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
+| `nk4-h100-f3` | 3 | 22/F2 | rule_writer-try09 | none | default | per rule (fitter_for) | 12 | h100 | `d77b3c1` | campaign-nk4-334d779 | — | — | |
 | `nocap` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 2 | a6000 | `131d612` | trace-nocap-131d612 | — | — | ★ a behaviour check, not a result (D-152) — 1 seed x 2 rounds, fold 0, 3-term seed, **after the live cap in the schema validator was removed**. Do not read its numbers |
 | `nocount` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 1 | a6000 | `1ecdd56` | trace-nocount-1ecdd56 | — | — | ★ a contrast, not a result (D-151) — 1 seed x 1 round, fold 0, after the size sentences were taken out of every surface. Do not read its numbers |
 | `noregime` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `c5c196a` | trace-noregime-c5c196a | — | — | ★ 12 rounds with our regime axis taken out of what the model sees (D-156) — 1 seed, fold 0, 3-term seed. Do not read its numbers |
