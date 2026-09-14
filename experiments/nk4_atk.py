@@ -25,7 +25,7 @@ from experiments.f1_pipeline import _splits
 from experiments.transfer_29_5 import TABLES
 from kernelrule.baselines.static_topk import StaticTopK
 from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
-from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.matrix import CACHE_DIR, FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import evaluate, evaluate_scores, geomean
 from kernelrule.core.table import PerfTable
@@ -85,7 +85,7 @@ def main() -> None:
                 best = min(_rows(d / "archive.jsonl"),
                            key=lambda e: e["regret"])
                 reg = _registry(gpu, fold, seed, table)
-                m = FeatureMatrix(table, reg)
+                m = FeatureMatrix(table, reg, cache_dir=CACHE_DIR)
                 fn = compile_rule(best["code"])
                 ev = evaluate_scores(
                     make_score_of(fn, m, np.asarray(best["w"], float)),

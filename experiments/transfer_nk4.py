@@ -46,7 +46,7 @@ from experiments.f1_pipeline import _splits
 from experiments.transfer_29_5 import TABLES, _fit_per_regime, _score_on
 from kernelrule.baselines.static_topk import StaticTopK
 from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
-from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.matrix import CACHE_DIR, FeatureMatrix
 from kernelrule.core.scoring import evaluate, geomean
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY, FeatureRegistry
@@ -164,7 +164,7 @@ def main() -> None:
                 continue
             sA, tA = splits[(src, f)], tables[src]
             regA, _ = _registry_for(src, f, seed, tA)
-            mA = FeatureMatrix(tA, regA)
+            mA = FeatureMatrix(tA, regA, cache_dir=CACHE_DIR)
             fnA, wsA = _fit_per_regime(e["code"], e["w"], tA, mA,
                                        list(sA.train.shapes))
             slA = _shape_level_map(src, f, seed, tA)
@@ -173,7 +173,7 @@ def main() -> None:
                     continue
                 tB, sB = tables[dst], splits[(dst, f)]
                 regB, _ = _registry_for(src, f, seed, tB)
-                mB = FeatureMatrix(tB, regB)
+                mB = FeatureMatrix(tB, regB, cache_dir=CACHE_DIR)
                 hold = list(sB.val.shapes)
                 slB = {n: bool(regB[n].shape_level) for n in regB._items}
                 flips = sorted(n for n in slA
@@ -194,7 +194,7 @@ def main() -> None:
                     gn = native_cache[(dst, f)]
                 elif ne is not None:
                     regN, _ = _registry_for(dst, f, nseed, tB)
-                    mN = FeatureMatrix(tB, regN)
+                    mN = FeatureMatrix(tB, regN, cache_dir=CACHE_DIR)
                     fnN, wsN = _fit_per_regime(ne["code"], ne["w"], tB, mN,
                                                list(sB.train.shapes))
                     gn = _score_on(fnN, wsN, tB, mN, hold)

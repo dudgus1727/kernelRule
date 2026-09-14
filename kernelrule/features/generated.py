@@ -37,7 +37,7 @@ from dataclasses import replace
 import numpy as np
 
 from kernelrule.core.matrix import FeatureMatrix
-from kernelrule.features import Feature, FeatureRegistry
+from kernelrule.features import Feature, FeatureRegistry, code_hash_of
 from kernelrule.features.validate import ReferenceColumns
 
 __all__ = ["FeatureRejected", "check_feature_code", "check_generated",
@@ -565,7 +565,7 @@ def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
                 direction=str(meta.get("direction", "higher_is_worse")),
                 doc=str(meta.get("rationale", ""))[:200],
                 physical_meaning=str(meta.get("rationale", "")),
-                code_hash=str(abs(hash(code.strip()))),
+                code_hash=code_hash_of(code),
                 source=code.strip())
     # ★ Validation runs on a **temporary matrix** holding the candidate.
     #   `validate_feature` reads values from `matrix.for_shape()`, so a

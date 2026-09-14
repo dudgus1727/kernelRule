@@ -11,6 +11,9 @@ from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.features import REGISTRY
 from kernelrule.features.validate import validate_registry
 
+#: The repository root — the D-171 §S subprocess tests put it on PYTHONPATH.
+ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
+
 
 @pytest.fixture(scope="module")
 def matrix(synth_table):
@@ -865,3 +868,94 @@ def test_a_rebuilt_run_registry_rescores_that_run_s_archive(perf_table):
                          perf_table, list(splits.train.shapes), ks=(1,))
     assert ev.at(1) == pytest.approx(best["regret"], abs=1e-9), (
         f"recorded {best['regret']:.6f} != rescored {ev.at(1):.6f}")
+
+
+# ---------------------------------------------------------------------------
+# ★ D-171 §S — the identity hash of a generated axis
+# ---------------------------------------------------------------------------
+def test_code_hash_is_the_same_in_another_process():
+    """★ The reproduction: `code_hash` must not depend on PYTHONHASHSEED.
+
+    Four call sites used `str(abs(hash(code.strip())))`, and Python salts
+    `hash()` per process for `str`. The same axis therefore carried a
+    different hash in every process, which made
+    `FeatureMatrix._cache_key()` **never** hit for a generated registry —
+    a device that silently does nothing (principle 1).
+
+    ⚠️ Two subprocesses with **different** hash seeds. Running it in-process
+    proves nothing: within one process the built-in `hash()` is stable too,
+    which is exactly why this went unseen.
+    """
+    import subprocess
+    import sys
+
+    prog = (
+        "from kernelrule.features import code_hash_of;"
+        "print(code_hash_of('def f(p, hw, cfg):\\n    return 1.0\\n'))")
+    out = []
+    for seed in ("1", "2"):
+        r = subprocess.run([sys.executable, "-c", prog], check=True,
+                           capture_output=True, text=True,
+                           env={"PATH": "/usr/bin:/bin",
+                                "PYTHONHASHSEED": seed,
+                                "PYTHONPATH": str(ROOT)})
+        out.append(r.stdout.strip())
+    assert out[0] == out[1], out
+    # ⛔ And the old formula must actually differ under those seeds —
+    #    otherwise this test would pass even if nothing had been fixed.
+    old = ("print(str(abs(hash('def f(p, hw, cfg):\\n    return 1.0\\n'"
+           ".strip()))))")
+    olds = []
+    for seed in ("1", "2"):
+        r = subprocess.run([sys.executable, "-c", old], check=True,
+                           capture_output=True, text=True,
+                           env={"PATH": "/usr/bin:/bin",
+                                "PYTHONHASHSEED": seed})
+        olds.append(r.stdout.strip())
+    assert olds[0] != olds[1], (
+        "the old formula did not differ between hash seeds, so this test "
+        "cannot tell a fix from no fix")
+
+
+def test_a_generated_registry_lock_hash_is_stable_across_processes():
+    """★ What the cache key actually needs (D-171 §S).
+
+    `lock_hash` feeds `FeatureMatrix._cache_key()`. One generated axis with
+    a salted `code_hash` is enough to make the key differ every run.
+    """
+    import subprocess
+    import sys
+
+    prog = (
+        "from kernelrule.features import FeatureRegistry, Feature, "
+        "code_hash_of;"
+        "r = FeatureRegistry('g');"
+        "code = 'def g(p, hw, cfg):\\n    return 2.0\\n';"
+        "r.add(Feature(name='g', fn=lambda p, hw, c: 2.0, unit='x',"
+        " expected_range=(0.0, 1.0), direction='neutral', source=code,"
+        " code_hash=code_hash_of(code)));"
+        "print(r.lock_hash())")
+    out = []
+    for seed in ("3", "4"):
+        r = subprocess.run([sys.executable, "-c", prog], check=True,
+                           capture_output=True, text=True,
+                           env={"PATH": "/usr/bin:/bin",
+                                "PYTHONHASHSEED": seed,
+                                "PYTHONPATH": str(ROOT)})
+        out.append(r.stdout.strip())
+    assert out[0] == out[1], out
+
+
+def test_every_generated_code_hash_goes_through_the_helper():
+    """★ Principle 2 — four copies is what this replaced. A new call site
+    that reaches for the built-in `hash()` is caught here."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    bad = [f"{f.relative_to(root)}:{i + 1}"
+           for f in sorted((root / "kernelrule").rglob("*.py"))
+           for i, ln in enumerate(f.read_text().splitlines())
+           if "code_hash=str(abs(hash(" in ln.replace(" ", "")]
+    assert not bad, (
+        "`code_hash` built from the salted built-in `hash()` (D-171 §S):\n"
+        + "\n".join(bad))

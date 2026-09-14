@@ -233,3 +233,45 @@ def test_adopt_refuses_a_foreign_table(synth_table, null_table):
     b = FeatureMatrix(null_table, reg)
     with pytest.raises(ValueError, match="same table"):
         a.adopt(b, "waves")
+
+
+# ---------------------------------------------------------------------------
+# ★ D-171 §T — `_configs_of` without `to_dict("records")`
+# ---------------------------------------------------------------------------
+def test_configs_of_matches_the_to_dict_path_exactly(synth_table):
+    """★ The regression guard: the column-array path must build **the same
+    `Config` objects** as `to_dict("records")` did.
+
+    Measured on the A6000 (66 shapes / 980,915 rows) the old line split as
+    `to_dict` 9.85s + `config_from_row` 7.34s — more than half was pandas
+    -> dict, and `Config` reads 18 of the table's 68 columns. Reading the
+    columns directly skips it.
+
+    ⛔ Equality, not tolerance. The same arithmetic in the same order must
+    give the same object; a difference means the conversion changed.
+    """
+    from kernelrule.core.matrix import _configs_of
+    from kernelrule.core.types import config_from_row
+
+    for p in synth_table.shapes():
+        df = synth_table.frame_for(p)
+        old = [config_from_row(r) for r in df.to_dict("records")]
+        new = _configs_of(df)
+        assert len(old) == len(new)
+        assert old == new, p
+
+
+def test_configs_of_keeps_the_ext_dict(synth_table):
+    """★ `ext` is the table's raw record and nothing that reads it may
+    change (D-161). The column path rebuilds it from the `ext_*` columns,
+    so its keys and values are pinned here."""
+    from kernelrule.core.matrix import _configs_of
+    from kernelrule.core.types import config_from_row
+
+    p = synth_table.shapes()[0]
+    df = synth_table.frame_for(p)
+    old = config_from_row(df.to_dict("records")[0])
+    new = _configs_of(df)[0]
+    assert new.ext == old.ext
+    assert {k: type(v).__name__ for k, v in new.ext.items()} == \
+           {k: type(v).__name__ for k, v in old.ext.items()}

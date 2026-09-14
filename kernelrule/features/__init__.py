@@ -93,6 +93,8 @@ class Feature:
     deprecated_at_round: int | None = None
     deprecation_reason: str = ""
     #: Source hash. Used in `features.lock` and in the FeatureMatrix cache
+    #: key. ★ Build it with `code_hash_of` for a generated axis — the
+    #: built-in `hash()` is salted per process (D-171 §S).
     #: key (§25).
     code_hash: str = ""
     #: ★ The source code. **For a feature built with `exec`,
@@ -228,6 +230,42 @@ class FeatureRegistry:
 
 #: The global registry. `features/physical.py` registers into it.
 REGISTRY = FeatureRegistry("physical")
+
+
+def code_hash_of(code: str) -> str:
+    """★ The identity hash of a generated axis's source (D-171 §S).
+
+    ## What this replaced
+
+    Four call sites used `str(abs(hash(code.strip())))`. Python's built-in
+    `hash()` is **salted per process** for `str` (PYTHONHASHSEED), so the
+    same axis got a different `code_hash` in every process:
+
+    ```
+    same code, two processes   59842078212829897  vs  5096144044792620548
+    k7-1 registry lock_hash    f5d3822e314a505d   vs  6978c47d71d86426
+    ★ the human REGISTRY       a8e4c6b89cd33cb1   ==  a8e4c6b89cd33cb1
+    ```
+
+    The human registry was stable because `_hash_fn` below already hashes
+    the source with sha256 — **only the generated path was salted**, and
+    that is the path every campaign since F1 runs on.
+
+    ⛔ It made `FeatureMatrix._cache_key()` useless for generated
+    registries: the key mixes `registry.lock_hash()`, which mixes
+    `code_hash`, so a disk cache could **never** hit. A device that
+    silently does nothing (principle 1).
+
+    ## The normalisation, decided once
+
+    `code.strip()` and nothing more. Leading and trailing whitespace cannot
+    change what Python compiles; inner whitespace can (indentation), so
+    collapsing it would make two different axes collide. ★ Two of the four
+    sites stripped and two did not, so the **same axis already got two
+    different hashes** depending on whether it arrived through
+    `register_generated` or `load_generated` — one helper ends that too.
+    """
+    return hashlib.sha256(code.strip().encode()).hexdigest()[:16]
 
 
 def _hash_fn(fn: Callable) -> str:

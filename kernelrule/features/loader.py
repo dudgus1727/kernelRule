@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from kernelrule.features import Feature, FeatureRegistry
+from kernelrule.features import Feature, FeatureRegistry, code_hash_of
 
 __all__ = ["load_generated", "extended_registry", "base_registry",
            "run_registry", "registry_spec", "registry_from_spec",
@@ -73,7 +73,7 @@ def load_generated(path: str | Path, *, table, only: set[str] | None = None,
                 direction=str(r.get("direction", "higher_is_worse")),
                 doc=str(r.get("rationale", ""))[:200],
                 physical_meaning=str(r.get("rationale", "")),
-                source=r["code"], code_hash=str(abs(hash(r["code"])))))
+                source=r["code"], code_hash=code_hash_of(r["code"])))
     if table is not None:
         from dataclasses import replace
 
@@ -262,7 +262,7 @@ def run_registry(run: str, *, table, seed: int = 0, root: str | Path = "runs",
                 expected_range=(float(rng[0]), float(rng[1])),
                 direction=str(e.get("direction", "higher_is_worse")),
                 doc=str(e.get("requirement", ""))[:200],
-                source=e["code"], code_hash=str(abs(hash(e["code"])))))
+                source=e["code"], code_hash=code_hash_of(e["code"])))
             origin[name] = f"loop r{e.get('round', '?')}"
 
     return _rederive(pending, table,
@@ -373,7 +373,7 @@ def registry_from_spec(spec: dict, *, table,
                 name=name, fn=fn, unit=str(ax.get("unit", "dimensionless")),
                 expected_range=(float(lo), float(hi)),
                 direction=str(ax.get("direction", "higher_is_worse")),
-                source=ax["source"], code_hash=str(abs(hash(ax["source"])))))
+                source=ax["source"], code_hash=code_hash_of(ax["source"])))
         elif ax["name"] in base._items:
             pending.append(base[ax["name"]])
         else:

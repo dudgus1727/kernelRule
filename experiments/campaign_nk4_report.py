@@ -74,7 +74,9 @@ def build() -> str:
     add("")
     add("```")
     add("21실행                          48실행")
-    add("라이브러리 c21-lib (F2-known5)   ★ k7-1 (F2-known7)")
+    # ★ `known5` is the pre-D-170 name of that condition, and it is the
+    #   right name here — the 21-run campaign really had five axes.
+    add("라이브러리 c21-lib (F2-known5)   ★ k7-1 (F2-known7)")  # D-170
     add("형상 61 (정렬 8)                 ★ 형상 65 (커널 패밀리)")
     add("분할 층화 무작위 3-fold + nk11008  ★ (N,K) 묶음 4-fold")
     add("분기 가능 축 실질 1개             ★ 7개 (known7 3 + k7-1 4)")

@@ -30,7 +30,7 @@ import kernelrule.features.physical  # noqa: F401
 from experiments.f1_pipeline import _splits
 from experiments.transfer_29_5 import TABLES
 from kernelrule.core.canonical import canonical_score
-from kernelrule.core.matrix import FeatureMatrix
+from kernelrule.core.matrix import CACHE_DIR, FeatureMatrix
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 from kernelrule.features.loader import run_registry
@@ -101,7 +101,9 @@ def measure_run(gpu: str, fold: int, seed: int, table, shape_names) -> dict:
                 if f.name not in reg._items:
                     reg.add(f)
                     origin[f.name] = f"loop s{earlier} (inherited)"
-    matrix = FeatureMatrix(table, reg)
+    # ★ D-171 §U — this script builds one matrix per run (48 of them),
+    #   so the cache is what it is for. Key = bundle + registry lock.
+    matrix = FeatureMatrix(table, reg, cache_dir=CACHE_DIR)
     cs = canonical_score(best["code"], np.asarray(best["w"], float),
                          table=table, matrix=matrix, splits=splits)
     hyp = _rows(d / "hypotheses.jsonl") if (d / "hypotheses.jsonl").exists() \

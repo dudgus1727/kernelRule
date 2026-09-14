@@ -34,7 +34,12 @@ from pathlib import Path
 import numpy as np
 
 from kernelrule.core.table import PerfTable
-from kernelrule.core.types import Hardware, Problem, config_from_row
+from kernelrule.core.types import (
+    Config,
+    Hardware,
+    Problem,
+    config_from_row,
+)
 from kernelrule.features import FeatureRegistry
 
 __all__ = ["FeatureMatrix", "Feats", "ShapeInfo"]
@@ -138,10 +143,95 @@ class MatrixStats:
                 f"{self.build_seconds:.1f}s")
 
 
+#: The columns `Config` needs, besides `ext_*`. ★ Written here so
+#: `_configs_of` reads six of the table's 68 columns instead of all of them.
+_CFG_INT = ("tile_m", "tile_n", "tile_k", "align_a", "align_b", "align_c",
+            "split_k", "regs_per_thread", "threads", "smem_bytes",
+            "spill_bytes", "max_blocks_per_sm")
+_CFG_STR = ("split_k_mode", "arch", "kernel_id", "pipeline_kind")
+#: Optional — absent in an older bundle, and then the default applies.
+_CFG_OPT = ("ext_stages", "inst_total")
+
+
 def _configs_of(df) -> list:
     """One shape's rows as `Config` objects. ★ Built once and handed to
-    every feature (D-161) — the conversion is what a column costs."""
-    return [config_from_row(r) for r in df.to_dict("records")]
+    every feature (D-161) — the conversion is what a column costs.
+
+    ## ★ 2026-09-14 (D-171 §T) — `to_dict("records")` was the larger half
+
+    This was `[config_from_row(r) for r in df.to_dict("records")]`, and
+    measured over the A6000's 66 shapes / 980,915 rows:
+
+    ```
+    frame_for x66                 0.75s   ( 4%)
+    ★ df.to_dict("records")       9.85s   (55%)
+    config_from_row x980,915      7.34s   (41%)
+                             합  17.93s
+    ```
+
+    **More than half was pandas -> dict, not `Config`.** `to_dict("records")`
+    materialises a **68-key dict per row** while `Config` reads 18 of them;
+    reading the columns as numpy arrays and indexing skips that entirely.
+
+    ⚠️ The per-row object stays. A feature function is handed `cfg` and
+    reads `cfg.tile_m`, so removing the object would change the axis calling
+    convention — **that is a change of condition** and is out of scope.
+
+    ⛔ The values must be **bit-identical** to the old path. `to_dict`
+    yields Python `int` / `str` for these columns (int64 and category
+    dtypes), so `.tolist()` — which converts the same way — is used rather
+    than `.to_numpy()`, whose elements would be `np.int64`.
+    """
+    n = len(df)
+    ints = {c: df[c].tolist() for c in _CFG_INT}
+    strs = {c: df[c].tolist() for c in _CFG_STR}
+    opt = {c: (df[c].tolist() if c in df.columns else None)
+           for c in _CFG_OPT}
+    ext_names = [c for c in df.columns if c.startswith("ext_")]
+    ext_cols = {c[len("ext_"):]: df[c].tolist() for c in ext_names}
+    out = []
+    for i in range(n):
+        st = opt["ext_stages"]
+        it = opt["inst_total"]
+        out.append(Config(
+            tile_m=int(ints["tile_m"][i]), tile_n=int(ints["tile_n"][i]),
+            tile_k=int(ints["tile_k"][i]),
+            align_a=int(ints["align_a"][i]),
+            align_b=int(ints["align_b"][i]),
+            align_c=int(ints["align_c"][i]),
+            split_k=int(ints["split_k"][i]),
+            split_k_mode=str(strs["split_k_mode"][i]),
+            arch=str(strs["arch"][i]),
+            kernel_id=str(strs["kernel_id"][i]),
+            regs_per_thread=int(ints["regs_per_thread"][i]),
+            threads=int(ints["threads"][i]),
+            smem_bytes=int(ints["smem_bytes"][i]),
+            spill_bytes=int(ints["spill_bytes"][i]),
+            max_blocks_per_sm=int(ints["max_blocks_per_sm"][i]),
+            pipeline_kind=str(strs["pipeline_kind"][i]),
+            stages=int(st[i] or 0) if st is not None else 0,
+            inst_total=int(it[i] or 0) if it is not None else 0,
+            ext={k: v[i] for k, v in ext_cols.items()},
+        ))
+    return out
+
+
+#: ★ Where an experiment script keeps its feature-matrix cache (D-171 §U).
+#:
+#: ⚠️ **What this is and is not worth.** Inside the loop the matrix is not
+#: rebuilt — a new axis adopts the probe's column (D-161) and `invalidate`
+#: runs only when a column is missing; the workers see the parent's memory
+#: through fork's copy-on-write. A stage-3 run therefore builds **one**
+#: matrix, so 48 runs x 18s is about 15 minutes against a 12-hour campaign.
+#: ★ The cache pays in `experiments/` — the aggregation and transfer
+#: scripts that build a matrix per run or per transfer cell.
+#:
+#: ⛔ A partial matrix is never cached (D-161): the key carries no shape
+#: list, so it would later be served as a complete one.
+#:
+#: ⛔ It is **not** turned on inside the loop or the pipeline. A campaign
+#: writing a cache while it runs is a new failure surface for no gain.
+CACHE_DIR = Path(".cache/featmat")
 
 
 class FeatureMatrix:
