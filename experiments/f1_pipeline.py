@@ -1055,13 +1055,56 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
         table=table, matrix=matrix, splits=splits, llm=llm)
 
 
-def stage3(a, d: Path, table, matrix, reg, splits, seed_rule: dict) -> None:
+def stage3(a, d: Path, table, base: FeatureRegistry, splits,
+           seed_rule: dict) -> None:
+    """The evolution loop, once per seed.
+
+    ## ★ 2026-09-14 (D-172 §X) — **each seed starts from stage 1 again**
+
+    This used to take `matrix` and `reg` as arguments and share them across
+    the seed loop. The loop registers a new axis into
+    `self.matrix.registry` (`_write_features`), and **nothing put it back**,
+    so seed 1 began with seed 0's axes still in the library:
+
+    ```
+    nk4-a6000-f3   s0 27 axes -> s1 ★37 -> s2 ★39
+    nk4-a6000-f1   s0 27 axes -> s1 ★36 -> s2 ★38
+    ★ 32 of 32 (table, fold) x later-seed combinations leaked
+    ★ 270 archive rules use an axis an earlier seed built
+    ```
+
+    s1 and s2 were not repetitions of s0, they were **continuations** of it.
+
+    ⛔ The stage-1 library stays shared — that is the intended condition
+    (one library per campaign, §10.1). What must not carry over is only
+    **what the loop built**.
+
+    ## Why a fresh matrix rather than trimming the old one
+
+    Trimming would mean deleting the added columns from `_cols` — and the
+    matrix also holds `_info`, and callers hold `Feats`/`ShapeInfo` views
+    built from them. ★ A partial revert that leaves one derived cache
+    behind is exactly the shape of bug this repository keeps paying for, and
+    it would be **silent**. Rebuilding is structurally certain.
+
+    ★ It is affordable because of D-171 §T: a 65-shape build is 6~8s, not
+    19~22s. Three seeds is about 20 seconds against a 56-minute run — 0.6%.
+
+    ⚠️ `cache_dir` is **not** turned on here. D-171 §U left the loop and the
+    pipeline out on purpose: a campaign writing a cache while it runs is a
+    new failure surface, and the seed-start matrix is the only one that
+    could ever hit (the registry grows every round). 0.6% does not buy that.
+    """
     out = d / "stage3-evolution"
     out.mkdir(parents=True, exist_ok=True)
     budget = Budget(max_calls=3000, max_input_tokens=60_000_000,
                     max_output_tokens=8_000_000)
     for s in range(a.n_seeds):
         run_id = f"{d.name}-s{s}"
+        # ★ A fresh registry and matrix per seed — the stage-1 state, which
+        #   is `base` plus what stage 1 accepted, and nothing the loop added.
+        reg = _load_stage1(d, base, a.condition, table)
+        matrix = FeatureMatrix(table, reg)
         llm = _make_llm(a, registry=reg, budget=budget, table=table)
         loop = RoundLoop(
             cfg=LoopConfig(run_id=run_id, max_rounds=a.rounds,
@@ -1472,7 +1515,9 @@ def main() -> None:
         # Stage 3
         if 3 in stages:
             print("\n--- stage 3 evolution ---")
-            stage3(a, d, table, matrix, reg, splits, chosen)
+            # ★ D-172 §X — `base`, not the live registry. stage 3 rebuilds
+            #   the stage-1 state for every seed.
+            stage3(a, d, table, base, splits, chosen)
 
     print(f"\ndone. artefacts {d}")
 
