@@ -31,6 +31,8 @@ from kernelrule.core.splits import (
     MIN_REGIME_FRAC,
     NK_LAYER,
     experiment_shapes,
+    in_main_band,
+    nk_band_folds,
     nk_group_folds,
     nk_groups,
     regime_of,
@@ -40,6 +42,20 @@ from kernelrule.core.table import PerfTable
 OUT = "docs/artifacts/nk-fold-plan.json"
 OUT_MD = "docs/artifacts/nk-fold-plan.md"
 K = 4
+#: ★ D-174 §1 — `band` releases the layer pin; `layer` is what the 48-run
+#: campaign used and stays reproducible.
+DESIGNS = {"band": nk_band_folds, "layer": nk_group_folds}
+
+
+def _spread(v: list[float]) -> dict:
+    """min · q1 · median · q3 · max of a fold's log2 scale."""
+    import statistics as st
+
+    v = sorted(v)
+    return {"min": round(v[0], 2), "median": round(st.median(v), 2),
+            "max": round(v[-1], 2),
+            "q1": round(v[len(v) // 4], 2),
+            "q3": round(v[(3 * len(v)) // 4], 2)}
 
 
 def _check(table, folds, shapes) -> dict:
@@ -61,6 +77,8 @@ def _check(table, folds, shapes) -> dict:
             if p.M in tr_m:
                 m_twins += 1
 
+    import math
+
     rows = []
     for i, f in enumerate(folds):
         cv = Counter(regime_of(p, table.hw, axis="roofline")
@@ -75,18 +93,46 @@ def _check(table, folds, shapes) -> dict:
                               {(p.N, p.K) for p in f.val.shapes}]),
             "val_regimes": dict(cv), "train_regimes": dict(ct),
             "train_minority_frac": round(min(ct.values()) / n_tr, 4),
+            # ★ D-174 §1-4 (3) — the N·K scale spread per fold, and how
+            #   many of its shapes are out of the main band. A fold holding
+            #   more than half of all out-of-band shapes is re-assigned.
+            "log2_N": _spread([math.log2(p.N) for p in f.val.shapes]),
+            "log2_K": _spread([math.log2(p.K) for p in f.val.shapes]),
+            "n_out_of_band": sum(1 for p in f.val.shapes
+                                 if not in_main_band((p.N, p.K))),
+            # ★ (4) — is M piled on one value?
+            "M_counts": dict(sorted(Counter(p.M for p in f.val.shapes
+                                            ).items())),
+            "M_top_share": round(max(Counter(p.M for p in f.val.shapes
+                                             ).values())
+                                 / len(f.val.shapes), 3),
             "val": [[p.M, p.N, p.K] for p in f.val.shapes]})
+    total_oob = sum(r["n_out_of_band"] for r in rows)
     return {"coverage_ok": coverage_ok, "nk_twins_in_train": twins,
+            # ★ (3) the re-assignment trigger
+            "max_out_of_band_share": (round(max(r["n_out_of_band"]
+                                                for r in rows) / total_oob, 3)
+                                      if total_oob else 0.0),
+            "max_M_top_share": max(r["M_top_share"] for r in rows),
             "m_twins_in_train": m_twins,
             "min_train_minority": min(r["train_minority_frac"] for r in rows),
             "folds": rows}
 
 
 def main() -> None:
+    import argparse
+
     warnings.simplefilter("ignore")
-    res: dict = {"k": K, "nk_layer": NK_LAYER,
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--design", choices=tuple(DESIGNS), default="band")
+    ap.add_argument("--out", default=OUT)
+    ap.add_argument("--out-md", default=OUT_MD)
+    a = ap.parse_args()
+    res: dict = {"k": K, "design": a.design, "nk_layer": NK_LAYER,
                  "min_regime_frac": MIN_REGIME_FRAC,
-                 "design": "D-171 §1 — a whole (N,K) group on one side",
+                 "design_note": ("D-171 §1 (layer) / ★ D-174 §1 (band) — "
+                                 "a whole (N,K) group on one side either "
+                                 "way; `band` does not pin the layer"),
                  "tables": {}}
     print("=" * 92)
     print(f"★ the (N,K) group split, k={K}. 0 LLM calls")
@@ -97,7 +143,7 @@ def main() -> None:
                                       ok_only=False)
         shapes = experiment_shapes(table)
         groups = nk_groups(shapes)
-        folds = nk_group_folds(shapes, k=K)
+        folds = DESIGNS[a.design](shapes, k=K)
         r = _check(table, folds, shapes)
         r["n_shapes"] = len(shapes)
         r["n_groups"] = len(groups)
@@ -135,9 +181,9 @@ def main() -> None:
               + ("   ⚠️ the whole table is "
                  f"{r['table_minority_frac']:.0%} — no split can reach it"
                  if r["balance_ceiling_is_the_table"] else ""))
-    Path(OUT).write_text(json.dumps(res, ensure_ascii=False, indent=1))
-    Path(OUT_MD).write_text(_md(res))
-    print(f"\n  -> {OUT}\n  -> {OUT_MD}")
+    Path(a.out).write_text(json.dumps(res, ensure_ascii=False, indent=1))
+    Path(a.out_md).write_text(_md(res))
+    print(f"\n  -> {a.out}\n  -> {a.out_md}")
 
 
 def _md(res: dict) -> str:

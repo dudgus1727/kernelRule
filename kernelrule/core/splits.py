@@ -46,6 +46,7 @@ from kernelrule.core.types import Problem
 
 __all__ = ["Split", "SplitSet", "SplitError", "by_predicate",
            "nk_groups", "nk_group_folds", "NK_LAYER",
+           "nk_band_folds", "MAIN_BAND", "in_main_band",
            "experiment_shapes", "aligned_shapes", "kernel_families",
            "ALIGNMENT_REQUIRED", "MIN_KERNEL_FAMILIES",
            "KERNEL_FAMILY_COLUMN",
@@ -735,6 +736,106 @@ def nk_group_folds(shapes: Sequence[Problem], *, k: int = 4,
         val = tuple(p for p in shapes if p in assigned[i])
         vk = {p.key for p in val}
         train = tuple(p for p in shapes if p.key not in vk)
+        if not train or not val:
+            raise SplitError(f"fold {i} left one side empty (§26.4)")
+        out.append(SplitSet(
+            train=Split("train", train, name=f"{name}{i}:train"),
+            val=Split("val", val, name=f"{name}{i}:val"),
+            kind=f"{name}{i}-k{k}"))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# ★ 2026-09-14 (D-174 §1) — the (N,K) band split, **without pinning the
+#   layer to one fold**
+# ---------------------------------------------------------------------------
+#: The N and K values the grid sweeps as a "main band" — the layer widths a
+#: transformer block actually uses. A group is in the band when **both** N
+#: and K are one of these.
+#:
+#: ⛔ It is not a tuning knob. It names which groups are the large ones so
+#: they can be spread one per fold; the values come from the grid's design,
+#: not from any score.
+MAIN_BAND = (4096, 11008, 12288)
+
+
+def in_main_band(nk: tuple[int, int]) -> bool:
+    return nk[0] in MAIN_BAND and nk[1] in MAIN_BAND
+
+
+def nk_band_folds(shapes: Sequence[Problem], *, k: int = 4,
+                  name: str = "nkband") -> list[SplitSet]:
+    """★ k folds over whole `(N, K)` groups, **balanced by size and by
+    band** (D-174 §1).
+
+    ## Why this replaced pinning the layer to fold 0
+
+    `nk_group_folds` put both 11008 groups in fold 0 so that fold 0 was the
+    old `nk11008` holdout. The grid has **four large groups** (17 · 10 · 10
+    · 10 shapes on the A6000), and spending two of them on one fold leaves
+    two to cover three folds — the last fold gets the leftovers:
+
+    ```
+    방식                   형상 수              대역 밖         최대 비율
+    k=3 · nk11008 고정   [24, 23, 18]        [4, 6, 8]         44%
+    k=4 · nk11008 고정   [22, 20, 15,  8]    [2, 3, 5, 8]      44%
+    ★ k=4 · 고정 없음    [17, 16, 16, 16]  ★ [0, 6, 6, 6]   ★ 28%
+    ```
+
+    ★ Lowering `k` does not fix it. Releasing the pin does.
+
+    That leftover fold is where the campaign's rules collapsed, and the
+    baselines say it was not the shapes:
+
+    ```
+              n    vendor   static top-1   native
+    fold3    12   1.1055     1.0475      ★ 1.4717
+    fold0-2  36   1.1060     1.0644        1.0583
+    ```
+
+    ## The rule — dimensions only
+
+    ```
+    ★ a whole (N,K) group stays on one side      ⛔ never split
+    ★ the four largest groups go ★ one per fold
+    ★ the rest, largest first, to the fold with the fewest shapes and then
+      the fewest out-of-band groups
+    ⛔ the layer is not pinned anywhere
+    ```
+
+    ⚠️ It reads `N` and `K` and nothing else — no score, no `best_ms`.
+
+    ⚠️ **The old `nk11008` holdout is no longer one fold.** Under
+    cross-validation every shape is held out exactly once, so those 20
+    shapes still get a value; it is a **different procedure** from the old
+    "train 45 -> holdout 20 once" and must be reported as such (§1-5).
+    """
+    if k < 2:
+        raise SplitError(f"folds cannot be built with k={k}")
+    groups = nk_groups(shapes)
+    if len(groups) < k:
+        raise SplitError(
+            f"there are only {len(groups)} (N,K) groups and {k} folds were "
+            f"asked for (§26.4)")
+    order = sorted(groups, key=lambda g: (-len(groups[g]), g))
+    assigned: list[list] = [[] for _ in range(k)]
+    out_of_band: list[int] = [0] * k
+    # ★ The k largest groups take one fold each.
+    for i, g in enumerate(order[:k]):
+        assigned[i].extend(groups[g])
+        if not in_main_band(g):
+            out_of_band[i] += len(groups[g])
+    for g in order[k:]:
+        i = min(range(k),
+                key=lambda j: (len(assigned[j]), out_of_band[j], j))
+        assigned[i].extend(groups[g])
+        if not in_main_band(g):
+            out_of_band[i] += len(groups[g])
+    out: list[SplitSet] = []
+    for i in range(k):
+        keep = {p.key for p in assigned[i]}
+        val = tuple(p for p in shapes if p.key in keep)
+        train = tuple(p for p in shapes if p.key not in keep)
         if not train or not val:
             raise SplitError(f"fold {i} left one side empty (§26.4)")
         out.append(SplitSet(

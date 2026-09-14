@@ -417,8 +417,20 @@ def _splits(table: PerfTable, *, fold: int | None = None,
     #   shape list, so a different population is a different split, and the
     #   number would move with no sign of it.
     shapes = _population_shapes(table, population)
-    if design not in ("kfold", "nkgroup"):
+    if design not in ("kfold", "nkgroup", "nkband"):
         raise ValueError(f"unknown split design: {design!r}")
+    if design == "nkband":
+        # ★ D-174 §1 — the layer is not pinned to a fold; the four large
+        #   groups go one per fold. Deterministic, so no split seed.
+        from kernelrule.core.splits import nk_band_folds
+
+        if fold is None:
+            raise ValueError(
+                "the nkband design has no default fold — state --fold "
+                "(§26.4)")
+        s = nk_band_folds(shapes, k=k)[fold]
+        check_balance(s.train, table.hw)
+        return s
     if design == "nkgroup":
         # ★ D-171 §1 — a whole (N,K) group on one side. `fold` picks which.
         #   ⚠️ It takes **no seed**: the assignment is deterministic, so
@@ -1306,7 +1318,8 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     # ★ The split (D-144). With `--fold` it is a stratified 3-fold;
     #   without it, the structural split.
-    ap.add_argument("--split-design", choices=("kfold", "nkgroup"),
+    ap.add_argument("--split-design",
+                    choices=("kfold", "nkgroup", "nkband"),
                     default="kfold",
                     help="★ D-171 §1: `nkgroup` keeps a whole (N,K) group "
                          "on one side — the layer is the unit a deployment "
