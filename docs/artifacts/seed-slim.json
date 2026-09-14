@@ -1,0 +1,57 @@
+{
+ "note": "D-173 §2 — 씨앗 프롬프트의 기준을 \"물리를 말할 수 있으면\" 에서 \"없으면 명백히 나빠지면\" 으로 올렸다. ⛔ 숫자 상한은 안 박았고 분기 지시는 남겼다. 한 (표,fold) x stage 2 한 번이다 — n=1.",
+ "where": "a6000 x fold0 (nk11008 과 같은 20형상 홀드아웃)",
+ "arms": {
+  "old": {
+   "tag": "nk4-a6000-f0",
+   "pass": "10/10",
+   "seconds": 441.0,
+   "chosen": {
+    "n_terms": 18,
+    "n_paths": 1,
+    "len_w0": 18,
+    "train": 1.145687033129188,
+    "holdout_canonical": 1.17996,
+    "in_sample": 1.156739
+   },
+   "candidates": {
+    "len_w0_min": 12,
+    "len_w0_max": 21,
+    "len_w0_median": 19.0,
+    "paths_min": 1,
+    "paths_max": 2,
+    "train_min": 1.145687033129188,
+    "train_max": 1.233110646550927,
+    "train_median": 1.151454
+   }
+  },
+  "slim": {
+   "tag": "x-seedslim-a6000-f0",
+   "pass": "10/10",
+   "seconds": 324.4,
+   "chosen": {
+    "n_terms": 12,
+    "n_paths": 1,
+    "len_w0": 12,
+    "train": 1.1500552580766636,
+    "holdout_canonical": 1.113796,
+    "in_sample": 1.133201
+   },
+   "candidates": {
+    "len_w0_min": 7,
+    "len_w0_max": 12,
+    "len_w0_median": 10.0,
+    "paths_min": 1,
+    "paths_max": 1,
+    "train_min": 1.1500552580766636,
+    "train_max": 1.3608337058904747,
+    "train_median": 1.284782
+   }
+  }
+ },
+ "delta": {
+  "train": 0.004368,
+  "holdout": -0.066164,
+  "len_w0": -6
+ }
+}
