@@ -1,0 +1,402 @@
+{
+ "paused_at": "24/48",
+ "why": "D-171 §3-1 third stop condition — the same rejection reason 3 times in one run (nk4-a6000-f3-s1 r6, NameError: name 'skiny' is not defined)",
+ "done": [
+  "a6000 f0-f3 x s0-s2",
+  "5090 f0-f3 x s0-s2"
+ ],
+ "not_started": [
+  "4090 x 12",
+  "h100 x 12"
+ ],
+ "dead_runs": 0,
+ "rate_limit_events": 0,
+ "runs": [
+  {
+   "run": "nk4-5090-f0-s0",
+   "n_rounds": 12,
+   "best_train": 1.0308033375369055,
+   "best_val": 1.038154005716507,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 40,
+    "n_features_made": 5
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f0-s1",
+   "n_rounds": 12,
+   "best_train": 1.0274888127163664,
+   "best_val": 1.0358564371655121,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 1,
+    "n_rejected_fit": 0,
+    "n_accepted": 35,
+    "n_features_made": 1
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f0-s2",
+   "n_rounds": 12,
+   "best_train": 1.0245301803782443,
+   "best_val": 1.0280317449774101,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 7,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 35,
+    "n_features_made": 2
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f1-s0",
+   "n_rounds": 12,
+   "best_train": 1.0225210207866808,
+   "best_val": 1.0466115976816874,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 48,
+    "n_features_made": 6
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f1-s1",
+   "n_rounds": 12,
+   "best_train": 1.0266962993180186,
+   "best_val": 1.0352620320406132,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 33,
+    "n_features_made": 0
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f1-s2",
+   "n_rounds": 12,
+   "best_train": 1.0247027327476712,
+   "best_val": 1.0306903730686114,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 1,
+    "n_rejected_fit": 0,
+    "n_accepted": 38,
+    "n_features_made": 1
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f2-s0",
+   "n_rounds": 12,
+   "best_train": 1.0308988086125632,
+   "best_val": 1.0161550561874495,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 33,
+    "n_features_made": 4
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f2-s1",
+   "n_rounds": 12,
+   "best_train": 1.028610611015998,
+   "best_val": 1.029622525132559,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 41,
+    "n_features_made": 2
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f2-s2",
+   "n_rounds": 12,
+   "best_train": 1.029819370715041,
+   "best_val": 1.1184196723757285,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 37,
+    "n_features_made": 0
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f3-s0",
+   "n_rounds": 12,
+   "best_train": 1.0227037499245863,
+   "best_val": 1.2990273389482003,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 33,
+    "n_features_made": 3
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f3-s1",
+   "n_rounds": 12,
+   "best_train": 1.0176441414785313,
+   "best_val": 1.7815411231461211,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 1,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 32,
+    "n_features_made": 4
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-5090-f3-s2",
+   "n_rounds": 12,
+   "best_train": 1.0196427325419424,
+   "best_val": 1.589908886284374,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 34,
+    "n_features_made": 1
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f0-s0",
+   "n_rounds": 12,
+   "best_train": 1.0959554752989746,
+   "best_val": 1.0995396398841037,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 1,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 26,
+    "n_features_made": 7
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f0-s1",
+   "n_rounds": 12,
+   "best_train": 1.1024283145097398,
+   "best_val": 1.1325600163013365,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 1,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 30,
+    "n_features_made": 0
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f0-s2",
+   "n_rounds": 12,
+   "best_train": 1.0830386804286423,
+   "best_val": 1.0791408948241936,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 29,
+    "n_features_made": 3
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f1-s0",
+   "n_rounds": 12,
+   "best_train": 1.0628331007203653,
+   "best_val": 1.1092949116665713,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 34,
+    "n_features_made": 9
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f1-s1",
+   "n_rounds": 12,
+   "best_train": 1.070112084074066,
+   "best_val": 1.1000806819129856,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 7,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 33,
+    "n_features_made": 2
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f1-s2",
+   "n_rounds": 12,
+   "best_train": 1.0854056253402684,
+   "best_val": 1.1118827114043772,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 26,
+    "n_features_made": 1
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f2-s0",
+   "n_rounds": 12,
+   "best_train": 1.0964497639314255,
+   "best_val": 1.1035057629283092,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 1,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 18,
+    "n_features_made": 5
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f2-s1",
+   "n_rounds": 12,
+   "best_train": 1.0976027492927602,
+   "best_val": 1.112481400470222,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 23,
+    "n_features_made": 7
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f2-s2",
+   "n_rounds": 12,
+   "best_train": 1.0931226703596288,
+   "best_val": 1.0789306834528432,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 24,
+    "n_features_made": 4
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f3-s0",
+   "n_rounds": 12,
+   "best_train": 1.054328473044749,
+   "best_val": 1.1611578361343708,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 33,
+    "n_features_made": 10
+   },
+   "repeated_reasons": {}
+  },
+  {
+   "run": "nk4-a6000-f3-s1",
+   "n_rounds": 12,
+   "best_train": 1.03301551147309,
+   "best_val": 1.1876678648648713,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 7,
+    "n_rejected_sandbox": 3,
+    "n_rejected_fit": 0,
+    "n_accepted": 40,
+    "n_features_made": 2
+   },
+   "repeated_reasons": {
+    "['sandbox', \"[failed] NameError: name 'skiny' is not defined\"]": 3
+   }
+  },
+  {
+   "run": "nk4-a6000-f3-s2",
+   "n_rounds": 12,
+   "best_train": 1.0436799831328212,
+   "best_val": 1.1979800126019617,
+   "counts": {
+    "n_proposed": 72,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_accepted": 30,
+    "n_features_made": 2
+   },
+   "repeated_reasons": {}
+  }
+ ]
+}
