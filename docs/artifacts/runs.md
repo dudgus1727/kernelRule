@@ -73,6 +73,22 @@ F3hg-p8-d75-a  the human_guided seed
 | `F3rw-p8-prod` | 3 | 19/F3 | rule_writer-try05 | 8 | prod | cma/1/300 | 12 | a6000 | `?` | — | 1.0840 | expressive-regret.json | ⛔ retired — p8 and yet CMA. To be re-measured |
 | `archive` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `06c7c7b` | trace-archive-06c7c7b | — | — | ★ 12 rounds with the archive rebuilt (D-155) — 1 seed, fold 0, 3-term seed. New population, cut line and axes. Do not read its numbers |
 | `ast3000` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 12 | a6000 | `0989b92` | trace-ast3000-0989b92 | — | — | ★ 12 rounds with the AST node cap at 3000 (D-154) — 1 seed, fold 0, 3-term seed. Refusals 3/72, none of them the cap. Do not read its numbers |
+| `c2-4090-f0` | 4 | 23/F2 | rule_writer-try02 | none | default | per rule (fitter_for) | 12 | 4090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-4090-f1` | 4 | 21/F2 | rule_writer-try06 | none | default | per rule (fitter_for) | 12 | 4090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-4090-f2` | 4 | 22/F2 | rule_writer-try01 | none | default | per rule (fitter_for) | 12 | 4090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-4090-f3` | 4 | 23/F2 | rule_writer-try00 | none | default | per rule (fitter_for) | 12 | 4090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-5090-f0` | 4 | 25/F2 | rule_writer-try01 | none | default | per rule (fitter_for) | 12 | 5090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-5090-f1` | 4 | 23/F2 | rule_writer-try07 | none | default | per rule (fitter_for) | 12 | 5090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-5090-f2` | 4 | 22/F2 | rule_writer-try03 | none | default | per rule (fitter_for) | 12 | 5090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-5090-f3` | 4 | 24/F2 | rule_writer-try09 | none | default | per rule (fitter_for) | 12 | 5090 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-a6000-f0` | 4 | 24/F2 | rule_writer-try01 | none | default | per rule (fitter_for) | 12 | a6000 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-a6000-f1` | 4 | 22/F2 | rule_writer-try00 | none | default | per rule (fitter_for) | 12 | a6000 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-a6000-f2` | 4 | 27/F2 | rule_writer-try07 | none | default | per rule (fitter_for) | 12 | a6000 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-a6000-f3` | 4 | 23/F2 | rule_writer-try06 | none | default | per rule (fitter_for) | 12 | a6000 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-h100-f0` | 4 | 23/F2 | rule_writer-try05 | none | default | per rule (fitter_for) | 12 | h100 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-h100-f1` | 4 | 22/F2 | rule_writer-try03 | none | default | per rule (fitter_for) | 12 | h100 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-h100-f2` | 4 | 23/F2 | rule_writer-try08 | none | default | per rule (fitter_for) | 12 | h100 | `2162a2d` | campaign2-3e84259 | — | — | |
+| `c2-h100-f3` | 4 | 24/F2 | rule_writer-try05 | none | default | per rule (fitter_for) | 12 | h100 | `2162a2d` | campaign2-3e84259 | — | — | |
 | `c21-4090-nk-s0` | 1 | 23/F2 | rule_writer-try00 | none | default | per rule (fitter_for) | 12 | 4090 | `6199e1b` | campaign-21-7d30b54 | — | — | |
 | `c21-4090-nk-s1` | 1 | 30/F2 | rule_writer-try00 | none | default | per rule (fitter_for) | 12 | 4090 | `6199e1b` | campaign-21-7d30b54 | — | — | |
 | `c21-4090-nk-s2` | 1 | 27/F2 | rule_writer-try00 | none | default | per rule (fitter_for) | 12 | 4090 | `6199e1b` | campaign-21-7d30b54 | — | — | |
