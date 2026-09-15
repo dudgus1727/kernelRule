@@ -30,6 +30,18 @@ from pathlib import Path
 A = Path("docs/artifacts")
 OUT = A / "campaign-nk4.md"
 GPUS = ("a6000", "5090", "4090", "h100")
+#: ★ D-174 — which artefact set the report is built from.
+SETS = {
+    "nk4": {"camp": "campaign-nk4.json", "tr": "transfer-nk4.json",
+            "atk": "nk4-at-k.json", "plan": "nk-fold-plan.json",
+            "seed": None, "out": "campaign-nk4.md", "seeds": (0, 1, 2)},
+    "c2": {"camp": "campaign2.json", "tr": "campaign2-transfer.json",
+           "atk": "campaign2-at-k.json",
+           "plan": "campaign2-fold-plan.json",
+           "seed": "campaign2-seed-holdout.json",
+           "out": "campaign2.md", "seeds": (0, 1, 2, 3)},
+}
+SET = SETS["nk4"]
 
 
 def _load(name: str) -> dict:
@@ -37,10 +49,11 @@ def _load(name: str) -> dict:
 
 
 def build() -> str:
-    camp = _load("campaign-nk4.json")
-    tr = _load("transfer-nk4.json")
-    atk = _load("nk4-at-k.json")
-    plan = _load("nk-fold-plan.json")
+    camp = _load(SET["camp"])
+    tr = _load(SET["tr"])
+    atk = _load(SET["atk"])
+    plan = _load(SET["plan"])
+    seedho = _load(SET["seed"]) if SET["seed"] else None
     runs = [r for r in camp["runs"] if not r.get("missing")]
     ag = camp["aggregates"]
     L: list[str] = []
@@ -88,7 +101,28 @@ def build() -> str:
     add("동시         4실행 · 워커 6")
     add("```")
     add("")
-    add("★ **21실행과 무엇이 다른가** (조건만, 비교 아님)")
+    if SET["out"] == "campaign2.md":
+        add("## ★ 48실행(nk4)과 무엇이 다른가 — 조건만")
+        add("")
+        add("```")
+        add("               48실행 (nk4)              ★ 이 캠페인 (c2)")
+        add("배정          nk11008 을 fold0 에 고정    ★ 고정 없음 —")
+        add("                                          큰 묶음 넷을 하나씩")
+        add("              -> fold3 이 자투리 14형상    -> 17·16·16·16")
+        add("씨앗 문구      \"물리를 말할 수 있으면 추가\"  ★ \"없으면 명백히")
+        add("                                          나빠지면\" (d08a48d)")
+        add("시드 격리      ⛔ 없음 — s1 이 s0 의 축을   ★ 있음 (D-172 §X)")
+        add("              물려받았다 (32/32 검출)      64/64 축 20 에서 출발")
+        add("시드 수        3                          ★ 4")
+        add("표본(표당)     12                         ★ 16")
+        add("```")
+        add("")
+        add("⛔ **넷이 다르므로 값을 나란히 놓고 판정하지 않는다.** 아래에서 "
+            "nk4 를 언급하는 곳은 **설계 진단이 맞았는지**를 말하는 것이지 "
+            "성능 비교가 아니다.")
+        add("")
+    add("★ 21실행과 무엇이 다른가** (조건만, 비교 아님)"
+        if False else "★ **21실행과 무엇이 다른가** (조건만, 비교 아님)")
     add("")
     add("```")
     add("21실행                          48실행")
@@ -245,6 +279,57 @@ def build() -> str:
             f" · @10 {st.median([r['regret_at']['k10'] for r in rs]):.4f}"
             f" · hit@1 {st.median([r['hit_at']['k1'] for r in rs]):.2f}")
     add("")
+
+    # -- 5b  씨앗 홀드아웃 · 구간 기여 -------------------------------------
+    if seedho:
+        add("## 5b. 씨앗의 홀드아웃과 구간별 기여")
+        add("")
+        add("★ `rounds.jsonl` 의 r0 은 **씨앗 + 편집 6개 중 최고**라 씨앗 "
+            "자체의 홀드아웃이 없다. 여기서 따로 잰다.")
+        add("")
+        add("| 표 | fold | 씨앗 학습 | ★ 씨앗 HO | 최종 HO(s0) | "
+            "최종 HO(중앙) | ★ 루프 기여 |")
+        add("|---|--:|--:|--:|--:|--:|--:|")
+        gains = []
+        for r in seedho["rows"]:
+            g = r.get("loop_gain_canonical_s0")
+            if g is not None:
+                gains.append(g)
+            add(f"| {r['gpu']} | {r['fold']} | "
+                f"{r['seed_train_recorded']:.4f} | "
+                f"**{r['seed_holdout_canonical']:.4f}** | "
+                f"{(r['final_holdout_s0'] or float('nan')):.4f} | "
+                f"{(r['final_holdout_median'] or float('nan')):.4f} | "
+                f"{(g if g is not None else float('nan')):+.4f} |")
+        add("")
+        add(f"★ 루프가 홀드아웃을 올린 곳 "
+            f"**{sum(1 for x in gains if x > 0)}/{len(gains)}** · "
+            f"중앙 **{st.median(gains):+.4f}**")
+        add("")
+        add("### 구간별 기여 — ⚠️ 전부 **루프 절차** "
+            "(`rounds.jsonl` 과 같은 자)")
+        add("")
+        add("⛔ `canonical`(체제별 재적합)과 빼지 않는다. 다른 자다.")
+        add("")
+        add("⚠️ **중앙값은 분해되지 않는다** — 구간 중앙값의 합은 전체의 "
+            "중앙값이 아니다. 비율은 **평균**으로 분해하고 중앙값은 옆에 둔다.")
+        add("")
+        for tag, d in seedho["segments"].items():
+            m, mu = d["median"], d["mean"]
+            add(f"- **{tag}** (n={d['n']}, 좋아진 "
+                f"{d['improved_seed_to_r11']}/{d['n']})")
+            add(f"  - 중앙 씨앗→r0 {m['seed_to_r0']:+.4f} · "
+                f"r0→r5 {m['r0_to_r5']:+.4f} · "
+                f"r5→r11 {m['r5_to_r11']:+.4f} · "
+                f"합 {m['seed_to_r11']:+.4f}")
+            add(f"  - 평균 씨앗→r0 {mu['seed_to_r0']:+.4f} · "
+                f"r0→r5 {mu['r0_to_r5']:+.4f} · "
+                f"r5→r11 {mu['r5_to_r11']:+.4f} · "
+                f"합 {mu['seed_to_r11']:+.4f}")
+            if "share_of_mean" in d:
+                add(f"  - ★ 비율(평균 분해) {d['share_of_mean']} · "
+                    f"실행별 비율 중앙 {d['share_per_run_median']}")
+        add("")
 
     # -- 6 ----------------------------------------------------------------
     add("## 6. 전이 행렬 (§4)")
@@ -410,9 +495,14 @@ def build() -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--campaign", choices=tuple(SETS), default="nk4")
     ap.add_argument("--check", action="store_true")
-    ap.add_argument("--out", default=str(OUT))
+    ap.add_argument("--out", default=None)
     a = ap.parse_args()
+    global SET  # noqa: PLW0603
+    SET = SETS[a.campaign]
+    if a.out is None:
+        a.out = str(A / SET["out"])
     text = build()
     p = Path(a.out)
     if a.check:

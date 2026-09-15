@@ -44,6 +44,10 @@ from kernelrule.rules.checks import fitter_for
 
 GPUS = ("a6000", "5090", "4090", "h100")
 OUT = Path("docs/artifacts/seed-holdout.json")
+#: ★ D-174 — campaign 2 (`c2-*`, 4 seeds, `nkband`) beside the 48-run one.
+CAMPAIGNS = {"nk4": ("nk4", (0, 1, 2), "nkgroup", "campaign-nk4.json"),
+             "c2": ("c2", (0, 1, 2, 3), "nkband", "campaign2.json")}
+PREFIX, SEEDS, DESIGN, CAMPFILE = CAMPAIGNS["nk4"]
 
 
 def _rows(p: Path) -> list[dict]:
@@ -70,12 +74,15 @@ def _loop_val(code: str, w0, table, matrix, splits) -> float:
 def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
+    ap.add_argument("--campaign", choices=tuple(CAMPAIGNS), default="nk4")
     ap.add_argument("--out", default=str(OUT))
     # ★ The segment table is read back from the artefact — recomputing the
     #   16 canonical scores to change how a ratio is summarised would be
     #   two hours for nothing.
     ap.add_argument("--segments-only", action="store_true")
     a = ap.parse_args()
+    global PREFIX, SEEDS, DESIGN, CAMPFILE
+    PREFIX, SEEDS, DESIGN, CAMPFILE = CAMPAIGNS[a.campaign]
 
     if a.segments_only:
         old = json.loads(Path(a.out).read_text())
@@ -83,7 +90,7 @@ def main() -> None:
         Path(a.out).write_text(json.dumps(old, ensure_ascii=False, indent=1))
         _print_segments(old["segments"])
         return
-    camp = json.loads(Path("docs/artifacts/campaign-nk4.json").read_text())
+    camp = json.loads(Path(f"docs/artifacts/{CAMPFILE}").read_text())
     finals = {(r["gpu"], r["fold"], r["seed"]): r
               for r in camp["runs"] if not r.get("missing")}
 
@@ -100,12 +107,12 @@ def main() -> None:
         table = PerfTable.from_bundle(T["bundle"], env_hash=T["env_hash"],
                                       ok_only=False)
         for fold in range(4):
-            d = Path(f"runs/nk4-{gpu}-f{fold}")
+            d = Path(f"runs/{PREFIX}-{gpu}-f{fold}")
             ch = d / "stage2-rule-writer" / "chosen.json"
             if not ch.exists():
                 continue
             chosen = json.loads(ch.read_text())
-            splits = _splits(table, fold=fold, k=4, design="nkgroup")
+            splits = _splits(table, fold=fold, k=4, design=DESIGN)
             # ★ The registry the seed was written against — the stage-1
             #   state, not a run's grown one.
             reg = _load_stage1(d, base_registry("F2", human=REGISTRY),
@@ -116,7 +123,7 @@ def main() -> None:
                                  table=table, matrix=matrix, splits=splits)
             lv, ltrain, moved = _loop_val(chosen["code"], chosen["w0"],
                                           table, matrix, splits)
-            fin = [finals[(gpu, fold, s)]["holdout"] for s in range(3)
+            fin = [finals[(gpu, fold, s)]["holdout"] for s in SEEDS
                    if (gpu, fold, s) in finals]
             row = {
                 "gpu": gpu, "fold": fold, "n_holdout": cs.n_holdout,
@@ -166,8 +173,9 @@ def _segments(rows: list[dict]) -> dict:
         for r in rows:
             if r["fold"] not in folds:
                 continue
-            for s in range(3):
-                p = Path(f"runs/nk4-{r['gpu']}-f{r['fold']}-s{s}/rounds.jsonl")
+            for s in SEEDS:
+                p = Path(f"runs/{PREFIX}-{r['gpu']}-f{r['fold']}-s{s}"
+                         f"/rounds.jsonl")
                 if not p.exists():
                     continue
                 rr = _rows(p)

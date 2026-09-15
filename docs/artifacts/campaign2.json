@@ -1,0 +1,11766 @@
+{
+ "n_runs": 64,
+ "campaign": "c2",
+ "design": "nkband",
+ "library": "k7-1 (known7 + 20 generated)",
+ "seed_isolation": true,
+ "note": "⛔ conditions differ between campaigns — library, shape population, split design, seed prompt and seed isolation. Numbers are not put side by side.",
+ "runs": [
+  {
+   "run": "c2-a6000-f0-s0",
+   "gpu": "a6000",
+   "fold": 0,
+   "seed": 0,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.112763,
+   "in_sample": 1.111433,
+   "by_regime": {
+    "short": 1.105389,
+    "long": 1.123916
+   },
+   "n_holdout": 20,
+   "train_best": 1.1010293485863014,
+   "val_best": 1.1613539273571245,
+   "len_w_best": 28,
+   "round_best": 11,
+   "len_w_by_round": [
+    13,
+    12,
+    16,
+    15,
+    17,
+    28,
+    30,
+    18
+   ],
+   "len_w_archive": [
+    12,
+    13,
+    15,
+    16,
+    17,
+    18,
+    28,
+    30
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_flops",
+      "<",
+      35.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 4
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    3,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    82,
+    62,
+    33,
+    43,
+    60,
+    56,
+    51,
+    63,
+    46,
+    61,
+    56,
+    93
+   ],
+   "n_dead_terms": [
+    82,
+    62,
+    33,
+    46,
+    61,
+    56,
+    51,
+    63,
+    46,
+    61,
+    56,
+    93
+   ],
+   "axes_made_in_loop": [
+    "shared_memory_bank_conflict_or_swizzle_efficiency",
+    "pipeline_family_buffer_overhead",
+    "traffic_reuse_context",
+    "shared_memory_access_slack",
+    "shared_memory_stride_alias_risk",
+    "shared_memory_bank_conflict_proxy",
+    "warp_axis_coverage_mismatch",
+    "execution_measurement_uncertainty"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 38,
+    "explore": 24,
+    "cross": 10
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 11,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 20,
+    "n_features_made": 4,
+    "n_feature_requests": 8,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 20.2,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 8
+   }
+  },
+  {
+   "run": "c2-a6000-f0-s1",
+   "gpu": "a6000",
+   "fold": 0,
+   "seed": 1,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.106529,
+   "in_sample": 1.102065,
+   "by_regime": {
+    "short": 1.09534,
+    "long": 1.123528
+   },
+   "n_holdout": 20,
+   "train_best": 1.0968424351527293,
+   "val_best": 1.14490842847045,
+   "len_w_best": 17,
+   "round_best": 7,
+   "len_w_by_round": [
+    13,
+    14,
+    19,
+    23,
+    17,
+    26,
+    21,
+    19,
+    27
+   ],
+   "len_w_archive": [
+    13,
+    14,
+    17,
+    19,
+    19,
+    21,
+    23,
+    26,
+    27
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      6.0
+     ],
+     [
+      "log_flops",
+      "<",
+      35.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      6.0
+     ],
+     [
+      "log_flops",
+      "<",
+      35.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ]
+    ],
+    "n_paths": 4
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    65,
+    50,
+    43,
+    80,
+    77,
+    53,
+    76,
+    92,
+    66,
+    67,
+    78,
+    93
+   ],
+   "n_dead_terms": [
+    65,
+    50,
+    43,
+    80,
+    77,
+    53,
+    77,
+    92,
+    66,
+    67,
+    78,
+    93
+   ],
+   "axes_made_in_loop": [
+    "shared_stride_conflict_ratio",
+    "warp_level_tile_mapping_efficiency",
+    "warp_swizzle_mapping_conflict",
+    "pipeline_family",
+    "shared_access_padding_fraction",
+    "alignment_pipeline_family_interaction",
+    "execution_granularity_tie_scale",
+    "signed_output_axis_aspect",
+    "cta_wave_count",
+    "axis_grid_underfill"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 38,
+    "explore": 24,
+    "cross": 10
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 20,
+    "n_features_made": 4,
+    "n_feature_requests": 10,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 22.8,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 10
+   }
+  },
+  {
+   "run": "c2-a6000-f0-s2",
+   "gpu": "a6000",
+   "fold": 0,
+   "seed": 2,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.094172,
+   "in_sample": 1.109842,
+   "by_regime": {
+    "short": 1.090675,
+    "long": 1.099438
+   },
+   "n_holdout": 20,
+   "train_best": 1.1018758224842111,
+   "val_best": 1.1502723364492229,
+   "len_w_best": 22,
+   "round_best": 11,
+   "len_w_by_round": [
+    16,
+    17,
+    16,
+    17,
+    20,
+    22,
+    22,
+    22,
+    24
+   ],
+   "len_w_archive": [
+    16,
+    16,
+    17,
+    17,
+    20,
+    22,
+    22,
+    22,
+    24
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 3
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    54,
+    42,
+    58,
+    64,
+    55,
+    50,
+    68,
+    64,
+    67,
+    94,
+    99,
+    78
+   ],
+   "n_dead_terms": [
+    54,
+    42,
+    58,
+    64,
+    55,
+    50,
+    68,
+    64,
+    67,
+    94,
+    99,
+    78
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "cta_reuse_opportunity_deficit",
+    "realized_operand_reuse_deficit",
+    "reduction_to_spatial_parallelism",
+    "operand_transaction_padding",
+    "shared_stride_aliasing"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 38,
+    "explore": 24,
+    "cross": 10
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 17,
+    "n_features_made": 3,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 18.6,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-a6000-f0-s3",
+   "gpu": "a6000",
+   "fold": 0,
+   "seed": 3,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.091377,
+   "in_sample": 1.098564,
+   "by_regime": {
+    "short": 1.082202,
+    "long": 1.105286
+   },
+   "n_holdout": 20,
+   "train_best": 1.089106474544373,
+   "val_best": 1.1659422460871556,
+   "len_w_best": 40,
+   "round_best": 10,
+   "len_w_by_round": [
+    30,
+    32,
+    34,
+    38,
+    37,
+    36,
+    40,
+    44
+   ],
+   "len_w_archive": [
+    30,
+    32,
+    34,
+    36,
+    37,
+    38,
+    40,
+    44
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.75
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.75
+     ],
+     [
+      "log_flops",
+      ">",
+      40.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 8
+   },
+   "n_dead_by_weight": [
+    0,
+    2,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    67,
+    48,
+    103,
+    106,
+    114,
+    118,
+    106,
+    162,
+    153,
+    179,
+    176,
+    199
+   ],
+   "n_dead_terms": [
+    67,
+    50,
+    103,
+    106,
+    114,
+    118,
+    106,
+    162,
+    153,
+    179,
+    176,
+    199
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "split_k_wave_gain_deficit",
+    "split_k_parallelism_gain",
+    "reduction_length_shortness",
+    "oriented_tile_geometry_mismatch",
+    "per_axis_wave_balance",
+    "pipeline_stage_count",
+    "split_k_slices",
+    "row_tile_height"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 25,
+    "n_features_made": 5,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 24.6,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-a6000-f1-s0",
+   "gpu": "a6000",
+   "fold": 1,
+   "seed": 0,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.102813,
+   "in_sample": 1.073183,
+   "by_regime": {
+    "short": 1.102996,
+    "long": 1.102375
+   },
+   "n_holdout": 17,
+   "train_best": 1.072213124789564,
+   "val_best": 1.1537728594571641,
+   "len_w_best": 34,
+   "round_best": 11,
+   "len_w_by_round": [
+    24,
+    23,
+    27,
+    29,
+    29,
+    29,
+    34
+   ],
+   "len_w_archive": [
+    23,
+    24,
+    27,
+    29,
+    29,
+    29,
+    34
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ]
+    ],
+    "n_paths": 7
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    55,
+    105,
+    83,
+    83,
+    92,
+    114,
+    111,
+    93,
+    96,
+    98,
+    105,
+    97
+   ],
+   "n_dead_terms": [
+    55,
+    105,
+    83,
+    83,
+    92,
+    114,
+    111,
+    93,
+    96,
+    98,
+    105,
+    97
+   ],
+   "axes_made_in_loop": [
+    "multistage_family_overhead",
+    "swizzle_operand_transaction_amplification",
+    "split_k_task_parallelism_deficit",
+    "serial_split_task_supply_deficit",
+    "multistage_steady_state_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 38,
+    "n_features_made": 2,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 22.0,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-a6000-f1-s1",
+   "gpu": "a6000",
+   "fold": 1,
+   "seed": 1,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.069943,
+   "in_sample": 1.077037,
+   "by_regime": {
+    "short": 1.07701,
+    "long": 1.053169
+   },
+   "n_holdout": 17,
+   "train_best": 1.0682702788275988,
+   "val_best": 1.118613317894229,
+   "len_w_best": 29,
+   "round_best": 9,
+   "len_w_by_round": [
+    18,
+    30,
+    25,
+    33,
+    42,
+    35,
+    42,
+    29,
+    39,
+    37
+   ],
+   "len_w_archive": [
+    18,
+    25,
+    29,
+    30,
+    33,
+    35,
+    37,
+    39,
+    42,
+    42
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      1000.0
+     ],
+     [
+      "log_flops",
+      "<",
+      24.0
+     ],
+     [
+      "log_flops",
+      "<",
+      24.0
+     ],
+     [
+      "log_flops",
+      "<",
+      24.0
+     ],
+     [
+      "log_flops",
+      "<",
+      24.0
+     ],
+     [
+      "log_flops",
+      ">=",
+      24.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      1000.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<=",
+      1000.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      1000.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<=",
+      1000.0
+     ]
+    ],
+    "n_paths": 15
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    58,
+    60,
+    56,
+    98,
+    75,
+    91,
+    92,
+    110,
+    105,
+    135,
+    117,
+    128
+   ],
+   "n_dead_terms": [
+    58,
+    60,
+    56,
+    98,
+    75,
+    91,
+    92,
+    110,
+    105,
+    135,
+    117,
+    128
+   ],
+   "axes_made_in_loop": [
+    "multistage_family_indicator",
+    "reduction_tile_size",
+    "stage_count",
+    "axis_coverage_imbalance",
+    "absolute_output_tile_area",
+    "serial_partition_count"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 7,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 28,
+    "n_features_made": 6,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 26.2,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-a6000-f1-s2",
+   "gpu": "a6000",
+   "fold": 1,
+   "seed": 2,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.107765,
+   "in_sample": 1.084347,
+   "by_regime": {
+    "short": 1.12357,
+    "long": 1.070734
+   },
+   "n_holdout": 17,
+   "train_best": 1.0800297567146284,
+   "val_best": 1.2034230117220692,
+   "len_w_best": 45,
+   "round_best": 11,
+   "len_w_by_round": [
+    33,
+    34,
+    36,
+    35,
+    41,
+    45,
+    35,
+    54
+   ],
+   "len_w_archive": [
+    33,
+    34,
+    35,
+    35,
+    36,
+    41,
+    45,
+    54
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ]
+    ],
+    "n_paths": 8
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    70,
+    94,
+    85,
+    103,
+    121,
+    140,
+    119,
+    121,
+    142,
+    145,
+    178,
+    136
+   ],
+   "n_dead_terms": [
+    70,
+    94,
+    85,
+    103,
+    122,
+    140,
+    119,
+    121,
+    142,
+    145,
+    178,
+    136
+   ],
+   "axes_made_in_loop": [
+    "split_k_grid_parallelism_deficit",
+    "stage_count_overhead",
+    "split_k_parallel_wave_deficit",
+    "cta_swizzle_layout_unavailable",
+    "output_tile_area",
+    "serial_split_k_tile_count",
+    "warp_layout_and_swizzle_efficiency",
+    "signed_tile_orientation_mismatch",
+    "serial_partition_count"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 11,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 31,
+    "n_features_made": 7,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 27.8,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-a6000-f1-s3",
+   "gpu": "a6000",
+   "fold": 1,
+   "seed": 3,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.1132,
+   "in_sample": 1.093335,
+   "by_regime": {
+    "short": 1.116464,
+    "long": 1.105407
+   },
+   "n_holdout": 17,
+   "train_best": 1.0859775482756644,
+   "val_best": 1.1524609997009863,
+   "len_w_best": 25,
+   "round_best": 7,
+   "len_w_by_round": [
+    20,
+    23,
+    22,
+    28,
+    27,
+    26,
+    25,
+    29,
+    29,
+    29
+   ],
+   "len_w_archive": [
+    20,
+    22,
+    23,
+    25,
+    26,
+    27,
+    28,
+    29,
+    29,
+    29
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      ">",
+      8.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.25
+     ]
+    ],
+    "n_paths": 2
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    51,
+    50,
+    85,
+    89,
+    112,
+    87,
+    111,
+    101,
+    111,
+    105,
+    115,
+    106
+   ],
+   "n_dead_terms": [
+    51,
+    50,
+    85,
+    89,
+    112,
+    87,
+    111,
+    101,
+    111,
+    105,
+    115,
+    106
+   ],
+   "axes_made_in_loop": [
+    "multistage_family_indicator",
+    "cta_traversal_locality_loss",
+    "split_k_scheduling_balance",
+    "swizzle_reuse_conflict",
+    "cta_partition_reuse_cost",
+    "swizzle_neighbor_reuse_deficit",
+    "swizzle_neighborhood_discontinuity",
+    "split_k_partition_overhead"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 31,
+    "n_features_made": 5,
+    "n_feature_requests": 8,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 28.5,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 8
+   }
+  },
+  {
+   "run": "c2-a6000-f2-s0",
+   "gpu": "a6000",
+   "fold": 2,
+   "seed": 0,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.095856,
+   "in_sample": 1.102084,
+   "by_regime": {
+    "short": 1.094064,
+    "long": 1.099089
+   },
+   "n_holdout": 14,
+   "train_best": 1.108710099830366,
+   "val_best": 1.0964668914957685,
+   "len_w_best": 41,
+   "round_best": 11,
+   "len_w_by_round": [
+    38,
+    37,
+    50,
+    41,
+    51,
+    53
+   ],
+   "len_w_archive": [
+    37,
+    38,
+    41,
+    50,
+    51,
+    53
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_flops",
+     "log_min_dim",
+     "log_reduction_length",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 6,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_flops",
+      ">",
+      32.0
+     ],
+     [
+      "log_min_dim",
+      ">",
+      6.0
+     ],
+     [
+      "log_flops",
+      ">",
+      32.0
+     ],
+     [
+      "log_min_dim",
+      ">",
+      6.0
+     ],
+     [
+      "log_reduction_length",
+      ">",
+      10.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1000000.0
+     ],
+     [
+      "log_reduction_length",
+      ">",
+      10.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1000000.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.5
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.5
+     ],
+     [
+      "log_flops",
+      ">",
+      40.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      100000.0
+     ],
+     [
+      "log_flops",
+      ">",
+      40.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      100000.0
+     ],
+     [
+      "log_flops",
+      ">",
+      40.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      100000.0
+     ]
+    ],
+    "n_paths": 18
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    48,
+    120,
+    143,
+    100,
+    137,
+    130,
+    127,
+    165,
+    207,
+    157,
+    157,
+    209
+   ],
+   "n_dead_terms": [
+    48,
+    120,
+    143,
+    100,
+    137,
+    130,
+    127,
+    165,
+    207,
+    157,
+    157,
+    209
+   ],
+   "axes_made_in_loop": [
+    "split_k_parallelism_gain_deficit",
+    "pipeline_family_buffer_bytes",
+    "cta_swizzle_locality_penalty",
+    "log_reduction_length",
+    "l2_amplified_operand_traffic",
+    "multistage_family_indicator",
+    "split_k_incremental_wave_gain",
+    "tensor_fragment_padding_ratio",
+    "pipeline_stage_count",
+    "cta_output_surface_inverse",
+    "serial_split_k_d_roundtrip_bytes"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_flops",
+    "log_min_dim",
+    "log_reduction_length",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 54,
+   "n_hyp_with_evidence": 54,
+   "n_hyp_new_feature": 12,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 67,
+    "n_accepted": 30,
+    "n_features_made": 8,
+    "n_feature_requests": 11,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 32.2,
+   "llm_calls": {
+    "analyze": 18,
+    "rule_editor": 72,
+    "feature": 11
+   }
+  },
+  {
+   "run": "c2-a6000-f2-s1",
+   "gpu": "a6000",
+   "fold": 2,
+   "seed": 1,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.03887,
+   "in_sample": 1.051001,
+   "by_regime": {
+    "short": 1.040373,
+    "long": 1.036169
+   },
+   "n_holdout": 14,
+   "train_best": 1.058410078603158,
+   "val_best": 1.0495224895355235,
+   "len_w_best": 35,
+   "round_best": 11,
+   "len_w_by_round": [
+    23,
+    24,
+    32,
+    32,
+    25,
+    35,
+    37,
+    27
+   ],
+   "len_w_archive": [
+    23,
+    24,
+    25,
+    27,
+    32,
+    32,
+    35,
+    37
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      5.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      1024.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.25
+     ]
+    ],
+    "n_paths": 7
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    65,
+    62,
+    66,
+    114,
+    37,
+    84,
+    91,
+    85,
+    83,
+    77,
+    88,
+    111
+   ],
+   "n_dead_terms": [
+    65,
+    62,
+    66,
+    114,
+    37,
+    84,
+    91,
+    85,
+    83,
+    77,
+    88,
+    111
+   ],
+   "axes_made_in_loop": [
+    "stage_family",
+    "warp_schedule_count",
+    "layout_swizzle_diversity",
+    "layout_family_mismatch",
+    "warp_swizzle_orientation_mismatch",
+    "output_tile_cache_footprint",
+    "split_k_partition_count",
+    "cta_wave_quantization",
+    "k_tile_staging_bytes",
+    "exact_stage_count"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 69,
+    "n_accepted": 31,
+    "n_features_made": 8,
+    "n_feature_requests": 10,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 25.4,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 10
+   }
+  },
+  {
+   "run": "c2-a6000-f2-s2",
+   "gpu": "a6000",
+   "fold": 2,
+   "seed": 2,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.057436,
+   "in_sample": 1.076243,
+   "by_regime": {
+    "short": 1.041705,
+    "long": 1.086352
+   },
+   "n_holdout": 14,
+   "train_best": 1.062168284080991,
+   "val_best": 1.11113043230061,
+   "len_w_best": 43,
+   "round_best": 10,
+   "len_w_by_round": [
+    39,
+    34,
+    43,
+    36,
+    42,
+    43,
+    43,
+    46,
+    43
+   ],
+   "len_w_archive": [
+    34,
+    36,
+    39,
+    42,
+    43,
+    43,
+    43,
+    43,
+    46
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "log_flops",
+      "<",
+      24.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "log_k_output_parallelism_ratio",
+      ">",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      ">",
+      8.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_flops",
+      ">=",
+      40.0
+     ],
+     [
+      "log_min_dim",
+      ">",
+      8.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ]
+    ],
+    "n_paths": 25
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    46,
+    56,
+    77,
+    130,
+    104,
+    162,
+    101,
+    143,
+    169,
+    163,
+    171,
+    154
+   ],
+   "n_dead_terms": [
+    46,
+    56,
+    77,
+    130,
+    104,
+    162,
+    101,
+    143,
+    169,
+    163,
+    171,
+    154
+   ],
+   "axes_made_in_loop": [
+    "extra_pipeline_stage_count",
+    "regime_tile_output_scale_mismatch",
+    "shared_operand_stride_conflict",
+    "log_k_output_parallelism_ratio",
+    "split_k_partition_count",
+    "warp_schedule_or_swizzle_efficiency",
+    "shared_bank_stride_conflict",
+    "cta_swizzle_locality_cost",
+    "serial_fp16_d_roundtrip_precision_cost"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 9,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 34,
+    "n_features_made": 6,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 32.7,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-a6000-f2-s3",
+   "gpu": "a6000",
+   "fold": 2,
+   "seed": 3,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.069526,
+   "in_sample": 1.087058,
+   "by_regime": {
+    "short": 1.076792,
+    "long": 1.05657
+   },
+   "n_holdout": 14,
+   "train_best": 1.0821917581841605,
+   "val_best": 1.1054157993593863,
+   "len_w_best": 41,
+   "round_best": 11,
+   "len_w_by_round": [
+    23,
+    27,
+    25,
+    41,
+    29,
+    29,
+    42
+   ],
+   "len_w_archive": [
+    23,
+    25,
+    27,
+    29,
+    29,
+    41,
+    42
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "l2_working_set_pressure",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "l2_working_set_pressure",
+      ">",
+      0.5
+     ],
+     [
+      "alignment_deficit",
+      ">",
+      0.25
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ]
+    ],
+    "n_paths": 21
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    76,
+    109,
+    96,
+    115,
+    102,
+    85,
+    49,
+    119,
+    103,
+    116,
+    132,
+    147
+   ],
+   "n_dead_terms": [
+    76,
+    109,
+    97,
+    115,
+    102,
+    85,
+    49,
+    119,
+    103,
+    116,
+    132,
+    147
+   ],
+   "axes_made_in_loop": [
+    "multistage_alignment_compatibility",
+    "cta_l2_footprint_ratio",
+    "warp_lane_utilization_deficit",
+    "warp_partition_aspect_deficit",
+    "stage_family_control_cost",
+    "split_k_grid_parallelism_deficit",
+    "cta_area_per_sm_work",
+    "split_k_independent_cta_load",
+    "steady_state_overlap_deficit"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "l2_working_set_pressure",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 11,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 26,
+    "n_features_made": 6,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 26.4,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-a6000-f3-s0",
+   "gpu": "a6000",
+   "fold": 3,
+   "seed": 0,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.140191,
+   "in_sample": 1.055065,
+   "by_regime": {
+    "short": 1.155352,
+    "long": 1.053317
+   },
+   "n_holdout": 14,
+   "train_best": 1.072478027204033,
+   "val_best": 1.0681142753064823,
+   "len_w_best": 31,
+   "round_best": 11,
+   "len_w_by_round": [
+    21,
+    19,
+    23,
+    30,
+    26,
+    26,
+    31,
+    35,
+    26
+   ],
+   "len_w_archive": [
+    19,
+    21,
+    23,
+    26,
+    26,
+    26,
+    30,
+    31,
+    35
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ]
+    ],
+    "n_paths": 14
+   },
+   "n_dead_by_weight": [
+    3,
+    1,
+    3,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    47,
+    49,
+    47,
+    76,
+    54,
+    73,
+    93,
+    83,
+    79,
+    90,
+    102,
+    82
+   ],
+   "n_dead_terms": [
+    50,
+    50,
+    50,
+    76,
+    54,
+    73,
+    93,
+    83,
+    79,
+    90,
+    102,
+    82
+   ],
+   "axes_made_in_loop": [
+    "aligned_transfer_exposure",
+    "tile_l2_fit_deficit",
+    "stage_family_depth",
+    "warp_mapping_aspect_deficit",
+    "split_k_partition_count",
+    "warp_tile_shape_imbalance"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 7,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 32,
+    "n_features_made": 3,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 20.9,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-a6000-f3-s1",
+   "gpu": "a6000",
+   "fold": 3,
+   "seed": 1,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.127045,
+   "in_sample": 1.093664,
+   "by_regime": {
+    "short": 1.094776,
+    "long": 1.341647
+   },
+   "n_holdout": 14,
+   "train_best": 1.1017129839732975,
+   "val_best": 1.1076048294779701,
+   "len_w_best": 40,
+   "round_best": 11,
+   "len_w_by_round": [
+    30,
+    17,
+    33,
+    30,
+    34,
+    34,
+    33,
+    40,
+    34
+   ],
+   "len_w_archive": [
+    17,
+    30,
+    30,
+    33,
+    33,
+    34,
+    34,
+    34,
+    40
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.35
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.35
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.75
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      256.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "log_flops",
+      "<",
+      20.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      6.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 21
+   },
+   "n_dead_by_weight": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    44,
+    43,
+    59,
+    48,
+    48,
+    72,
+    105,
+    93,
+    115,
+    108,
+    101,
+    175
+   ],
+   "n_dead_terms": [
+    45,
+    43,
+    59,
+    48,
+    48,
+    72,
+    105,
+    93,
+    115,
+    108,
+    101,
+    175
+   ],
+   "axes_made_in_loop": [
+    "multistage_family_indicator",
+    "reduction_seriality_pressure",
+    "oriented_tile_aspect_mismatch",
+    "alignment_family_incompatibility",
+    "warp_output_lane_padding",
+    "exact_pipeline_stage_count",
+    "warp_level_work_mapping_imbalance",
+    "cta_output_granularity_deficit"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 8,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 26,
+    "n_features_made": 4,
+    "n_feature_requests": 8,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 27.5,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 8
+   }
+  },
+  {
+   "run": "c2-a6000-f3-s2",
+   "gpu": "a6000",
+   "fold": 3,
+   "seed": 2,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.095132,
+   "in_sample": 1.072964,
+   "by_regime": {
+    "short": 1.10226,
+    "long": 1.053317
+   },
+   "n_holdout": 14,
+   "train_best": 1.0776811039675036,
+   "val_best": 1.0806272390925995,
+   "len_w_best": 58,
+   "round_best": 10,
+   "len_w_by_round": [
+    39,
+    48,
+    58,
+    60,
+    60,
+    62,
+    63,
+    61
+   ],
+   "len_w_archive": [
+    39,
+    48,
+    58,
+    60,
+    60,
+    61,
+    62,
+    63
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "log_k",
+      "<",
+      8.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ]
+    ],
+    "n_paths": 4
+   },
+   "n_dead_by_weight": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0,
+    2,
+    0
+   ],
+   "n_dead_by_sens": [
+    44,
+    70,
+    94,
+    130,
+    96,
+    200,
+    187,
+    207,
+    207,
+    186,
+    231,
+    204
+   ],
+   "n_dead_terms": [
+    45,
+    70,
+    94,
+    130,
+    97,
+    200,
+    188,
+    207,
+    207,
+    186,
+    233,
+    204
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_storage_overhead",
+    "pipeline_family_discontinuity",
+    "output_tile_count_per_sm",
+    "alignment_conditioned_pipeline_eligibility",
+    "l2_traffic_exposure",
+    "spatial_output_tiles_per_sm",
+    "split_k_partition_count",
+    "tile_axis_extent",
+    "log_k"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 54,
+   "n_hyp_with_evidence": 54,
+   "n_hyp_new_feature": 9,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 40,
+    "n_features_made": 8,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 31.1,
+   "llm_calls": {
+    "analyze": 18,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-a6000-f3-s3",
+   "gpu": "a6000",
+   "fold": 3,
+   "seed": 3,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.118336,
+   "in_sample": 1.060354,
+   "by_regime": {
+    "short": 1.100682,
+    "long": 1.230369
+   },
+   "n_holdout": 14,
+   "train_best": 1.0676582202984544,
+   "val_best": 1.0892868877605895,
+   "len_w_best": 36,
+   "round_best": 11,
+   "len_w_by_round": [
+    31,
+    31,
+    28,
+    35,
+    36,
+    41,
+    38,
+    31,
+    37
+   ],
+   "len_w_archive": [
+    28,
+    31,
+    31,
+    31,
+    35,
+    36,
+    37,
+    38,
+    41
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 2
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    82,
+    69,
+    67,
+    95,
+    132,
+    95,
+    89,
+    105,
+    116,
+    82,
+    92,
+    106
+   ],
+   "n_dead_terms": [
+    82,
+    69,
+    67,
+    95,
+    132,
+    95,
+    89,
+    105,
+    116,
+    82,
+    92,
+    106
+   ],
+   "axes_made_in_loop": [
+    "stage_family_or_stage_count",
+    "swizzle_access_conflict_exposure",
+    "swizzle_layout_permutation_class",
+    "per_axis_tile_overhang",
+    "layout_stride_serialization",
+    "axis_tile_fit_imbalance",
+    "worst_operand_bank_conflict_cost",
+    "directional_grid_coverage_deficit",
+    "pipeline_family",
+    "signed_output_axis_orientation",
+    "serial_partial_accumulator_roundtrip_ratio",
+    "shared_bank_transaction_amplification",
+    "k_loop_amortization_deficit",
+    "directional_cta_grid_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 15,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 33,
+    "n_features_made": 6,
+    "n_feature_requests": 14,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 28.3,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 14
+   }
+  },
+  {
+   "run": "c2-5090-f0-s0",
+   "gpu": "5090",
+   "fold": 0,
+   "seed": 0,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.035299,
+   "in_sample": 1.033899,
+   "by_regime": {
+    "short": 1.048353,
+    "long": 1.005469
+   },
+   "n_holdout": 20,
+   "train_best": 1.0325052320315509,
+   "val_best": 1.052556451558875,
+   "len_w_best": 36,
+   "round_best": 9,
+   "len_w_by_round": [
+    30,
+    34,
+    42,
+    46,
+    37,
+    36,
+    38,
+    36,
+    47,
+    39,
+    38
+   ],
+   "len_w_archive": [
+    30,
+    34,
+    36,
+    36,
+    37,
+    38,
+    38,
+    39,
+    42,
+    46,
+    47
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "log_flops",
+      "<",
+      36.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ]
+    ],
+    "n_paths": 7
+   },
+   "n_dead_by_weight": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    58,
+    65,
+    77,
+    113,
+    136,
+    178,
+    149,
+    178,
+    197,
+    179,
+    187,
+    186
+   ],
+   "n_dead_terms": [
+    59,
+    65,
+    77,
+    113,
+    136,
+    178,
+    149,
+    178,
+    197,
+    179,
+    187,
+    186
+   ],
+   "axes_made_in_loop": [
+    "stage_family_eligibility_deficit",
+    "serial_split_k_d_roundtrip_fraction",
+    "stage_family_identity",
+    "pipeline_stage_count",
+    "cta_output_area_fraction",
+    "signed_output_aspect"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 54,
+   "n_hyp_with_evidence": 54,
+   "n_hyp_new_feature": 7,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 31,
+    "n_features_made": 6,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 29.3,
+   "llm_calls": {
+    "analyze": 18,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-5090-f0-s1",
+   "gpu": "5090",
+   "fold": 0,
+   "seed": 1,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.036018,
+   "in_sample": 1.04805,
+   "by_regime": {
+    "short": 1.048383,
+    "long": 1.007732
+   },
+   "n_holdout": 20,
+   "train_best": 1.032777981713282,
+   "val_best": 1.0871062291999771,
+   "len_w_best": 56,
+   "round_best": 11,
+   "len_w_by_round": [
+    46,
+    52,
+    48,
+    56,
+    53,
+    56
+   ],
+   "len_w_archive": [
+    46,
+    48,
+    52,
+    53,
+    56,
+    56
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "l2_working_set_pressure",
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 7,
+    "thresholds": [
+     [
+      "alignment_deficit",
+      ">=",
+      0.5
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      ">=",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">=",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">=",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">=",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">=",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">=",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">=",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      ">=",
+      0.5
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ]
+    ],
+    "n_paths": 34
+   },
+   "n_dead_by_weight": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    76,
+    84,
+    67,
+    86,
+    111,
+    95,
+    170,
+    176,
+    149,
+    218,
+    197,
+    217
+   ],
+   "n_dead_terms": [
+    77,
+    84,
+    67,
+    86,
+    112,
+    95,
+    170,
+    176,
+    149,
+    218,
+    197,
+    217
+   ],
+   "axes_made_in_loop": [
+    "cp_async_family_mismatch",
+    "stage_family_identity",
+    "l2_working_set_pressure",
+    "signed_tile_orientation_mismatch",
+    "parallel_partial_working_set_pressure"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "l2_working_set_pressure",
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 67,
+    "n_accepted": 43,
+    "n_features_made": 3,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 32.1,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-5090-f0-s2",
+   "gpu": "5090",
+   "fold": 0,
+   "seed": 2,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.025768,
+   "in_sample": 1.032912,
+   "by_regime": {
+    "short": 1.035908,
+    "long": 1.002493
+   },
+   "n_holdout": 20,
+   "train_best": 1.0297763287379362,
+   "val_best": 1.0363250821381917,
+   "len_w_best": 36,
+   "round_best": 11,
+   "len_w_by_round": [
+    30,
+    36,
+    27,
+    28,
+    35,
+    36,
+    46,
+    56,
+    38,
+    44,
+    46
+   ],
+   "len_w_archive": [
+    27,
+    28,
+    30,
+    35,
+    36,
+    36,
+    38,
+    44,
+    46,
+    46,
+    56
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_flops",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 23
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "n_dead_by_sens": [
+    81,
+    65,
+    88,
+    96,
+    95,
+    83,
+    103,
+    91,
+    108,
+    93,
+    172,
+    161
+   ],
+   "n_dead_terms": [
+    81,
+    65,
+    88,
+    96,
+    95,
+    83,
+    103,
+    91,
+    108,
+    93,
+    173,
+    161
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "grid_cta_count",
+    "split_k_partition_sync_count",
+    "cta_output_area"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_flops",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 39,
+    "n_features_made": 4,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 32.7,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-5090-f0-s3",
+   "gpu": "5090",
+   "fold": 0,
+   "seed": 3,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.025161,
+   "in_sample": 1.04145,
+   "by_regime": {
+    "short": 1.032725,
+    "long": 1.007727
+   },
+   "n_holdout": 20,
+   "train_best": 1.0342122832448097,
+   "val_best": 1.0562113757482807,
+   "len_w_best": 50,
+   "round_best": 11,
+   "len_w_by_round": [
+    33,
+    32,
+    40,
+    37,
+    43,
+    47,
+    37,
+    50,
+    44,
+    43
+   ],
+   "len_w_archive": [
+    32,
+    33,
+    37,
+    37,
+    40,
+    43,
+    43,
+    44,
+    47,
+    50
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_flops",
+     "output_aspect_imbalance",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ]
+    ],
+    "n_paths": 7
+   },
+   "n_dead_by_weight": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    87,
+    68,
+    143,
+    136,
+    160,
+    172,
+    194,
+    185,
+    167,
+    161,
+    212,
+    213
+   ],
+   "n_dead_terms": [
+    88,
+    68,
+    143,
+    136,
+    160,
+    172,
+    194,
+    185,
+    167,
+    161,
+    212,
+    213
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family_overhead",
+    "split_k_occupancy_gain",
+    "productive_cta_output_surface",
+    "cta_compute_service_time",
+    "spill_traffic_ratio",
+    "split_k_partition_or_reduction_round_count"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_flops",
+    "output_aspect_imbalance",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 33,
+    "n_features_made": 3,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 28.3,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-5090-f1-s0",
+   "gpu": "5090",
+   "fold": 1,
+   "seed": 0,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.073014,
+   "in_sample": 1.02762,
+   "by_regime": {
+    "short": 1.086501,
+    "long": 1.00805
+   },
+   "n_holdout": 18,
+   "train_best": 1.0347428491613746,
+   "val_best": 1.0499143981925045,
+   "len_w_best": 40,
+   "round_best": 11,
+   "len_w_by_round": [
+    24,
+    28,
+    31,
+    33,
+    33,
+    36,
+    40,
+    35
+   ],
+   "len_w_archive": [
+    24,
+    28,
+    31,
+    33,
+    33,
+    35,
+    36,
+    40
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_min_dim",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      6.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      6.0
+     ]
+    ],
+    "n_paths": 3
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    59,
+    84,
+    58,
+    56,
+    94,
+    110,
+    135,
+    148,
+    140,
+    155,
+    149,
+    157
+   ],
+   "n_dead_terms": [
+    59,
+    84,
+    58,
+    56,
+    94,
+    110,
+    136,
+    148,
+    140,
+    155,
+    149,
+    157
+   ],
+   "axes_made_in_loop": [
+    "multistage_pipeline_family",
+    "alignment_deficit",
+    "log_min_dim",
+    "operand_permutation_stride_cost",
+    "layout_access_swizzle_cost",
+    "parallel_split_grid_gain_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_min_dim",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 72,
+    "n_accepted": 32,
+    "n_features_made": 3,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 22.1,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-5090-f1-s1",
+   "gpu": "5090",
+   "fold": 1,
+   "seed": 1,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.063812,
+   "in_sample": 1.076801,
+   "by_regime": {
+    "short": 1.072428,
+    "long": 1.021756
+   },
+   "n_holdout": 18,
+   "train_best": 1.0600582027799614,
+   "val_best": 1.1290666455824454,
+   "len_w_best": 36,
+   "round_best": 10,
+   "len_w_by_round": [
+    26,
+    35,
+    34,
+    35,
+    38,
+    36,
+    37,
+    39,
+    40
+   ],
+   "len_w_archive": [
+    26,
+    34,
+    35,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ]
+    ],
+    "n_paths": 4
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    62,
+    84,
+    119,
+    87,
+    89,
+    112,
+    97,
+    105,
+    122,
+    134,
+    136,
+    150
+   ],
+   "n_dead_terms": [
+    62,
+    84,
+    119,
+    87,
+    90,
+    112,
+    97,
+    105,
+    122,
+    134,
+    136,
+    150
+   ],
+   "axes_made_in_loop": [
+    "multistage_family_overhead",
+    "split_k_wave_gain_deficit"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 2,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 31,
+    "n_features_made": 2,
+    "n_feature_requests": 2,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 22.0,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 2
+   }
+  },
+  {
+   "run": "c2-5090-f1-s2",
+   "gpu": "5090",
+   "fold": 1,
+   "seed": 2,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.053144,
+   "in_sample": 1.04039,
+   "by_regime": {
+    "short": 1.060266,
+    "long": 1.018244
+   },
+   "n_holdout": 18,
+   "train_best": 1.0419097851321477,
+   "val_best": 1.0751813511403954,
+   "len_w_best": 55,
+   "round_best": 11,
+   "len_w_by_round": [
+    30,
+    27,
+    27,
+    38,
+    32,
+    31,
+    39,
+    29,
+    31,
+    55
+   ],
+   "len_w_archive": [
+    27,
+    27,
+    29,
+    30,
+    31,
+    31,
+    32,
+    38,
+    39,
+    55
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ]
+    ],
+    "n_paths": 15
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    47,
+    83,
+    133,
+    115,
+    168,
+    128,
+    121,
+    121,
+    128,
+    154,
+    152,
+    198
+   ],
+   "n_dead_terms": [
+    47,
+    83,
+    133,
+    115,
+    168,
+    128,
+    121,
+    121,
+    128,
+    154,
+    152,
+    198
+   ],
+   "axes_made_in_loop": [
+    "k_boundary_distance_ratio",
+    "pipeline_stage_family_deficit",
+    "split_k_coverage_gain"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 38,
+    "explore": 24,
+    "cross": 10
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 3,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 69,
+    "n_accepted": 28,
+    "n_features_made": 3,
+    "n_feature_requests": 3,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 20.3,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 3
+   }
+  },
+  {
+   "run": "c2-5090-f1-s3",
+   "gpu": "5090",
+   "fold": 1,
+   "seed": 3,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.03327,
+   "in_sample": 1.040746,
+   "by_regime": {
+    "short": 1.038673,
+    "long": 1.006673
+   },
+   "n_holdout": 18,
+   "train_best": 1.0360943763363974,
+   "val_best": 1.0575617856283208,
+   "len_w_best": 29,
+   "round_best": 10,
+   "len_w_by_round": [
+    16,
+    34,
+    17,
+    27,
+    20,
+    36,
+    29
+   ],
+   "len_w_archive": [
+    16,
+    17,
+    20,
+    27,
+    29,
+    34,
+    36
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 2
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    93,
+    64,
+    57,
+    78,
+    134,
+    124,
+    107,
+    118,
+    110,
+    115,
+    124,
+    143
+   ],
+   "n_dead_terms": [
+    93,
+    64,
+    57,
+    78,
+    134,
+    125,
+    107,
+    118,
+    110,
+    115,
+    124,
+    143
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family",
+    "cta_tile_area_fraction"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 2,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 28,
+    "n_features_made": 2,
+    "n_feature_requests": 2,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 23.2,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 2
+   }
+  },
+  {
+   "run": "c2-5090-f2-s0",
+   "gpu": "5090",
+   "fold": 2,
+   "seed": 0,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.017519,
+   "in_sample": 1.026754,
+   "by_regime": {
+    "short": 1.025459,
+    "long": 1.003381
+   },
+   "n_holdout": 14,
+   "train_best": 1.0246013530940852,
+   "val_best": 1.0381306773447982,
+   "len_w_best": 78,
+   "round_best": 10,
+   "len_w_by_round": [
+    50,
+    66,
+    74,
+    65,
+    78,
+    44
+   ],
+   "len_w_archive": [
+    44,
+    50,
+    65,
+    66,
+    74,
+    78
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 2,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ]
+    ],
+    "n_paths": 7
+   },
+   "n_dead_by_weight": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    81,
+    107,
+    160,
+    169,
+    152,
+    175,
+    217,
+    219,
+    257,
+    213,
+    212,
+    256
+   ],
+   "n_dead_terms": [
+    82,
+    107,
+    160,
+    169,
+    152,
+    175,
+    217,
+    219,
+    257,
+    213,
+    212,
+    256
+   ],
+   "axes_made_in_loop": [
+    "accumulator_widening_fraction",
+    "exact_cta_wave_count",
+    "warp_mapping_imbalance",
+    "stage_family",
+    "spill_traffic_ratio",
+    "stage_count_or_stage_family",
+    "reduction_depth_aspect",
+    "reduction_depth_to_output_root",
+    "l2_working_set_pressure",
+    "alignment_conditioned_stage_family_availability"
+   ],
+   "axes_used_by_best": [
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 14,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 64,
+    "n_accepted": 30,
+    "n_features_made": 4,
+    "n_feature_requests": 10,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 8,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 39.1,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 10
+   }
+  },
+  {
+   "run": "c2-5090-f2-s1",
+   "gpu": "5090",
+   "fold": 2,
+   "seed": 1,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.087618,
+   "in_sample": 1.022637,
+   "by_regime": {
+    "short": 1.051229,
+    "long": 1.156321
+   },
+   "n_holdout": 14,
+   "train_best": 1.022690920840363,
+   "val_best": 1.0801576946424916,
+   "len_w_best": 35,
+   "round_best": 8,
+   "len_w_by_round": [
+    33,
+    34,
+    33,
+    33,
+    35,
+    35
+   ],
+   "len_w_archive": [
+    33,
+    33,
+    33,
+    34,
+    35,
+    35
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      2048.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "log_flops",
+      ">",
+      30.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 10
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    67,
+    96,
+    110,
+    99,
+    108,
+    117,
+    130,
+    154,
+    165,
+    149,
+    174,
+    158
+   ],
+   "n_dead_terms": [
+    67,
+    96,
+    111,
+    99,
+    108,
+    117,
+    130,
+    154,
+    165,
+    149,
+    174,
+    158
+   ],
+   "axes_made_in_loop": [
+    "stage_family_alignment_deficit",
+    "serial_splitk_precision_loss",
+    "parallel_reduction_tree_depth",
+    "alignment_traffic_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 4,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 32,
+    "n_features_made": 2,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 21.1,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-5090-f2-s2",
+   "gpu": "5090",
+   "fold": 2,
+   "seed": 2,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.078127,
+   "in_sample": 1.020252,
+   "by_regime": {
+    "short": 1.037167,
+    "long": 1.155973
+   },
+   "n_holdout": 14,
+   "train_best": 1.0190875194049154,
+   "val_best": 1.0795236360594778,
+   "len_w_best": 56,
+   "round_best": 11,
+   "len_w_by_round": [
+    33,
+    56,
+    59
+   ],
+   "len_w_archive": [
+    33,
+    56,
+    59
+   ],
+   "n_cells": 3,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.25
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.25
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ]
+    ],
+    "n_paths": 19
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    66,
+    67,
+    56,
+    106,
+    130,
+    138,
+    124,
+    157,
+    172,
+    182,
+    157,
+    236
+   ],
+   "n_dead_terms": [
+    66,
+    67,
+    56,
+    106,
+    130,
+    138,
+    124,
+    158,
+    172,
+    182,
+    157,
+    236
+   ],
+   "axes_made_in_loop": [
+    "cp_async_capable_or_stage_family",
+    "signed_tile_output_aspect",
+    "absolute_parallel_partial_materialization_work_per_wave"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 3,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 41,
+    "n_features_made": 3,
+    "n_feature_requests": 3,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 29.4,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 3
+   }
+  },
+  {
+   "run": "c2-5090-f2-s3",
+   "gpu": "5090",
+   "fold": 2,
+   "seed": 3,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.123853,
+   "in_sample": 1.065812,
+   "by_regime": {
+    "short": 1.100176,
+    "long": 1.167765
+   },
+   "n_holdout": 14,
+   "train_best": 1.0664501069916548,
+   "val_best": 1.133340100751374,
+   "len_w_best": 45,
+   "round_best": 11,
+   "len_w_by_round": [
+    28,
+    28,
+    37,
+    33,
+    36,
+    34,
+    45
+   ],
+   "len_w_archive": [
+    28,
+    28,
+    33,
+    34,
+    36,
+    37,
+    45
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "roofline_ratio"
+    ],
+    "n_axes": 2,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ]
+    ],
+    "n_paths": 3
+   },
+   "n_dead_by_weight": [
+    3,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    46,
+    107,
+    135,
+    146,
+    168,
+    141,
+    154,
+    137,
+    115,
+    148,
+    148,
+    176
+   ],
+   "n_dead_terms": [
+    49,
+    107,
+    135,
+    146,
+    168,
+    141,
+    154,
+    137,
+    115,
+    148,
+    148,
+    176
+   ],
+   "axes_made_in_loop": [
+    "parallel_reduction_work_amortization",
+    "negative_useful_output_elements_per_cta",
+    "pipeline_family_complexity",
+    "split_k_partition_count",
+    "l2_tile_pressure",
+    "misaligned_transfer_fraction"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 24,
+    "n_features_made": 4,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 26.5,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-5090-f3-s0",
+   "gpu": "5090",
+   "fold": 3,
+   "seed": 0,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.043748,
+   "in_sample": 1.025568,
+   "by_regime": {
+    "short": 1.053082,
+    "long": 1.013227
+   },
+   "n_holdout": 13,
+   "train_best": 1.0285556042522916,
+   "val_best": 1.0303956965752346,
+   "len_w_best": 57,
+   "round_best": 10,
+   "len_w_by_round": [
+    36,
+    32,
+    34,
+    38,
+    54,
+    50,
+    42,
+    42,
+    46,
+    57,
+    58
+   ],
+   "len_w_archive": [
+    32,
+    34,
+    36,
+    38,
+    42,
+    42,
+    46,
+    50,
+    54,
+    57,
+    58
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_k",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      1.0
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.5
+     ],
+     [
+      "log_k",
+      ">",
+      6.0
+     ],
+     [
+      "alignment_deficit",
+      ">=",
+      0.5
+     ],
+     [
+      "log_k",
+      "<=",
+      6.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 8
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    81,
+    118,
+    146,
+    126,
+    145,
+    153,
+    150,
+    157,
+    155,
+    175,
+    177,
+    179
+   ],
+   "n_dead_terms": [
+    81,
+    118,
+    146,
+    126,
+    145,
+    153,
+    150,
+    157,
+    155,
+    175,
+    177,
+    179
+   ],
+   "axes_made_in_loop": [
+    "extra_pipeline_stage_fraction",
+    "cta_output_area_overhead",
+    "log_k",
+    "pipeline_family_indicator",
+    "absolute_parallel_partial_reduction_bytes",
+    "warp_mapping_efficiency"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_k",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 7,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 67,
+    "n_accepted": 30,
+    "n_features_made": 5,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.3,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-5090-f3-s1",
+   "gpu": "5090",
+   "fold": 3,
+   "seed": 1,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.042209,
+   "in_sample": 1.01841,
+   "by_regime": {
+    "short": 1.052696,
+    "long": 1.008002
+   },
+   "n_holdout": 13,
+   "train_best": 1.0224063378824353,
+   "val_best": 1.0205768240562911,
+   "len_w_best": 47,
+   "round_best": 10,
+   "len_w_by_round": [
+    47,
+    45,
+    47,
+    58,
+    55,
+    55,
+    47,
+    49
+   ],
+   "len_w_archive": [
+    45,
+    47,
+    47,
+    47,
+    49,
+    55,
+    55,
+    58
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_flops",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      10000.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      10000.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.25
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      10000.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.25
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      10000.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      10000.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      10000.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      10000.0
+     ],
+     [
+      "log_flops",
+      ">",
+      45.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      10000.0
+     ],
+     [
+      "log_flops",
+      ">",
+      45.0
+     ]
+    ],
+    "n_paths": 12
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    4,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    61,
+    125,
+    110,
+    154,
+    140,
+    149,
+    192,
+    209,
+    176,
+    219,
+    230,
+    190
+   ],
+   "n_dead_terms": [
+    61,
+    125,
+    110,
+    154,
+    140,
+    149,
+    196,
+    209,
+    176,
+    219,
+    230,
+    190
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family_or_stage_count",
+    "serial_split_k_partial_roundtrip_cost",
+    "warp_tile_mapping_coalescing_efficiency",
+    "split_k_reduction_depth",
+    "cta_iteration_work_residency_quantum"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_flops",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 65,
+    "n_accepted": 37,
+    "n_features_made": 5,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.9,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-5090-f3-s2",
+   "gpu": "5090",
+   "fold": 3,
+   "seed": 2,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.053944,
+   "in_sample": 1.02179,
+   "by_regime": {
+    "short": 1.06765,
+    "long": 1.009514
+   },
+   "n_holdout": 13,
+   "train_best": 1.0254457937157633,
+   "val_best": 1.0282314935188481,
+   "len_w_best": 58,
+   "round_best": 11,
+   "len_w_by_round": [
+    49,
+    46,
+    50,
+    50,
+    55,
+    51,
+    52,
+    58
+   ],
+   "len_w_archive": [
+    46,
+    49,
+    50,
+    50,
+    51,
+    52,
+    55,
+    58
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 6,
+    "thresholds": [
+     [
+      "alignment_deficit",
+      "<",
+      0.25
+     ],
+     [
+      "log_flops",
+      ">",
+      35.0
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.25
+     ],
+     [
+      "log_flops",
+      ">",
+      35.0
+     ],
+     [
+      "log_flops",
+      "<",
+      35.0
+     ],
+     [
+      "log_flops",
+      ">=",
+      35.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      8.0
+     ],
+     [
+      "log_flops",
+      "<",
+      35.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1000000.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1000000.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1000000.0
+     ]
+    ],
+    "n_paths": 12
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    74,
+    124,
+    145,
+    152,
+    175,
+    188,
+    74,
+    202,
+    232,
+    124,
+    190,
+    162
+   ],
+   "n_dead_terms": [
+    74,
+    124,
+    145,
+    152,
+    175,
+    188,
+    74,
+    202,
+    232,
+    124,
+    190,
+    162
+   ],
+   "axes_made_in_loop": [
+    "warp_layout_bank_alias",
+    "warp_work_distribution_deficit",
+    "multistage_family_indicator",
+    "warp_to_tile_mapping_efficiency",
+    "multistage_stage_depth",
+    "cta_work_deficit",
+    "split_k_coordination_overhead",
+    "thread_output_assignment_imbalance",
+    "split_k_coordination_count"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 12,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 64,
+    "n_accepted": 33,
+    "n_features_made": 4,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.4,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-5090-f3-s3",
+   "gpu": "5090",
+   "fold": 3,
+   "seed": 3,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.069965,
+   "in_sample": 1.021306,
+   "by_regime": {
+    "short": 1.089212,
+    "long": 1.008228
+   },
+   "n_holdout": 13,
+   "train_best": 1.023479058608371,
+   "val_best": 1.0209758225130665,
+   "len_w_best": 42,
+   "round_best": 9,
+   "len_w_by_round": [
+    37,
+    39,
+    40,
+    44,
+    46,
+    41,
+    52,
+    42,
+    46,
+    45,
+    46,
+    44
+   ],
+   "len_w_archive": [
+    37,
+    39,
+    40,
+    41,
+    42,
+    44,
+    44,
+    45,
+    46,
+    46,
+    46,
+    52
+   ],
+   "n_cells": 12,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      6.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 4
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    2,
+    0
+   ],
+   "n_dead_by_sens": [
+    87,
+    145,
+    151,
+    143,
+    155,
+    179,
+    111,
+    166,
+    174,
+    184,
+    174,
+    210
+   ],
+   "n_dead_terms": [
+    87,
+    145,
+    151,
+    143,
+    155,
+    179,
+    111,
+    166,
+    175,
+    184,
+    176,
+    210
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family_ineligibility",
+    "stage_buffer_pressure",
+    "pipeline_stage_count_deficit",
+    "pipeline_stage_count",
+    "effective_alignment_deficit",
+    "log_reduction_dimension",
+    "signed_tile_output_aspect_orientation",
+    "signed_tile_output_aspect_error",
+    "warp_output_mapping_fragmentation"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 12,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 33,
+    "n_features_made": 7,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 32.1,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-4090-f0-s0",
+   "gpu": "4090",
+   "fold": 0,
+   "seed": 0,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.030838,
+   "in_sample": 1.030783,
+   "by_regime": {
+    "short": 1.042549,
+    "long": 1.013518
+   },
+   "n_holdout": 20,
+   "train_best": 1.0205399398877022,
+   "val_best": 1.0673480401401003,
+   "len_w_best": 36,
+   "round_best": 11,
+   "len_w_by_round": [
+    25,
+    35,
+    23,
+    30,
+    28,
+    36
+   ],
+   "len_w_archive": [
+    23,
+    25,
+    28,
+    30,
+    35,
+    36
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 2,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      100000.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      100000.0
+     ]
+    ],
+    "n_paths": 3
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    66,
+    53,
+    66,
+    91,
+    74,
+    76,
+    95,
+    104,
+    114,
+    101,
+    26,
+    111
+   ],
+   "n_dead_terms": [
+    66,
+    53,
+    66,
+    91,
+    74,
+    76,
+    95,
+    104,
+    114,
+    102,
+    26,
+    111
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "warp_swizzle_memory_partition_balance",
+    "split_k_partition_count",
+    "serial_partial_roundtrip_ratio",
+    "shared_bank_conflict_factor",
+    "shared_bank_conflict_proxy",
+    "async_stage_balance_deficit",
+    "warp_mma_fragment_mapping_deficit",
+    "shared_bank_conflict_penalty",
+    "shared_tile_transaction_overhead"
+   ],
+   "axes_used_by_best": [
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 11,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 65,
+    "n_accepted": 31,
+    "n_features_made": 3,
+    "n_feature_requests": 10,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 25.1,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 10
+   }
+  },
+  {
+   "run": "c2-4090-f0-s1",
+   "gpu": "4090",
+   "fold": 0,
+   "seed": 1,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.046126,
+   "in_sample": 1.026906,
+   "by_regime": {
+    "short": 1.053296,
+    "long": 1.035463
+   },
+   "n_holdout": 20,
+   "train_best": 1.031638965971097,
+   "val_best": 1.0627811448050504,
+   "len_w_best": 48,
+   "round_best": 9,
+   "len_w_by_round": [
+    42,
+    31,
+    40,
+    48,
+    48,
+    48,
+    52,
+    56,
+    51,
+    50
+   ],
+   "len_w_archive": [
+    31,
+    40,
+    42,
+    48,
+    48,
+    48,
+    50,
+    51,
+    52,
+    56
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.8
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.8
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.8
+     ],
+     [
+      "output_aspect_imbalance",
+      "<=",
+      0.8
+     ],
+     [
+      "output_aspect_imbalance",
+      "<=",
+      0.8
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "log_flops",
+      ">=",
+      30.0
+     ],
+     [
+      "log_flops",
+      ">=",
+      30.0
+     ]
+    ],
+    "n_paths": 14
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    51,
+    110,
+    152,
+    98,
+    110,
+    106,
+    104,
+    147,
+    195,
+    189,
+    163,
+    212
+   ],
+   "n_dead_terms": [
+    51,
+    110,
+    152,
+    98,
+    110,
+    106,
+    104,
+    147,
+    195,
+    189,
+    163,
+    212
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family",
+    "operand_bank_conflict_proxy",
+    "pipeline_stage_count",
+    "cta_traversal_reuse_loss",
+    "warp_output_geometry_mismatch",
+    "split_k_partition_overhead",
+    "wave_order_locality_cost",
+    "warp_mapping_padding_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 67,
+    "n_accepted": 33,
+    "n_features_made": 5,
+    "n_feature_requests": 8,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.3,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 8
+   }
+  },
+  {
+   "run": "c2-4090-f0-s2",
+   "gpu": "4090",
+   "fold": 0,
+   "seed": 2,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.030753,
+   "in_sample": 1.023684,
+   "by_regime": {
+    "short": 1.042524,
+    "long": 1.013346
+   },
+   "n_holdout": 20,
+   "train_best": 1.0234434546541948,
+   "val_best": 1.0308359753012495,
+   "len_w_best": 27,
+   "round_best": 11,
+   "len_w_by_round": [
+    22,
+    30,
+    26,
+    23,
+    27,
+    24,
+    30,
+    28,
+    29,
+    28
+   ],
+   "len_w_archive": [
+    22,
+    23,
+    24,
+    26,
+    27,
+    28,
+    28,
+    29,
+    30,
+    30
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      5.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      5.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      5.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ]
+    ],
+    "n_paths": 14
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    72,
+    72,
+    65,
+    73,
+    85,
+    54,
+    55,
+    82,
+    86,
+    109,
+    83,
+    87
+   ],
+   "n_dead_terms": [
+    72,
+    72,
+    65,
+    73,
+    85,
+    54,
+    55,
+    82,
+    86,
+    109,
+    83,
+    87
+   ],
+   "axes_made_in_loop": [
+    "async_stage_capability_deficit",
+    "stage_depth_amortization_deficit",
+    "multistage_alignment_incompatibility",
+    "multistage_family_overhead",
+    "warp_scheduling_layout_waste",
+    "pipeline_stage_count",
+    "warp_tile_shape_and_orientation",
+    "shared_bank_aliasing_cost",
+    "row_edge_waste",
+    "serial_split_k_partition_count",
+    "swizzle_dependent_warp_tile_mapping_cost",
+    "split_k_parallelism_gain_before_reduction_cost",
+    "steady_state_pipeline_transfer_efficiency",
+    "swizzle_mapping_efficiency"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 18,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 62,
+    "n_accepted": 35,
+    "n_features_made": 6,
+    "n_feature_requests": 14,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 32.5,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 14
+   }
+  },
+  {
+   "run": "c2-4090-f0-s3",
+   "gpu": "4090",
+   "fold": 0,
+   "seed": 3,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.046174,
+   "in_sample": 1.025632,
+   "by_regime": {
+    "short": 1.045223,
+    "long": 1.047604
+   },
+   "n_holdout": 20,
+   "train_best": 1.025123865733218,
+   "val_best": 1.0543872684441076,
+   "len_w_best": 35,
+   "round_best": 10,
+   "len_w_by_round": [
+    21,
+    31,
+    25,
+    32,
+    31,
+    35,
+    32,
+    35,
+    37
+   ],
+   "len_w_archive": [
+    21,
+    25,
+    31,
+    31,
+    32,
+    32,
+    35,
+    35,
+    37
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 6,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "alignment_deficit",
+      ">",
+      0.5
+     ],
+     [
+      "log_flops",
+      ">=",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      60.0
+     ],
+     [
+      "log_flops",
+      ">=",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      60.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      ">=",
+      40.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "log_min_dim",
+      "<",
+      10.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      10.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      10.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      10.0
+     ]
+    ],
+    "n_paths": 19
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    50,
+    53,
+    59,
+    107,
+    69,
+    69,
+    89,
+    116,
+    99,
+    88,
+    118,
+    135
+   ],
+   "n_dead_terms": [
+    50,
+    53,
+    59,
+    107,
+    69,
+    70,
+    89,
+    116,
+    99,
+    88,
+    118,
+    135
+   ],
+   "axes_made_in_loop": [
+    "stage_alignment_mismatch",
+    "cta_traversal_locality_loss",
+    "steady_state_stage_deficit",
+    "cta_reuse_cache_footprint_ratio",
+    "cta_grid_partition_imbalance",
+    "pipeline_overlap_capacity_deficit",
+    "serial_split_wave_gain_deficit",
+    "short_reduction_log_penalty",
+    "signed_tile_orientation_mismatch",
+    "serial_split_k_boundary_count",
+    "warp_tile_decomposition_deficit"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 11,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 29,
+    "n_features_made": 8,
+    "n_feature_requests": 11,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 35.7,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 11
+   }
+  },
+  {
+   "run": "c2-4090-f1-s0",
+   "gpu": "4090",
+   "fold": 1,
+   "seed": 0,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.037083,
+   "in_sample": 1.028605,
+   "by_regime": {
+    "short": 1.041616,
+    "long": 1.023602
+   },
+   "n_holdout": 16,
+   "train_best": 1.0326506121410293,
+   "val_best": 1.0263787107033302,
+   "len_w_best": 32,
+   "round_best": 9,
+   "len_w_by_round": [
+    23,
+    23,
+    23,
+    24,
+    23,
+    25,
+    33,
+    32,
+    26,
+    30
+   ],
+   "len_w_archive": [
+    23,
+    23,
+    23,
+    23,
+    24,
+    25,
+    26,
+    30,
+    32,
+    33
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 10
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    40,
+    73,
+    98,
+    90,
+    79,
+    118,
+    117,
+    116,
+    116,
+    114,
+    92,
+    129
+   ],
+   "n_dead_terms": [
+    40,
+    73,
+    98,
+    90,
+    79,
+    118,
+    117,
+    116,
+    116,
+    114,
+    92,
+    129
+   ],
+   "axes_made_in_loop": [
+    "stage_family"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 39,
+   "n_hyp_with_evidence": 39,
+   "n_hyp_new_feature": 1,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 66,
+    "n_accepted": 26,
+    "n_features_made": 1,
+    "n_feature_requests": 1,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 19.4,
+   "llm_calls": {
+    "analyze": 13,
+    "rule_editor": 72,
+    "feature": 1
+   }
+  },
+  {
+   "run": "c2-4090-f1-s1",
+   "gpu": "4090",
+   "fold": 1,
+   "seed": 1,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.033747,
+   "in_sample": 1.029684,
+   "by_regime": {
+    "short": 1.041616,
+    "long": 1.010493
+   },
+   "n_holdout": 16,
+   "train_best": 1.0321035052274803,
+   "val_best": 1.0281276208632253,
+   "len_w_best": 31,
+   "round_best": 11,
+   "len_w_by_round": [
+    31,
+    43,
+    31,
+    35,
+    39,
+    34,
+    46
+   ],
+   "len_w_archive": [
+    31,
+    31,
+    34,
+    35,
+    39,
+    43,
+    46
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 6
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    38,
+    59,
+    83,
+    84,
+    96,
+    117,
+    116,
+    139,
+    148,
+    155,
+    148,
+    137
+   ],
+   "n_dead_terms": [
+    38,
+    59,
+    84,
+    84,
+    96,
+    117,
+    116,
+    139,
+    149,
+    155,
+    148,
+    137
+   ],
+   "axes_made_in_loop": [
+    "pipeline_sync_event_count",
+    "signed_tile_to_output_aspect_alignment",
+    "reduction_depth_to_output_frontier",
+    "pipeline_family_buffer_bytes_ratio"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 4,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 28,
+    "n_features_made": 4,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 23.4,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-4090-f1-s2",
+   "gpu": "4090",
+   "fold": 1,
+   "seed": 2,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.035576,
+   "in_sample": 1.025149,
+   "by_regime": {
+    "short": 1.043616,
+    "long": 1.011827
+   },
+   "n_holdout": 16,
+   "train_best": 1.0351543269373527,
+   "val_best": 1.0581161065414837,
+   "len_w_best": 33,
+   "round_best": 11,
+   "len_w_by_round": [
+    27,
+    52,
+    27,
+    32,
+    29,
+    28,
+    29,
+    28,
+    31,
+    33,
+    34
+   ],
+   "len_w_archive": [
+    27,
+    27,
+    28,
+    28,
+    29,
+    29,
+    31,
+    32,
+    33,
+    34,
+    52
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      10.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      10.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 14
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    65,
+    84,
+    93,
+    62,
+    114,
+    116,
+    98,
+    134,
+    107,
+    113,
+    106,
+    138
+   ],
+   "n_dead_terms": [
+    65,
+    84,
+    93,
+    62,
+    114,
+    116,
+    98,
+    134,
+    107,
+    113,
+    106,
+    138
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_control_cost",
+    "cta_locality_wave_fragmentation",
+    "multistage_alignment_deficit",
+    "log_k"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 66,
+    "n_accepted": 35,
+    "n_features_made": 3,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 26.4,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-4090-f1-s3",
+   "gpu": "4090",
+   "fold": 1,
+   "seed": 3,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.025781,
+   "in_sample": 1.025142,
+   "by_regime": {
+    "short": 1.030702,
+    "long": 1.01116
+   },
+   "n_holdout": 16,
+   "train_best": 1.0248951097826906,
+   "val_best": 1.0311461844154632,
+   "len_w_best": 52,
+   "round_best": 9,
+   "len_w_by_round": [
+    47,
+    51,
+    52,
+    60,
+    56
+   ],
+   "len_w_archive": [
+    47,
+    51,
+    52,
+    56,
+    60
+   ],
+   "n_cells": 5,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 3
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    53,
+    88,
+    144,
+    123,
+    165,
+    176,
+    152,
+    156,
+    218,
+    221,
+    212,
+    247
+   ],
+   "n_dead_terms": [
+    53,
+    88,
+    144,
+    123,
+    165,
+    176,
+    152,
+    156,
+    218,
+    221,
+    212,
+    247
+   ],
+   "axes_made_in_loop": [
+    "cta_overhead_per_output",
+    "serial_reduction_boundary_count",
+    "shared_memory_transaction_multiplier",
+    "pipeline_sync_burden",
+    "cta_mapping_locality_deficit",
+    "shared_stride_conflict_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 65,
+    "n_accepted": 36,
+    "n_features_made": 4,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 1,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 30.9,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-4090-f2-s0",
+   "gpu": "4090",
+   "fold": 2,
+   "seed": 0,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.05279,
+   "in_sample": 1.028852,
+   "by_regime": {
+    "short": 1.045041,
+    "long": 1.06321
+   },
+   "n_holdout": 14,
+   "train_best": 1.022954158421329,
+   "val_best": 1.102960851478459,
+   "len_w_best": 32,
+   "round_best": 11,
+   "len_w_by_round": [
+    19,
+    20,
+    21,
+    21,
+    32,
+    25,
+    33,
+    22
+   ],
+   "len_w_archive": [
+    19,
+    20,
+    21,
+    21,
+    22,
+    25,
+    32,
+    33
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "l2_working_set_pressure",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ]
+    ],
+    "n_paths": 5
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    47,
+    41,
+    78,
+    42,
+    57,
+    59,
+    67,
+    67,
+    85,
+    96,
+    121,
+    127
+   ],
+   "n_dead_terms": [
+    47,
+    41,
+    78,
+    42,
+    57,
+    60,
+    67,
+    67,
+    85,
+    96,
+    121,
+    127
+   ],
+   "axes_made_in_loop": [
+    "async_stage_family_deficit",
+    "boundary_cta_fraction"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "l2_working_set_pressure",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 2,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 29,
+    "n_features_made": 2,
+    "n_feature_requests": 2,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 21.6,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 2
+   }
+  },
+  {
+   "run": "c2-4090-f2-s1",
+   "gpu": "4090",
+   "fold": 2,
+   "seed": 1,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.085173,
+   "in_sample": 1.040874,
+   "by_regime": {
+    "short": 1.044665,
+    "long": 1.141636
+   },
+   "n_holdout": 14,
+   "train_best": 1.031007199076021,
+   "val_best": 1.121997828114526,
+   "len_w_best": 30,
+   "round_best": 11,
+   "len_w_by_round": [
+    22,
+    24,
+    25,
+    29,
+    28,
+    28,
+    32,
+    29,
+    28,
+    30,
+    34,
+    28,
+    28,
+    29,
+    30
+   ],
+   "len_w_archive": [
+    22,
+    24,
+    25,
+    28,
+    28,
+    28,
+    28,
+    28,
+    29,
+    29,
+    29,
+    30,
+    30,
+    32,
+    34
+   ],
+   "n_cells": 15,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      ">",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ]
+    ],
+    "n_paths": 7
+   },
+   "n_dead_by_weight": [
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    49,
+    72,
+    76,
+    71,
+    82,
+    74,
+    91,
+    95,
+    108,
+    105,
+    118,
+    105
+   ],
+   "n_dead_terms": [
+    50,
+    73,
+    76,
+    71,
+    82,
+    74,
+    91,
+    95,
+    108,
+    105,
+    118,
+    105
+   ],
+   "axes_made_in_loop": [
+    "cp_async_family_deficit",
+    "parallel_reduction_synchronization_overhead",
+    "layout_swizzle_compatibility_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 3,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 32,
+    "n_features_made": 3,
+    "n_feature_requests": 3,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 24.7,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 3
+   }
+  },
+  {
+   "run": "c2-4090-f2-s2",
+   "gpu": "4090",
+   "fold": 2,
+   "seed": 2,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.074179,
+   "in_sample": 1.038029,
+   "by_regime": {
+    "short": 1.065981,
+    "long": 1.085208
+   },
+   "n_holdout": 14,
+   "train_best": 1.0247497562654893,
+   "val_best": 1.285110894061956,
+   "len_w_best": 39,
+   "round_best": 11,
+   "len_w_by_round": [
+    29,
+    43,
+    25,
+    47,
+    27,
+    38,
+    39
+   ],
+   "len_w_archive": [
+    25,
+    27,
+    29,
+    38,
+    39,
+    43,
+    47
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_flops",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "log_flops",
+      "<",
+      32.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ]
+    ],
+    "n_paths": 8
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    13
+   ],
+   "n_dead_by_sens": [
+    54,
+    46,
+    47,
+    69,
+    89,
+    76,
+    87,
+    120,
+    131,
+    105,
+    149,
+    114
+   ],
+   "n_dead_terms": [
+    54,
+    46,
+    48,
+    69,
+    89,
+    76,
+    87,
+    120,
+    131,
+    105,
+    149,
+    127
+   ],
+   "axes_made_in_loop": [
+    "stage_family_alignment_deficit",
+    "multistage_family_indicator",
+    "row_tile_overcoverage",
+    "k_boundary_predication_ratio",
+    "axis_tile_quantization_deficit",
+    "signed_tile_output_aspect_alignment",
+    "warp_tile_decomposition_deficit",
+    "warp_tile_decomposition_overhead"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_flops",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 72,
+    "n_accepted": 30,
+    "n_features_made": 4,
+    "n_feature_requests": 8,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 28.2,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 8
+   }
+  },
+  {
+   "run": "c2-4090-f2-s3",
+   "gpu": "4090",
+   "fold": 2,
+   "seed": 3,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.04271,
+   "in_sample": 1.036183,
+   "by_regime": {
+    "short": 1.027594,
+    "long": 1.06321
+   },
+   "n_holdout": 14,
+   "train_best": 1.0210468801257107,
+   "val_best": 1.1108936049646687,
+   "len_w_best": 55,
+   "round_best": 11,
+   "len_w_by_round": [
+    17,
+    38,
+    29,
+    39,
+    54,
+    57,
+    55
+   ],
+   "len_w_archive": [
+    17,
+    29,
+    38,
+    39,
+    54,
+    55,
+    57
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_min_dim",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ]
+    ],
+    "n_paths": 7
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    40,
+    83,
+    55,
+    58,
+    109,
+    118,
+    91,
+    163,
+    209,
+    127,
+    95,
+    131
+   ],
+   "n_dead_terms": [
+    40,
+    83,
+    55,
+    58,
+    109,
+    118,
+    91,
+    163,
+    209,
+    127,
+    95,
+    131
+   ],
+   "axes_made_in_loop": [
+    "serial_split_k_parallelism_gain",
+    "stage_family_overhead",
+    "serial_split_k_roundtrip_cost",
+    "swizzle_mode_scheduling_effect",
+    "warp_scheduler_role_cost",
+    "warp_swizzle_distribution_or_harmony_cost",
+    "operand_coalescing_span_deficit"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_min_dim",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 8,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 65,
+    "n_accepted": 30,
+    "n_features_made": 3,
+    "n_feature_requests": 7,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 5,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 28.7,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 7
+   }
+  },
+  {
+   "run": "c2-4090-f3-s0",
+   "gpu": "4090",
+   "fold": 3,
+   "seed": 0,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.030517,
+   "in_sample": 1.025219,
+   "by_regime": {
+    "short": 1.037391,
+    "long": 1.015216
+   },
+   "n_holdout": 13,
+   "train_best": 1.023610839981763,
+   "val_best": 1.0288241000347746,
+   "len_w_best": 40,
+   "round_best": 11,
+   "len_w_by_round": [
+    32,
+    31,
+    33,
+    42,
+    40,
+    46,
+    44,
+    46,
+    41,
+    46,
+    31
+   ],
+   "len_w_archive": [
+    31,
+    31,
+    32,
+    33,
+    40,
+    41,
+    42,
+    44,
+    46,
+    46,
+    46
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      1000000.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.75
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 10
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    33,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    71,
+    104,
+    62,
+    108,
+    93,
+    112,
+    110,
+    112,
+    155,
+    127,
+    75,
+    127
+   ],
+   "n_dead_terms": [
+    71,
+    104,
+    62,
+    108,
+    93,
+    112,
+    110,
+    112,
+    155,
+    160,
+    75,
+    127
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family_alignment_risk",
+    "warp_underfill_fraction",
+    "k_tile_dynamic_instruction_cost",
+    "staging_family_overhead",
+    "warp_swizzle_or_warp_specialization_mode_cost",
+    "warp_tile_geometry_efficiency"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 65,
+    "n_accepted": 31,
+    "n_features_made": 3,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 30.7,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-4090-f3-s1",
+   "gpu": "4090",
+   "fold": 3,
+   "seed": 1,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.039918,
+   "in_sample": 1.039701,
+   "by_regime": {
+    "short": 1.054186,
+    "long": 1.008516
+   },
+   "n_holdout": 13,
+   "train_best": 1.0370217411956195,
+   "val_best": 1.0520811096001654,
+   "len_w_best": 48,
+   "round_best": 10,
+   "len_w_by_round": [
+    40,
+    45,
+    48,
+    49,
+    50
+   ],
+   "len_w_archive": [
+    40,
+    45,
+    48,
+    49,
+    50
+   ],
+   "n_cells": 5,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "l2_working_set_pressure",
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 7,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.25
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.25
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.125
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.125
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.125
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.125
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.125
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.125
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      256.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      5.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_k",
+      "<",
+      8.0
+     ]
+    ],
+    "n_paths": 17
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    65,
+    92,
+    121,
+    102,
+    106,
+    121,
+    128,
+    116,
+    144,
+    140,
+    167,
+    215
+   ],
+   "n_dead_terms": [
+    65,
+    92,
+    121,
+    102,
+    106,
+    121,
+    128,
+    116,
+    144,
+    140,
+    167,
+    215
+   ],
+   "axes_made_in_loop": [
+    "split_k_partition_count",
+    "cta_span_fraction",
+    "stage_count_or_pipeline_family",
+    "log_k",
+    "cta_joint_span_fraction"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "l2_working_set_pressure",
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 26,
+    "n_features_made": 5,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.7,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-4090-f3-s2",
+   "gpu": "4090",
+   "fold": 3,
+   "seed": 2,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.035589,
+   "in_sample": 1.02684,
+   "by_regime": {
+    "short": 1.048083,
+    "long": 1.008021
+   },
+   "n_holdout": 13,
+   "train_best": 1.0289801883760423,
+   "val_best": 1.0276649920971852,
+   "len_w_best": 34,
+   "round_best": 11,
+   "len_w_by_round": [
+    31,
+    30,
+    35,
+    29,
+    34,
+    37,
+    36,
+    34
+   ],
+   "len_w_archive": [
+    29,
+    30,
+    31,
+    34,
+    34,
+    35,
+    36,
+    37
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      256.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      ">=",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      ">=",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      ">=",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      256.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      65536.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ]
+    ],
+    "n_paths": 11
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    55,
+    75,
+    69,
+    98,
+    90,
+    74,
+    80,
+    87,
+    105,
+    96,
+    119,
+    124
+   ],
+   "n_dead_terms": [
+    55,
+    75,
+    69,
+    98,
+    90,
+    74,
+    80,
+    87,
+    105,
+    96,
+    119,
+    124
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "cta_l2_footprint_pressure",
+    "split_k_partition_count",
+    "serial_split_k_precision_roundtrip_cost",
+    "signed_tile_output_orientation_mismatch"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 33,
+    "n_features_made": 5,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 28.2,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-4090-f3-s3",
+   "gpu": "4090",
+   "fold": 3,
+   "seed": 3,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.023289,
+   "in_sample": 1.022892,
+   "by_regime": {
+    "short": 1.030149,
+    "long": 1.008021
+   },
+   "n_holdout": 13,
+   "train_best": 1.0211940158760318,
+   "val_best": 1.0289078719781908,
+   "len_w_best": 49,
+   "round_best": 11,
+   "len_w_by_round": [
+    38,
+    41,
+    41,
+    48,
+    48,
+    42,
+    49,
+    50
+   ],
+   "len_w_archive": [
+    38,
+    41,
+    41,
+    42,
+    48,
+    48,
+    49,
+    50
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "l2_working_set_pressure",
+     "output_aspect_imbalance",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ]
+    ],
+    "n_paths": 5
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    35,
+    84,
+    63,
+    74,
+    74,
+    101,
+    113,
+    131,
+    135,
+    88,
+    156,
+    123
+   ],
+   "n_dead_terms": [
+    35,
+    84,
+    63,
+    74,
+    74,
+    101,
+    113,
+    132,
+    135,
+    88,
+    156,
+    123
+   ],
+   "axes_made_in_loop": [
+    "multistage_family_overhead",
+    "split_k_partition_count",
+    "stage_buffer_depth",
+    "warp_issue_slot_waste",
+    "layout_swizzle_mode_complexity",
+    "tile_surface_extent_ratio"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "l2_working_set_pressure",
+    "output_aspect_imbalance",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 8,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 65,
+    "n_accepted": 29,
+    "n_features_made": 4,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 1,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 34.5,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-h100-f0-s0",
+   "gpu": "h100",
+   "fold": 0,
+   "seed": 0,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.041886,
+   "in_sample": 1.073776,
+   "by_regime": {
+    "short": 1.046341,
+    "long": 1.024254
+   },
+   "n_holdout": 20,
+   "train_best": 1.0458271263149868,
+   "val_best": 1.1173575954725696,
+   "len_w_best": 50,
+   "round_best": 11,
+   "len_w_by_round": [
+    28,
+    28,
+    50,
+    44,
+    58,
+    38
+   ],
+   "len_w_archive": [
+    28,
+    28,
+    38,
+    44,
+    50,
+    58
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.75
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "log_min_dim",
+      ">=",
+      10.0
+     ],
+     [
+      "log_min_dim",
+      ">=",
+      10.0
+     ],
+     [
+      "log_min_dim",
+      ">=",
+      10.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ]
+    ],
+    "n_paths": 14
+   },
+   "n_dead_by_weight": [
+    2,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    57,
+    105,
+    132,
+    132,
+    153,
+    81,
+    139,
+    149,
+    168,
+    178,
+    179,
+    221
+   ],
+   "n_dead_terms": [
+    59,
+    105,
+    132,
+    132,
+    153,
+    82,
+    139,
+    149,
+    168,
+    178,
+    179,
+    221
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family_boundary_penalty",
+    "cta_partition_reuse_imbalance",
+    "signed_cta_output_orientation_mismatch",
+    "split_k_sync_latency_density",
+    "signed_cta_orientation_mismatch"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 7,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 70,
+    "n_accepted": 35,
+    "n_features_made": 3,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 2,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 37.7,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-h100-f0-s1",
+   "gpu": "h100",
+   "fold": 0,
+   "seed": 1,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.034068,
+   "in_sample": 1.044643,
+   "by_regime": {
+    "short": 1.041294,
+    "long": 1.005661
+   },
+   "n_holdout": 20,
+   "train_best": 1.0283819518464348,
+   "val_best": 1.0836085436565428,
+   "len_w_best": 48,
+   "round_best": 11,
+   "len_w_by_round": [
+    33,
+    38,
+    32,
+    38,
+    29,
+    48,
+    31,
+    40,
+    40,
+    43,
+    44
+   ],
+   "len_w_archive": [
+    29,
+    31,
+    32,
+    33,
+    38,
+    38,
+    40,
+    40,
+    43,
+    44,
+    48
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      ">=",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      8.0
+     ],
+     [
+      "roofline_ratio",
+      ">=",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.75
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 18
+   },
+   "n_dead_by_weight": [
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1
+   ],
+   "n_dead_by_sens": [
+    43,
+    101,
+    109,
+    138,
+    154,
+    147,
+    142,
+    161,
+    139,
+    174,
+    166,
+    168
+   ],
+   "n_dead_terms": [
+    44,
+    101,
+    109,
+    138,
+    154,
+    147,
+    142,
+    161,
+    139,
+    175,
+    166,
+    169
+   ],
+   "axes_made_in_loop": [
+    "signed_tile_orientation_mismatch",
+    "pipeline_family_stage_overhead",
+    "cache_conditioned_parallel_reduction_cost",
+    "operand_stride_exposure",
+    "thread_sync_amortization_deficit",
+    "accumulator_footprint_per_thread"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 6,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 69,
+    "n_accepted": 40,
+    "n_features_made": 6,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.6,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-h100-f0-s2",
+   "gpu": "h100",
+   "fold": 0,
+   "seed": 2,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.095737,
+   "in_sample": 1.058634,
+   "by_regime": {
+    "short": 1.119179,
+    "long": 1.006777
+   },
+   "n_holdout": 20,
+   "train_best": 1.0353147964257265,
+   "val_best": 1.0996186101572973,
+   "len_w_best": 55,
+   "round_best": 11,
+   "len_w_by_round": [
+    25,
+    33,
+    47,
+    43,
+    47,
+    47,
+    49,
+    55,
+    49,
+    55,
+    53
+   ],
+   "len_w_archive": [
+    25,
+    33,
+    43,
+    47,
+    47,
+    47,
+    49,
+    49,
+    53,
+    55,
+    55
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "log_flops",
+      ">",
+      30.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1048576.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      8.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.75
+     ],
+     [
+      "log_min_dim",
+      "<",
+      8.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.75
+     ]
+    ],
+    "n_paths": 12
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    60,
+    74,
+    85,
+    91,
+    127,
+    135,
+    143,
+    168,
+    168,
+    186,
+    195,
+    168
+   ],
+   "n_dead_terms": [
+    60,
+    74,
+    85,
+    91,
+    127,
+    135,
+    143,
+    168,
+    168,
+    186,
+    195,
+    168
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "pipeline_stage_count",
+    "row_k_extent_mismatch"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 3,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 66,
+    "n_accepted": 31,
+    "n_features_made": 3,
+    "n_feature_requests": 3,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 34.6,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 3
+   }
+  },
+  {
+   "run": "c2-h100-f0-s3",
+   "gpu": "h100",
+   "fold": 0,
+   "seed": 3,
+   "split_kind": "nkgroup0-k4",
+   "holdout": 1.057014,
+   "in_sample": 1.045531,
+   "by_regime": {
+    "short": 1.068428,
+    "long": 1.012565
+   },
+   "n_holdout": 20,
+   "train_best": 1.0401512651521962,
+   "val_best": 1.1565135647079132,
+   "len_w_best": 33,
+   "round_best": 11,
+   "len_w_by_round": [
+    21,
+    22,
+    36,
+    28,
+    30,
+    30,
+    30,
+    29,
+    24,
+    32,
+    33
+   ],
+   "len_w_archive": [
+    21,
+    22,
+    24,
+    28,
+    29,
+    30,
+    30,
+    30,
+    32,
+    33,
+    36
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<=",
+      1024.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_work_per_sm",
+      ">",
+      1024.0
+     ],
+     [
+      "output_work_per_sm",
+      "<=",
+      1024.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ]
+    ],
+    "n_paths": 11
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    55,
+    70,
+    75,
+    76,
+    85,
+    103,
+    111,
+    105,
+    139,
+    139,
+    114,
+    109
+   ],
+   "n_dead_terms": [
+    55,
+    70,
+    75,
+    76,
+    85,
+    104,
+    111,
+    105,
+    139,
+    139,
+    114,
+    109
+   ],
+   "axes_made_in_loop": [
+    "stage_family",
+    "split_k_independence_deficit",
+    "absolute_pipeline_stage_count"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 35,
+    "n_features_made": 2,
+    "n_feature_requests": 3,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 35.2,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 3
+   }
+  },
+  {
+   "run": "c2-h100-f1-s0",
+   "gpu": "h100",
+   "fold": 1,
+   "seed": 0,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.061876,
+   "in_sample": 1.052717,
+   "by_regime": {
+    "short": 1.065069,
+    "long": 1.015119
+   },
+   "n_holdout": 16,
+   "train_best": 1.058310089833127,
+   "val_best": 1.0552771771236893,
+   "len_w_best": 35,
+   "round_best": 9,
+   "len_w_by_round": [
+    26,
+    35,
+    26,
+    37,
+    31,
+    37,
+    32
+   ],
+   "len_w_archive": [
+    26,
+    26,
+    31,
+    32,
+    35,
+    37,
+    37
+   ],
+   "n_cells": 7,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "l2_working_set_pressure",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.6
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.6
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.6
+     ],
+     [
+      "l2_working_set_pressure",
+      "<",
+      0.6
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "alignment_deficit",
+      ">",
+      0.25
+     ]
+    ],
+    "n_paths": 8
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    69,
+    80,
+    76,
+    101,
+    147,
+    103,
+    80,
+    118,
+    122,
+    95,
+    82,
+    138
+   ],
+   "n_dead_terms": [
+    69,
+    80,
+    76,
+    101,
+    147,
+    103,
+    80,
+    118,
+    122,
+    95,
+    82,
+    138
+   ],
+   "axes_made_in_loop": [
+    "stage_family",
+    "shared_layout_overhead_fraction",
+    "warp_issue_efficiency_deficit",
+    "swizzle_warp_organization_efficiency",
+    "warp_organization_and_swizzle_efficiency",
+    "signed_tile_aspect_alignment"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "l2_working_set_pressure",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 7,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 63,
+    "n_accepted": 26,
+    "n_features_made": 2,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 1,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 43.8,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-h100-f1-s1",
+   "gpu": "h100",
+   "fold": 1,
+   "seed": 1,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.079541,
+   "in_sample": 1.045623,
+   "by_regime": {
+    "short": 1.083333,
+    "long": 1.024229
+   },
+   "n_holdout": 16,
+   "train_best": 1.0608255991417033,
+   "val_best": 1.1379960932295925,
+   "len_w_best": 48,
+   "round_best": 10,
+   "len_w_by_round": [
+    46,
+    44,
+    48,
+    48,
+    52
+   ],
+   "len_w_archive": [
+    44,
+    46,
+    48,
+    48,
+    52
+   ],
+   "n_cells": 5,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "alignment_deficit",
+      "<",
+      0.5
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 5
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    65,
+    102,
+    173,
+    184,
+    192,
+    184,
+    181,
+    187,
+    241,
+    219,
+    210,
+    253
+   ],
+   "n_dead_terms": [
+    65,
+    102,
+    173,
+    184,
+    192,
+    184,
+    181,
+    187,
+    241,
+    219,
+    210,
+    253
+   ],
+   "axes_made_in_loop": [
+    "cta_tile_granularity",
+    "split_k_parallelism_deficit",
+    "pipeline_stage_family",
+    "split_k_parallelism_supply"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 69,
+    "n_accepted": 32,
+    "n_features_made": 2,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 38.8,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-h100-f1-s2",
+   "gpu": "h100",
+   "fold": 1,
+   "seed": 2,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.093891,
+   "in_sample": 1.056456,
+   "by_regime": {
+    "short": 1.098442,
+    "long": 1.027842
+   },
+   "n_holdout": 16,
+   "train_best": 1.0563245927109317,
+   "val_best": 1.0714524685450268,
+   "len_w_best": 28,
+   "round_best": 10,
+   "len_w_by_round": [
+    24,
+    27,
+    26,
+    28,
+    29,
+    27
+   ],
+   "len_w_archive": [
+    24,
+    26,
+    27,
+    27,
+    28,
+    29
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      8.0
+     ],
+     [
+      "reduction_spatial_imbalance",
+      ">=",
+      0.75
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      4096.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      ">=",
+      4096.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">=",
+      0.5
+     ],
+     [
+      "reduction_spatial_imbalance",
+      ">=",
+      0.75
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 8
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    63,
+    83,
+    84,
+    94,
+    95,
+    109,
+    102,
+    86,
+    106,
+    111,
+    124,
+    136
+   ],
+   "n_dead_terms": [
+    63,
+    83,
+    85,
+    95,
+    95,
+    109,
+    102,
+    86,
+    106,
+    111,
+    124,
+    136
+   ],
+   "axes_made_in_loop": [
+    "reduction_spatial_imbalance",
+    "sustained_tensor_tile_issue_efficiency",
+    "weighted_alignment_transaction_deficit",
+    "resident_tile_cache_pressure",
+    "sustained_tensor_core_issue_efficiency",
+    "pipeline_family",
+    "staging_depth"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 51,
+   "n_hyp_with_evidence": 51,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 34,
+    "n_features_made": 5,
+    "n_feature_requests": 7,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 39.3,
+   "llm_calls": {
+    "analyze": 17,
+    "rule_editor": 72,
+    "feature": 7
+   }
+  },
+  {
+   "run": "c2-h100-f1-s3",
+   "gpu": "h100",
+   "fold": 1,
+   "seed": 3,
+   "split_kind": "nkgroup1-k4",
+   "holdout": 1.086503,
+   "in_sample": 1.039542,
+   "by_regime": {
+    "short": 1.092338,
+    "long": 1.002631
+   },
+   "n_holdout": 16,
+   "train_best": 1.0455890625615714,
+   "val_best": 1.0523233851413403,
+   "len_w_best": 24,
+   "round_best": 8,
+   "len_w_by_round": [
+    40,
+    24,
+    24,
+    24,
+    25,
+    26,
+    25,
+    26,
+    25,
+    26
+   ],
+   "len_w_archive": [
+    24,
+    24,
+    24,
+    25,
+    25,
+    25,
+    26,
+    26,
+    26,
+    40
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "roofline_ratio"
+    ],
+    "n_axes": 2,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ],
+     [
+      "log_flops",
+      "<",
+      30.0
+     ]
+    ],
+    "n_paths": 4
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    81,
+    72,
+    124,
+    121,
+    113,
+    98,
+    126,
+    103,
+    103,
+    107,
+    101,
+    106
+   ],
+   "n_dead_terms": [
+    81,
+    72,
+    124,
+    121,
+    113,
+    98,
+    126,
+    103,
+    103,
+    107,
+    101,
+    106
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "parallel_split_wave_scarcity_deficit",
+    "cta_useful_output_work",
+    "serial_split_wave_occupancy_gain",
+    "predicted_timer_noise_margin"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 42,
+   "n_hyp_with_evidence": 42,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 31,
+    "n_features_made": 3,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 35.7,
+   "llm_calls": {
+    "analyze": 14,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-h100-f2-s0",
+   "gpu": "h100",
+   "fold": 2,
+   "seed": 0,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.039683,
+   "in_sample": 1.058144,
+   "by_regime": {
+    "short": 1.052208,
+    "long": 1.00902
+   },
+   "n_holdout": 14,
+   "train_best": 1.0538521320002996,
+   "val_best": 1.0656374994745592,
+   "len_w_best": 27,
+   "round_best": 7,
+   "len_w_by_round": [
+    23,
+    26,
+    22,
+    27,
+    27,
+    29,
+    29,
+    32
+   ],
+   "len_w_archive": [
+    22,
+    23,
+    26,
+    27,
+    27,
+    29,
+    29,
+    32
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_aspect_imbalance",
+     "roofline_ratio"
+    ],
+    "n_axes": 3,
+    "thresholds": [
+     [
+      "log_flops",
+      "<",
+      35.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 3
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    81,
+    84,
+    80,
+    69,
+    86,
+    92,
+    106,
+    64,
+    79,
+    122,
+    117,
+    112
+   ],
+   "n_dead_terms": [
+    81,
+    84,
+    80,
+    69,
+    86,
+    92,
+    106,
+    64,
+    79,
+    122,
+    117,
+    112
+   ],
+   "axes_made_in_loop": [
+    "l2_exposed_parallel_reduction",
+    "pipeline_stage_depth",
+    "useful_output_elements_per_cta",
+    "output_tile_shape_reuse_deficit"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_aspect_imbalance",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 4,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 66,
+    "n_accepted": 23,
+    "n_features_made": 3,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.8,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-h100-f2-s1",
+   "gpu": "h100",
+   "fold": 2,
+   "seed": 1,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.043185,
+   "in_sample": 1.052199,
+   "by_regime": {
+    "short": 1.045068,
+    "long": 1.038491
+   },
+   "n_holdout": 14,
+   "train_best": 1.0474978521779679,
+   "val_best": 1.065944214792695,
+   "len_w_best": 42,
+   "round_best": 8,
+   "len_w_by_round": [
+    27,
+    38,
+    42,
+    25,
+    50,
+    44
+   ],
+   "len_w_archive": [
+    25,
+    27,
+    38,
+    42,
+    44,
+    50
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      ">",
+      7.0
+     ],
+     [
+      "log_min_dim",
+      ">",
+      7.0
+     ]
+    ],
+    "n_paths": 12
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    87,
+    77,
+    81,
+    86,
+    73,
+    106,
+    102,
+    164,
+    167,
+    182,
+    159,
+    218
+   ],
+   "n_dead_terms": [
+    87,
+    77,
+    81,
+    86,
+    73,
+    106,
+    102,
+    164,
+    167,
+    182,
+    159,
+    218
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "pipeline_stage_count",
+    "cta_output_tile_area_relative_to_shape",
+    "cta_swizzle_distribution_or_locality_score",
+    "signed_tile_orientation_mismatch",
+    "reduction_depth_to_output_parallelism"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 7,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 68,
+    "n_accepted": 26,
+    "n_features_made": 4,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 4,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 40.3,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-h100-f2-s2",
+   "gpu": "h100",
+   "fold": 2,
+   "seed": 2,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.054296,
+   "in_sample": 1.050061,
+   "by_regime": {
+    "short": 1.071753,
+    "long": 1.011886
+   },
+   "n_holdout": 14,
+   "train_best": 1.05263841400344,
+   "val_best": 1.0711786165067143,
+   "len_w_best": 73,
+   "round_best": 11,
+   "len_w_by_round": [
+    26,
+    48,
+    63,
+    68,
+    73,
+    25
+   ],
+   "len_w_archive": [
+    25,
+    26,
+    48,
+    63,
+    68,
+    73
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      8.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      8.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 18
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    80,
+    110,
+    85,
+    90,
+    146,
+    191,
+    127,
+    250,
+    228,
+    160,
+    312,
+    304
+   ],
+   "n_dead_terms": [
+    80,
+    110,
+    85,
+    90,
+    146,
+    191,
+    128,
+    250,
+    229,
+    160,
+    312,
+    304
+   ],
+   "axes_made_in_loop": [
+    "multistage_family_indicator",
+    "split_k_wave_utilization_deficit",
+    "pipeline_stage_count",
+    "split_k_wave_oversubscription"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 4,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 65,
+    "n_accepted": 20,
+    "n_features_made": 3,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 38.4,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-h100-f2-s3",
+   "gpu": "h100",
+   "fold": 2,
+   "seed": 3,
+   "split_kind": "nkgroup2-k4",
+   "holdout": 1.0632,
+   "in_sample": 1.049705,
+   "by_regime": {
+    "short": 1.079486,
+    "long": 1.02355
+   },
+   "n_holdout": 14,
+   "train_best": 1.0449505651308817,
+   "val_best": 1.0768540589031326,
+   "len_w_best": 48,
+   "round_best": 11,
+   "len_w_by_round": [
+    34,
+    33,
+    33,
+    47,
+    41,
+    44,
+    47,
+    48
+   ],
+   "len_w_archive": [
+    33,
+    33,
+    34,
+    41,
+    44,
+    47,
+    47,
+    48
+   ],
+   "n_cells": 8,
+   "branching": {
+    "axes": [
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      10000.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      10000.0
+     ]
+    ],
+    "n_paths": 5
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    0
+   ],
+   "n_dead_by_sens": [
+    84,
+    70,
+    152,
+    141,
+    151,
+    164,
+    140,
+    162,
+    167,
+    137,
+    199,
+    203
+   ],
+   "n_dead_terms": [
+    84,
+    70,
+    152,
+    141,
+    151,
+    164,
+    140,
+    162,
+    167,
+    138,
+    200,
+    203
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family_stage_count",
+    "warp_contiguous_lane_utilization_deficit",
+    "warp_issue_overhead_per_output",
+    "pipeline_family_depth_cost"
+   ],
+   "axes_used_by_best": [
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 38,
+    "explore": 24,
+    "cross": 10
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 69,
+    "n_accepted": 23,
+    "n_features_made": 3,
+    "n_feature_requests": 4,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 3,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 33.8,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 4
+   }
+  },
+  {
+   "run": "c2-h100-f3-s0",
+   "gpu": "h100",
+   "fold": 3,
+   "seed": 0,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.014414,
+   "in_sample": 1.054155,
+   "by_regime": {
+    "short": 1.017262,
+    "long": 1.00498
+   },
+   "n_holdout": 13,
+   "train_best": 1.0474600866541548,
+   "val_best": 1.040627709114429,
+   "len_w_best": 37,
+   "round_best": 10,
+   "len_w_by_round": [
+    30,
+    24,
+    31,
+    32,
+    29,
+    34,
+    31,
+    39,
+    35,
+    36,
+    37
+   ],
+   "len_w_archive": [
+    24,
+    29,
+    30,
+    31,
+    31,
+    32,
+    34,
+    35,
+    36,
+    37,
+    39
+   ],
+   "n_cells": 11,
+   "branching": {
+    "axes": [
+     "output_aspect_imbalance",
+     "roofline_ratio"
+    ],
+    "n_axes": 2,
+    "thresholds": [
+     [
+      "output_aspect_imbalance",
+      ">",
+      0.5
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 2
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    44,
+    73,
+    63,
+    101,
+    91,
+    100,
+    127,
+    144,
+    140,
+    140,
+    146,
+    160
+   ],
+   "n_dead_terms": [
+    44,
+    73,
+    63,
+    101,
+    91,
+    100,
+    127,
+    144,
+    140,
+    140,
+    146,
+    160
+   ],
+   "axes_made_in_loop": [
+    "stage_family",
+    "stage_depth_coordination_cost",
+    "tile_dimension_coarseness",
+    "partial_reduction_residency_sync",
+    "shared_access_bank_pressure",
+    "directional_tile_partition_slack"
+   ],
+   "axes_used_by_best": [
+    "output_aspect_imbalance",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 8,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 37,
+    "n_features_made": 4,
+    "n_feature_requests": 6,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 1,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 44.0,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 6
+   }
+  },
+  {
+   "run": "c2-h100-f3-s1",
+   "gpu": "h100",
+   "fold": 3,
+   "seed": 1,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.043468,
+   "in_sample": 1.051358,
+   "by_regime": {
+    "short": 1.055362,
+    "long": 1.004782
+   },
+   "n_holdout": 13,
+   "train_best": 1.0530931530030248,
+   "val_best": 1.044078355963416,
+   "len_w_best": 40,
+   "round_best": 10,
+   "len_w_by_round": [
+    28,
+    34,
+    28,
+    35,
+    40,
+    43
+   ],
+   "len_w_archive": [
+    28,
+    28,
+    34,
+    35,
+    40,
+    43
+   ],
+   "n_cells": 6,
+   "branching": {
+    "axes": [
+     "l2_working_set_pressure",
+     "log_min_dim",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 5,
+    "thresholds": [
+     [
+      "log_k",
+      "<",
+      8.0
+     ],
+     [
+      "log_min_dim",
+      "<",
+      7.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ]
+    ],
+    "n_paths": 5
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    48,
+    84,
+    97,
+    130,
+    97,
+    123,
+    123,
+    119,
+    145,
+    168,
+    152,
+    193
+   ],
+   "n_dead_terms": [
+    48,
+    84,
+    97,
+    130,
+    97,
+    123,
+    123,
+    119,
+    145,
+    169,
+    152,
+    193
+   ],
+   "axes_made_in_loop": [
+    "pipeline_stage_family",
+    "configured_tile_area_pressure",
+    "log_k",
+    "cta_output_work_quantization",
+    "split_k_parallelism_deficit",
+    "pipeline_buffer_bytes",
+    "k_tile_traffic_per_flop",
+    "pipeline_buffering_depth",
+    "cta_tile_extent_product"
+   ],
+   "axes_used_by_best": [
+    "l2_working_set_pressure",
+    "log_min_dim",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 10,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 72,
+    "n_accepted": 25,
+    "n_features_made": 6,
+    "n_feature_requests": 9,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 46.0,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 9
+   }
+  },
+  {
+   "run": "c2-h100-f3-s2",
+   "gpu": "h100",
+   "fold": 3,
+   "seed": 2,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.03481,
+   "in_sample": 1.039725,
+   "by_regime": {
+    "short": 1.042974,
+    "long": 1.008053
+   },
+   "n_holdout": 13,
+   "train_best": 1.04152043690771,
+   "val_best": 1.0326518380914833,
+   "len_w_best": 35,
+   "round_best": 11,
+   "len_w_by_round": [
+    25,
+    23,
+    30,
+    31,
+    24,
+    32,
+    32,
+    33,
+    35
+   ],
+   "len_w_archive": [
+    23,
+    24,
+    25,
+    30,
+    31,
+    32,
+    32,
+    33,
+    35
+   ],
+   "n_cells": 9,
+   "branching": {
+    "axes": [
+     "log_flops",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "output_aspect_imbalance",
+      "<",
+      0.5
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      1024.0
+     ],
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ],
+     [
+      "log_flops",
+      "<",
+      40.0
+     ]
+    ],
+    "n_paths": 6
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    66,
+    82,
+    83,
+    86,
+    93,
+    100,
+    93,
+    99,
+    151,
+    130,
+    137,
+    150
+   ],
+   "n_dead_terms": [
+    66,
+    82,
+    83,
+    86,
+    93,
+    100,
+    93,
+    99,
+    151,
+    130,
+    137,
+    150
+   ],
+   "axes_made_in_loop": [
+    "pipeline_family_protocol_overhead",
+    "tile_row_aspect_excess",
+    "l2_amplified_operand_redundancy",
+    "k_tile_granularity",
+    "extra_pipeline_stage_fraction"
+   ],
+   "axes_used_by_best": [
+    "log_flops",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 48,
+   "n_hyp_with_evidence": 48,
+   "n_hyp_new_feature": 5,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 71,
+    "n_accepted": 35,
+    "n_features_made": 4,
+    "n_feature_requests": 5,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 0,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 41.3,
+   "llm_calls": {
+    "analyze": 16,
+    "rule_editor": 72,
+    "feature": 5
+   }
+  },
+  {
+   "run": "c2-h100-f3-s3",
+   "gpu": "h100",
+   "fold": 3,
+   "seed": 3,
+   "split_kind": "nkgroup3-k4",
+   "holdout": 1.046391,
+   "in_sample": 1.031327,
+   "by_regime": {
+    "short": 1.058063,
+    "long": 1.008407
+   },
+   "n_holdout": 13,
+   "train_best": 1.0346662717874069,
+   "val_best": 1.0356195543757614,
+   "len_w_best": 49,
+   "round_best": 11,
+   "len_w_by_round": [
+    28,
+    40,
+    36,
+    31,
+    41,
+    38,
+    53,
+    48,
+    49,
+    40
+   ],
+   "len_w_archive": [
+    28,
+    31,
+    36,
+    38,
+    40,
+    40,
+    41,
+    48,
+    49,
+    53
+   ],
+   "n_cells": 10,
+   "branching": {
+    "axes": [
+     "alignment_deficit",
+     "output_aspect_imbalance",
+     "output_work_per_sm",
+     "roofline_ratio"
+    ],
+    "n_axes": 4,
+    "thresholds": [
+     [
+      "roofline_ratio",
+      "<",
+      1.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.25
+     ],
+     [
+      "alignment_deficit",
+      "<",
+      0.25
+     ],
+     [
+      "output_work_per_sm",
+      "<",
+      4096.0
+     ]
+    ],
+    "n_paths": 6
+   },
+   "n_dead_by_weight": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_dead_by_sens": [
+    38,
+    60,
+    89,
+    83,
+    110,
+    134,
+    146,
+    101,
+    153,
+    119,
+    218,
+    185
+   ],
+   "n_dead_terms": [
+    38,
+    60,
+    89,
+    83,
+    110,
+    134,
+    146,
+    101,
+    153,
+    119,
+    218,
+    185
+   ],
+   "axes_made_in_loop": [
+    "stage_family_overhead",
+    "cta_output_surface_or_output_elements_per_cta",
+    "pipeline_stage_depth_deficit",
+    "warp_mapping_load_imbalance",
+    "reduction_tile_depth_ratio",
+    "coalescing_transaction_deficit",
+    "serial_split_k_fp16_roundtrip_or_precision_loss",
+    "l2_tile_footprint_pressure"
+   ],
+   "axes_used_by_best": [
+    "alignment_deficit",
+    "output_aspect_imbalance",
+    "output_work_per_sm",
+    "roofline_ratio"
+   ],
+   "lineage_best_parents": [],
+   "by_parent_kind": {
+    "exploit": 37,
+    "explore": 24,
+    "cross": 11
+   },
+   "n_hypotheses": 45,
+   "n_hyp_with_evidence": 45,
+   "n_hyp_new_feature": 9,
+   "counts": {
+    "n_proposed": 72,
+    "n_scored": 66,
+    "n_accepted": 40,
+    "n_features_made": 4,
+    "n_feature_requests": 8,
+    "n_rejected_schema": 0,
+    "n_rejected_static": 6,
+    "n_rejected_sandbox": 0,
+    "n_rejected_fit": 0,
+    "n_llm_error": 0,
+    "n_val_blowups": 0
+   },
+   "minutes": 34.6,
+   "llm_calls": {
+    "analyze": 15,
+    "rule_editor": 72,
+    "feature": 8
+   }
+  }
+ ],
+ "aggregates": {
+  "seed_spread_per_cell": {
+   "4090-f0": 0.0154,
+   "4090-f1": 0.0113,
+   "4090-f2": 0.0425,
+   "4090-f3": 0.0166,
+   "5090-f0": 0.0109,
+   "5090-f1": 0.0397,
+   "5090-f2": 0.1063,
+   "5090-f3": 0.0278,
+   "a6000-f0": 0.0214,
+   "a6000-f1": 0.0433,
+   "a6000-f2": 0.057,
+   "a6000-f3": 0.0451,
+   "h100-f0": 0.0617,
+   "h100-f1": 0.032,
+   "h100-f2": 0.0235,
+   "h100-f3": 0.032
+  },
+  "seed_spread_median_per_gpu": {
+   "a6000": 0.0442,
+   "5090": 0.0338,
+   "4090": 0.016,
+   "h100": 0.032
+  },
+  "fold_spread_per_gpu": {
+   "a6000": 0.0592,
+   "5090": 0.0523,
+   "4090": 0.0304,
+   "h100": 0.0439
+  },
+  "★ fold_over_seed": {
+   "a6000": 1.34,
+   "5090": 1.55,
+   "4090": 1.9,
+   "h100": 1.37
+  },
+  "rule_size": {
+   "min": 17,
+   "max": 78,
+   "median": 40.0,
+   "corr_size_vs_holdout": -0.2606,
+   "⚠️": "not a causal statement"
+  },
+  "dead_terms": {
+   "by_weight_total": 112,
+   "by_sens_total": 88824,
+   "by_weight_nonzero_rounds": 53,
+   "n_rounds": 768,
+   "★": "if by_weight is 0 everywhere, no term died because the fitter zeroed it — they died because they cannot change the ranking (D-169 §2)"
+  },
+  "axes": {
+   "made_total": 408,
+   "distinct": 344,
+   "repeated_across_runs": {
+    "pipeline_stage_family": 10,
+    "pipeline_stage_count": 9,
+    "split_k_partition_count": 9,
+    "multistage_family_indicator": 7,
+    "stage_family": 6,
+    "pipeline_family": 5,
+    "signed_tile_orientation_mismatch": 5,
+    "log_k": 5,
+    "multistage_family_overhead": 4,
+    "split_k_wave_gain_deficit": 2,
+    "serial_partition_count": 2,
+    "split_k_grid_parallelism_deficit": 2,
+    "cta_traversal_locality_loss": 2,
+    "split_k_partition_overhead": 2,
+    "stage_family_identity": 2,
+    "l2_working_set_pressure": 2,
+    "spill_traffic_ratio": 2,
+    "stage_family_alignment_deficit": 2,
+    "extra_pipeline_stage_fraction": 2,
+    "warp_tile_decomposition_deficit": 2,
+    "stage_family_overhead": 2,
+    "split_k_parallelism_deficit": 2
+   }
+  },
+  "branching": {
+   "axes_used": {
+    "roofline_ratio": 64,
+    "output_work_per_sm": 53,
+    "output_aspect_imbalance": 36,
+    "log_min_dim": 32,
+    "log_flops": 31,
+    "l2_working_set_pressure": 24,
+    "alignment_deficit": 18,
+    "log_reduction_length": 1,
+    "log_k": 1
+   },
+   "n_distinct_used": 9,
+   "median_per_rule": 4.0
+  },
+  "lineage": {
+   "exploit": 2373,
+   "explore": 1536,
+   "cross": 699
+  },
+  "cost": {
+   "llm_calls": {
+    "analyze": 988,
+    "rule_editor": 4608,
+    "feature": 408
+   },
+   "minutes_summed": 1941.9
+  }
+ }
+}

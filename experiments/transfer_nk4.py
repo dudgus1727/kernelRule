@@ -54,7 +54,10 @@ from kernelrule.features.loader import load_generated, run_registry
 
 GPUS = ("a6000", "5090", "4090", "h100")
 FOLDS = (0, 1, 2, 3)
-SEEDS = (0, 1, 2)
+#: ★ D-174 — campaign 2 (`c2-*`, 4 seeds, `nkband`, seeds isolated).
+CAMPAIGNS = {"nk4": ("nk4", (0, 1, 2), "nkgroup", True),
+             "c2": ("c2", (0, 1, 2, 3), "nkband", False)}
+PREFIX, SEEDS, DESIGN, LEAKED = CAMPAIGNS["nk4"]
 OUT = Path("docs/artifacts/transfer-nk4.json")
 VENDOR = {g: f"datasets/baselines/vendor-{g}-{TABLES[g]['env_hash'][:8]}.json"
           for g in GPUS}
@@ -69,7 +72,7 @@ def _best_of_fold(gpu: str, fold: int) -> tuple[dict, int]:
     seeds. ⛔ The holdout is not read (§10.2)."""
     best, best_seed = None, None
     for s in SEEDS:
-        arc = Path(f"runs/nk4-{gpu}-f{fold}-s{s}/archive.jsonl")
+        arc = Path(f"runs/{PREFIX}-{gpu}-f{fold}-s{s}/archive.jsonl")
         if not arc.exists():
             continue
         e = min(_rows(arc), key=lambda x: x["regret"])
@@ -85,10 +88,11 @@ def _registry_for(gpu: str, fold: int, seed: int, table):
     `shape_level` verdict differs from the source table's and the axes that
     are constant here.
     """
-    reg, origin = run_registry(f"nk4-{gpu}-f{fold}", table=table, seed=seed,
-                               human=REGISTRY)
-    for earlier in range(seed):
-        fp = Path(f"runs/nk4-{gpu}-f{fold}-s{earlier}/features.jsonl")
+    reg, origin = run_registry(f"{PREFIX}-{gpu}-f{fold}", table=table,
+                               seed=seed, human=REGISTRY)
+    # ⛔ Only the leaking campaign needs this (D-172 §X).
+    for earlier in (range(seed) if LEAKED else ()):
+        fp = Path(f"runs/{PREFIX}-{gpu}-f{fold}-s{earlier}/features.jsonl")
         if fp.exists():
             for f in load_generated(fp, table=table):
                 if f.name not in reg._items:
@@ -125,10 +129,13 @@ def main() -> None:
     #   83 weights — measured at ~19 min, so 48 cells in one process is 15
     #   hours. Cells are independent, so they are split by (fold, source) and
     #   merged. ⛔ The computation per cell is unchanged.
+    ap.add_argument("--campaign", choices=tuple(CAMPAIGNS), default="nk4")
     ap.add_argument("--fold", type=int, default=None)
     ap.add_argument("--src", default=None)
     ap.add_argument("--merge", nargs="*", default=None)
     a = ap.parse_args()
+    global PREFIX, SEEDS, DESIGN, LEAKED  # noqa: PLW0603
+    PREFIX, SEEDS, DESIGN, LEAKED = CAMPAIGNS[a.campaign]
 
     if a.merge:
         cells = []
@@ -144,7 +151,7 @@ def main() -> None:
     tables = {g: PerfTable.from_bundle(TABLES[g]["bundle"],
                                        env_hash=TABLES[g]["env_hash"],
                                        ok_only=False) for g in GPUS}
-    splits = {(g, f): _splits(tables[g], fold=f, k=4, design="nkgroup")
+    splits = {(g, f): _splits(tables[g], fold=f, k=4, design=DESIGN)
               for g in GPUS for f in FOLDS}
     best = {(g, f): _best_of_fold(g, f) for g in GPUS for f in FOLDS}
 

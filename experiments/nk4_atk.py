@@ -36,6 +36,10 @@ from kernelrule.features.loader import load_generated, run_registry
 GPUS = ("a6000", "5090", "4090", "h100")
 KS = (1, 3, 5, 10)
 OUT = Path("docs/artifacts/nk4-at-k.json")
+#: ★ D-174 — campaign 2 (`c2-*`, 4 seeds, `nkband`, seeds isolated).
+CAMPAIGNS = {"nk4": ("nk4", (0, 1, 2), "nkgroup", True),
+             "c2": ("c2", (0, 1, 2, 3), "nkband", False)}
+PREFIX, SEEDS, DESIGN, LEAKED = CAMPAIGNS["nk4"]
 
 
 def _rows(p: Path) -> list[dict]:
@@ -43,10 +47,11 @@ def _rows(p: Path) -> list[dict]:
 
 
 def _registry(gpu, fold, seed, table):
-    reg, _ = run_registry(f"nk4-{gpu}-f{fold}", table=table, seed=seed,
+    reg, _ = run_registry(f"{PREFIX}-{gpu}-f{fold}", table=table, seed=seed,
                           human=REGISTRY)
-    for earlier in range(seed):
-        fp = Path(f"runs/nk4-{gpu}-f{fold}-s{earlier}/features.jsonl")
+    # ⛔ Only the leaking campaign needs this (D-172 §X).
+    for earlier in (range(seed) if LEAKED else ()):
+        fp = Path(f"runs/{PREFIX}-{gpu}-f{fold}-s{earlier}/features.jsonl")
         if fp.exists():
             for f in load_generated(fp, table=table):
                 if f.name not in reg._items:
@@ -57,8 +62,11 @@ def _registry(gpu, fold, seed, table):
 def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
+    ap.add_argument("--campaign", choices=tuple(CAMPAIGNS), default="nk4")
     ap.add_argument("--out", default=str(OUT))
     a = ap.parse_args()
+    global PREFIX, SEEDS, DESIGN, LEAKED  # noqa: PLW0603
+    PREFIX, SEEDS, DESIGN, LEAKED = CAMPAIGNS[a.campaign]
     res: list[dict] = []
     per_shape: dict = {}
     print("=" * 96)
@@ -71,15 +79,15 @@ def main() -> None:
         vend = load_vendor(f"datasets/baselines/vendor-{gpu}-"
                            f"{T['env_hash'][:8]}.json")
         for fold in range(4):
-            sp = _splits(table, fold=fold, k=4, design="nkgroup")
+            sp = _splits(table, fold=fold, k=4, design=DESIGN)
             hold = list(sp.val.shapes)
             ev_v = evaluate(vendor_order_fn(table, vend, mapping="nearest"),
                             table, hold, ks=KS, label="vendor")
             st1 = StaticTopK(table, hold, coverage="union").run(ks=KS)
             base_v = {p.key: float(ev_v.regret[i, 0])
                       for i, p in enumerate(ev_v.shapes)}
-            for seed in range(3):
-                d = Path(f"runs/nk4-{gpu}-f{fold}-s{seed}")
+            for seed in SEEDS:
+                d = Path(f"runs/{PREFIX}-{gpu}-f{fold}-s{seed}")
                 if not (d / "archive.jsonl").exists():
                     continue
                 best = min(_rows(d / "archive.jsonl"),
