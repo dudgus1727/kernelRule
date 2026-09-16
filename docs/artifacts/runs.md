@@ -146,6 +146,42 @@ F3hg-p8-d75-a  the human_guided seed
 | `pc-h10024090-f0` | 1 | 27/F2 | ported:h100->4090 | none | default | per rule (fitter_for) | 6 | 4090 | `de4e08d` | porting-cost-9cd7f48 | — | — | |
 | `pc-h10025090-f0` | 1 | 26/F2 | ported:h100->5090 | none | default | per rule (fitter_for) | 6 | 5090 | `de4e08d` | porting-cost-9cd7f48 | — | — | |
 | `pc-h1002a6000-f0` | 1 | 29/F2 | ported:h100->a6000 | none | default | per rule (fitter_for) | 6 | a6000 | `de4e08d` | porting-cost-9cd7f48 | — | — | |
+| `ps-409025090-n16-f0` | 1 | 23/F2 | ported:4090->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-409025090-n4-f0` | 1 | 23/F2 | ported:4090->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-409025090-n8-f0` | 1 | 23/F2 | ported:4090->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-40902a6000-n16-f0` | 1 | 23/F2 | ported:4090->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-40902a6000-n4-f0` | 1 | 23/F2 | ported:4090->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-40902a6000-n8-f0` | 1 | 23/F2 | ported:4090->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-40902h100-n16-f0` | 1 | 24/F2 | ported:4090->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-40902h100-n4-f0` | 1 | 24/F2 | ported:4090->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-40902h100-n8-f0` | 1 | 23/F2 | ported:4090->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-509024090-n16-f0` | 1 | 24/F2 | ported:5090->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-509024090-n4-f0` | 1 | 24/F2 | ported:5090->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-509024090-n8-f0` | 1 | 26/F2 | ported:5090->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-50902a6000-n16-f0` | 1 | 24/F2 | ported:5090->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-50902a6000-n4-f0` | 1 | 25/F2 | ported:5090->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-50902a6000-n8-f0` | 1 | 24/F2 | ported:5090->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-50902h100-n16-f0` | 1 | 25/F2 | ported:5090->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-50902h100-n4-f0` | 1 | 24/F2 | ported:5090->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-50902h100-n8-f0` | 1 | 25/F2 | ported:5090->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a600024090-n16-f0` | 1 | 24/F2 | ported:a6000->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a600024090-n4-f0` | 1 | 24/F2 | ported:a6000->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a600024090-n8-f0` | 1 | 26/F2 | ported:a6000->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a600025090-n16-f0` | 1 | 24/F2 | ported:a6000->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a600025090-n4-f0` | 1 | 25/F2 | ported:a6000->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a600025090-n8-f0` | 1 | 24/F2 | ported:a6000->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a60002h100-n16-f0` | 1 | 24/F2 | ported:a6000->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a60002h100-n4-f0` | 1 | 26/F2 | ported:a6000->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-a60002h100-n8-f0` | 1 | 26/F2 | ported:a6000->h100 | none | default | per rule (fitter_for) | 3 | h100 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h10024090-n16-f0` | 1 | 27/F2 | ported:h100->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h10024090-n4-f0` | 1 | 26/F2 | ported:h100->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h10024090-n8-f0` | 1 | 26/F2 | ported:h100->4090 | none | default | per rule (fitter_for) | 3 | 4090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h10025090-n16-f0` | 1 | 26/F2 | ported:h100->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h10025090-n4-f0` | 1 | 27/F2 | ported:h100->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h10025090-n8-f0` | 1 | 26/F2 | ported:h100->5090 | none | default | per rule (fitter_for) | 3 | 5090 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h1002a6000-n16-f0` | 1 | 27/F2 | ported:h100->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h1002a6000-n4-f0` | 1 | 27/F2 | ported:h100->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
+| `ps-h1002a6000-n8-f0` | 1 | 26/F2 | ported:h100->a6000 | none | default | per rule (fitter_for) | 3 | a6000 | `5ca1618` | porting-shapes-0c9e652 | — | — | |
 | `seed3` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 1 | a6000 | `1ecdd56` | trace-seed3-1ecdd56 | — | — | ★ a contrast, not a result (D-151) — the same round with a **3-term seed**, to see whether len(w0) follows the parent. Do not read its numbers |
 | `smoke` | 1 | 19/F3 | human_guided | 8 | default | nelder-mead/4/200 | 2 | a6000 | `579bdf6` | trace-smoke-579bdf6 | — | — | ★ a wiring smoke run, not a result (D-149) — 1 seed x 2 rounds, fold 0. Do not read its numbers |
 | `verify` | 2 | 19/? | ? | ? | default | nelder-mead/4/200 | 6 | a6000 | `?` | — | — | — | |
