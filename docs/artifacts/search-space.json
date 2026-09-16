@@ -1,0 +1,127 @@
+{
+ "axes": [
+  "tile_m",
+  "tile_n",
+  "tile_k",
+  "ext_warp_m",
+  "ext_warp_n",
+  "ext_warp_k",
+  "ext_stages",
+  "ext_swizzle_type",
+  "ext_swizzle_n",
+  "split_k",
+  "split_k_mode"
+ ],
+ "align_axes": [
+  "align_a",
+  "align_b",
+  "align_c"
+ ],
+ "implementation": "conditional draw over the shape's own candidate list: axes in a fixed order, each domain filtered by the choices already made, so a draw always lands on a real candidate (D-176 §1-1)",
+ "tables": {
+  "a6000": {
+   "n_shapes": 65,
+   "axis_sizes": {
+    "tile_m": 4,
+    "tile_n": 3,
+    "tile_k": 2,
+    "ext_warp_m": 4,
+    "ext_warp_n": 2,
+    "ext_warp_k": 2,
+    "ext_stages": 7,
+    "ext_swizzle_type": 2,
+    "ext_swizzle_n": 4,
+    "split_k": 8,
+    "split_k_mode": 2
+   },
+   "cartesian": 344064,
+   "valid_median": 15015,
+   "valid_range": [
+    3465,
+    17325
+   ],
+   "valid_frac_median": 0.0436,
+   "pruned_median": 13910,
+   "prune_keeps_mean": 0.7538,
+   "shapes_with_a_free_align_axis": 0
+  },
+  "5090": {
+   "n_shapes": 65,
+   "axis_sizes": {
+    "tile_m": 4,
+    "tile_n": 3,
+    "tile_k": 2,
+    "ext_warp_m": 4,
+    "ext_warp_n": 2,
+    "ext_warp_k": 2,
+    "ext_stages": 7,
+    "ext_swizzle_type": 2,
+    "ext_swizzle_n": 4,
+    "split_k": 10,
+    "split_k_mode": 2
+   },
+   "cartesian": 430080,
+   "valid_median": 19635,
+   "valid_range": [
+    3465,
+    21945
+   ],
+   "valid_frac_median": 0.0457,
+   "pruned_median": 18190,
+   "prune_keeps_mean": 0.7572,
+   "shapes_with_a_free_align_axis": 0
+  },
+  "4090": {
+   "n_shapes": 63,
+   "axis_sizes": {
+    "tile_m": 4,
+    "tile_n": 3,
+    "tile_k": 2,
+    "ext_warp_m": 4,
+    "ext_warp_n": 2,
+    "ext_warp_k": 2,
+    "ext_stages": 7,
+    "ext_swizzle_type": 2,
+    "ext_swizzle_n": 4,
+    "split_k": 10,
+    "split_k_mode": 2
+   },
+   "cartesian": 430080,
+   "valid_median": 19635,
+   "valid_range": [
+    3465,
+    21945
+   ],
+   "valid_frac_median": 0.0457,
+   "pruned_median": 18190,
+   "prune_keeps_mean": 0.7955,
+   "shapes_with_a_free_align_axis": 0
+  },
+  "h100": {
+   "n_shapes": 63,
+   "axis_sizes": {
+    "tile_m": 4,
+    "tile_n": 3,
+    "tile_k": 2,
+    "ext_warp_m": 4,
+    "ext_warp_n": 2,
+    "ext_warp_k": 2,
+    "ext_stages": 7,
+    "ext_swizzle_type": 2,
+    "ext_swizzle_n": 4,
+    "split_k": 10,
+    "split_k_mode": 2
+   },
+   "cartesian": 430080,
+   "valid_median": 36125,
+   "valid_range": [
+    6375,
+    40375
+   ],
+   "valid_frac_median": 0.084,
+   "pruned_median": 32810,
+   "prune_keeps_mean": 0.7767,
+   "shapes_with_a_free_align_axis": 0
+  }
+ }
+}

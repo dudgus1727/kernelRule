@@ -516,6 +516,9 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
                                #   this path, so the number belongs where it
                                #   can be read.
                                max_retries=FEATURE_RETRIES,
+                               size_guidance=getattr(
+                                   a, "size_guidance",
+                                   "role/_size_loop.md"),
                                parameters=getattr(a, "parameters", None),
                                product_hint=getattr(
                                    a, "product_hint", False),
@@ -1225,6 +1228,12 @@ def main() -> None:
                          "the comparison table")
     ap.set_defaults(categorize=False)
     ap.add_argument("--n-rule-writer", type=int, default=10)
+    ap.add_argument("--size-guidance", default="role/_size_loop.md",
+                    help="★ D-176 §2 — which size-guidance block goes into "
+                         "the RuleWriter prompt. ⛔ The default is the "
+                         "campaign's condition; the single-agent control "
+                         "passes `role/_size_single.md`. Recorded in "
+                         "config.json")
     ap.add_argument("--seed-source", choices=("rule_writer", "human_guided"),
                     default=None,
                     help="where the seed comes from. The default is "
@@ -1477,6 +1486,9 @@ def main() -> None:
     _dump_json(d / "config.json", {
         "condition": a.condition, "model": a.model, "dry_run": a.dry_run,
         "seed_source": a.seed_source,
+        # ★ D-176 §2 — which RuleWriter prompt this run used. Without it a
+        #   variant run and a campaign run look identical in the record.
+        "size_guidance": getattr(a, "size_guidance", "role/_size_loop.md"),
         # ★ Were the areas drawn again with the LLM (§30.18)? If so, that
         #   run is a **different condition** from one using the fixed list.
         "recategorize": a.recategorize,

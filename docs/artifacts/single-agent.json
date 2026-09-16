@@ -1,0 +1,552 @@
+{
+ "aggregate": {
+  "n": 4,
+  "★ note": "⚠️ budgets are NOT matched — 10 LLM calls against the loop's 103 (12 rounds x 7). Stated, not corrected.",
+  "single_beats_loop": 0,
+  "median_rank_of_train_winner": 1.5,
+  "median_selection_overfit": 0.003034
+ },
+ "rows": [
+  {
+   "gpu": "a6000",
+   "n_ok": 10,
+   "n_tries": 10,
+   "llm_calls": 10,
+   "chosen_i": 7,
+   "chosen_train": 1.1259151547333541,
+   "chosen_holdout": 1.175046,
+   "★ train_winner_holdout_rank": 1,
+   "best_possible_holdout": 1.175046,
+   "selection_overfit": 0.0,
+   "train_spread": [
+    1.1259151547333541,
+    1.3201704266343677
+   ],
+   "holdout_spread": [
+    1.175046,
+    1.381415
+   ],
+   "n_terms_median": 18.0,
+   "n_paths_median": 1.0,
+   "branch_axes_chosen": [
+    "roofline_ratio"
+   ],
+   "c2_loop_holdout_seeds": [
+    1.091377,
+    1.094172,
+    1.106529,
+    1.112763
+   ],
+   "c2_loop_holdout_median": 1.100351,
+   "c2_loop_llm_calls": 103,
+   "candidates": [
+    {
+     "i": 0,
+     "train": 1.1435339508061126,
+     "holdout": 1.24353,
+     "n_terms": 20,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 1,
+     "train": 1.2736159882522413,
+     "holdout": 1.290753,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 2,
+     "train": 1.1895102513248372,
+     "holdout": 1.188707,
+     "n_terms": 19,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 3,
+     "train": 1.1603789333592973,
+     "holdout": 1.340279,
+     "n_terms": 15,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 4,
+     "train": 1.2236242545160076,
+     "holdout": 1.275497,
+     "n_terms": 17,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 5,
+     "train": 1.2814230492137748,
+     "holdout": 1.183882,
+     "n_terms": 11,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 6,
+     "train": 1.139112568853423,
+     "holdout": 1.249335,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 7,
+     "train": 1.1259151547333541,
+     "holdout": 1.175046,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 8,
+     "train": 1.3201704266343677,
+     "holdout": 1.381415,
+     "n_terms": 15,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 9,
+     "train": 1.2723527154154741,
+     "holdout": 1.198723,
+     "n_terms": 19,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    }
+   ]
+  },
+  {
+   "gpu": "5090",
+   "n_ok": 10,
+   "n_tries": 10,
+   "llm_calls": 10,
+   "chosen_i": 5,
+   "chosen_train": 1.084713516940853,
+   "chosen_holdout": 1.075743,
+   "★ train_winner_holdout_rank": 1,
+   "best_possible_holdout": 1.075743,
+   "selection_overfit": 0.0,
+   "train_spread": [
+    1.084713516940853,
+    1.228018312674293
+   ],
+   "holdout_spread": [
+    1.075743,
+    1.309744
+   ],
+   "n_terms_median": 13.5,
+   "n_paths_median": 1.0,
+   "branch_axes_chosen": [
+    "roofline_ratio"
+   ],
+   "c2_loop_holdout_seeds": [
+    1.025161,
+    1.025768,
+    1.035299,
+    1.036018
+   ],
+   "c2_loop_holdout_median": 1.030533,
+   "c2_loop_llm_calls": 103,
+   "candidates": [
+    {
+     "i": 0,
+     "train": 1.1174978522521224,
+     "holdout": 1.118604,
+     "n_terms": 15,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 1,
+     "train": 1.1006904958350385,
+     "holdout": 1.087286,
+     "n_terms": 16,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 2,
+     "train": 1.228018312674293,
+     "holdout": 1.131421,
+     "n_terms": 14,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 3,
+     "train": 1.1221894426247823,
+     "holdout": 1.224245,
+     "n_terms": 15,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 4,
+     "train": 1.1205656018936205,
+     "holdout": 1.309744,
+     "n_terms": 11,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 5,
+     "train": 1.084713516940853,
+     "holdout": 1.075743,
+     "n_terms": 16,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 6,
+     "train": 1.1390336604037017,
+     "holdout": 1.146699,
+     "n_terms": 12,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 7,
+     "train": 1.1401248982778232,
+     "holdout": 1.129798,
+     "n_terms": 13,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 8,
+     "train": 1.1283443378154416,
+     "holdout": 1.14515,
+     "n_terms": 13,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 9,
+     "train": 1.1151570913639228,
+     "holdout": 1.119477,
+     "n_terms": 12,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    }
+   ]
+  },
+  {
+   "gpu": "4090",
+   "n_ok": 10,
+   "n_tries": 10,
+   "llm_calls": 10,
+   "chosen_i": 6,
+   "chosen_train": 1.0472717571654413,
+   "chosen_holdout": 1.080278,
+   "★ train_winner_holdout_rank": 2,
+   "best_possible_holdout": 1.074211,
+   "selection_overfit": 0.006067,
+   "train_spread": [
+    1.0472717571654413,
+    1.1934789222581021
+   ],
+   "holdout_spread": [
+    1.074211,
+    1.231383
+   ],
+   "n_terms_median": 16.5,
+   "n_paths_median": 1.0,
+   "branch_axes_chosen": [
+    "roofline_ratio"
+   ],
+   "c2_loop_holdout_seeds": [
+    1.030753,
+    1.030838,
+    1.046126,
+    1.046174
+   ],
+   "c2_loop_holdout_median": 1.038482,
+   "c2_loop_llm_calls": 103,
+   "candidates": [
+    {
+     "i": 0,
+     "train": 1.0761138106244312,
+     "holdout": 1.173989,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 1,
+     "train": 1.058694101112696,
+     "holdout": 1.118067,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 2,
+     "train": 1.1370445458785343,
+     "holdout": 1.187775,
+     "n_terms": 14,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 3,
+     "train": 1.1187396761250503,
+     "holdout": 1.112538,
+     "n_terms": 12,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 4,
+     "train": 1.1629720087731792,
+     "holdout": 1.085583,
+     "n_terms": 16,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 5,
+     "train": 1.1934789222581021,
+     "holdout": 1.163102,
+     "n_terms": 17,
+     "n_paths": 1,
+     "branch_axes": [
+      "l2_working_set_pressure",
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 6,
+     "train": 1.0472717571654413,
+     "holdout": 1.080278,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 7,
+     "train": 1.0590482257254927,
+     "holdout": 1.074211,
+     "n_terms": 15,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 8,
+     "train": 1.0667509126125916,
+     "holdout": 1.095892,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 9,
+     "train": 1.0618676388371562,
+     "holdout": 1.231383,
+     "n_terms": 16,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    }
+   ]
+  },
+  {
+   "gpu": "h100",
+   "n_ok": 10,
+   "n_tries": 10,
+   "llm_calls": 10,
+   "chosen_i": 2,
+   "chosen_train": 1.077043042345986,
+   "chosen_holdout": 1.159677,
+   "★ train_winner_holdout_rank": 3,
+   "best_possible_holdout": 1.139454,
+   "selection_overfit": 0.020223,
+   "train_spread": [
+    1.077043042345986,
+    1.3981918477067246
+   ],
+   "holdout_spread": [
+    1.139454,
+    1.480641
+   ],
+   "n_terms_median": 14.0,
+   "n_paths_median": 1.0,
+   "branch_axes_chosen": [
+    "roofline_ratio"
+   ],
+   "c2_loop_holdout_seeds": [
+    1.034068,
+    1.041886,
+    1.057014,
+    1.095737
+   ],
+   "c2_loop_holdout_median": 1.04945,
+   "c2_loop_llm_calls": 103,
+   "candidates": [
+    {
+     "i": 0,
+     "train": 1.2015782240960151,
+     "holdout": 1.201891,
+     "n_terms": 13,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 1,
+     "train": 1.0773689714577337,
+     "holdout": 1.139454,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 2,
+     "train": 1.077043042345986,
+     "holdout": 1.159677,
+     "n_terms": 15,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 3,
+     "train": 1.2932218438740712,
+     "holdout": 1.211204,
+     "n_terms": 13,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 4,
+     "train": 1.3981918477067246,
+     "holdout": 1.211204,
+     "n_terms": 13,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 5,
+     "train": 1.1214195566393403,
+     "holdout": 1.145172,
+     "n_terms": 19,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 6,
+     "train": 1.0795421618674415,
+     "holdout": 1.324608,
+     "n_terms": 18,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 7,
+     "train": 1.2230527644145617,
+     "holdout": 1.339386,
+     "n_terms": 11,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 8,
+     "train": 1.1914437049676339,
+     "holdout": 1.357446,
+     "n_terms": 15,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    },
+    {
+     "i": 9,
+     "train": 1.2717907377380013,
+     "holdout": 1.480641,
+     "n_terms": 13,
+     "n_paths": 1,
+     "branch_axes": [
+      "roofline_ratio"
+     ]
+    }
+   ]
+  }
+ ]
+}

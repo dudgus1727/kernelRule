@@ -481,6 +481,14 @@ class LLMConfig:
     #:   `arch_prompt` a file path. Used only when retracing an old run
     arch_prompt: str | None = None
     hw_text: str | None = None
+    #: ★ Which size-guidance block goes into the RuleWriter prompt
+    #: (D-176 §2). Everything else in `role/rule_writer.md` is shared.
+    #:
+    #: ⛔ The default is the campaign's condition — `_size_loop.md` holds
+    #: `d08a48d`'s wording **verbatim**, and the assembled prompt is
+    #: byte-identical to what campaign 2 ran on. The single-agent control
+    #: passes `role/_size_single.md`, and the run records which it used.
+    size_guidance: str = "role/_size_loop.md"
     #: ★ The OpenAI endpoint. **It stays in `config.json`** — mixing them
     #: breaks comparison, so it must be checkable later (D-31, D-44).
     #:
@@ -1072,8 +1080,14 @@ class OpenAILLM:
         #   the registry is the human 24 the real names may be used, and with
         #   an F0/F1 registry an unrelated domain must be.
         rule_ex = _rule_example_for(reg, parameters=self._parameters)
+        # ★ D-176 §2 — the one block that differs between the loop's seed
+        #   prompt and the single-agent control. Everything else is the same
+        #   file, so the two cannot drift apart (principle 2).
+        size_block = load_prompt(self.cfg.size_guidance,
+                                 parameters=self._parameters)
         return load_prompt("role/rule_writer.md",
                            parameters=self._parameters).format(
+            size_guidance_block=size_block,
             rule_example_block=rule_ex,
             table_note=note, feature_block=block, aggregate_block=agg)
 
