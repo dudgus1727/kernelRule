@@ -40,7 +40,13 @@ from pathlib import Path
 import numpy as np
 
 from experiments.f1_pipeline import _splits
-from experiments.porting_shapes import FOLD, GPUS, NS
+from experiments.porting_shapes import (
+    FOLD,
+    GPUS,
+    NS,
+    _sample,
+    _seed_of,
+)
 from experiments.transfer_29_5 import TABLES
 from kernelrule.core.table import PerfTable
 
@@ -48,18 +54,35 @@ OUT = Path("docs/artifacts/porting-shapes-time.json")
 COUNTS = (*NS, 48)
 #: ★ 뽑기마다 커널 집합이 달라 비용이 흔들린다. 5회의 중앙을 쓴다.
 DRAWS = 5
+#: ★ 2026-09-16 (2차 정정) — `--paired` 는 ★ 곡선이 실제로 쓴 형상으로 낸다.
+#: 기본 경로는 무작위로 새로 뽑는데, 컴파일 비용이 뽑기에 크게 흔들리므로
+#: (4090 은 N=4 와 N=8 이 커널 1,155개로 **같다**) 새 뽑기로 낸 시간은
+#: 곡선의 성능값과 ★ 짝이 맞지 않는다.
+#:
+#: ```
+#:            무작위 새 뽑기   ★ 곡선이 쓴 형상
+#: N= 4          10.1h           ★  6.1h
+#: N= 8          12.9h           ★ 11.9h
+#: N=16          18.4h           ★ 21.6h
+#: N=48          44.0h           ★ 44.0h
+#: ```
+#:
+#: ⛔ 보고에는 ★ `--paired` 값을 쓴다.
 
 
 def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(OUT))
+    ap.add_argument("--paired", action="store_true",
+                    help="★ 곡선이 실제로 쓴 형상으로 낸다 (rep 0 의 뽑기). "
+                         "⛔ 보고에는 이쪽을 쓴다")
     a = ap.parse_args()
 
     import pandas as pd
 
     res: dict = {
-        "counts": list(COUNTS), "draws": DRAWS,
+        "counts": list(COUNTS), "draws": DRAWS, "paired": bool(a.paired),
         "correction": {
             "date": "2026-09-16",
             "wrong": ("build_seconds summed per ROW — a6000 came out 69 "
@@ -86,9 +109,9 @@ def main() -> None:
                                      "build_seconds", "time_ms", "n_reps"])
         table = PerfTable.from_bundle(str(B), env_hash=T["env_hash"],
                                       ok_only=False)
-        tr = [(p.M, p.N, p.K)
-              for p in _splits(table, fold=FOLD, k=4,
-                               design="nkband").train.shapes]
+        tr_shapes = list(_splits(table, fold=FOLD, k=4,
+                                 design="nkband").train.shapes)
+        tr = [(p.M, p.N, p.K) for p in tr_shapes]
         keys = list(zip(d["M"], d["N"], d["K"], strict=True))
         whole_compile = (d.drop_duplicates("kernel_id")["build_seconds"].sum()
                          / 3600)
@@ -96,9 +119,19 @@ def main() -> None:
         rows: dict = {}
         for n in COUNTS:
             comp, meas, nk = [], [], []
-            for _ in range(DRAWS):
-                idx = rng.choice(len(tr), min(n, len(tr)), replace=False)
-                want = {tr[int(i)] for i in idx}
+            # ★ paired: the picks the curves actually used — one per source
+            #   direction, `_seed_of(src, dst, n, 0)`. ⛔ N=48 is the whole
+            #   training split, so it has no pick.
+            picks = ([[(p.M, p.N, p.K) for p in _sample(
+                tr_shapes, n, _seed_of(src, gpu, n, 0))]
+                for src in GPUS if src != gpu] if a.paired and n < len(tr)
+                else None)
+            for j in range(DRAWS if picks is None else len(picks)):
+                if picks is not None:
+                    want = set(picks[j])
+                else:
+                    idx = rng.choice(len(tr), min(n, len(tr)), replace=False)
+                    want = {tr[int(i)] for i in idx}
                 sub = d[[k in want for k in keys]]
                 comp.append(float(
                     sub.drop_duplicates("kernel_id")["build_seconds"].sum()
