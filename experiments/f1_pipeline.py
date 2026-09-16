@@ -1338,6 +1338,13 @@ def main() -> None:
                     help="which fold of the stratified k-fold (0..k-1). "
                          "Without it, the structural split (11008)")
     ap.add_argument("--folds", type=int, default=3, help="the k of the k-fold")
+    # ★ D-177 §1-2 — run with only **some** of the training shapes, to ask
+    #   how many target shapes a transfer actually needs. The holdout is
+    #   untouched: ⛔ the evaluation stays the whole fold.
+    ap.add_argument("--train-shapes", metavar="FILE",
+                    help="a JSON list of [M, N, K] — restrict the TRAIN "
+                         "split to these shapes. The val split is not "
+                         "touched. Recorded in config.json")
     ap.add_argument("--split-seed", type=int, default=12345,
                     help="★ the randomness that builds the folds. "
                          "**Separated from the evolution seed**")
@@ -1408,6 +1415,24 @@ def main() -> None:
                      split_seed=getattr(a, "split_seed", 12345),
                      k=getattr(a, "folds", 3),
                      design=getattr(a, "split_design", "kfold"))
+    train_subset = None
+    if getattr(a, "train_shapes", None):
+        from kernelrule.core.splits import Split, SplitSet
+
+        want = {tuple(x) for x in
+                json.loads(Path(a.train_shapes).read_text())}
+        keep = [p for p in splits.train.shapes if (p.M, p.N, p.K) in want]
+        if len(keep) != len(want):
+            raise SystemExit(
+                f"--train-shapes lists {len(want)} shapes but only "
+                f"{len(keep)} of them are in this fold's train split. ⛔ A "
+                f"shape that is not in train is either in the holdout or "
+                f"not in the population — either way the run would not mean "
+                f"what the file says.")
+        train_subset = sorted(want)
+        splits = SplitSet(train=Split("train", tuple(keep)), val=splits.val,
+                          test=splits.test,
+                          kind=f"{splits.kind}+n{len(keep)}")
     base = _base_registry(a.condition)
 
     print("=" * 78)
@@ -1498,6 +1523,10 @@ def main() -> None:
         "n_features": a.n_features, "n_rule_writer": a.n_rule_writer,
         "bundle": a.bundle, "env_hash": a.env_hash,
         "split_kind": splits.kind,
+        # ★ D-177 — the N target shapes this run was allowed to fit on.
+        #   `null` means the whole training split.
+        "train_shapes": train_subset,
+        "n_train": len(splits.train.shapes),
         # ★ D-167 §Q — the shape population, not just how it was cut.
         "shape_population": _shape_population(table, splits),
         "registry": {"name": reg.name, "n": len(reg._items),

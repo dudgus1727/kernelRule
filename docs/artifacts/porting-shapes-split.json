@@ -1,0 +1,1086 @@
+{
+ "budget": 16,
+ "n_halvings": 5,
+ "rows": [
+  {
+   "src": "a6000",
+   "dst": "4090",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.123757,
+   "picked_min": 1.068324,
+   "picked_max": 1.171502,
+   "oracle_median": 1.102405,
+   "selection_loss": 0.021352,
+   "picked_n_counts": {
+    "4": 8,
+    "8": 2
+   },
+   "b_refit": 1.141034,
+   "a_as_is": 1.105319,
+   "native": 1.059611,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.1590027027018877,
+     "picked_n": 4,
+     "oracle": 1.150867922825559,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.0869206851953144,
+     "picked_n": 4,
+     "oracle": 1.0611150450670874,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.0683236625509558,
+     "picked_n": 8,
+     "oracle": 1.0641849360993887,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1130212277572094,
+     "picked_n": 8,
+     "oracle": 1.1068398948475104,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1272926094542635,
+     "picked_n": 4,
+     "oracle": 1.1074293257343977,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1715021201854598,
+     "picked_n": 4,
+     "oracle": 1.09796918631923,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.150564473390962,
+     "picked_n": 4,
+     "oracle": 1.0652589888582396,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1202209760969812,
+     "picked_n": 4,
+     "oracle": 1.1202209760969812,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.0875136996539227,
+     "picked_n": 4,
+     "oracle": 1.0869017595687338,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1385806762264334,
+     "picked_n": 4,
+     "oracle": 1.1068398948475104,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "5090",
+   "dst": "4090",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.088071,
+   "picked_min": 1.070161,
+   "picked_max": 1.224575,
+   "oracle_median": 1.080419,
+   "selection_loss": 0.007652,
+   "picked_n_counts": {
+    "4": 9,
+    "8": 1
+   },
+   "b_refit": 1.064555,
+   "a_as_is": 1.088832,
+   "native": 1.059611,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.085530577291026,
+     "picked_n": 4,
+     "oracle": 1.085530577291026,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.1232537406552037,
+     "picked_n": 4,
+     "oracle": 1.0620017309817982,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.0821216364138824,
+     "picked_n": 8,
+     "oracle": 1.0821216364138824,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1951827370425627,
+     "picked_n": 4,
+     "oracle": 1.0629933745457307,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.0787166006740174,
+     "picked_n": 4,
+     "oracle": 1.0787166006740174,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.0701609966865737,
+     "picked_n": 4,
+     "oracle": 1.0701609966865737,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.0831986349067997,
+     "picked_n": 4,
+     "oracle": 1.0787166006740174,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.0906121135345168,
+     "picked_n": 4,
+     "oracle": 1.0906121135345168,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.224574759839362,
+     "picked_n": 4,
+     "oracle": 1.224574759839362,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.0909436216709016,
+     "picked_n": 4,
+     "oracle": 1.0895716178815413,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "h100",
+   "dst": "4090",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.16104,
+   "picked_min": 1.066999,
+   "picked_max": 1.284049,
+   "oracle_median": 1.132502,
+   "selection_loss": 0.028538,
+   "picked_n_counts": {
+    "4": 7,
+    "8": 3
+   },
+   "b_refit": 1.117965,
+   "a_as_is": 1.184577,
+   "native": 1.059611,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.2840492004827395,
+     "picked_n": 4,
+     "oracle": 1.0753213706877287,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.1530505732451872,
+     "picked_n": 4,
+     "oracle": 1.151709177875735,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1902681378322484,
+     "picked_n": 4,
+     "oracle": 1.1466866248136884,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.066998887620835,
+     "picked_n": 8,
+     "oracle": 1.066998887620835,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.122202996327301,
+     "picked_n": 4,
+     "oracle": 1.0974957017117373,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.2261951739835606,
+     "picked_n": 4,
+     "oracle": 1.1938063939012156,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1690284503038482,
+     "picked_n": 4,
+     "oracle": 1.1039477988042754,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1943845997588305,
+     "picked_n": 4,
+     "oracle": 1.1851588906991053,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1519620200626701,
+     "picked_n": 8,
+     "oracle": 1.1519620200626701,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1230843320788881,
+     "picked_n": 8,
+     "oracle": 1.1183168687863532,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "a6000",
+   "dst": "5090",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.249046,
+   "picked_min": 1.11064,
+   "picked_max": 1.267344,
+   "oracle_median": 1.147231,
+   "selection_loss": 0.101815,
+   "picked_n_counts": {
+    "4": 9,
+    "8": 1
+   },
+   "b_refit": 1.13314,
+   "a_as_is": 1.235385,
+   "native": 1.036001,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.134482114804839,
+     "picked_n": 8,
+     "oracle": 1.134482114804839,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.267344022384092,
+     "picked_n": 4,
+     "oracle": 1.15003089587589,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1503441148088525,
+     "picked_n": 4,
+     "oracle": 1.0856923999348853,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.110639783807929,
+     "picked_n": 4,
+     "oracle": 1.110639783807929,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.259947531365987,
+     "picked_n": 4,
+     "oracle": 1.2310328294191515,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.248389572095867,
+     "picked_n": 4,
+     "oracle": 1.0998750114069704,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.2497017174922673,
+     "picked_n": 4,
+     "oracle": 1.1683435855951916,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.2589670734991298,
+     "picked_n": 4,
+     "oracle": 1.1625987457355536,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.2591004893096933,
+     "picked_n": 4,
+     "oracle": 1.1618488620689698,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.201025394111953,
+     "picked_n": 4,
+     "oracle": 1.1444305560074295,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "4090",
+   "dst": "5090",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.082944,
+   "picked_min": 1.054117,
+   "picked_max": 1.241842,
+   "oracle_median": 1.05595,
+   "selection_loss": 0.026994,
+   "picked_n_counts": {
+    "4": 7,
+    "8": 3
+   },
+   "b_refit": 1.078058,
+   "a_as_is": 1.094752,
+   "native": 1.036001,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.0541166346741921,
+     "picked_n": 4,
+     "oracle": 1.0541166346741921,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.062675365446324,
+     "picked_n": 4,
+     "oracle": 1.062675365446324,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.2418416585691736,
+     "picked_n": 4,
+     "oracle": 1.0686412670677903,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1088279255366216,
+     "picked_n": 8,
+     "oracle": 1.0558435736483183,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1021154668584368,
+     "picked_n": 4,
+     "oracle": 1.0541166346741921,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.0554434622312858,
+     "picked_n": 4,
+     "oracle": 1.0480655481275656,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.0558435736483183,
+     "picked_n": 4,
+     "oracle": 1.0558435736483183,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1232938777440884,
+     "picked_n": 8,
+     "oracle": 1.0560567152814009,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.0779956841384895,
+     "picked_n": 4,
+     "oracle": 1.0779956841384895,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.087891675051829,
+     "picked_n": 8,
+     "oracle": 1.0812290145906889,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "h100",
+   "dst": "5090",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.146976,
+   "picked_min": 1.078388,
+   "picked_max": 1.245613,
+   "oracle_median": 1.10369,
+   "selection_loss": 0.043286,
+   "picked_n_counts": {
+    "4": 8,
+    "8": 2
+   },
+   "b_refit": 1.129406,
+   "a_as_is": 1.252459,
+   "native": 1.036001,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.2412086216726046,
+     "picked_n": 4,
+     "oracle": 1.157418305959338,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.161530701052028,
+     "picked_n": 4,
+     "oracle": 1.0863874014182116,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1324212107894498,
+     "picked_n": 8,
+     "oracle": 1.103989584425718,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.2340711506112778,
+     "picked_n": 4,
+     "oracle": 1.1716673389663312,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.0783877928525316,
+     "picked_n": 4,
+     "oracle": 1.0783877928525316,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1311051451190002,
+     "picked_n": 8,
+     "oracle": 1.1311051451190002,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1033904857718615,
+     "picked_n": 4,
+     "oracle": 1.1033904857718615,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.161530701052028,
+     "picked_n": 4,
+     "oracle": 1.100325900678151,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.2456125038018353,
+     "picked_n": 4,
+     "oracle": 1.161530701052028,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.0978412430404554,
+     "picked_n": 4,
+     "oracle": 1.0978412430404554,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "5090",
+   "dst": "a6000",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.186803,
+   "picked_min": 1.107464,
+   "picked_max": 1.332628,
+   "oracle_median": 1.108661,
+   "selection_loss": 0.078142,
+   "picked_n_counts": {
+    "4": 7,
+    "8": 3
+   },
+   "b_refit": 1.097652,
+   "a_as_is": 1.167025,
+   "native": 1.121376,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.3326280457183264,
+     "picked_n": 4,
+     "oracle": 1.1581387431463255,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.2262351278541592,
+     "picked_n": 4,
+     "oracle": 1.0804499185162952,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1074642317339056,
+     "picked_n": 4,
+     "oracle": 1.1074642317339056,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.18073138159391,
+     "picked_n": 4,
+     "oracle": 1.18073138159391,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.145752476987712,
+     "picked_n": 8,
+     "oracle": 1.1015500566051677,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.3286439346132595,
+     "picked_n": 4,
+     "oracle": 1.25996043009596,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1928738810705097,
+     "picked_n": 8,
+     "oracle": 1.0831894122709653,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1098577241482408,
+     "picked_n": 4,
+     "oracle": 1.1098577241482408,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1943052586258427,
+     "picked_n": 8,
+     "oracle": 1.1943052586258427,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1091807633411346,
+     "picked_n": 4,
+     "oracle": 1.1064297318702951,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "4090",
+   "dst": "a6000",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.161088,
+   "picked_min": 1.114306,
+   "picked_max": 1.262854,
+   "oracle_median": 1.125029,
+   "selection_loss": 0.036059,
+   "picked_n_counts": {
+    "4": 8,
+    "8": 2
+   },
+   "b_refit": 1.123746,
+   "a_as_is": 1.319772,
+   "native": 1.121376,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.1642685833284923,
+     "picked_n": 4,
+     "oracle": 1.1344979327128861,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.2628538484793663,
+     "picked_n": 8,
+     "oracle": 1.1266023212848437,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.2628538484793663,
+     "picked_n": 8,
+     "oracle": 1.127396837337782,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1234556342552902,
+     "picked_n": 4,
+     "oracle": 1.1234556342552902,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1143063183397388,
+     "picked_n": 4,
+     "oracle": 1.1143063183397388,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1583169049633313,
+     "picked_n": 4,
+     "oracle": 1.0986138955922555,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1429024920863327,
+     "picked_n": 4,
+     "oracle": 1.1186049309184158,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.2151273922299421,
+     "picked_n": 4,
+     "oracle": 1.1276124694853917,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1423903776786317,
+     "picked_n": 4,
+     "oracle": 1.128053020618507,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1638587387594448,
+     "picked_n": 4,
+     "oracle": 1.1051561423236291,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "h100",
+   "dst": "a6000",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.177013,
+   "picked_min": 1.152854,
+   "picked_max": 1.189911,
+   "oracle_median": 1.162861,
+   "selection_loss": 0.014152,
+   "picked_n_counts": {
+    "4": 8,
+    "8": 2
+   },
+   "b_refit": 1.175882,
+   "a_as_is": 1.184788,
+   "native": 1.121376,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.1803368664529108,
+     "picked_n": 4,
+     "oracle": 1.149172265181164,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.1728444116316945,
+     "picked_n": 4,
+     "oracle": 1.1704745263462677,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1676699771970684,
+     "picked_n": 8,
+     "oracle": 1.1676699771970684,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1899110033416616,
+     "picked_n": 4,
+     "oracle": 1.1629442306092754,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1793446006897674,
+     "picked_n": 4,
+     "oracle": 1.1617689536384406,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1853261171101057,
+     "picked_n": 4,
+     "oracle": 1.1658635256965997,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.177427648703565,
+     "picked_n": 4,
+     "oracle": 1.1627782576374583,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.152854226322718,
+     "picked_n": 8,
+     "oracle": 1.1521447538255825,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1728444116316945,
+     "picked_n": 4,
+     "oracle": 1.1333551712528804,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1765986206299603,
+     "picked_n": 4,
+     "oracle": 1.1709492367592058,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "a6000",
+   "dst": "h100",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.111932,
+   "picked_min": 1.098233,
+   "picked_max": 1.184292,
+   "oracle_median": 1.098233,
+   "selection_loss": 0.013699,
+   "picked_n_counts": {
+    "4": 6,
+    "8": 4
+   },
+   "b_refit": 1.12063,
+   "a_as_is": 1.162225,
+   "native": 1.080213,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.1032644774215667,
+     "picked_n": 4,
+     "oracle": 1.0908961618077238,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.1032644774215667,
+     "picked_n": 4,
+     "oracle": 1.1032644774215667,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.1117543921630908,
+     "picked_n": 4,
+     "oracle": 1.0923463368339497,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.0982333923732963,
+     "picked_n": 8,
+     "oracle": 1.0982333923732963,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1842916238297918,
+     "picked_n": 4,
+     "oracle": 1.1157873035687527,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1566039177902587,
+     "picked_n": 4,
+     "oracle": 1.1566039177902587,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1121098488080852,
+     "picked_n": 8,
+     "oracle": 1.0795140232651819,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1200307017570261,
+     "picked_n": 8,
+     "oracle": 1.0982333923732963,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.0982333923732963,
+     "picked_n": 4,
+     "oracle": 1.0982333923732963,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1139305997233464,
+     "picked_n": 8,
+     "oracle": 1.1139305997233464,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "5090",
+   "dst": "h100",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.175304,
+   "picked_min": 1.10531,
+   "picked_max": 2.236711,
+   "oracle_median": 1.113915,
+   "selection_loss": 0.06139,
+   "picked_n_counts": {
+    "4": 9,
+    "8": 1
+   },
+   "b_refit": 1.132955,
+   "a_as_is": 1.560075,
+   "native": 1.080213,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.1153640597912384,
+     "picked_n": 4,
+     "oracle": 1.0924367581982193,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.235484618754427,
+     "picked_n": 4,
+     "oracle": 1.235484618754427,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.105309855050902,
+     "picked_n": 4,
+     "oracle": 1.105309855050902,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.287714213199874,
+     "picked_n": 4,
+     "oracle": 1.1118197757488326,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 2.2367112932525703,
+     "picked_n": 4,
+     "oracle": 1.2337535010378642,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.114741385330848,
+     "picked_n": 4,
+     "oracle": 1.105309855050902,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.235484618754427,
+     "picked_n": 4,
+     "oracle": 1.235484618754427,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.1072822049503965,
+     "picked_n": 4,
+     "oracle": 1.0985427320711125,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.2345996094906073,
+     "picked_n": 4,
+     "oracle": 1.2345996094906073,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.116009330254999,
+     "picked_n": 8,
+     "oracle": 1.116009330254999,
+     "n_candidates": 6
+    }
+   ]
+  },
+  {
+   "src": "4090",
+   "dst": "h100",
+   "budget": 16,
+   "n_points": 10,
+   "picked_median": 1.119658,
+   "picked_min": 1.086575,
+   "picked_max": 1.405206,
+   "oracle_median": 1.096451,
+   "selection_loss": 0.023208,
+   "picked_n_counts": {
+    "4": 9,
+    "8": 1
+   },
+   "b_refit": 1.088292,
+   "a_as_is": 1.123808,
+   "native": 1.080213,
+   "points": [
+    {
+     "halving": 0,
+     "picked": 1.122294912160185,
+     "picked_n": 4,
+     "oracle": 1.0994174619051922,
+     "n_candidates": 6
+    },
+    {
+     "halving": 0,
+     "picked": 1.1274247651019964,
+     "picked_n": 4,
+     "oracle": 1.070976653358029,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.0994174619051922,
+     "picked_n": 4,
+     "oracle": 1.086145822152603,
+     "n_candidates": 6
+    },
+    {
+     "halving": 1,
+     "picked": 1.4052056361854413,
+     "picked_n": 4,
+     "oracle": 1.4052056361854413,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.1199701602101215,
+     "picked_n": 4,
+     "oracle": 1.0934835706635,
+     "n_candidates": 6
+    },
+    {
+     "halving": 2,
+     "picked": 1.137667749938643,
+     "picked_n": 8,
+     "oracle": 1.1018198794814769,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.086575048946693,
+     "picked_n": 4,
+     "oracle": 1.086575048946693,
+     "n_candidates": 6
+    },
+    {
+     "halving": 3,
+     "picked": 1.0938170677085703,
+     "picked_n": 4,
+     "oracle": 1.0709999549534588,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1193461737729464,
+     "picked_n": 4,
+     "oracle": 1.105563509323402,
+     "n_candidates": 6
+    },
+    {
+     "halving": 4,
+     "picked": 1.1187619357524674,
+     "picked_n": 4,
+     "oracle": 1.0998519334309445,
+     "n_candidates": 6
+    }
+   ]
+  }
+ ]
+}
