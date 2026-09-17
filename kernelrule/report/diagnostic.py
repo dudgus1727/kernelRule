@@ -8,7 +8,10 @@ Given only a scalar score it becomes a poor numerical optimiser.
     1    hardware facts       injected fixed every time. Recalled from
                               memory it comes out wrong
     2    the current rule code in full
-    3    per-regime regret breakdown  ★ size stratification first (§30.5)
+    3    regret breakdown by band     ⛔ `REGIMES` is empty — it renders
+                              nothing. The size stratification that used to
+                              lead this block was removed (D-179/D-181: its
+                              boundary had no derivation)
     3.5  table-structure observations  patterns individual cases never show
     4    10~15 cases          ★ the core. The pick and the optimum side by side
     5    the failure history  without it the same idea returns every 3 rounds
@@ -187,7 +190,12 @@ def hardware_block(hw, noise) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Block 3 — the per-regime breakdown. ★ Size comes first
+# Block 3 — the breakdown by band.
+#
+# ⛔ 2026-09-18 (D-181): this said "★ Size comes first". The size cut was our
+#   own boundary with no derivation behind it, and leading the report with it
+#   is exactly how the model came to branch on it (D-156). `REGIMES` is `()`
+#   and `_regime_masks` no longer produces a size mask.
 # ---------------------------------------------------------------------------
 def _regime_masks(table: PerfTable, matrix: FeatureMatrix,
                   shapes) -> dict[str, np.ndarray]:

@@ -387,7 +387,13 @@ class RegimeBalance:
         return f"[{self.axis}] n={self.n}  {parts}{mark}"
 
 
-def regime_of(p: Problem, hw, *, axis: str) -> str:
+#: ★ `axis` 에 기본값을 주지 않기 위한 표식. 기본값을 `"roofline"` 으로 두면
+#: 옛 호출이 **조용히 뜻만 바뀐다** — `short`/`long` 비교가 빈 그룹이 된다.
+#: ⛔ 그렇다고 맨 `TypeError` 만 내면 호출자가 무엇을 해야 하는지 모른다.
+_AXIS_REQUIRED = object()
+
+
+def regime_of(p: Problem, hw, *, axis: str = _AXIS_REQUIRED) -> str:
     """The shape's regime. **It does not use the answer** — it cuts at the
     ridge point.
 
@@ -409,6 +415,21 @@ def regime_of(p: Problem, hw, *, axis: str) -> str:
     """
     from kernelrule.features.physical import is_memory_bound
 
+    if axis is _AXIS_REQUIRED:
+        raise SplitError(
+            "regime_of(p, hw) now needs axis=... — there is no default "
+            "(D-179).\n"
+            "  ⛔ This call almost certainly used the old 'size' axis: the "
+            "SOL lower bound cut at 0.5 ms. That axis was removed. The "
+            "boundary was ours, chosen by looking at the table, and D-181 "
+            "found it has no derivation anywhere in the record.\n"
+            "  ★ If this script produced committed numbers under the "
+            "per-regime procedure, it CANNOT be re-run: putting another "
+            "axis in its place would publish different numbers under the "
+            "same name. Its numbers stand as recorded in docs/decisions.md.\n"
+            "  ★ If you only need a read-only band label, pass "
+            "axis='roofline'. ⛔ Do not fit per regime with it — scoring "
+            "fits one weight vector (kernelrule/core/canonical.py).")
     if axis == "size":
         raise SplitError(
             "the 'size' regime axis was removed (D-179). It cut on the SOL "

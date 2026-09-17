@@ -158,8 +158,10 @@ def test_the_size_regime_axis_raises():
     p, hw = t.shapes()[0], t.hw
     with pytest.raises(SplitError, match="removed"):
         regime_of(p, hw, axis="size")
-    with pytest.raises(TypeError):
-        regime_of(p, hw)          # ⛔ no default — the caller must say
+    # ⛔ no default — and the error must *say what to do* (D-181), not be a
+    #   bare TypeError. 31 experiment scripts land here.
+    with pytest.raises(SplitError, match="no default"):
+        regime_of(p, hw)
     assert regime_of(p, hw, axis="roofline") in ("mem", "comp")
 
 
