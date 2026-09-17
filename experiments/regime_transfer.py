@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import ast
 import json
-import math
 from pathlib import Path
 
 import numpy as np
@@ -40,13 +39,29 @@ from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import compare, evaluate, evaluate_scores, geomean
-from kernelrule.core.splits import _DUMMY_CFG, Split, experiment_shapes
+from kernelrule.core.splits import Split, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
-from kernelrule.features.physical import log_sol_ms
 from kernelrule.rules.human_guided import CODE as HW
 from kernelrule.rules.human_guided import W0 as HW_W0
+
+
+#: ⛔ 2026-09-17 (D-179) — the SOL lower-bound value this script used was
+#: **removed from the code**. The 0.5 ms boundary was ours, chosen by looking
+#: at the a6000 table, and the scoring path used it to fit two weight vectors
+#: while the loop evolved one. See `docs/decisions.md` D-179.
+#:
+#: ⚠️ This script is kept because the numbers it produced are on the record
+#: and this is how they were produced. ⛔ It **cannot be re-run** — and it
+#: says so rather than quietly substituting another cut, which would put
+#: different numbers under the same name.
+def _sol_removed(where: str):
+    raise SystemExit(
+        f"{where}: the SOL lower-bound value was removed at D-179. This "
+        f"script cannot be re-run. Its recorded numbers stay in "
+        f"docs/decisions.md; ⛔ do not substitute another boundary.")
+
 
 #: The three terms that were named. The ground of the claim was that they only
 #: mean something when `K/tile_k` is small.
@@ -156,9 +171,8 @@ def main() -> None:                                          # noqa: PLR0915
     matrix = FeatureMatrix(table, REGISTRY)
 
     all_shapes = experiment_shapes(table)
-    thr = math.log2(SIZE_THRESHOLD_MS)
-    short = [p for p in all_shapes
-             if log_sol_ms(p, table.hw, _DUMMY_CFG) < thr]
+    _sol_removed("regime_transfer")
+    short = []
     long_ = [p for p in all_shapes if p not in short]
     vendor = load_vendor(VENDOR)
 

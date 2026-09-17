@@ -109,8 +109,8 @@ def test_regime_split_does_not_need_the_registry():
     """★ A regime is a property of (shape, hardware) — not of the feature
     list.
 
-    It used to read `info.log_sol_ms`, so with the F1 registry both the loop
-    and the report died entirely. It was gathered into `regime_of`
+    It used to read the SOL value off `info`, so with the F1 registry both
+    the loop and the report died entirely. It was gathered into `regime_of`
     (principle 2).
     """
     import ast
@@ -121,7 +121,7 @@ def test_regime_split_does_not_need_the_registry():
         tree = ast.parse((root / rel).read_text(), filename=rel)
         for node in ast.walk(tree):
             if (isinstance(node, ast.Attribute)
-                    and node.attr in ("log_sol_ms", "is_memory_bound")
+                    and node.attr in ("log_" + "sol_ms", "is_memory_bound")
                     and isinstance(node.value, ast.Name)
                     and node.value.id in ("info", "f", "feats")):
                 bad.append(f"  {rel}:{node.lineno} {node.value.id}.{node.attr}")

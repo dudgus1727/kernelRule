@@ -53,6 +53,23 @@ from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 
+
+#: ⛔ 2026-09-17 (D-179) — the SOL lower-bound value this script used was
+#: **removed from the code**. The 0.5 ms boundary was ours, chosen by looking
+#: at the a6000 table, and the scoring path used it to fit two weight vectors
+#: while the loop evolved one. See `docs/decisions.md` D-179.
+#:
+#: ⚠️ This script is kept because the numbers it produced are on the record
+#: and this is how they were produced. ⛔ It **cannot be re-run** — and it
+#: says so rather than quietly substituting another cut, which would put
+#: different numbers under the same name.
+def _sol_removed(where: str):
+    raise SystemExit(
+        f"{where}: the SOL lower-bound value was removed at D-179. This "
+        f"script cannot be re-run. Its recorded numbers stay in "
+        f"docs/decisions.md; ⛔ do not substitute another boundary.")
+
+
 G5090 = ("datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403")
 SRC_RUNS = [f"F3rw-p8-s{i}" for i in range(6)]
 KS = (2, 4, 8, 10, 12)
@@ -79,10 +96,11 @@ def _features_without_table(p, hw) -> dict:
     the table to be known, and using them is a leak (pre-registration §3-2).
     """
     from kernelrule.core.splits import _DUMMY_CFG
-    from kernelrule.features.physical import arith_intensity, log_sol_ms
+    from kernelrule.features.physical import arith_intensity
 
+    _sol_removed("subset_design._axes")
     ai = arith_intensity(p, hw, _DUMMY_CFG)
-    return {"log_sol": log_sol_ms(p, hw, _DUMMY_CFG),
+    return {"log_sol": None,
             "arith_intensity": ai,
             # The position relative to ridge. The closer to 1, the closer to
             # the regime boundary

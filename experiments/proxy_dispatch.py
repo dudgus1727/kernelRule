@@ -38,13 +38,29 @@ from kernelrule.baselines.vendor import load_vendor, vendor_order_fn
 from kernelrule.core.matrix import FeatureMatrix
 from kernelrule.core.sandbox import compile_rule
 from kernelrule.core.scoring import evaluate, evaluate_scores, geomean
-from kernelrule.core.splits import _DUMMY_CFG, Split, experiment_shapes
+from kernelrule.core.splits import Split, experiment_shapes
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
-from kernelrule.features.physical import log_sol_ms
 from kernelrule.rules.human_guided import CODE as PS
 from kernelrule.rules.human_guided import W0 as PS_W0
+
+
+#: ⛔ 2026-09-17 (D-179) — the SOL lower-bound value this script used was
+#: **removed from the code**. The 0.5 ms boundary was ours, chosen by looking
+#: at the a6000 table, and the scoring path used it to fit two weight vectors
+#: while the loop evolved one. See `docs/decisions.md` D-179.
+#:
+#: ⚠️ This script is kept because the numbers it produced are on the record
+#: and this is how they were produced. ⛔ It **cannot be re-run** — and it
+#: says so rather than quietly substituting another cut, which would put
+#: different numbers under the same name.
+def _sol_removed(where: str):
+    raise SystemExit(
+        f"{where}: the SOL lower-bound value was removed at D-179. This "
+        f"script cannot be re-run. Its recorded numbers stay in "
+        f"docs/decisions.md; ⛔ do not substitute another boundary.")
+
 
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 VENDOR = "datasets/baselines/vendor-a6000-c63710df.json"
@@ -59,7 +75,8 @@ def _setup():
     table = PerfTable.from_bundle(BUNDLE, env_hash="c63710df", ok_only=False)
 
     shapes = experiment_shapes(table)
-    sol = {p: 2 ** log_sol_ms(p, table.hw, _DUMMY_CFG) for p in shapes}
+    _sol_removed("proxy_dispatch")
+    sol = {}
     best = {p: float(table.times_of(p).min()) for p in shapes}
     return table, shapes, sol, best
 

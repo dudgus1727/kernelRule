@@ -11,7 +11,6 @@ from kernelrule.baselines.static_topk import PROCEDURES, StaticTopK
 from kernelrule.core.splits import (
     split_by_alignment,
     split_by_M_range,
-    split_by_size,
     split_by_waves,
 )
 
@@ -128,25 +127,40 @@ def test_block_splits_match_documented_sizes(real_bundle_path):
     assert len(split_by_alignment(sh).val) == 5       # layer D
 
 
-@pytest.mark.needs_bundle
-def test_size_split_does_not_use_answers(real_bundle_path):
-    """★ The size-split boundary is taken from the roofline, not from
-    `best_ms` (the answer).
+def test_the_size_split_is_gone():
+    """⛔ 2026-09-17 (D-179) — `split_by_size` was **removed**.
 
-    Even so it has to include **all** 45 of the really short shapes.
+    It held out the shapes whose roofline lower bound was under 0.5 ms. That
+    0.5 was **ours**: chosen by looking at the a6000 table (§10.1 "경계
+    탐색"), and the scoring path used the same cut to fit two weight vectors
+    while the loop evolved one.
+
+    ★ The old test that stood here (`test_size_split_does_not_use_answers`)
+    checked that the boundary came from the roofline rather than from
+    `best_ms`. That was true and is not the reason it went — the reason is
+    that the boundary was ours at all.
     """
-    from kernelrule.core.table import PerfTable
+    import kernelrule.core.splits as sp
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        tb = PerfTable.from_bundle(real_bundle_path, env_hash="c63710df",
-                                   ok_only=False)
-    sp = split_by_size(tb.shapes(), tb.hw)
-    held = {p.key for p in sp.val} | ({p.key for p in sp.test}
-                                      if sp.test else set())
-    real_small = {s.key for s in tb.all_stats() if s.is_small}
-    assert real_small <= held, \
-        f"{len(real_small - held)} really short shapes fell out of the holdout"
+    assert not hasattr(sp, "split_by_size")
+    assert "split_by_size" not in sp.__all__
+
+
+def test_the_size_regime_axis_raises():
+    """★ `regime_of(axis="size")` must **raise**, not fall back.
+
+    A silent fallback to roofline would turn every old `short`/`long`
+    comparison into an empty group instead of an error.
+    """
+    from kernelrule.core.splits import SplitError, regime_of
+
+    t = make_table({(1024, 4096, 4096): [1.0, 2.0]})
+    p, hw = t.shapes()[0], t.hw
+    with pytest.raises(SplitError, match="removed"):
+        regime_of(p, hw, axis="size")
+    with pytest.raises(TypeError):
+        regime_of(p, hw)          # ⛔ no default — the caller must say
+    assert regime_of(p, hw, axis="roofline") in ("mem", "comp")
 
 
 def test_gbdt_module_imports_without_lightgbm():

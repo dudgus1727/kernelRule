@@ -787,15 +787,15 @@ class RoundLoop:
         a cell axis contaminates the holdout (§10.2).
         """
         # ★ It uses `regime_of` — the same verdict in two places diverges
-        #   (principle 2). This used to compute
-        #   `info.log_sol_ms < log2(0.5)` directly here, which **assumed
-        #   `log_sol_ms` was in the registry**. The F0/F1 registries do not
-        #   have it, so the whole loop dies (§30.9). A regime is a property
-        #   of (shape, hardware), not of the feature list.
+        #   (principle 2). This used to compute the SOL cut directly here,
+        #   which **assumed that value was in the registry**. The F0/F1
+        #   registries do not have it, so the whole loop dies (§30.9). A
+        #   regime is a property of (shape, hardware), not of the feature
+        #   list.
         from kernelrule.core.splits import regime_of
 
-        # ★ The axis changed from size (SOL 0.5ms) to the **roofline**
-        #   (D-144).
+        # ★ The axis changed from the SOL cut to the **roofline** (D-144),
+        #   and the SOL axis was removed outright at D-179.
         short = np.asarray([regime_of(p, self.table.hw, axis="roofline")
                             == "mem" for p in self.splits.train.shapes])
         if not short.any() or short.all():

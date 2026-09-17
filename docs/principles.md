@@ -643,7 +643,8 @@ D-35 에서 "형태 예시가 실제 피처를 건네주면 안 된다" 를 발�
 
 ```
 role/architect.md    f.traffic_amplification / f.tail_waste
-                     p.is_memory_bound / p.log_sol_ms
+                     p.is_memory_bound / p.roofline_ratio
+                     (SOL 값은 D-179 에서 없어졌다)
 _base.md             "예: if p.is_memory_bound:"
 role/_rules_common   f.waves / f.tile_bytes
 role/optimize.md     f.waves / f.tail_waste      <- D-35 이 고친 파일이다

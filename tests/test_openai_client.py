@@ -22,7 +22,7 @@ from kernelrule.agents.openai_client import (
 from kernelrule.features import FeatureRegistry
 
 FEATS = ["traffic_amplification", "has_spill", "waves"]
-SHAPE = ["is_memory_bound", "log_sol_ms"]
+SHAPE = ["is_memory_bound", "roofline_ratio"]
 
 #: ★ `registry` is a required argument (§30.9). While it had a default,
 #   every client in this file was built with `None` and `render_features`

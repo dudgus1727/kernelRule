@@ -52,7 +52,7 @@ __all__ = ["Split", "SplitSet", "SplitError", "by_predicate",
            "KERNEL_FAMILY_COLUMN",
            "stratified_kfold",
            "split_by_M_range", "split_by_K_range", "split_by_alignment",
-           "split_by_size", "split_by_waves", "SPLITS",
+           "split_by_waves", "SPLITS",
            "RegimeBalance", "regime_of", "check_balance", "describe",
            "MIN_REGIME_FRAC"]
 
@@ -279,28 +279,15 @@ def split_by_alignment(shapes: Sequence[Problem]) -> SplitSet:
     return by_predicate(shapes, held, name="align<8")
 
 
-def split_by_size(shapes: Sequence[Problem], hw, *, ms: float = 0.5
-                  ) -> SplitSet:
-    """Short shapes as the holdout (the §30.5 tension).
-
-    Almost all the room is under 0.5ms, and that band is where the
-    measurement resolution is worst. It directly tests **whether what was
-    learned on long shapes transfers to short ones**.
-
-    ⚠️ The boundary is taken from the **roofline lower bound**, not from
-    `best_ms` (the answer). `best_ms` is `ANSWER_COLS`, so using it in a
-    split definition leaks the answer in.
-    """
-    import math
-
-    from kernelrule.features.physical import log_sol_ms
-
-    thresh = math.log2(ms)
-
-    def held(p: Problem) -> bool:
-        return log_sol_ms(p, hw, _DUMMY_CFG) < thresh
-    return by_predicate(shapes, held, name=f"sol<{ms}ms")
-
+#: ⛔ 2026-09-17 (D-179) — `split_by_size` 를 지웠다.
+#:
+#: SOL 하한 0.5ms 로 짧은 형상을 홀드아웃으로 두던 분할이다. 경계 0.5 를
+#: **우리가 표를 보고 골랐고**(§10.1 "경계 탐색") D-143 이 이미 체제 경계로는
+#: 방어할 수 없다고 판정했다. 그것을 계산하던 함수를 함께 지웠으므로 이 분할은
+#: **계산할 수 없다**.
+#:
+#: ⚠️ 옛 수치를 지우지 않는다 — 이 분할로 낸 값은 기록에 그대로 있다.
+#: 다만 **다시 만들 수는 없다**.
 
 def split_by_waves(shapes: Sequence[Problem], hw, *, tile: int = 128,
                    waves_threshold: float = 1.0) -> SplitSet:
@@ -325,7 +312,7 @@ SPLITS = {
     "alignment": split_by_alignment,
 }
 
-#: The placeholder config `split_by_size` needs in order to call a
+#: The placeholder config `regime_of` needs in order to call a
 #: shape-level feature. A shape-level feature does not look at `cfg` (that is
 #: its definition).
 _DUMMY_CFG = None
@@ -400,28 +387,57 @@ class RegimeBalance:
         return f"[{self.axis}] n={self.n}  {parts}{mark}"
 
 
-def regime_of(p: Problem, hw, *, axis: str = "size") -> str:
-    """The shape's regime. **It does not use the answer** — it cuts on the
-    roofline lower bound.
+def regime_of(p: Problem, hw, *, axis: str) -> str:
+    """The shape's regime. **It does not use the answer** — it cuts at the
+    ridge point.
 
     `best_ms` is `ANSWER_COLS`, so putting it into a split definition
     contaminates the holdout.
-    """
-    import math
 
-    from kernelrule.features.physical import is_memory_bound, log_sol_ms
+    ⛔ 2026-09-17 (D-179) — the `"size"` axis is **gone**. It cut on
+    the SOL lower bound at `log2(0.5)`, and that 0.5 was **ours**: chosen by looking at
+    the a6000 table (§10.1 "경계 탐색"), then applied to four tables. The
+    scoring path used it to fit **two** weight vectors while the loop
+    evolved **one**, so the optimised objective and the reported number were
+    different functions.
+
+    ★ `axis` is **required and has no default.** Making `"roofline"` the
+    default would let every old `regime_of(p, hw)` call silently change
+    meaning — `short`/`long` would quietly become `mem`/`comp` and the
+    groups would come out empty instead of raising. A missing argument is a
+    `TypeError` at the call site, which is what we want.
+    """
+    from kernelrule.features.physical import is_memory_bound
 
     if axis == "size":
-        return ("short" if log_sol_ms(p, hw, _DUMMY_CFG) < math.log2(0.5)
-                else "long")
+        raise SplitError(
+            "the 'size' regime axis was removed (D-179). It cut on the SOL "
+            "lower bound at a 0.5 ms boundary we chose by looking at the "
+            "table, and the scoring path used it to fit two weight vectors "
+            "while the loop evolved one. Scoring no longer splits by regime; "
+            "for a read-only breakdown use axis='roofline'.")
     if axis == "roofline":
         return ("mem" if is_memory_bound(p, hw, _DUMMY_CFG) else "comp")
     raise ValueError(f"unknown regime axis: {axis!r}")
 
 
-def check_balance(split: Split, hw, *, axis: str = "size",
+def check_balance(split: Split, hw, *, axis: str = "roofline",
                   strict: bool = False) -> RegimeBalance:
     """Does the training split hold enough of every regime?
+
+    ⛔ 2026-09-17 (D-179): the default axis was `"size"` (the SOL 0.5 ms
+    cut) and is now `"roofline"`, because the SOL axis is gone. ⚠️ **This
+    changes what the check says** about splits that were lopsided on the SOL
+    axis but not on the roofline one — measured on the a6000 align-8 shapes:
+
+    ```
+    split_by_M_range   SOL ★ 41/9 (18%, warns)   roofline ★ 20/30 (40%, ok)
+    (N,K)==(11008,4096) SOL ★ 35/16 (31%, ok)    roofline ★ 35/16 (31%, ok)
+    ```
+
+    ★ A default was kept here (unlike `regime_of`) because every caller
+    passes no axis and wants "the regime axis we use" — and there is now
+    only one. ⛔ It is a **warning**, not a cut: nothing is split by it.
 
     ⚠️ If not it **warns** (an error with `strict=True`). It is not waved
     through silently — a rule that sacrificed a minority regime looks like an
@@ -449,7 +465,7 @@ def check_balance(split: Split, hw, *, axis: str = "size",
     return bal
 
 
-def describe(ss: SplitSet, hw, *, axis: str = "size") -> str:
+def describe(ss: SplitSet, hw, *, axis: str = "roofline") -> str:
     """Renders a split's regime composition for a human. **Always
     printed.**"""
     lines = [f"split {ss.kind or '(unnamed)'}"]

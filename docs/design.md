@@ -1159,7 +1159,7 @@ def split_by_M_range(shapes)      # M > 2048 홀드아웃 (외삽)
 def split_by_layer_type(shapes)   # 특정 (N,K) 조합 전체
 def split_by_K_range(shapes)      # 층 B의 K 구간
 def split_by_alignment(shapes)    # 층 D 전체
-def split_by_size(shapes, hw)     # ★ roofline 하한 < 0.5ms 홀드아웃
+def split_by_size(shapes, hw)     # ⛔ D-179 에서 삭제 (경계가 우리 것이었다)
 def split_by_arch(bundles)        # ★ 주 지표
 ```
 
@@ -4510,9 +4510,13 @@ AST 검사 둘이 이것을 고정한다 (`tests/test_features.py`):
 `--dry-run` 이 두 번 죽었고, 둘 다 같은 원인이었다.
 
 ```
-core/loop.py::_regime_masks        info.log_sol_ms < log2(0.5)
-report/diagnostic.py::_regime_masks  info.log_sol_ms / info.is_memory_bound
+core/loop.py::_regime_masks        info 의 SOL 값 < log2(0.5)
+report/diagnostic.py::_regime_masks  info 의 SOL 값 / info.is_memory_bound
 ```
+
+⛔ **2026-09-17 (D-179) 정정** — 위 두 경로의 SOL 축은 **없어졌다.** 둘 다
+`regime_of(axis="roofline")` 하나만 쓰고, `diagnostic` 의 `small`/`large`
+마스크는 대체 없이 삭제했다.
 
 **체제 판정이 "레지스트리에 그 두 피처가 있다" 를 가정하고 있었다.**
 F0/F1 레지스트리에는 없으니 루프도 리포트도 통째로 죽는다.
@@ -4935,9 +4939,12 @@ roofline 이 통째로 틀린다 (§26.4).
 
 ```
 arith_intensity / can_use_cp_async / is_memory_bound /
-log_sol_ms / roofline_ratio          -> 5개 전부 자동으로도 형상 수준
+SOL 값 / roofline_ratio              -> 5개 전부 자동으로도 형상 수준
 나머지 19개                           -> 전부 config 수준
 ```
+
+⛔ **2026-09-17 (D-179) 정정** — SOL 값은 D-156 에서 등록 피처에서 빠졌고
+D-179 에서 함수까지 지웠다. 형상 수준은 이제 4개다.
 
 **일치하면 로직이 맞는 것이고 어긋나면 판정에 결함이 있는 것이다.**
 `tests/test_features.py::test_detection_matches_the_hand_written_labels`

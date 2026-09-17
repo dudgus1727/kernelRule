@@ -9,7 +9,8 @@ from kernelrule.rules.checks import CheckReport, RuleCheckError, check_rule
 FEAT = {"tail_waste", "smem_pressure", "waves", "has_spill", "edge_waste",
         "traffic_amplification", "sm_idle_cost", "split_k_cost",
         "pipeline_warmup_frac"}
-SHAPE = {"is_memory_bound", "arith_intensity", "log_sol_ms", "M", "N", "K"}
+SHAPE = {"is_memory_bound", "arith_intensity", "roofline_ratio",
+         "M", "N", "K"}
 
 
 def chk(code: str, n_weights: int = 1) -> CheckReport:

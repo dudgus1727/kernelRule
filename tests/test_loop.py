@@ -355,10 +355,24 @@ def test_dead_terms_come_back_from_the_worker_too(synth_table, tmp_path):
 # regime
 # ---------------------------------------------------------------------------
 def test_regime_balance_flags_a_lopsided_train_split(real_bundle_path):
-    """★ `M > 2048` splits training 82%/18% — it must warn.
+    """⛔ 2026-09-17 (D-179) — this test **changed verdict**, on purpose.
 
-    Measured: under that composition, evolution worsened overall regret from
-    1.177 to 1.390 while the training score improved from 1.201 to 1.118.
+    It used to read: "`M > 2048` splits training 82%/18% on the SOL axis —
+    it must warn." The harm behind it was real and measured: under that
+    composition, evolution worsened overall regret from 1.177 to 1.390 while
+    the training score improved from 1.201 to 1.118.
+
+    ⚠️ But the 82/18 was **on the SOL axis**, which D-179 removed. On the
+    roofline axis the same split is 30/20 — **40% minority, so it does not
+    warn**. Re-measured on the a6000 align-8 shapes:
+
+    ```
+    split_by_M_range   SOL ★ 41/9 (18%)   roofline ★ 30/20 (40%)
+    ```
+
+    ⛔ The old numbers are kept above rather than overwritten. What this test
+    now pins is the **new** verdict, so that a later change to the axis is
+    caught rather than absorbed.
     """
     import warnings
 
@@ -375,15 +389,22 @@ def test_regime_balance_flags_a_lopsided_train_split(real_bundle_path):
                       and (tb.frame_for(p).align_b == 8).all()
                       and (tb.frame_for(p).align_c == 8).all())]
     sp = split_by_M_range(sh)
-    with pytest.warns(UserWarning, match="minority regime"):
-        bal = check_balance(sp.train, tb.hw)
-    assert not bal.ok
-    assert bal.minority()[1] < MIN_REGIME_FRAC
-    assert bal.counts["long"] == 9 and bal.counts["short"] == 41
+    bal = check_balance(sp.train, tb.hw)          # ★ it no longer warns
+    assert bal.ok
+    assert bal.minority()[1] > MIN_REGIME_FRAC
+    assert bal.counts["mem"] == 20 and bal.counts["comp"] == 30
+    # ⛔ and the axis it used to cut on must be gone
+    from kernelrule.core.splits import SplitError, regime_of
+    with pytest.raises(SplitError, match="removed"):
+        regime_of(sh[0], tb.hw, axis="size")
 
 
 def test_regime_balance_accepts_a_crossing_split(real_bundle_path):
-    """A split that crosses the regimes passes (69%/31% measured)."""
+    """A split that crosses the regimes passes (69%/31% measured).
+
+    ★ This one reads the same on both axes — SOL 35/16 and roofline 35/16,
+    31% either way. It is the split that D-179 did **not** move.
+    """
     import warnings
 
     import kernelrule.features.physical  # noqa: F401
@@ -400,7 +421,7 @@ def test_regime_balance_accepts_a_crossing_split(real_bundle_path):
                       and (tb.frame_for(p).align_c == 8).all())]
     sp = by_predicate(sh, lambda p: (p.N, p.K) == (11008, 4096), name="nk")
     bal = check_balance(sp.train, tb.hw)      # it must not warn
-    assert bal.ok and bal.counts["long"] == 16
+    assert bal.ok and bal.counts["mem"] == 16
 
 
 def test_balance_check_is_strictable():

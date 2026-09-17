@@ -1,0 +1,257 @@
+{
+ "threshold_ms": 0.5,
+ "note": "⛔ 지우기 전의 기록이다 (D-179). log_sol_ms 가 없어지면 이 표는 다시 만들 수 없다.",
+ "tables": {
+  "a6000": [
+   {
+    "fold": 0,
+    "train": {
+     "short": 33,
+     "long": 15
+    },
+    "val": {
+     "short": 12,
+     "long": 5
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 1,
+    "train": {
+     "short": 33,
+     "long": 16
+    },
+    "val": {
+     "short": 12,
+     "long": 4
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 2,
+    "train": {
+     "short": 33,
+     "long": 16
+    },
+    "val": {
+     "short": 12,
+     "long": 4
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 3,
+    "train": {
+     "short": 36,
+     "long": 13
+    },
+    "val": {
+     "short": 9,
+     "long": 7
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   }
+  ],
+  "5090": [
+   {
+    "fold": 0,
+    "train": {
+     "short": 33,
+     "long": 14
+    },
+    "val": {
+     "short": 15,
+     "long": 3
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 1,
+    "train": {
+     "short": 37,
+     "long": 12
+    },
+    "val": {
+     "short": 11,
+     "long": 5
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 2,
+    "train": {
+     "short": 36,
+     "long": 13
+    },
+    "val": {
+     "short": 12,
+     "long": 4
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 3,
+    "train": {
+     "short": 38,
+     "long": 12
+    },
+    "val": {
+     "short": 10,
+     "long": 5
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   }
+  ],
+  "4090": [
+   {
+    "fold": 0,
+    "train": {
+     "short": 29,
+     "long": 18
+    },
+    "val": {
+     "short": 12,
+     "long": 4
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 1,
+    "train": {
+     "short": 32,
+     "long": 15
+    },
+    "val": {
+     "short": 9,
+     "long": 7
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 2,
+    "train": {
+     "short": 30,
+     "long": 17
+    },
+    "val": {
+     "short": 11,
+     "long": 5
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 3,
+    "train": {
+     "short": 32,
+     "long": 16
+    },
+    "val": {
+     "short": 9,
+     "long": 6
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   }
+  ],
+  "h100": [
+   {
+    "fold": 0,
+    "train": {
+     "short": 36,
+     "long": 11
+    },
+    "val": {
+     "short": 15,
+     "long": 1
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 1,
+    "train": {
+     "short": 39,
+     "long": 8
+    },
+    "val": {
+     "short": 12,
+     "long": 4
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 2,
+    "train": {
+     "short": 38,
+     "long": 9
+    },
+    "val": {
+     "short": 13,
+     "long": 3
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   },
+   {
+    "fold": 3,
+    "train": {
+     "short": 40,
+     "long": 8
+    },
+    "val": {
+     "short": 11,
+     "long": 4
+    },
+    "train_long_under_8": false,
+    "train_short_under_8": false,
+    "val_regime_missing_in_train": []
+   }
+  ]
+ },
+ "c2_warnings": {
+  "thin": [],
+  "partial": [],
+  "files_scanned": 192
+ },
+ "derived": {
+  "min_train_regime": 8,
+  "thin_regime_cases": [],
+  "unscorable_cases": [],
+  "c2_runs_with_partial_holdout": 56,
+  "note": "canonical_score 의 경고는 반환값이라 c2 산출물에 안 남았다. 구성표에서 직접 판정하고 n_holdout 으로 확인했다."
+ },
+ "procedure": {
+  "what": "the SOL lower-bound regime cut, as it stood immediately before D-179 removed it",
+  "formula": "t_c = 2*M*N*K / (peak_tflops_f16*1e12) * 1e3 ms ; t_m = ebytes(dtype) * (M*K + K*N + M*N) / (bandwidth_gbps*1e9) * 1e3 ms ; value = log2(max(1e-6, t_c, t_m))",
+  "cut": "short if value < log2(0.5) else long",
+  "splits": "experiments.f1_pipeline._splits(table, fold=f, k=4, design='nkband')",
+  "note": "⛔ the script that produced this (experiments/sol_audit.py) was removed with the function — D-179 requires the name to be gone from the code. The formula above is the record of how these counts were made."
+ }
+}

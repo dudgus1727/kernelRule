@@ -422,38 +422,21 @@ def is_memory_bound(p: Problem, hw: Hardware, cfg: Config) -> float:
     return 1.0 if roofline_ratio(p, hw, cfg) < 1.0 else 0.0
 
 
-def log_sol_ms(p: Problem, hw: Hardware, cfg: Config) -> float:
-    """The roofline lower-bound time (log2, ms). **Computed from the
-    shape, not measured.**
-
-    ⚠️ 2026-09-10 (D-156): **no longer a registered feature.** It used to
-    carry `@shape_feature`, so a rule could branch on `p.log_sol_ms` — and
-    the diagnostic report handed the model the SOL 0.5 ms split every round,
-    so it did. That is **our** axis, chosen in 2026-08, and D-143 had already
-    found it indefensible as a regime boundary. Feeding it back through the
-    report made the model rediscover it every round (the r9 rule of D-155
-    branches on `p.log_sol_ms < -5`, then drifts to `log_flops > 20/40/30`).
-
-    ★ The function stays because the **scoring** path uses it: the canonical
-    procedure refits per regime on this split (`core/canonical.py`,
-    §10.2 · D-69), and every committed number was produced that way.
-    ⚠️ So the axis is gone from what the model sees, **not** from how we
-    score. That asymmetry is deliberate and is written down in D-156.
-
-    If it matters, FeatureWriter can invent it again — and then it is the
-    model's axis, not ours.
-    """
-    eb = _ebytes(p.dtype)
-    t_c = 2.0 * p.M * p.N * p.K / (hw.peak_tflops_f16 * 1e12) * 1e3
-    t_m = eb * (p.M * p.K + p.K * p.N + p.M * p.N) / (hw.bandwidth_gbps
-                                                      * 1e9) * 1e3
-    return math.log2(max(1e-6, t_c, t_m))
+# ⛔ 2026-09-17 (D-179) — SOL 하한 시간 값을 지웠다.
+#
+# roofline 하한 시간(log2 ms)을 주던 함수였다. D-156 이 등록 피처에서 뺐지만 **채점
+# 경로에는 남아 있었다** — `canonical_score` 가 이것으로 학습 분할을
+# short/long 으로 갈라 가중치를 두 벌 맞췄다. 경계 0.5ms 를 우리가 표를 보고
+# 골랐고, 루프는 한 벌로 진화하는데 채점만 두 벌이었다.
+#
+# ★ 이제 채점은 체제를 나누지 않는다. 계산할 곳이 없으므로 함수를 지운다.
+# ⚠️ 이것으로 낸 옛 수치는 기록에 그대로 있다 — 다시 만들 수는 없다.
 
 
 # ---------------------------------------------------------------------------
 # ★ 2026-09-08 (D-144) — four more shape-level values to branch on.
 #   There were only four so far (`is_memory_bound` · `roofline_ratio` ·
-#   `log_sol_ms` · `arith_intensity`), too little material for the model to
+#   the SOL bound · `arith_intensity`), too little material for the model to
 #   find a regime with.
 #   ★ All are determined **by the shape alone** — no config enters.
 # ---------------------------------------------------------------------------

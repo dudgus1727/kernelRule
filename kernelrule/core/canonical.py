@@ -44,11 +44,26 @@ the representative runs   F3rw-p8-nan, 6 seeds   patience = 0 (all six)
    (principle 39).
 ```
 
-## Deciding the regime
+## ⛔ 2026-09-17 (D-179) — ★ 체제를 나누지 않는다
 
-`regime_of(axis="size")` — an SOL proxy. **It does not use `t_best`**
-(§10.1). Cutting on a boundary that cannot be computed at deployment time
-makes the number an oracle.
+예전에는 `regime_of(axis="size")` 로 학습 분할을 `short`/`long` 으로 갈라
+**가중치를 두 벌** 맞추고 홀드아웃도 갈라 채점했다. 넷이 잘못이었다.
+
+```
+⛔ 경계 0.5ms 를 ★ 우리가 표를 보고 골랐다 (§10.1 "경계 탐색")
+⛔ 그 경계로 가중치를 두 벌 쓴다 — ★ 벤더에는 그 자유도가 없다
+⛔ ★ 루프는 한 벌로 진화했는데 채점은 두 벌이었다
+   -> 최적화한 목적과 보고한 값이 ★ 다른 함수였다
+⛔ 0.5 는 ★ a6000 을 보고 고른 값인데 네 표에 그대로 썼다
+   빠른 GPU 일수록 SOL 이 작아져 ★ long 이 줄어든다
+   (실측: h100 fold1·fold3 의 학습 long 이 ★ 8개 — MIN_PER_REGIME 과 같다)
+```
+
+★ **이제 학습 분할 전체로 가중치 한 벌을 맞추고 홀드아웃 전체를 그 한 벌로
+채점한다.** 루프가 최적화한 것과 보고하는 값이 같은 함수다.
+
+그 SOL 값을 계산하던 함수는 코드에서 **완전히 지웠다** — `regime_of` 의
+`axis="size"` 분기도, 그것으로 자르던 분할 함수도 함께 없앴다.
 """
 
 from __future__ import annotations
@@ -63,8 +78,13 @@ from kernelrule.core.table import PerfTable
 
 __all__ = ["CanonicalScore", "canonical_score"]
 
-#: Below this many per regime, that regime's fit cannot be trusted (§10.1).
-MIN_PER_REGIME = 8
+#: ⛔ 2026-09-17 (D-179): `MIN_PER_REGIME` 은 체제별 적합이 있을 때의 문턱이라
+#: 없앴다. 그런데 "학습 형상이 너무 적으면 조용히 넘어가지 않는다" 는 보증은
+#: 남겨야 해서, ★ 같은 수 8 을 **분할 전체**에 적용한다.
+#:
+#: ⚠️ 이것은 ★ 무엇을 자르는 경계가 아니다 — **경고만** 한다. 예전에는 체제마다
+#: 8 을 요구했으므로 이 문턱은 그때보다 ★ 느슨하다.
+MIN_TRAIN_SHAPES = 8
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,13 +97,17 @@ class CanonicalScore:
     #: Geometric mean over `splits.train`. For reference — the structure was
     #: fitted here.
     in_sample: float
-    #: Per-regime holdout geometric mean.
+    #: ⚠️ ★ **읽기용** roofline 쪼개기 (`mem`/`comp`). ⛔ 적합을 나누는 근거가
+    #: 아니다 — 가중치는 한 벌이고 이 값은 그 한 벌의 결과를 갈라 본 것뿐이다.
+    #: 예전의 `short`/`long`(SOL 축)은 D-179 에서 사라졌다.
     by_regime: dict[str, float]
     #: The holdout evaluation. Used as is for significance (`compare`).
     evaluation: Evaluation
-    #: ★ The weights **as fitted** per regime. Without them, exporting the
-    #: rule to a file writes the initial values, and that file does not
-    #: reproduce — the file lies.
+    #: ★ The weights **as fitted**. Without them, exporting the rule to a
+    #: file writes the initial values, and that file does not reproduce —
+    #: the file lies.
+    #: ⛔ 2026-09-17 (D-179): 한 벌이므로 키는 `"all"` 하나다. 예전에는
+    #: `short`/`long` 두 벌이었다.
     weights: dict[str, list[float]] = field(default_factory=dict)
     n_holdout: int = 0
     warnings: tuple[str, ...] = field(default_factory=tuple)
@@ -99,8 +123,9 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
     """★ It cannot be called without `splits`. There is no arbitrary-split
     path.
 
-    Per regime, weights are fitted on `splits.train` and measured on
-    `splits.val`.
+    ★ 2026-09-17 (D-179): weights are fitted on **all** of `splits.train`
+    as **one** vector and measured on **all** of `splits.val`. ⛔ There is no
+    regime split any more — see the module docstring.
     """
     if not isinstance(splits, SplitSet):
         raise SplitError(
@@ -120,42 +145,27 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
 
     fn = compile_rule(code)
     warns: list[str] = []
-    reg_tr: dict = {}
-    reg_ho: dict = {}
-    tol_ho: dict = {}
-    fitted: dict[str, list[float]] = {}
+    if len(train) < MIN_TRAIN_SHAPES:
+        warns.append(f"{len(train)} training shapes < {MIN_TRAIN_SHAPES}. "
+                     "These weights are hard to trust")
 
-    for name in ("short", "long"):
-        g_tr = [p for p in train if regime_of(p, table.hw) == name]
-        g_ho = [p for p in val if regime_of(p, table.hw) == name]
-        if not g_tr:
-            if g_ho:
-                warns.append(f"regime {name!r}: 0 training shapes but "
-                             f"{len(g_ho)} in the holdout — those shapes "
-                             "cannot be scored")
-            continue
-        if len(g_tr) < MIN_PER_REGIME:
-            warns.append(f"regime {name!r}: {len(g_tr)} training shapes < "
-                         f"{MIN_PER_REGIME}. That regime's weights are hard "
-                         "to trust")
-        fit = fit_weights(fn, matrix, table, Split("train", tuple(g_tr)),
-                          w0, max_evals=max_evals,
-                          # ★ **Final scoring is always regret** (D-103).
-                          #   `fit_weights`'s default once changed to `rank`,
-                          #   so it must be **stated** here. Otherwise every
-                          #   number in this project silently becomes a
-                          #   different thing.
-                          objective="regret")
-        fitted[name] = [float(x) for x in fit.w]
-        so = make_score_of(fn, matrix, fit.w)
-        e_tr = evaluate_scores(so, table, g_tr, ks=(1,))
-        for i, p in enumerate(e_tr.shapes):
-            reg_tr[p] = e_tr.regret[i, 0]
-        if not g_ho:
-            continue
-        e_ho = evaluate_scores(so, table, g_ho, ks=(1,))
-        for i, p in enumerate(e_ho.shapes):
-            reg_ho[p], tol_ho[p] = e_ho.regret[i, 0], e_ho.tol[i]
+    # ★ D-179 — ★ one fit on the whole training split, read on the whole
+    #   holdout. ⛔ No regime split: the loop optimised one weight vector, so
+    #   the reported number must come from one weight vector too.
+    fit = fit_weights(fn, matrix, table, Split("train", tuple(train)),
+                      w0, max_evals=max_evals,
+                      # ★ **Final scoring is always regret** (D-103).
+                      #   `fit_weights`'s default once changed to `rank`, so
+                      #   it must be **stated** here. Otherwise every number
+                      #   in this project silently becomes a different thing.
+                      objective="regret")
+    fitted: dict[str, list[float]] = {"all": [float(x) for x in fit.w]}
+    so = make_score_of(fn, matrix, fit.w)
+    e_tr = evaluate_scores(so, table, train, ks=(1,))
+    reg_tr = {p: e_tr.regret[i, 0] for i, p in enumerate(e_tr.shapes)}
+    e_ho = evaluate_scores(so, table, val, ks=(1,))
+    reg_ho = {p: e_ho.regret[i, 0] for i, p in enumerate(e_ho.shapes)}
+    tol_ho = {p: e_ho.tol[i] for i, p in enumerate(e_ho.shapes)}
 
     scored = [p for p in val if p in reg_ho]
     if not scored:
@@ -165,9 +175,12 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
         warns.append(f"only {len(scored)} of {len(val)} holdout shapes were "
                      "scored")
 
+    # ⚠️ ★ 읽기용일 뿐이다 (D-179 §2-3). 적합은 이미 한 벌로 끝났고, 이
+    #    쪼개기는 `roofline` 축 — ⛔ 우리가 고른 경계가 아니라 ridge point 다.
     by_regime = {}
-    for name in ("short", "long"):
-        v = [reg_ho[p] for p in scored if regime_of(p, table.hw) == name]
+    for name in ("mem", "comp"):
+        v = [reg_ho[p] for p in scored
+             if regime_of(p, table.hw, axis="roofline") == name]
         if v:
             by_regime[name] = geomean(np.array(v))
 

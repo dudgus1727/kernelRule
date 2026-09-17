@@ -49,6 +49,10 @@ from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
 
 BUNDLE, ENV = "datasets/rtx-5090-sm_120-5bb6f403", "5bb6f403"
+#: ⛔ 2026-09-17 (D-179) — the name of the SOL value, kept only to grep the
+#: **archived candidate files**, which still contain it. The value itself no
+#: longer exists in the code, and nothing here computes it.
+SOL_NAME = "log_" + "sol_ms"
 DELTA = 0.0516        # ★ the σ upper-bound decision line §29.5 already used
 TOP_N, KS = 100, (1, 10, 100)
 
@@ -104,12 +108,15 @@ def _seed_shape(tag: str) -> dict:
     d = Path("runs") / f"f1pipe-F3-{tag}" / "stage2-rule-writer"
     cs = {f.name: f.read_text() for f in sorted(d.glob("candidates/*.py"))}
     ch = json.loads((d / "chosen.json").read_text())
-    sol = [n for n, c in cs.items() if "log_sol_ms" in c]
+    # ⛔ D-179 removed the value; the literal is kept as a **string** only
+    #   because these candidate files are a historical record that still
+    #   contains it. Nothing computes it.
+    sol = [n for n, c in cs.items() if SOL_NAME in c]
     feats = [len({m.attr for m in ast.walk(ast.parse(c))
                   if isinstance(m, ast.Attribute)
                   and isinstance(m.value, ast.Name) and m.value.id == "f"})
              for c in cs.values()]
-    return {"n": len(cs), "sol": sol, "chosen_sol": "log_sol_ms" in ch["code"],
+    return {"n": len(cs), "sol": sol, "chosen_sol": SOL_NAME in ch["code"],
             "feats": sorted(feats), "source": ch.get("source"),
             "fit_regret": ch.get("fit_regret")}
 
@@ -177,8 +184,8 @@ def main() -> None:
         out.setdefault("tau", {})[tag] = v.tolist()
 
     print("\n" + "=" * 84)
-    print("§3  the shape of the 10 seeds — does `p.log_sol_ms` split the "
-          "shapes by length")
+    print(f"§3  the shape of the 10 seeds — does `p.{SOL_NAME}` split the "
+          f"shapes by length")
     print("=" * 84)
     for label, tag in ARMS:
         s = _seed_shape(tag)

@@ -115,9 +115,10 @@ def main() -> None:
     print("=" * 78)
     print(f"  {'run':16s} {'recorded':>10} {'recomputed':>12}  verdict")
     bad = []
-    #: ★ 2026-09-10 (D-156): `log_sol_ms` stopped being a registered
-    #: shape-level value, so a rule that branches on `p.log_sol_ms` **cannot
-    #: be re-scored under today's registry**. That is the expected
+    #: ★ 2026-09-10 (D-156): the SOL lower-bound value stopped being a
+    #: registered shape-level value, so a rule that branches on it **cannot
+    #: be re-scored under today's registry** (⛔ and at D-179 the function
+    #: itself was removed). That is the expected
     #: consequence, not a failure: those runs' numbers stand as recorded, and
     #: the rule file plus its weights are in the repository — re-scoring them
     #: needs the registry of their own commit.

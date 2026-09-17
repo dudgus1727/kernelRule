@@ -95,7 +95,10 @@ def measure_run(gpu: str, fold: int, seed: int, table, shape_names) -> dict:
     rounds = _rows(d / "rounds.jsonl")
     arc = _rows(d / "archive.jsonl")
     best = _best_by_train(arc)
-    splits = _splits(table, fold=fold, k=4, design="nkgroup")
+    # ⛔ 2026-09-17 — 여기에 "nkgroup" 이 **상수로** 박혀 있었다. c2 는
+    #   `nkband` 로 돌았는데 집계는 nkgroup 분할로 채점했고, fold0·fold1 은
+    #   홀드아웃이 **100% 학습 형상**이었다 (pending_fixes 22).
+    splits = _splits(table, fold=fold, k=4, design=DESIGN)
     # ★ The three seeds of one (table, fold) run **inside one process** and
     #   `stage3` hands them the same `matrix`, so an axis seed 0 built is
     #   still in the registry when seed 1 starts. Measured: seeds 1 and 2 of

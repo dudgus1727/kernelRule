@@ -188,9 +188,9 @@ def main() -> None:
     mats: dict[str, FeatureMatrix] = {}
     #: ★ What is already recorded. A rule that **cannot be re-scored today**
     #:   keeps its entry — re-exporting must not delete a recorded number
-    #:   (documentation rule 2). Three `luna-*` rules branch on
-    #:   `p.log_sol_ms`, retired in D-156, and re-running this script has
-    #:   raised on them ever since.
+    #:   (documentation rule 2). Three `luna-*` rules branch on the SOL
+    #:   lower-bound value, retired in D-156 and removed outright in D-179,
+    #:   and re-running this script has raised on them ever since.
     prev = {}
     if (OUT / "index.json").exists():
         prev = {e["run"]: e

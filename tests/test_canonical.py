@@ -68,8 +68,13 @@ def test_canonical_scores_only_the_val_shapes():
     assert set(r.evaluation.shapes).isdisjoint(splits.train.shapes)
 
 
-def test_thin_regime_warns_instead_of_pretending():
-    """Too few shapes per regime **must not pass silently** (§10.1 / §26.4)."""
+def test_thin_training_split_warns_instead_of_pretending():
+    """Too few training shapes **must not pass silently** (§10.1 / §26.4).
+
+    ⛔ 2026-09-17 (D-179): this used to be a **per-regime** floor. Scoring no
+    longer splits by regime, so the same number is applied to the whole
+    training split — ⚠️ which is looser than before, not stricter.
+    """
     t, m = _setup()
     shapes = list(t.shapes())
     splits = SplitSet(train=Split("train", tuple(shapes[:3])),
@@ -77,6 +82,24 @@ def test_thin_regime_warns_instead_of_pretending():
     r = canonical_score(_CODE, [1.0], table=t, matrix=m, splits=splits)
     assert r.warnings, "training on 3 shapes yet there is no warning"
     assert any("training shapes" in w for w in r.warnings)
+
+
+def test_scoring_fits_one_weight_vector():
+    """★ D-179 — one fit, one vector, read on the whole holdout.
+
+    The loop optimises **one** weight vector. While scoring fitted two (one
+    per SOL regime), the optimised objective and the reported number were
+    different functions.
+    """
+    t, m = _setup()
+    shapes = list(t.shapes())
+    splits = SplitSet(train=Split("train", tuple(shapes[:3])),
+                      val=Split("val", tuple(shapes[3:])))
+    r = canonical_score(_CODE, [1.0], table=t, matrix=m, splits=splits)
+    assert list(r.weights) == ["all"], r.weights
+    assert r.n_holdout == len(shapes) - 3
+    # ⚠️ by_regime is a **read-only** roofline breakdown — never short/long
+    assert set(r.by_regime) <= {"mem", "comp"}
 
 
 # ---------------------------------------------------------------------------

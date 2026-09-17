@@ -20,13 +20,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import statistics as st
 import warnings
 from pathlib import Path
 
 import numpy as np
-
 from sigma_5090 import _splits
 
 import kernelrule.features.physical  # noqa: F401
@@ -38,7 +36,7 @@ from kernelrule.core.splits import _DUMMY_CFG, Split
 from kernelrule.core.table import PerfTable
 from kernelrule.core.weights import fit_weights, make_score_of
 from kernelrule.features import REGISTRY
-from kernelrule.features.physical import is_memory_bound, log_sol_ms
+from kernelrule.features.physical import is_memory_bound
 
 BUNDLE = ("datasets/rtx-a6000-sm_86-c63710df", "c63710df")
 RUNS = [f"F3rw-p8-nan-s{i}" for i in range(6)]
@@ -61,10 +59,20 @@ def _rule(run: str) -> dict:
                key=lambda e: e["round"])
 
 
+#: ⛔ 2026-09-17 (D-179) — the SOL axis this script compared against was
+#: **removed from the code**. The 0.5 ms boundary was ours (chosen on the
+#: a6000 table), and the scoring path used it to fit two weight vectors while
+#: the loop evolved one.
+#:
+#: ⚠️ The script is kept: its recorded numbers are on the record and this is
+#: how they were produced. ⛔ It cannot be re-run, and it says so instead of
+#: quietly swapping in another cut.
 def _sol(thr: float):
     def f(p, hw):
-        return ("short" if log_sol_ms(p, hw, _DUMMY_CFG) < math.log2(thr)
-                else "long")
+        raise SystemExit(
+            "regime_axis._sol: the SOL axis was removed at D-179. This "
+            "script cannot be re-run; its numbers stay in docs/decisions.md. "
+            "⛔ Do not substitute another boundary.")
     return f
 
 

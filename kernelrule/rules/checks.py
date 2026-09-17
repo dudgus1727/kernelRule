@@ -47,7 +47,7 @@ def noop_term_message(code: str) -> str | None:
     It is syntactically legal, so it runs and raises nothing — it **silently
     does nothing.** That is why this check is needed (§26.4). The first
     successful rule under RuleWriter condition A threw away one term as
-    `p.log_sol_ms * w[0]`.
+    `p.<a shape value> * w[0]`.
 
     A shape-level value **multiplied with `f.*`** does mean something — then
     it changes the weight of a config-level term by shape, so the ranking
@@ -153,7 +153,7 @@ def _numeric_literals(tree: ast.AST) -> tuple[list[ast.Constant],
 
         `-1.0` is a `UnaryOp(USub, Constant)`, so looking only for
         `Constant` misses it, and then the `-1.0` of
-        `p.log_sol_ms < -1.0` enters the budget.
+        `p.<a shape value> < -1.0` enters the budget.
         """
         if isinstance(side, ast.UnaryOp) and isinstance(
                 side.op, (ast.USub, ast.UAdd)):

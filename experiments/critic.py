@@ -60,6 +60,23 @@ import json
 import warnings
 from pathlib import Path
 
+
+#: ⛔ 2026-09-17 (D-179) — the SOL lower-bound value this script used was
+#: **removed from the code**. The 0.5 ms boundary was ours, chosen by looking
+#: at the a6000 table, and the scoring path used it to fit two weight vectors
+#: while the loop evolved one. See `docs/decisions.md` D-179.
+#:
+#: ⚠️ This script is kept because the numbers it produced are on the record
+#: and this is how they were produced. ⛔ It **cannot be re-run** — and it
+#: says so rather than quietly substituting another cut, which would put
+#: different numbers under the same name.
+def _sol_removed(where: str):
+    raise SystemExit(
+        f"{where}: the SOL lower-bound value was removed at D-179. This "
+        f"script cannot be re-run. Its recorded numbers stay in "
+        f"docs/decisions.md; ⛔ do not substitute another boundary.")
+
+
 BUNDLE = "datasets/rtx-a6000-sm_86-c63710df"
 
 
@@ -382,7 +399,8 @@ def _folds(table, matrix, groups):
     because it has only 3 slow shapes in validation — with 4 folds the same
     shape comes to validation one time in four."""
     train = [p for g in groups.values() for p in g]
-    srt = sorted(train, key=lambda p: matrix.for_shape(p)[1].log_sol_ms)
+    _sol_removed("critic._folds")
+    srt = train
     out = [[] for _ in range(N_FOLDS)]
     for i, p in enumerate(srt):
         out[i % N_FOLDS].append(p)

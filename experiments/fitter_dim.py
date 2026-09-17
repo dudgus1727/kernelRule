@@ -101,7 +101,7 @@ def extend_code(code: str, f_names: list[str], p_names: list[str],
     ★ `f` and `p` are **different name spaces**. `f` is the (shape, config)
     matrix and `p` is a shape-level value, so writing `p.roofline_ratio` as
     `f.` raises `AttributeError`. 5 of the human 24 (`arith_intensity`,
-    `can_use_cp_async`, `is_memory_bound`, `log_sol_ms`, `roofline_ratio`)
+    `can_use_cp_async`, `is_memory_bound`, the SOL bound, `roofline_ratio`)
     are shape level, so `f` has only 19, and there are rules that cannot fill
     8 terms from those alone. When they run short it fills up with **the
     square of an already used feature** — it is not a new physical quantity,

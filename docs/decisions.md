@@ -120,6 +120,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-176](#d-176-비교군-둘-오토튜닝-곡선-단일-에이전트-2026-09-15)  비교군 둘 — 오토튜닝 곡선 · 단일 에이전트 (2026-09-15)
 - [D-177](#d-177-전이에-대상-형상이-몇-개나-필요한가-2026-09-16)  전이에 대상 형상이 몇 개나 필요한가 (2026-09-16)
 - [D-178](#d-178-전이-형상-뽑기-무작위-대신-층화-2026-09-17)  전이 형상 뽑기 — 무작위 대신 층화 (2026-09-17)
+- [D-179](#d-179-sol-을-채점-경로에서-완전히-제거한다-2026-09-17)  SOL 을 채점 경로에서 완전히 제거한다 (2026-09-17)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -10272,3 +10273,182 @@ python3 -m experiments.porting_strat --dst <g> --src <s>   # --merge
 python3 -m experiments.porting_strat_seed
 python3 -m experiments.porting_shapes_curve --prefix ps2 --dst <g>   # --merge
 ```
+
+---
+
+## D-179  SOL 을 채점 경로에서 완전히 제거한다 (2026-09-17)
+
+D-156 이 SOL 을 **모델이 보는 것**에서 뺐다. 그런데 **채점 경로에는 남아
+있었다** — `canonical_score` 가 그것으로 학습 분할을 갈라 **가중치를 두 벌**
+맞추고 홀드아웃도 갈라 채점했다. 이번에 마저 지운다. ⛔ 수치는 다시 내지
+않았다.
+
+### ① 무엇이 잘못이었나
+
+```
+⛔ 경계 0.5ms 를 ★ 우리가 표를 보고 골랐다 (§10.1 "경계 탐색")
+⛔ 그 경계로 가중치를 두 벌 쓴다 — ★ 벤더에는 그 자유도가 없다
+⛔ ★ 루프는 한 벌로 진화했는데 채점은 두 벌이었다
+   -> 최적화한 목적과 보고한 값이 ★ 다른 함수였다
+⛔ 0.5 는 a6000 을 보고 고른 값인데 네 표에 그대로 썼다
+```
+
+### ② ⛔ 지우기 전에 잰 것 — 옛 절차가 얼마나 얇았나
+
+`log_sol_ms` 가 없어지면 다시 만들 수 없어서 먼저 쟀다
+(`docs/artifacts/sol-audit.json`, 공식과 절차를 그 파일에 넣어 두었다).
+
+```
+표      fold0        fold1        fold2        fold3      (학습 short/long)
+a6000   33/15        33/16        33/16        36/13
+5090    33/14        37/12        36/13        38/12
+4090    29/18        32/15        30/17        32/16
+h100    36/11        ★ 39/8       38/9         ★ 40/8
+
+홀드아웃 long   a6000 5·4·4·7 · 5090 3·5·4·5 · 4090 4·7·5·6
+               h100 ★ 1 ·4·3·4
+```
+
+★ **예상대로 빠른 GPU 일수록 `long` 이 줄었다.** h100 은 fold1·fold3 의 학습
+`long` 이 **8개** — 옛 `MIN_PER_REGIME` 과 **같은 값**이라 경고가 아슬아슬하게
+안 켜졌다(조건이 `< 8`). fold0 은 **홀드아웃 `long` 이 1형상**이었고, 그
+한 형상이 `by_regime["long"]` 전체였다.
+
+```
+② '체제가 8 미만' 경고가 켜지는 (표,fold)   ★ 0건 (최소가 정확히 8)
+③ 채점 못 한 홀드아웃 형상                  ★ 0건 (학습에 두 체제가 다 있었다)
+```
+
+⚠️ `canonical_score` 의 경고는 **반환값**이라 c2 산출물에 남지 않았다.
+`rerun.py` 만 그것을 읽는다. 그래서 구성표에서 직접 판정했다.
+
+### ③ 고친 것 — 채점을 한 벌로
+
+```python
+# 전
+for name in ("short", "long"):
+    g_tr = [p for p in train if regime_of(p, hw) == name]   # 기본 axis="size"
+    fit  = fit_weights(..., Split("train", g_tr), w0, ...)
+    fitted[name] = fit.w                                     # ★ 두 벌
+
+# 후
+fit = fit_weights(fn, matrix, table, Split("train", tuple(train)), w0, ...)
+fitted = {"all": [float(x) for x in fit.w]}                  # ★ 한 벌
+```
+
+★ 루프가 최적화한 것과 보고하는 값이 **같은 함수**가 되었다.
+
+### ④ 지운 것
+
+```
+kernelrule/features/physical.py   ★ log_sol_ms 함수 정의
+kernelrule/core/splits.py         ★ split_by_size · regime_of 의 axis="size"
+                                  · __all__ 항목 · _DUMMY_CFG 주석
+kernelrule/core/canonical.py      ★ 체제별 적합 · MIN_PER_REGIME
+kernelrule/report/diagnostic.py   ★ small/large 마스크 (대체 없이)
+kernelrule/core/loop.py           주석
+kernelrule/rules/checks.py        주석 예시 두 곳
+tests/                            test_baselines · test_checks ·
+                                  test_openai_client · test_f1_pipeline
+```
+
+★ **`regime_of` 의 `axis` 는 기본값을 없애 필수 인자로 만들었다.**
+
+```python
+def regime_of(p, hw, *, axis: str) -> str:
+    if axis == "size":
+        raise SplitError("the 'size' regime axis was removed (D-179) ...")
+```
+
+⛔ 기본값을 `roofline` 으로 바꿔 살려두지 않았다. 그랬다면 옛
+`regime_of(p, hw)` 호출이 **조용히 뜻이 바뀌어** `short`/`long` 비교가 빈
+그룹이 되었을 것이다. 지금은 `TypeError` 가 호출 지점에서 난다.
+
+`check_balance` · `describe` 의 기본 축도 `roofline` 으로 옮겼다 — 이 둘은
+**진단**이고 적합을 나누지 않는다. `splits.py:224` 의 fold 층화는 원래
+`roofline` 이라 ⛔ 건드리지 않았다.
+
+### ⑤ SOL 을 쓰던 옛 실험 스크립트 — ★ 조용히 바꾸지 않고 멈추게 했다
+
+```
+critic.py · subset_design.py · regime_count.py · proxy_dispatch.py
+regime_transfer.py · regime_axis.py
+```
+
+전부 `SystemExit` 로 막았다. **다른 경계를 대신 끼워 넣으면 같은 이름 아래
+다른 수치가 나온다** — 그것이 더 나쁘다. 스크립트는 남긴다: 그 수치가 어떻게
+나왔는지의 증거다.
+
+`experiments/sol_audit.py` 는 ②를 잰 뒤 **지웠다** — 마지막 호출자였고 이름이
+코드에 남으면 안 되기 때문이다. ★ 공식과 절차는 `sol-audit.json` 안에 넣었다.
+
+### ⑥ `by_regime` 은 남기되 ★ 읽기용으로
+
+```
+전   short / long   ← SOL 0.5ms · ★ 적합을 나누는 근거였다
+후   mem / comp     ← roofline ridge point · ⛔ 읽기용일 뿐
+```
+
+★ 근거: 없애면 `campaign_nk4.py:149` 등 기록 경로가 깨지고, 체제별로 어떻게
+갈리는지는 **볼 값어치가 있다**. ⚠️ 다만 `roofline` 은 우리가 고른 경계가
+아니라 ridge point 이고, ⛔ 이 값으로 적합을 나누지 않는다.
+
+### ⑦ ★ "학습 형상이 너무 적다" 보증은 살렸다
+
+체제별 문턱(`MIN_PER_REGIME = 8`)이 사라지면서 그 경고도 같이 사라졌다.
+같은 수 8 을 **분할 전체**에 적용해 되살렸다(`MIN_TRAIN_SHAPES`).
+
+⚠️ 이것은 무엇을 자르는 경계가 아니라 **경고만** 하고, 예전에는 체제마다 8 을
+요구했으므로 ★ 그때보다 느슨하다.
+
+### ⑦-2 ⚠️ `check_balance` 의 판정이 한 갈래에서 ★ 뒤집혔다
+
+기본 축이 `size` -> `roofline` 으로 바뀌면서 **같은 분할에 다른 답**이 나온다.
+a6000 align-8 형상에서 실측:
+
+```
+split_by_M_range      SOL ★ 41/9 (18%, ★ 경고)   roofline ★ 30/20 (40%, ok)
+(N,K)==(11008,4096)   SOL   35/16 (31%, ok)      roofline   35/16 (31%, ok)
+```
+
+★ `split_by_M_range` 는 이제 **경고하지 않는다.** 그 뒤에 있던 피해는 진짜였다
+— 그 구성에서 진화가 전체 regret 을 1.177 -> 1.390 으로 악화시키면서 학습
+점수는 1.201 -> 1.118 로 좋아졌다(§10.1). ⚠️ 그러나 그 82/18 은 **SOL 축의
+값**이었다. 옛 수치는 시험 docstring 에 그대로 남기고, 시험이 pin 하는 것은
+**새 판정**으로 바꿨다 — 축이 또 바뀌면 흡수되지 않고 걸리도록.
+
+⛔ `check_balance` 는 `regime_of` 와 달리 기본값을 남겼다. 모든 호출자가 축을
+안 넘기고 "우리가 쓰는 체제 축" 을 원하는데 이제 그것이 하나뿐이고, 이 함수는
+**경고만** 할 뿐 무엇도 자르지 않기 때문이다.
+
+### ⑧ 확인
+
+```
+★ grep -rn "log_sol_ms" --include="*.py" kernelrule/ experiments/ tests/
+   -> ★ 0줄
+```
+
+⚠️ `docs/` 에는 남아 있고 **일부러 남긴다**.
+
+```
+docs/decisions.md         옛 기록 — ⛔ 지우지 않는다
+docs/artifacts/rules/*.py ★ 옛 규칙 3개 (luna-s4 · lunaNAMES-s0 · -s5)
+                          이미 재채점 불가로 기록돼 있다 (D-156)
+docs/artifacts/*.json     옛 실험 산출물
+docs/glossary.md          ★ 옛 용어 매핑 — "없어졌다" 로 고쳐 남겼다
+docs/design.md            ★ 정정 블록으로 이었다
+docs/principles.md        예시를 roofline_ratio 로 바꿨다
+```
+
+⛔ 저장소 전체 grep 을 0 으로 만들려면 옛 규칙 파일과 기록을 지워야 하는데,
+그것은 "옛 수치를 지우지 마라" 와 "옛 용어를 glossary 에 남겨라" 를 어긴다.
+★ **코드에서 0줄**이 이번의 조건으로 읽었다.
+
+### ⑨ ⛔ 이 작업 중에 발견한 것 — 캠페인 2 홀드아웃 오염
+
+§3 을 재다가 `campaign_nk4.py:98` 이 분할 설계를 **하드코딩**한 것을 찾았다.
+c2 는 `nkband` 로 돌았는데 집계는 `nkgroup` 으로 채점했고, **fold0·fold1 은
+홀드아웃 형상이 100% 학습 형상**이었다. 상세는 `docs/pending_fixes.md` 22.
+
+★ 98행은 고쳤다. ⛔ **재채점은 하지 않았다** — 이번 SOL 제거로 채점 절차가
+바뀌므로 두 번 낼 이유가 없다. 사용자가 2026-09-17 에 그렇게 정했다.

@@ -74,8 +74,9 @@ __all__ = ["DiagnosticReport", "Case", "Regime", "build_report"]
 #: printed the regret of each. Every one of them is **an axis we chose**, and
 #: the biggest number in the report was the SOL gap (+0.4307 at D-155). The
 #: Analyst read it every round, the hypotheses pointed there, and the rules
-#: branched there: the best rule of D-155 starts at `p.log_sol_ms < -5` and
-#: then drifts to `log_flops > 20 / 40 / 30`.
+#: branched there: the best rule of D-155 starts on the SOL value and then
+#: drifts to `log_flops > 20 / 40 / 30`. (That value was removed outright at
+#: D-179 — see `docs/decisions.md`.)
 #:
 #: The report now gives **cases** and lets the model find the pattern.
 #: ⚠️ The price is real: "the short shapes are +0.43 worse" was one line and
@@ -193,25 +194,26 @@ def _regime_masks(table: PerfTable, matrix: FeatureMatrix,
     import math
 
     # ★ A regime is a property of (shape, hardware), **not a property of
-    #   the feature list.** This used to read `info.log_sol_ms` /
-    #   `info.is_memory_bound`, which assumed those two features were in the
-    #   registry. The F0/F1 registries do not have them, so the whole report
+    #   the feature list.** This used to read the SOL value and
+    #   `info.is_memory_bound` off `info`, which assumed those two features
+    #   were in the registry. The F0/F1 registries do not have them, so the whole report
     #   dies (§30.9). `regime_of` calls the **functions** in `physical.py`
     #   directly, so it is condition-independent and the verdict lives in
     #   one place (principle 2).
     from kernelrule.core.splits import regime_of
 
-    small, mem, waves = [], [], []
+    # ⛔ 2026-09-17 (D-179): the `small` / `large` masks cut on the SOL
+    #   0.5 ms bound, which is gone. `REGIMES` is empty so nothing read
+    #   them; they are not replaced with a substitute cut of our own.
+    mem, waves = [], []
     for p in shapes:
-        small.append(regime_of(p, table.hw, axis="size") == "short")
         mem.append(regime_of(p, table.hw, axis="roofline") == "mem")
         gm = math.ceil(p.M / 128) * math.ceil(p.N / 128)
         waves.append(gm / table.hw.sm_count)
-    small = np.asarray(small)
     mem = np.asarray(mem)
     w = np.asarray(waves, dtype=np.float64)
     k = np.asarray([p.K for p in shapes])
-    return {"small": small, "large": ~small, "mem": mem, "comp": ~mem,
+    return {"mem": mem, "comp": ~mem,
             "wlt1": w < 1.0, "w14": (w >= 1.0) & (w < 4.0), "wgt8": w > 8.0,
             "smallk": k <= 1024}
 
