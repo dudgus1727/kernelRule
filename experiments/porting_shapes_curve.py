@@ -5,13 +5,15 @@
     python3 -m experiments.porting_shapes_curve --merge a.json ...
 
 ⚠️ **Every column is the same procedure as (a)**: the weights are refitted
-per regime on ★ **that run's N shapes only** and read on the ★ **whole**
-fold0 holdout (`porting_shapes._refit`).
+on ★ **that run's N shapes only** and read on the ★ **whole** fold0 holdout
+(`porting_shapes._refit`).
 
 ```
 ⛔ not canonical_score with the full train — that would hand the evaluation
    the 48 shapes this experiment is trying not to build
-⛔ not the loop's own best_val_regret — a single global fit
+⛔ not the loop's own best_val_regret — a different thing
+⛔ 2026-09-18 (D-182): `canonical_score` no longer fits at all, so `_refit`
+   is now a **different** procedure from it — see porting_shapes.py
 ```
 
 ★ `r-1` is the seed scored that way, so it must equal (a)'s rep-0 point for
@@ -73,7 +75,8 @@ def main() -> None:
              "prefix": a.prefix,
              "note": ("⚠️ weights refitted on that run's N shapes only, read "
                       "on the whole fold0 holdout — the same procedure as "
-                      "(a). ⛔ not canonical_score with the full train.")},
+                      "(a). ⛔ not canonical_score, which since D-182 does "
+                      "not fit at all.")},
             ensure_ascii=False, indent=1))
         # ⛔ the md follows `--out`, not a fixed name — merging the D-178
         #   stratified rows once overwrote D-177's md with them.

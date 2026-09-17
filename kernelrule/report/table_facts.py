@@ -117,7 +117,7 @@ class TableFacts:
              f"top-1 {res.by_k[1]['all']:.3f}   top-3 {res.by_k[3]['all']:.3f}"
              f"   top-8 {res.by_k[8]['all']:.3f}", n)
 
-        # ⚠️ 2026-09-10 (D-156): the per-regime baselines that stood here
+        # ⚠️ 2026-09-10 (D-156): the band baselines that stood here
         #   ("fast regime (SOL<0.5ms), 27 shapes only: top-1 1.179") are
         #   gone. They named our axis, in the same block that is supposed to
         #   hold **table structure**, not our stratification.

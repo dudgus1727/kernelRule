@@ -125,7 +125,8 @@ def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(OUT))
-    # ★ One cell costs two per-regime refits at 300 evals on rules of up to
+    # ★ When these numbers were made, one cell cost two refits at 300
+    #   evals (⛔ D-182 removed the refit from the scorer) on rules of up to
     #   83 weights — measured at ~19 min, so 48 cells in one process is 15
     #   hours. Cells are independent, so they are split by (fold, source) and
     #   merged. ⛔ The computation per cell is unchanged.

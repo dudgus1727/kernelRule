@@ -6,6 +6,12 @@
 ⛔ If a seed's holdout differs from the transfer table's `b_refit`, the seed
 did not go in — the run would measure something else and its curve would
 start from the wrong place. That is a stop condition, not a warning.
+
+⛔ **2026-09-18 (D-182)** — this check compared `canonical_score` against
+`b_refit`, and `b_refit` is **a refit**. The scorer no longer refits, so the
+two are no longer the same quantity and the check would now fail for a
+reason that is not the seed's fault. ★ It passed 12/12 when D-175 ran and
+that result stands; re-running it today compares two different things.
 """
 
 from __future__ import annotations

@@ -23,9 +23,27 @@ N       ★ 4 · 8 · 16      (⛔ not 32+ — past half the table it is obvious
 평가     ★ 대상 fold0 홀드아웃 전체 · canonical
 ```
 
-## ⚠️ What happens when the sample misses a regime
+## ⛔ 2026-09-18 (D-182) — `_refit` is **no longer** `canonical_score`
 
-`canonical_score` fits **per regime**. With N=4 a uniform sample can easily
+`_refit` below **fits**, and that is correct: fitting the weights on N target
+shapes **is the thing this experiment measures**. What changed is the other
+side — `canonical_score` stopped fitting at D-182, and stopped splitting by
+regime at D-179.
+
+```
+_refit            ★ N 형상으로 가중치를 맞춘다 — ★ 이 실험의 본체
+canonical_score   ⛔ 적합하지 않는다 — 받은 가중치로 채점만 한다
+-> ★ 두 절차는 더 이상 같지 않다. `--verify` 의 동일성 검사는 뜻이 없다
+```
+
+⛔ And this file **cannot run** since D-179: `_refit` calls
+`regime_of(p, hw)` with no axis, which now raises. Its numbers (D-177 ·
+D-178) stand as recorded; re-running with another axis would publish
+different numbers under the same name.
+
+## ⚠️ What happened when the sample missed a regime
+
+`canonical_score` **then** fitted per regime. With N=4 a uniform sample can easily
 contain no memory-bound shape (that side is 14~21% of these tables), and
 then `canonical_score` scores only part of the holdout — a different
 denominator, which cannot be laid beside the transfer table.
@@ -91,9 +109,12 @@ def _refit(code: str, w0, *, table, matrix, sample: list, val: list,
            max_evals: int = 300) -> dict:
     """Per-regime refit on `sample`, read on the whole of `val`.
 
-    ★ Same procedure as `canonical_score` except for one fallback: a regime
-    with no shape in the sample is fitted on the **whole sample**. That case
-    is flagged in the result (`pooled_regimes`).
+    ★ This is the experiment's subject — "how many target shapes does a
+    transfer need to refit on". ⛔ **Not** the same procedure as
+    `canonical_score`, which since D-182 does not fit at all.
+
+    One fallback: a regime with no shape in the sample is fitted on the
+    **whole sample**, flagged in the result (`pooled_regimes`).
     """
     from kernelrule.core.sandbox import compile_rule
     from kernelrule.core.weights import fit_weights, make_score_of
@@ -128,8 +149,20 @@ def _refit(code: str, w0, *, table, matrix, sample: list, val: list,
 
 
 def _verify(code, w0, *, table, matrix, sample, splits) -> float | None:
-    """★ The identity check — when the sample has both regimes, `_refit`
-    must equal `canonical_score` on the same train set."""
+    """⛔ 2026-09-18 (D-182) — this check is **retired**, not fixed.
+
+    It compared `_refit` against `canonical_score` on the same train set and
+    required them to agree (measured 0.0 across 12 directions). ★ They are
+    no longer the same procedure: `_refit` fits, `canonical_score` does not.
+    Making them agree again would mean putting the fit back into the scorer,
+    which is exactly what D-182 removed.
+    """
+    raise SystemExit(
+        "porting_shapes._verify: `_refit` and `canonical_score` are no "
+        "longer the same procedure (D-182 removed the fit from the "
+        "scorer). The identity this checked held when D-177/D-178 ran and "
+        "is recorded there. ⛔ Do not restore it by refitting in the "
+        "scorer.")
     names = {regime_of(p, table.hw) for p in sample}
     if len(names) < 2:
         return None

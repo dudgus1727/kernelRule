@@ -23,7 +23,7 @@ anyone can check the numbers in the documents in seconds with
 ## What it writes
 
 ```
-docs/artifacts/rules/<run>.py            score() + W_FITTED (per regime)
+docs/artifacts/rules/<run>.py            score() + W_FITTED
 docs/artifacts/rules/<run>.registry.json ★ the axis list the rule needs
 docs/artifacts/rules/index.json          the machine-written scores. The
                                          documents refer to it
@@ -41,10 +41,12 @@ weights, for the same reason the weights are written out at all.
 ⚠️ `W_FITTED` has to be the **fitted** value. Writing the initial value makes
 the file lie — that is exactly what was written at first, and it was caught.
 
-⚠️ 2026-09-11 (D-166 §M): **this script is not idempotent.** `canonical_score`
-**refits** per regime, so re-running it today rewrites the committed numbers
+⚠️ 2026-09-11 (D-166 §M): **this script was not idempotent.** `canonical_score`
+**refitted** the weights, so re-running it rewrote the committed numbers
 (measured: `luna-s5` holdout recorded 1.1378, re-exported 1.0895 — the fitter
-conditions changed in D-150/D-152). Re-export a run only when you mean to
+conditions changed in D-150/D-152). ⛔ 2026-09-18 (D-182) removed the refit,
+so that source of drift is gone; the committed numbers still come from the
+old procedure and are **not** reproducible by re-exporting. Re-export a run only when you mean to
 replace its record. What checks the existing numbers is
 `experiments/verify_rules.py`, which re-scores the committed `W_FITTED` and
 does not fit anything.
@@ -237,8 +239,9 @@ def main() -> None:
             f'features   {cfg.get("feature_detail", "?")}\n\n'
             f'structural holdout {r.holdout:.4f}  '
             f'(in-sample {r.in_sample:.4f})\n\n'
-            f'★ `W_FITTED` is the value **fitted per regime**. It is not the '
-            f'initial value.\n'
+            f'★ `W_FITTED` is the value the rule was **scored with**. '
+            f'For rules exported before D-182 that is a refit of the '
+            f'loop answer, not the loop answer itself.\n'
             f'To reproduce:  python3 experiments/verify_rules.py\n"""\n\n'
             "import numpy as np  # noqa: F401\n\n"
             + best["code"].strip() + "\n\n\n"

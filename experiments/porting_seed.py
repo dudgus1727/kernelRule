@@ -11,9 +11,11 @@ machinery.
 seed      the source (table, fold)'s best-by-training rule, and the axes it
           uses — re-derived on the **target** table (D-165)
 weights   ⛔ the source's `w` as they are. The loop refits on the target's
-          training split every round, and `canonical_score` refits per
-          regime — which is exactly what the transfer table calls (b).
-          Verified: canonical holdout == the table's `b_refit` to 2e-7
+          training split every round, and `canonical_score` **then** refitted
+          too — which is exactly what the transfer table calls (b).
+          Verified at the time: canonical holdout == `b_refit` to 2e-7.
+          ⛔ 2026-09-18 (D-182): the scorer no longer refits, so that
+          identity no longer holds and (b) is defined by the loop alone.
 ⛔ stage 2 is not run. The seed **is** the ported rule (§1-3)
 ```
 """

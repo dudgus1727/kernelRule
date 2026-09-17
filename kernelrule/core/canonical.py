@@ -24,8 +24,8 @@ only runs when given a `SplitSet`, and overlap raises.
     weights     fitted by fit_weights          -> within whichever split
     prompt      edited by a human              -> `splits.test` only (§10.2)
 
-This function produces the **structure holdout**: ★ one weight vector is
-fitted on **all** of `splits.train` and evaluated on **all** of
+This function produces the **structure holdout**: ⛔ it **fits nothing**. It
+takes the rule and the weights the loop ended with and reads them on all of
 `splits.val`.
 
 ★ 2026-09-11 (D-166): ~~The loop used val only for the early-stop
@@ -44,6 +44,22 @@ the representative runs   F3rw-p8-nan, 6 seeds   patience = 0 (all six)
    read val. **Which runs those are has not been checked** — do not assume
    (principle 39).
 ```
+
+## ⛔ 2026-09-18 (D-182) — ★ 채점은 적합하지 않는다
+
+채점은 **완성품을 재는 자리**다. 거기서 가중치를 다시 맞추면 재는 것이 아니다.
+
+```
+★ 루프가 ★ 그 학습 분할에서 이미 가중치를 맞췄다
+⛔ 그런데 채점기가 ★ 같은 형상으로 ★ 300회를 다시 돌리고 있었다
+⛔ 루프의 답은 ★ 출발점(w0)으로만 쓰였다
+```
+
+**왜 그렇게 됐나.** D-69 가 체제별 적합을 넣으면서, 루프가 만든 **한 벌**을
+채점기가 `short`/`long` **두 벌**로 다시 만들었다 — ★ 채점이 루프가 안 한 일을
+대신 해준 것이다. D-179 가 두 벌을 한 벌로 줄이면서 **적합 호출은 남겼다.**
+
+★ 이제 `fit_weights` 호출이 없다. 받은 `w` 로 홀드아웃을 잴 뿐이다.
 
 ## ⛔ 2026-09-17 (D-179) — ★ 체제를 나누지 않는다
 
@@ -74,18 +90,17 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 
 from kernelrule.core.scoring import Evaluation, evaluate_scores, geomean
-from kernelrule.core.splits import Split, SplitError, SplitSet, regime_of
+from kernelrule.core.splits import SplitError, SplitSet, regime_of
 from kernelrule.core.table import PerfTable
 
 __all__ = ["CanonicalScore", "canonical_score"]
 
-#: ⛔ 2026-09-17 (D-179): `MIN_PER_REGIME` 은 체제별 적합이 있을 때의 문턱이라
-#: 없앴다. 그런데 "학습 형상이 너무 적으면 조용히 넘어가지 않는다" 는 보증은
-#: 남겨야 해서, ★ 같은 수 8 을 **분할 전체**에 적용한다.
+#: ⛔ 2026-09-18 (D-182): `MIN_TRAIN_SHAPES` 를 없앴다.
 #:
-#: ⚠️ 이것은 ★ 무엇을 자르는 경계가 아니다 — **경고만** 한다. 예전에는 체제마다
-#: 8 을 요구했으므로 이 문턱은 그때보다 ★ 느슨하다.
-MIN_TRAIN_SHAPES = 8
+#: D-179 가 체제별 문턱(`MIN_PER_REGIME`)을 없애면서 "학습 형상이 너무 적으면
+#: 조용히 넘어가지 않는다" 를 분할 전체에 옮겨 놨었다. ★ 그런데 채점이 더는
+#: 학습 분할에서 적합하지 않으므로 **여기서 할 말이 아니다** — 가중치가 믿을
+#: 만한지는 ★ 그것을 만든 루프가 판정할 일이다 (`fit_weights` 의 경고).
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,8 +110,11 @@ class CanonicalScore:
 
     #: Geometric mean over `splits.val`. ★ This is the value to report.
     holdout: float
-    #: Geometric mean over `splits.train`. For reference — the structure was
-    #: fitted here.
+    #: Geometric mean over `splits.train`, read with the **same** weights.
+    #: ★ For reference — the structure was evolved here, so
+    #: `holdout - in_sample` is the structure's own generalisation gap.
+    #: ⛔ 2026-09-18 (D-182): it is no longer "the score the fit reached" —
+    #: nothing is fitted here.
     in_sample: float
     #: ⚠️ ★ **읽기용** roofline 쪼개기 (`mem`/`comp`). ⛔ 적합을 나누는 근거가
     #: 아니다 — 가중치는 한 벌이고 이 값은 그 한 벌의 결과를 갈라 본 것뿐이다.
@@ -104,11 +122,10 @@ class CanonicalScore:
     by_regime: dict[str, float]
     #: The holdout evaluation. Used as is for significance (`compare`).
     evaluation: Evaluation
-    #: ★ The weights **as fitted**. Without them, exporting the rule to a
-    #: file writes the initial values, and that file does not reproduce —
-    #: the file lies.
-    #: ⛔ 2026-09-17 (D-179): 한 벌이므로 키는 `"all"` 하나다. 예전에는
-    #: `short`/`long` 두 벌이었다.
+    #: ★ The weights **as scored** — since D-182 these are the ones handed
+    #: in, not a refit. Kept so that exporting a rule writes the numbers it
+    #: was actually scored with; a file without them does not reproduce.
+    #: ⛔ D-179: 키는 `"all"` 하나다 (예전에는 `short`/`long` 두 벌).
     weights: dict[str, list[float]] = field(default_factory=dict)
     n_holdout: int = 0
     warnings: tuple[str, ...] = field(default_factory=tuple)
@@ -119,14 +136,26 @@ class CanonicalScore:
                 f"in-sample {self.in_sample:.4f}  [{r}]")
 
 
-def canonical_score(code: str, w0, *, table: PerfTable, matrix,
-                    splits: SplitSet, max_evals: int = 300) -> CanonicalScore:
-    """★ It cannot be called without `splits`. There is no arbitrary-split
-    path.
+def canonical_score(code: str, w, *, table: PerfTable, matrix,
+                    splits: SplitSet) -> CanonicalScore:
+    """★ Score a finished rule on the holdout. ⛔ **It fits nothing.**
 
-    ★ 2026-09-17 (D-179): weights are fitted on **all** of `splits.train`
-    as **one** vector and measured on **all** of `splits.val`. ⛔ There is no
-    regime split any more — see the module docstring.
+    ```
+    받는 것   규칙 코드 + ★ 루프가 끝낸 가중치
+    하는 일   그 가중치로 ★ splits.val 전체를 채점한다
+              참고로 splits.train 도 ★ 같은 가중치로 읽는다
+    ⛔ 안 하는 일  적합. `fit_weights` 를 부르지 않는다
+    ```
+
+    ★ It cannot be called without `splits`. There is no arbitrary-split
+    path — that is what D-36 fixed.
+
+    ⚠️ **이름은 그대로 둔다.** `canonical_score` 로 낸 수치가 결정 기록과
+    산출물 수십 곳에 있고, 이름을 바꾸면 그 인용이 전부 미아가 된다. ★ 바뀐
+    것은 절차이고, 그 절차는 이 docstring 과 D-182 에 적혀 있다.
+
+    ⛔ 2026-09-18 (D-182): `max_evals` 인자를 없앴다 — 적합이 없으니 쓸 데가
+    없다. 넘기던 호출자는 없었다.
     """
     if not isinstance(splits, SplitSet):
         raise SplitError(
@@ -136,7 +165,7 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
             "passed' was reported wrongly.")
 
     from kernelrule.core.sandbox import compile_rule
-    from kernelrule.core.weights import fit_weights, make_score_of
+    from kernelrule.core.weights import make_score_of
 
     train = list(splits.train.shapes)
     val = list(splits.val.shapes)
@@ -146,27 +175,19 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
 
     fn = compile_rule(code)
     warns: list[str] = []
-    if len(train) < MIN_TRAIN_SHAPES:
-        warns.append(f"{len(train)} training shapes < {MIN_TRAIN_SHAPES}. "
-                     "These weights are hard to trust")
 
-    # ★ D-179 — ★ one fit on the whole training split, read on the whole
-    #   holdout. ⛔ No regime split: the loop optimised one weight vector, so
-    #   the reported number must come from one weight vector too.
-    fit = fit_weights(fn, matrix, table, Split("train", tuple(train)),
-                      w0, max_evals=max_evals,
-                      # ★ **Final scoring is always regret** (D-103).
-                      #   `fit_weights`'s default once changed to `rank`, so
-                      #   it must be **stated** here. Otherwise every number
-                      #   in this project silently becomes a different thing.
-                      objective="regret")
-    fitted: dict[str, list[float]] = {"all": [float(x) for x in fit.w]}
-    so = make_score_of(fn, matrix, fit.w)
-    e_tr = evaluate_scores(so, table, train, ks=(1,))
-    reg_tr = {p: e_tr.regret[i, 0] for i, p in enumerate(e_tr.shapes)}
+    # ★ D-182 — ⛔ no fitting. The weights are the loop's answer, used as
+    #   they are. `w` used to be only a starting point for a 300-evaluation
+    #   refit on the very shapes the loop had already fitted on.
+    w = np.asarray(w, float)
+    so = make_score_of(fn, matrix, w)
     e_ho = evaluate_scores(so, table, val, ks=(1,))
     reg_ho = {p: e_ho.regret[i, 0] for i, p in enumerate(e_ho.shapes)}
-    tol_ho = {p: e_ho.tol[i] for i, p in enumerate(e_ho.shapes)}
+    # ★ The training shapes, read with the **same** weights. ⛔ Not a fit —
+    #   it is what makes `holdout - in_sample` the structure's own gap
+    #   instead of a gap between two different weight vectors.
+    e_tr = evaluate_scores(so, table, train, ks=(1,))
+    reg_tr = {p: e_tr.regret[i, 0] for i, p in enumerate(e_tr.shapes)}
 
     scored = [p for p in val if p in reg_ho]
     if not scored:
@@ -176,8 +197,8 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
         warns.append(f"only {len(scored)} of {len(val)} holdout shapes were "
                      "scored")
 
-    # ⚠️ ★ 읽기용일 뿐이다 (D-179 §2-3). 적합은 이미 한 벌로 끝났고, 이
-    #    쪼개기는 `roofline` 축 — ⛔ 우리가 고른 경계가 아니라 ridge point 다.
+    # ⚠️ ★ 읽기용일 뿐이다 (D-179 §2-3). ⛔ 우리가 고른 경계가 아니라
+    #    roofline ridge point 다.
     by_regime = {}
     for name in ("mem", "comp"):
         v = [reg_ho[p] for p in scored
@@ -186,11 +207,11 @@ def canonical_score(code: str, w0, *, table: PerfTable, matrix,
             by_regime[name] = geomean(np.array(v))
 
     # Packed as an `Evaluation` so significance testing can use it directly
-    base = evaluate_scores(make_score_of(fn, matrix, np.asarray(w0, float)),
-                           table, scored, ks=(1,))
-    ev = replace(base,
-                 regret=np.array([reg_ho[p] for p in scored]).reshape(-1, 1),
-                 tol=np.array([tol_ho[p] for p in scored]), label="canonical")
+    ev = replace(evaluate_scores(so, table, scored, ks=(1,)),
+                 label="canonical")
+    # ★ The weights **as scored** — the same ones that came in. Exporting a
+    #   rule without them writes a file that does not reproduce.
+    fitted: dict[str, list[float]] = {"all": [float(x) for x in w]}
 
     return CanonicalScore(
         holdout=geomean(np.array([reg_ho[p] for p in scored])),

@@ -68,20 +68,48 @@ def test_canonical_scores_only_the_val_shapes():
     assert set(r.evaluation.shapes).isdisjoint(splits.train.shapes)
 
 
-def test_thin_training_split_warns_instead_of_pretending():
-    """Too few training shapes **must not pass silently** (§10.1 / §26.4).
+def test_scoring_does_not_fit():
+    """⛔ 2026-09-18 (D-182) — the scorer must **not** call `fit_weights`.
 
-    ⛔ 2026-09-17 (D-179): this used to be a **per-regime** floor. Scoring no
-    longer splits by regime, so the same number is applied to the whole
-    training split — ⚠️ which is looser than before, not stricter.
+    Scoring is where a finished rule is measured. Refitting there measures
+    something the loop never produced: the loop had already fitted on those
+    very shapes, and its answer was being used only as a starting point for
+    another 300 evaluations.
+
+    ★ Two ways of checking, because one alone is weak:
+
+    ```
+    1  ★ the **AST** of `canonical_score` contains no call to `fit_weights`
+       (grepping the text would hit this very docstring)
+    2  the weights come back ★ exactly as handed in — a refit would move them
+    ```
+
+    ⛔ The old test here (`test_thin_training_split_warns_instead_of_pretending`)
+    pinned a "too few training shapes" warning. That warning belonged to the
+    refit; the scorer no longer looks at the training split to fit anything,
+    so whether the weights are trustworthy is the loop's verdict to make.
     """
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(canonical_score)))
+    called = {n.func.id for n in ast.walk(tree)
+              if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+    imported = {a.name for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) for a in n.names}
+    assert "fit_weights" not in called | imported, \
+        "the scorer is fitting again (D-182)"
+
     t, m = _setup()
     shapes = list(t.shapes())
     splits = SplitSet(train=Split("train", tuple(shapes[:3])),
                       val=Split("val", tuple(shapes[3:])))
-    r = canonical_score(_CODE, [1.0], table=t, matrix=m, splits=splits)
-    assert r.warnings, "training on 3 shapes yet there is no warning"
-    assert any("training shapes" in w for w in r.warnings)
+    good = canonical_score(_CODE, [1.0], table=t, matrix=m, splits=splits)
+    bad = canonical_score(_CODE, [-50.0], table=t, matrix=m, splits=splits)
+    assert good.weights == {"all": [1.0]}
+    assert bad.weights == {"all": [-50.0]}, \
+        "the weights came back changed — something refitted them"
 
 
 def test_scoring_fits_one_weight_vector():

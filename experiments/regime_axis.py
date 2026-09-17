@@ -7,9 +7,10 @@ The pre-registration is `docs/artifacts/regime-axis-prereg.md`.
 
 ## Why it is reimplemented
 
-`canonical_score` hardcodes the regime names `("short","long")` and
-`regime_of(axis="size")`. Swapping the axis means rebuilding that procedure
-here. **So arm ① is first checked against the known representative value** —
+`canonical_score` **then** hardcoded the regime names `("short","long")`
+and the SOL axis. Swapping the axis meant rebuilding that procedure here.
+⛔ Both are gone (D-179 removed the axis, D-182 removed the refit), which is
+why this script can no longer run at all. **So arm ① is first checked against the known representative value** —
 if it differs, it stops.
 
 ⚠️ 2026-09-08 (D-146): the arm labels were translated together with the keys
@@ -94,8 +95,9 @@ ARMS = [
 
 
 def score(code, w0, T, M, sp, reg_fn, names, max_evals=300):
-    """**The same procedure** as `canonical_score`, with only the regime
-    function swapped."""
+    """**The same procedure** as `canonical_score` **was** when this ran,
+    with only the regime function swapped. ⛔ D-182 removed the refit from
+    `canonical_score`, so this is no longer the same procedure."""
     fn = compile_rule(code)
     train, val = list(sp.train.shapes), list(sp.val.shapes)
     per_shape, warns = {}, []

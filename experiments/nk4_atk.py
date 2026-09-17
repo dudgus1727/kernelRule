@@ -3,9 +3,11 @@ baselines (D-171 §5-2). **0 LLM calls.**
 
     python3 -m experiments.nk4_atk
 
-⚠️ **A different procedure from `canonical_score`, deliberately.** Canonical
-refits the weights per regime on the training split; this scores the rule
-**with the weights the loop left in the archive**. Two numbers from two
+⚠️ **A different procedure from `canonical_score` when these numbers were
+made, deliberately.** Canonical then refitted the weights on the training
+split; this scores the rule **with the weights the loop left in the
+archive**. ⛔ D-182 removed that refit, so the two have since converged on
+this point — the numbers here were made before that. Two numbers from two
 procedures are not put in one column — `campaign-nk4.json` carries the
 canonical holdout and this file carries the @k family, and each says which
 it is.
@@ -133,8 +135,9 @@ def main() -> None:
                [r["regret_at"][f"k{k}"] for r in res])) for k in KS}}
     Path(a.out).write_text(json.dumps(
         {"note": ("⚠️ scored with the archive's own weights — NOT the "
-                  "per-regime refit `canonical_score` uses. Do not put the "
-                  "two in one column."),
+                  "refit `canonical_score` performed when these numbers "
+                  "were made. Do not put the two in one column. ⛔ D-182 "
+                  "removed that refit."),
          "ks": list(KS), "aggregate": agg, "runs": res,
          "per_shape_vs_vendor": per_shape}, ensure_ascii=False, indent=1))
     print(f"\n  {json.dumps(agg, ensure_ascii=False)}")

@@ -195,7 +195,8 @@ def main() -> None:
     ap.add_argument("--campaign", choices=tuple(CAMPAIGNS), default="nk4")
     ap.add_argument("--only", nargs="*", default=list(GPUS))
     ap.add_argument("--out", default=str(OUT))
-    # ★ `canonical_score` refits per regime at 300 evals on rules of up to 83
+    # ★ When these numbers were made `canonical_score` refitted at 300
+    #   evals (⛔ D-182 removed that) on rules of up to 83
     #   weights — measured at ~2.5 min per run, so 48 runs in one process is
     #   two hours. The four tables are independent, so they are computed in
     #   four processes and merged here. **Same computation, same numbers** —

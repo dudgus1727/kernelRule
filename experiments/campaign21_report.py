@@ -195,7 +195,8 @@ def build(d: dict, b: dict, lc: dict) -> str:
     # -- 2 ---------------------------------------------------------------
     add(f"## 2. {d['n_runs']}실행")
     add("")
-    add("`canonical_score` = 체제별로 학습 분할에서 재적합해 홀드아웃에서 잰 값. "
+    add("`canonical_score` = 홀드아웃에서 잰 값. ⛔ 이 수치를 낼 때는 학습 "
+        "분할에서 가중치를 다시 맞췄다 — D-182 가 그 적합을 없앴다. "
         "`train`/`val` 은 루프가 스스로 기록한 것.")
     add("")
     add("| 실행 | 표 | 분할 | holdout | in-sample | train | val | w | 분 | 축 | 호출 |")

@@ -10,11 +10,15 @@
 원주민           LLM 103회  the rule grown on that table and fold
 ```
 
-⚠️ **Every column is `canonical_score`** — per-regime refit on the target's
-training split, read on its holdout. That is the same procedure the transfer
-table's `(a)`/`(b)`/`native` use, so the row can be read across. ⛔ The
-loop's own `best_val_regret` is a **single** global fit and is not put in
-this table.
+⚠️ **Every column is `canonical_score`**, read on the target's holdout —
+the same procedure as the transfer table's `(a)`/`(b)`/`native`, so the row
+can be read across. ⛔ The loop's own `best_val_regret` is a different thing
+and is not put in this table.
+
+⛔ **2026-09-18 (D-182)** — the numbers in `porting-cost.json` were produced
+when `canonical_score` still **refitted** the weights on the target's
+training split. That refit is gone. ★ These recorded values stand as they
+are; re-running this script today would produce different ones.
 """
 
 from __future__ import annotations
@@ -67,10 +71,10 @@ def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(OUT))
-    # ★ One direction costs 6 canonical scores (per-regime refits at 300
-    #   evals). 12 of them is about 90 minutes, so they are sharded by
-    #   target table and merged. ⛔ The computation per direction is
-    #   unchanged.
+    # ★ One direction costs 6 canonical scores. When these numbers were
+    #   made that meant 6 refits at 300 evaluations and 12 directions took
+    #   about 90 minutes, so they are sharded by target table and merged.
+    #   ⛔ D-182 removed the refit — the shape of the run is kept.
     ap.add_argument("--dst", default=None)
     ap.add_argument("--merge", nargs="*", default=None)
     a = ap.parse_args()
@@ -82,11 +86,12 @@ def main() -> None:
         rows.sort(key=lambda r: (r["src"], r["dst"]))
         Path(a.out).write_text(json.dumps(
             {"rounds": ROUNDS,
-             "note": ("⚠️ every column is canonical_score (per-regime refit "
-                      "on the target's train, read on its holdout) — the "
-                      "same procedure as the transfer table's "
-                      "(a)/(b)/native. ⛔ the loop's own best_val_regret is "
-                      "a single global fit and is not in this table."),
+             "note": ("⚠️ every column is canonical_score read on the "
+                      "target's holdout — the same procedure as the "
+                      "transfer table's (a)/(b)/native. ⛔ these values were "
+                      "produced while canonical_score still refitted on the "
+                      "training split; D-182 removed that refit and they "
+                      "are not reproducible today."),
              "rows": rows, "summary": _summary(rows)},
             ensure_ascii=False, indent=1))
         OUT_MD.write_text(_md(rows))
@@ -159,11 +164,12 @@ def main() -> None:
               + f" | 원주민 {ch['native']:.4f}  호출 {calls}")
     Path(a.out).write_text(json.dumps(
         {"rounds": ROUNDS,
-         "note": ("⚠️ every column is canonical_score (per-regime refit on "
-                  "the target's train, read on its holdout) — the same "
-                  "procedure as the transfer table's (a)/(b)/native. ⛔ the "
-                  "loop's own best_val_regret is a single global fit and is "
-                  "not in this table."),
+         "note": ("⚠️ every column is canonical_score read on the target's "
+                  "holdout — the same procedure as the transfer table's "
+                  "(a)/(b)/native. ⛔ these values were produced while "
+                  "canonical_score still refitted on the training split; "
+                  "D-182 removed that refit and they are not reproducible "
+                  "today."),
          "rows": rows, "summary": _summary(rows)}, ensure_ascii=False,
         indent=1))
     OUT_MD.write_text(_md(rows))

@@ -67,7 +67,8 @@ def _best(run: str, by: str) -> dict:
 def _fit(code, w0, table, matrix, train, objective, *,
          rank_top_k: int = TOP_N, rank_lambda: float = 0.0,
          method: str = "nelder-mead", n_restarts: int = 4):
-    """It fits per regime — the final scoring procedure (§10).
+    """It fits per regime — ⛔ the final scoring procedure **as it was**
+    when this ran. D-179 removed the regime split and D-182 removed the fit.
 
     ★ `rank_top_k` / `rank_lambda` are **conditions of that run**. Leaving
     them at the default measures the whole k sweep and λ sweep at k=100 and
