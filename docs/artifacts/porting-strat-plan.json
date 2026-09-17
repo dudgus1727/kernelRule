@@ -1,0 +1,173 @@
+{
+ "ns": [
+  4,
+  8,
+  16
+ ],
+ "tables": {
+  "a6000": {
+   "n_train": 48,
+   "m_cuts": [
+    256.0,
+    1024.0
+   ],
+   "strata_sizes": {
+    "comp|M_mid": 18,
+    "mem|M_low": 15,
+    "comp|M_high": 11,
+    "comp|M_low": 3,
+    "mem|M_mid": 1
+   },
+   "alloc": {
+    "4": {
+     "comp|M_mid": 1,
+     "mem|M_low": 1,
+     "comp|M_high": 1,
+     "comp|M_low": 1,
+     "mem|M_mid": 0
+    },
+    "8": {
+     "comp|M_mid": 2,
+     "mem|M_low": 2,
+     "comp|M_high": 2,
+     "comp|M_low": 1,
+     "mem|M_mid": 1
+    },
+    "16": {
+     "comp|M_mid": 4,
+     "mem|M_low": 4,
+     "comp|M_high": 4,
+     "comp|M_low": 3,
+     "mem|M_mid": 1
+    }
+   },
+   "unfilled": {
+    "4": [
+     "mem|M_mid"
+    ],
+    "8": [],
+    "16": []
+   }
+  },
+  "5090": {
+   "n_train": 47,
+   "m_cuts": [
+    512.0,
+    2048.0
+   ],
+   "strata_sizes": {
+    "comp|M_high": 15,
+    "comp|M_mid": 14,
+    "comp|M_low": 9,
+    "mem|M_low": 9
+   },
+   "alloc": {
+    "4": {
+     "comp|M_high": 1,
+     "comp|M_mid": 1,
+     "comp|M_low": 1,
+     "mem|M_low": 1
+    },
+    "8": {
+     "comp|M_high": 2,
+     "comp|M_mid": 2,
+     "comp|M_low": 2,
+     "mem|M_low": 2
+    },
+    "16": {
+     "comp|M_high": 4,
+     "comp|M_mid": 4,
+     "comp|M_low": 4,
+     "mem|M_low": 4
+    }
+   },
+   "unfilled": {
+    "4": [],
+    "8": [],
+    "16": []
+   }
+  },
+  "4090": {
+   "n_train": 47,
+   "m_cuts": [
+    512.0,
+    4096.0
+   ],
+   "strata_sizes": {
+    "comp|M_mid": 17,
+    "mem|M_low": 12,
+    "comp|M_high": 11,
+    "comp|M_low": 6,
+    "mem|M_high": 1
+   },
+   "alloc": {
+    "4": {
+     "comp|M_mid": 1,
+     "mem|M_low": 1,
+     "comp|M_high": 1,
+     "comp|M_low": 1,
+     "mem|M_high": 0
+    },
+    "8": {
+     "comp|M_mid": 2,
+     "mem|M_low": 2,
+     "comp|M_high": 2,
+     "comp|M_low": 1,
+     "mem|M_high": 1
+    },
+    "16": {
+     "comp|M_mid": 4,
+     "mem|M_low": 4,
+     "comp|M_high": 4,
+     "comp|M_low": 3,
+     "mem|M_high": 1
+    }
+   },
+   "unfilled": {
+    "4": [
+     "mem|M_high"
+    ],
+    "8": [],
+    "16": []
+   }
+  },
+  "h100": {
+   "n_train": 47,
+   "m_cuts": [
+    512.0,
+    4096.0
+   ],
+   "strata_sizes": {
+    "comp|M_mid": 17,
+    "comp|M_high": 12,
+    "comp|M_low": 9,
+    "mem|M_low": 9
+   },
+   "alloc": {
+    "4": {
+     "comp|M_mid": 1,
+     "comp|M_high": 1,
+     "comp|M_low": 1,
+     "mem|M_low": 1
+    },
+    "8": {
+     "comp|M_mid": 2,
+     "comp|M_high": 2,
+     "comp|M_low": 2,
+     "mem|M_low": 2
+    },
+    "16": {
+     "comp|M_mid": 4,
+     "comp|M_high": 4,
+     "comp|M_low": 4,
+     "mem|M_low": 4
+    }
+   },
+   "unfilled": {
+    "4": [],
+    "8": [],
+    "16": []
+   }
+  }
+ }
+}

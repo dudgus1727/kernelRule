@@ -56,6 +56,10 @@ def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
     ap.add_argument("--dst", default=None)
+    # ★ D-178 — the same aggregation for the stratified runs (`ps2-`). The
+    #   computation is identical; only which runs are read changes.
+    ap.add_argument("--prefix", default="ps",
+                    choices=("ps", "ps2"))
     ap.add_argument("--merge", nargs="*", default=None)
     ap.add_argument("--out", default=str(OUT))
     a = ap.parse_args()
@@ -66,12 +70,16 @@ def main() -> None:
         rows.sort(key=lambda r: (r["N"], r["src"], r["dst"]))
         Path(a.out).write_text(json.dumps(
             {"rounds": ROUNDS, "ns": list(NS), "rows": rows,
+             "prefix": a.prefix,
              "note": ("⚠️ weights refitted on that run's N shapes only, read "
                       "on the whole fold0 holdout — the same procedure as "
                       "(a). ⛔ not canonical_score with the full train.")},
             ensure_ascii=False, indent=1))
-        OUT_MD.write_text(_md(rows))
-        print(f"merged -> {a.out}  ({len(rows)} rows)")
+        # ⛔ the md follows `--out`, not a fixed name — merging the D-178
+        #   stratified rows once overwrote D-177's md with them.
+        md = Path(a.out).with_suffix(".md")
+        md.write_text(_md(rows, prefix=a.prefix))
+        print(f"merged -> {a.out}\n  -> {md}  ({len(rows)} rows)")
         _summary(rows)
         return
 
@@ -79,8 +87,8 @@ def main() -> None:
     print("=" * 112)
     print("★ (b) 루프 곡선 — N 형상 · 3라운드 (D-177). 0 LLM 호출")
     print("=" * 112)
-    for d in sorted(Path("runs").glob("ps-*-f0")):
-        m = re.match(r"ps-(\w+)2(\w+)-n(\d+)-f0$", d.name)
+    for d in sorted(Path("runs").glob(f"{a.prefix}-*-f0")):
+        m = re.match(rf"{a.prefix}-(\w+)2(\w+)-n(\d+)-f0$", d.name)
         if not m:
             continue
         src, dst, n = m.group(1), m.group(2), int(m.group(3))
@@ -167,8 +175,10 @@ def _summary(rows: list[dict]) -> None:
               f"{beat:>7}/{len(rs)} {st.median([r['llm_calls'] for r in rs]):>9.0f}")
 
 
-def _md(rows: list[dict]) -> str:
-    L = ["# The (b) loop curve — N target shapes (D-177)", "",
+def _md(rows: list[dict], prefix: str = "ps") -> str:
+    who = ("D-177 · ★ 무작위 뽑기" if prefix == "ps"
+           else "D-178 · ★ 층화 뽑기")
+    L = [f"# The (b) loop curve — N target shapes ({who})", "",
          ("> **reproduce** `python3 -m experiments.porting_shapes_curve "
           "--dst <gpu>` then `--merge` · 0 LLM calls"),
          ("> ⚠️ weights refitted on that run's **N shapes only**, read on "
