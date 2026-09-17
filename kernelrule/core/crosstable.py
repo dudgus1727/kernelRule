@@ -105,10 +105,14 @@ def bound_flipped(a, b, shapes=None) -> list[tuple[Problem, bool, bool]]:
 
     `(shape, memory-bound in a?, memory-bound in b?)`.
 
-    Weights are fitted per regime (§10), so if the regime verdict differs
+    A rule may branch on `p.is_memory_bound`, so if the verdict differs
     per table **the two tables measure different things.** Letting it pass
     silently can make "it did not transfer" actually mean "we compared
     different things".
+
+    ⛔ 2026-09-17 (D-179): this used to say "weights are fitted per regime".
+    Scoring fits **one** vector now; what still depends on the verdict is
+    the rule's own branch.
     """
     sh = shapes if shapes is not None else common_shapes(a, b)
     ra, rb = _ridge(a.hw), _ridge(b.hw)
@@ -140,8 +144,8 @@ class CrossReport:
             return f"{k}/{n} = {k / n:.0%}" if n else f"{k}/0"
         drop_a = frac(self.n_shapes_a - self.n_shapes_common, self.n_shapes_a)
         drop_b = frac(self.n_shapes_b - self.n_shapes_common, self.n_shapes_b)
-        flip = ("  — per-regime fitting measures different things in the "
-                "two tables"
+        flip = ("  — a rule branching on it measures different things in "
+                "the two tables"
                 if self.n_bound_flipped else "")
         return "\n".join([
             (f"  shapes    A {self.n_shapes_a}  B {self.n_shapes_b}  "

@@ -24,8 +24,9 @@ only runs when given a `SplitSet`, and overlap raises.
     weights     fitted by fit_weights          -> within whichever split
     prompt      edited by a human              -> `splits.test` only (§10.2)
 
-This function produces the **structure holdout**: weights are fitted per
-regime on `splits.train` and evaluated on `splits.val`.
+This function produces the **structure holdout**: ★ one weight vector is
+fitted on **all** of `splits.train` and evaluated on **all** of
+`splits.val`.
 
 ★ 2026-09-11 (D-166): ~~The loop used val only for the early-stop
 decision~~ — **the loop does not look at val at all.** Early stopping was

@@ -143,7 +143,7 @@ argsort / rankdata / sorted 를 쓰기 전에 "동률이면 무엇으로 가르�
 시드 선택   시드 3개짜리 값이었다
 묶음 선택   N개 중 최소를 골랐다
 규칙 선택   아카이브에서 무엇을 골랐나
-지표 선택   geomean 인가 승패인가 체제별인가
+지표 선택   geomean 인가 승패인가 구간별인가
 ```
 
 **각각이 낙관 편향을 만들고, 겹치면 곱해진다.**
@@ -644,7 +644,6 @@ D-35 에서 "형태 예시가 실제 피처를 건네주면 안 된다" 를 발�
 ```
 role/architect.md    f.traffic_amplification / f.tail_waste
                      p.is_memory_bound / p.roofline_ratio
-                     (SOL 값은 D-179 에서 없어졌다)
 _base.md             "예: if p.is_memory_bound:"
 role/_rules_common   f.waves / f.tile_bytes
 role/optimize.md     f.waves / f.tail_waste      <- D-35 이 고친 파일이다

@@ -80,7 +80,7 @@ class LoopConfig:
     #: **criterion**:
     #: ```
     #: even when the loop's internal score (best_val_regret) is flat,
-    #: ★ the final scoring (per-regime refit -> holdout) keeps improving
+    #: ★ the final scoring (a refit on train -> holdout) keeps improving
     #: -> stopping on the internal score loses final performance in
     #:    principle (D-131: +0.0187)
     #: raising patience to 5 only shrinks the size; the problem is the same

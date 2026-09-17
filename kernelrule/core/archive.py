@@ -192,8 +192,7 @@ class Archive:
         #: — every run so far is under that condition. `"rank"` runs **only
         #: when stated explicitly**.
         #:
-        #: ⚠️ The cell **axes** do not change (code length / per-regime
-        #: regret). The axes are the device that creates diversity and
+        #: ⚠️ The cell **axes** do not change (`n_terms` / `regime_skew`). The axes are the device that creates diversity and
         #: acceptance sets the goal — changing both together makes two
         #: variables (`rank-evo-prereg.md` correction).
         if select_by not in ("regret", "rank"):
