@@ -416,32 +416,42 @@ def test_shape_size_equality_is_banned_but_inequality_is_not():
                       n_weights=1).ok
 
 
-def test_the_path_counter_agrees_at_the_llm_boundary():
-    """★ The two counters must not diverge (the D-37 family).
+def test_many_paths_are_counted_and_not_refused():
+    """★ 2026-09-18 (D-187 §3) — **the path cap is gone.**
 
-    ⚠️ 2026-09-10 (D-152): this compared "static count > cap" with "the LLM
-    boundary refuses". There is no cap, so what is left to agree on is the
-    **path count** — the one thing both still refuse.
+    ⛔ This test used to check that the static counter and the LLM boundary
+    agreed on *refusing* a rule with more than `MAX_PATHS` paths (D-152,
+    itself a rewrite of the D-144 depth check). Neither refuses now.
+
+    ```
+    옛   경로 > 4        -> ⛔ 거부 (검사기 · LLM 경계 둘 다)
+    ★ 새  경로가 몇이든   -> ★ 통과 · 세어서 `n_paths` 로 ★ 보고만
+    ```
+
+    What is pinned instead: eight sequential `if`s (256 paths) **pass**, the
+    count is reported, and the LLM boundary agrees by also not refusing.
+    ⚠️ The count is what the campaign watches round by round — a rule that
+    passes while `n_paths` is wrong would make that record meaningless.
     """
-    from kernelrule.rules.checks import MAX_PATHS, literal_parameter_message
+    from kernelrule.rules.checks import literal_parameter_message
 
     ok = "def score(f, p, hw, w):\n    return f.waves * w[0]\n"
+    guards = ("is_memory_bound", "can_use_cp_async", "roofline_ratio")
     many = ("def score(f, p, hw, w):\n    s = f.waves * w[0]\n"
             + "".join(f"    if p.{g}:\n        s = s + f.tail_waste * w[{i}]\n"
-                      for i, g in enumerate(
-                          ("is_memory_bound", "can_use_cp_async",
-                           "roofline_ratio"), start=1))
+                      for i, g in enumerate(guards, start=1))
             + "    return s\n")
-    for code, nw in ((ok, 1), (many, 4)):
-        r = check_rule(code, feature_names=FEAT,
-                       shape_value_names=SHAPE | {"roofline_ratio",
-                                                  "can_use_cp_async"},
-                       n_weights=nw)
-        over_static = r.n_paths > MAX_PATHS
-        over_llm = literal_parameter_message(code, nw) is not None
-        assert over_static == over_llm, (
-            f"the two counters diverged: paths {r.n_paths}/{MAX_PATHS} vs "
-            f"boundary {over_llm}\n{code}")
+    names = SHAPE | {"roofline_ratio", "can_use_cp_async"}
+    r = check_rule(ok, feature_names=FEAT, shape_value_names=names,
+                   n_weights=1)
+    assert r.ok and r.n_paths == 1
+    r = check_rule(many, feature_names=FEAT, shape_value_names=names,
+                   n_weights=4)
+    assert r.ok, f"a 3-branch rule was refused: {r.reasons}"
+    assert r.n_paths == 2 ** len(guards), r.n_paths
+    assert not r.n_paths_capped
+    assert literal_parameter_message(many, 4) is None, \
+        "the LLM boundary still refuses what the checker accepts"
 
 
 # ---------------------------------------------------------------------------

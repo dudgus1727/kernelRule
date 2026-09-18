@@ -57,5 +57,5 @@ def score(f, p, hw, w):
 ```
 len(w0) = 5, and the indices run 0..4 with no gaps
 ★ Split only when the physics differs — not to make the rule look bigger
-⚠️ There may be at most 4 execution paths
+★ Split as often as the physics asks — name the bottleneck for each
 ```

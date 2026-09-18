@@ -987,11 +987,31 @@ class OpenAILLM:
             #   asking for one made the model trim the rule instead (D-149).
             one_change = ("Reflect the hypothesis as fully as it needs — "
                           "several terms, a split, or a replacement. ")
+            # ★ 2026-09-18 (D-187 §1) — "removing" and "rewriting" are two
+            #   different things and this block said only the first. Read as
+            #   one sentence it came out as "leave the existing terms
+            #   alone", and the model then only ever **added**: measured,
+            #   existing terms were modified in 2.6% of transfer edits and
+            #   4.4% of campaign-2 edits, with 42/64 runs at zero. A term
+            #   that pushes the ranking the wrong way then survives to the
+            #   last round and new terms are piled on to cancel it.
+            #   ⛔ The removal bar is left exactly where D-149 put it — it is
+            #   what stops the model from trimming the rule instead of
+            #   improving it. Only rewriting is opened.
             applied_warn = (
                 "\n**Do not undo the effect of the existing hypotheses.** The "
-                "terms listed below\nare there for a reason. Removing one "
+                "terms listed below\nare there for a reason. **Removing** one "
                 "requires evidence that this round's\nhypothesis invalidates "
-                "that reason.\n")
+                "that reason.\n"
+                "\n**Rewriting one is a different thing, and it is welcome.** "
+                "A term can be there\nfor a good reason and still be wrong in "
+                "its form or in its sign. If the cases\nshow that a term "
+                "pushes the ranking the wrong way, **change that term** — its "
+                "\nform, its sign, what it is multiplied by. Adding a second "
+                "term to cancel the\nfirst is not a fix: both stay, and the "
+                "rule carries two terms where the physics\nhas one.\n"
+                "\nIn `changes`, say which existing term you rewrote and what "
+                "in the cases told\nyou its direction was wrong.\n")
         else:
             hyp_block = inputs_hyp = one_change = applied_warn = ""
         # ★ There is a second parent only under `cross` (D-96). Without

@@ -64,7 +64,8 @@ fix could break gives the next round something to check.
 
 A hypothesis may ask for as much as the physics needs. When two regimes have
 different bottlenecks, the rule **splits a branch** and each branch gets its
-own weights — there may be at most 4 execution paths.
+own weights. Ask for as many branches as the physics has bottlenecks, and
+name the bottleneck each one is for.
 
 ## Can it be measured with existing features
 

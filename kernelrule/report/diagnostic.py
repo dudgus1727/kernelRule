@@ -259,6 +259,75 @@ def _cfg_summary(row: dict) -> str:
             f"sk{row['split_k']}{row['split_k_mode'][:3]}")
 
 
+#: ★ D-187 §2 — the config axes the per-axis bias line is computed over.
+#:
+#: **These are CUTLASS's own parameters**, read straight off the candidate
+#: row; not one of them is a summary we invented (⛔ the band labels D-156
+#: deleted were ours, and the model branched on them). Two groups, because
+#: "we picked smaller" only means something on an ordered axis:
+#:
+#: ```
+#: ★ ordered    tile_m tile_n tile_k split_k ext_warp_m ext_warp_n
+#:              ext_stages ext_swizzle_n
+#:              -> counted as picked-below / picked-above, with medians
+#: ★ unordered  split_k_mode ext_swizzle_type
+#:              -> counted as matches / differs only
+#: ⛔ excluded   kernel_id — an identifier, and a function of the others
+#: ```
+#:
+#: ⚠️ This tells the model **where to look**, and that is a real change to
+#: the experiment: it is recorded in the run artefact (`report_axes`) so a
+#: paper can state it. ⛔ It does not tell it **what to conclude** — the
+#: counts are computed from the cases in hand and the sentence is built from
+#: them (§12, the rule against nailing conclusions in).
+_BIAS_AXES_ORDERED = ("tile_m", "tile_n", "tile_k", "split_k",
+                      "ext_warp_m", "ext_warp_n", "ext_stages",
+                      "ext_swizzle_n")
+_BIAS_AXES_UNORDERED = ("split_k_mode", "ext_swizzle_type")
+
+
+def _axis_bias(cases: list) -> list[str]:
+    """★ Per config axis, how the picked config sat against the optimal one
+    (D-187 §2). **No new measurement** — the two configs are already in
+    every case; this counts them.
+
+    ## Why it is needed
+
+    The cases carry the pick and the optimum as **strings**, so reading a
+    bias off them means holding ten to fifteen of them in mind and counting.
+    Measured on one run, the same hypothesis came back in eleven rounds out
+    of twelve and was accepted in one.
+    """
+    import statistics as _st
+
+    losing = [c for c in cases if c.kind != "best"]
+    if not losing:
+        return []
+    out = []
+    for ax in _BIAS_AXES_ORDERED:
+        pairs = [(float(c.picked[ax]), float(c.optimum[ax])) for c in losing
+                 if ax in c.picked and ax in c.optimum]
+        if not pairs:
+            continue
+        lo = sum(1 for a, b in pairs if a < b)
+        hi = sum(1 for a, b in pairs if a > b)
+        if lo == 0 and hi == 0:
+            out.append(f"{ax:16s} {len(pairs)}/{len(pairs)} equal")
+            continue
+        mp = _st.median([a for a, _ in pairs])
+        mo = _st.median([b for _, b in pairs])
+        out.append(f"{ax:16s} ours below in {lo}/{len(pairs)}, above in "
+                   f"{hi}/{len(pairs)}  (median ours {mp:g} vs best {mo:g})")
+    for ax in _BIAS_AXES_UNORDERED:
+        pairs = [(c.picked[ax], c.optimum[ax]) for c in losing
+                 if ax in c.picked and ax in c.optimum]
+        if not pairs:
+            continue
+        diff = sum(1 for a, b in pairs if a != b)
+        out.append(f"{ax:16s} differs in {diff}/{len(pairs)}")
+    return out
+
+
 def _sigma(t_pick: float, t_opt: float, noise) -> float:
     """How many times the noise floor the gap is.
 
@@ -524,6 +593,18 @@ def _render(r: DiagnosticReport) -> str:
     add("**Picked vs optimal, side by side.** The neighbouring configs tell")
     add("you whether the optimum is sharp or wide — wide does not mean you")
     add("must hit it exactly.")
+    # ★ D-187 §2 — the same two configs, counted per axis instead of read
+    #   case by case. ⛔ No new measurement and no conclusion: the counts
+    #   come from the cases below and the reader draws from them.
+    bias = _axis_bias(r.cases)
+    if bias:
+        add("")
+        add("Per config axis, over the losing cases below — **counted, not "
+            "concluded**:")
+        add("```")
+        for line in bias:
+            add(line)
+        add("```")
     for i, c in enumerate(r.cases, 1):
         add("")
         # ⚠️ 2026-09-10 (D-156): the band label that stood here

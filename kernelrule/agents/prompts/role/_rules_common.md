@@ -71,9 +71,9 @@ weights are usually positive.
    Physics must be the reason for a split — not the shape of the code.
    ⚠️ Terms **outside** the `if/else` belong to every path. `np.where` is
    not a branch — both sides are computed, so it is one path.
-   ⚠️ There may be **at most 4 execution paths**.
-   Two levels of nesting · `if/elif/elif/else` · two sequential `if`s —
-   all of those are 4 paths.
+   ★ Split as many times as the physics asks for. **Every split must be a
+   bottleneck you can name** — a branch you cannot say the physics of is a
+   way of fitting more shapes.
 
 6. ★ **`len(w0)` must equal the largest index you use + 1, exactly.**
    An index you never use is still fitted, so it would be a free parameter.

@@ -54,7 +54,7 @@ in one pass.**
 ```
 [ ] 1. len(w0) == the largest index used + 1, with no gaps
 [ ] 2. no shape constant applied to the accumulated score
-[ ] 3. at most 4 execution paths
+[ ] 3. every branch is a physical claim, not a way to fit more shapes
 ```
 
 The reasoning and the examples are in **"Absolute rules"** above (6, 5, 2).

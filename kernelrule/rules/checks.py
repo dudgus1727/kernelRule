@@ -28,7 +28,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 
-__all__ = ["FITTER_SWITCH_DIM", "MAX_PATHS", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
+__all__ = ["FITTER_SWITCH_DIM", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
            "weight_reuse_message", "literal_parameter_message",
            "exponent_message", "exponent_indices", "weight_bounds",
            "EXPONENT_BOUNDS",
@@ -252,22 +252,34 @@ def _paths(stmts, counted_ids: set[int], *,
     return paths
 
 
-#: ★ The cap on the number of execution paths (D-145). 4 paths -> at most
-#: 32 effective parameters.
+#: ⛔ **2026-09-18 (D-187 §3) — `MAX_PATHS = 4` is gone.** It refused a rule
+#: with more than four execution paths (D-145; before that
+#: `MAX_BRANCH_DEPTH = 2`, D-144 — depth does not bound the path count,
+#: since an `elif` is an `If` inside `orelse` and four sequential `if`s are
+#: 16 paths at depth 1).
 #:
-#: ⚠️ The old value was `MAX_BRANCH_DEPTH = 2` (D-144). **Depth does not
-#: bound the path count** — in the Python AST an `elif` is an `If` inside
-#: `orelse`, so it eats depth:
+#: ## Why it was removed
 #:
-#: ```
-#: nested if/else, 2 levels   depth 2  4 paths    passed
-#: if/elif/elif/else          depth 3  4 paths    ⛔ refused, same 4 paths
-#: 4 sequential ifs           depth 1  16 paths   ⛔ depth did not catch it
-#: ```
+#: It stopped being a safety valve and started deciding **how** a defect
+#: could be fixed. Measured on one run: the rule reached four paths at
+#: round 10, and when the next round's hypothesis needed a new branch there
+#: was none to be had — it went in as a narrow `np.where` instead and
+#: switched itself off over most of the split.
 #:
-#: **The syntax split identical path counts.** The paths are counted
-#: directly.
-MAX_PATHS = 4
+#: ⚠️ **What this opens, stated plainly.** Paths multiply, so the cap of 4
+#: was also the only thing bounding nesting (two levels). Nothing now
+#: refuses three or five levels: `_branch_depth` is computed for reporting
+#: and has never been enforced. What is left is `LIMITS.ast_nodes` (3000)
+#: and `max_lines` (400), and **neither bounds the path count** — 100
+#: sequential `if`s fit in 3000 nodes.
+#:
+#: ⛔ This is an experiment with a known risk, not a tidy-up: the round-by-
+#: round path count is recorded and reported, and so is whether the holdout
+#: got worse as it grew (D-187 §3-4).
+#:
+#: ★ `_PATH_BUILD_CAP` below is **not** that cap coming back. Nothing is
+#: refused by it — it only stops the counter from materialising 2^100 paths.
+_PATH_BUILD_CAP = 4096
 
 #: Calls that are **always 1** when the argument is finite. They can only
 #: be used to manufacture a constant.
@@ -383,15 +395,13 @@ def literal_parameter_message(code: str, n_weights: int,
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
     if fnode is None:
         return None
-    # ★ The same `_paths` as `check_rule` — counted separately they would
-    #   diverge (the D-37 family).
-    paths = _paths(fnode.body, {id(n) for n in counted}, cap=MAX_PATHS)
-    if len(paths) > MAX_PATHS:
-        return (f"there are more than {MAX_PATHS} execution paths. "
-                f"**At most {MAX_PATHS}** are allowed — beyond that the "
-                f"paths explode and the rule becomes a lookup table. Two "
-                f"levels of nesting, `if/elif/elif/else`, and two sequential "
-                f"`if`s are all 4 paths")
+    # ⛔ 2026-09-18 (D-187 §3) — the path-count refusal that stood here is
+    #   gone, and with it the last thing this function refused. It is kept
+    #   (not deleted) because it is the LLM-boundary half of a pair: if the
+    #   two counters ever diverge again, this is where the other half goes.
+    #   ★ `fnode` is still walked so the counting stays shared with
+    #   `check_rule` (the D-37 family).
+    _paths(fnode.body, {id(n) for n in counted}, cap=_PATH_BUILD_CAP)
     return None
 
 
@@ -706,9 +716,14 @@ class CheckReport:
     #: The maximum nesting depth of `if`. ⚠️ For reporting — the verdict is
     #: made by `n_paths`.
     branch_depth: int = 0
-    #: ★ The number of execution paths (D-145). Beyond the cap it stops at
-    #: `MAX_PATHS + 1`.
+    #: ★ The number of execution paths (D-145). ⛔ Nothing refuses it any
+    #: more (D-187 §3) — it is **measured and reported**, and it is the
+    #: number the campaign watches round by round.
     n_paths: int = 0
+    #: ★ Did the counter stop building at `_PATH_BUILD_CAP`? Then `n_paths`
+    #: is a floor, not the count. ⚠️ Report it if it is ever true — it means
+    #: a rule reached thousands of paths.
+    n_paths_capped: bool = False
 
     @property
     def parameters_used(self) -> int:
@@ -1003,17 +1018,14 @@ def check_rule(code: str, *, feature_names, shape_value_names,
     fnode = next((n for n in tree.body if isinstance(n, ast.FunctionDef)), None)
     if fnode is not None:
         rep.branch_depth = _branch_depth(fnode)
-        paths = _paths(fnode.body, {id(n) for n in _counted}, cap=MAX_PATHS)
+        paths = _paths(fnode.body, {id(n) for n in _counted},
+                       cap=_PATH_BUILD_CAP)
         rep.n_paths = len(paths)
+        rep.n_paths_capped = rep.n_paths > _PATH_BUILD_CAP
         #: Reported, not enforced — "how many parameters did it settle on"
-        #: is now a **result** (D-150 §1-5).
+        #: is now a **result** (D-150 §1-5), and since D-187 §3 so is the
+        #: path count itself. ⛔ Nothing is refused here.
         rep.path_parameters = sorted(len(a) + len(b) for a, b in paths)
-        if rep.n_paths > MAX_PATHS:
-            bad(f"there are more than {MAX_PATHS} execution paths. At most "
-                f"{MAX_PATHS} are allowed — beyond that the paths explode "
-                f"and the rule becomes a lookup table (two levels of "
-                f"nesting, if/elif/elif/else, and two sequential ifs are "
-                f"all 4 paths)")
 
     # -- ★ No config-level branching --------------------------------------
     for node in ast.walk(tree):
