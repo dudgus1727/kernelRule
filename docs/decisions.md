@@ -126,6 +126,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-183](#d-183-캠페인-2-재집계-오염된-홀드아웃을-걷어낸다-2026-09-18)  캠페인 2 재집계 — 오염된 홀드아웃을 걷어낸다 (2026-09-18)
 - [D-184](#d-184-홀드아웃을-valtest-로-쪼개-라운드를-고르면-나은가-아니다-2026-09-18)  홀드아웃을 val/test 로 쪼개 라운드를 고르면 나은가 — ⛔ 아니다 (2026-09-18)
 - [D-185](#d-185-valtest-를-무작위로-쪼개-다시-같은-판정-2026-09-18)  val/test 를 ★ 무작위로 쪼개 다시 — ⛔ 같은 판정 (2026-09-18)
+- [D-186](#d-186-남은-네-릴리즈-재집계-판정이-두-곳에서-뒤집힌다-2026-09-18)  남은 네 릴리즈 재집계 — ★ 판정이 두 곳에서 뒤집힌다 (2026-09-18)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -11071,3 +11072,147 @@ python3 -m experiments.valtest_split --merge <f...> --out docs/artifacts/valtest
 
 ⛔ D-184 의 수치는 고치지 않았다 — 대조군으로 남긴다.
 ⛔ 이 결과로 c2 수치도 고치지 않았다.
+
+---
+
+## D-186  남은 네 릴리즈 재집계 — ★ 판정이 두 곳에서 뒤집힌다 (2026-09-18)
+
+D-182 가 채점기에서 적합을 없앴고 D-183 이 캠페인 2 의 **오염된 홀드아웃**을
+걷어냈다. 그 두 가지를 아직 반영하지 않은 릴리즈가 넷 남아 있었다 —
+`porting-cost` · `porting-shapes` · `porting-strat` · `baselines`. 넷을 같은
+자리에서 다시 냈다. ⛔ **LLM 0회 · GPU 0 · 규칙 재진화 0회 · 오토튜닝 재실행
+0회** — 이미 저장된 `code`·`w` 를 다시 채점만 했다.
+
+### ① 적합이 남는 곳과 없는 곳 — 먼저 못 박는다
+
+```
+★ 적합 있음   (b) 가중치 재적합 · porting_shapes._refit 의 N 형상 적합
+              -> 그것이 그 실험의 ★ 본체이므로 뺄 수 없다
+⛔ 적합 없음   원주민 · (a) 그대로 · 루프 곡선의 ★ 각 라운드 채점
+              -> 저장된 w 가 이미 그 라운드의 답이다 (D-182 와 같은 갈래)
+```
+
+### ② 넷이 같은 자리를 보게 하는 창구 하나 — `experiments/c2_ref.py`
+
+```python
+native(gpu, fold)        # campaign2.json 의 4시드 홀드아웃 ★ 중앙
+transfer(src, dst, fold) # campaign2-transfer.json 의 재집계 칸
+label()                  # 산출물 note 에 박는 한 줄
+```
+
+⛔ `runs/*/stage2-rule-writer/chosen.json` 에 박힌 `a_as_is`·`native` 는
+**읽지 않는다.** 그것은 "적합 있던 채점 + `nkgroup` 원주민" 이다.
+
+⚠️ **이 함정에 실제로 빠졌다.** `porting_shapes_curve.py` 가 주석으로는
+"재집계본을 본다" 고 적어 놓고 코드로는 `chosen.json` 을 읽고 있었다. 씨앗
+대조가 36/36 어긋나서 드러났다 — 고친 뒤 **0/36**.
+
+### ③ 씨앗 대조 — 적합을 빼면 씨앗은 곧 `(a) 그대로`다
+
+루프 곡선의 `r−1`(씨앗)은 **옮긴 규칙 + 소스의 `w`** 를 적합 없이 채점한
+값이다. 그러면 그것은 전이표의 `(a) 그대로`와 **같은 자**여야 한다.
+
+```
+무작위(ps)  불일치 ★ 0/36   (허용 1e-9)
+층화(ps2)   불일치 ★ 0/36
+```
+
+### ④ 옛↔새 — 판정이 바뀐 곳
+
+```
+                          옛         ★ 새       원주민넘음
+① 전이 비용 r5          −0.0012    ★ −0.0048   6/12 -> ★ 9/12
+② 층화 (b) 루프 N=16    +0.0105    ★ −0.0125   4/12 -> ★ 7/12
+   무작위 (b) 루프 N=16  +0.0381      +0.0098   1/12 ->   5/12
+③ 오토튜닝              ★ 곡선 한 칸도 안 바뀜 · 교차 k 만 작아짐
+④ 단일 에이전트         0/4        ★ 1/4       (5090 1.0455 < 루프 1.0544)
+```
+
+★ **두 곳에서 판정이 뒤집힌다.**
+
+```
+② 옛 기록의 말   "층화 N=16 은 48형상 전체 재적합과 ★ 같다"
+                  (+0.0105 vs 48형상 +0.0104)
+   ★ 새 말        "층화 N=16 이 48형상보다 ★ 낫다"
+                  (−0.0125 vs 48형상 ★ +0.0199)
+
+④ 옛 기록의 말   "단일 에이전트는 네 표 전부에서 루프에 진다" (0/4)
+   ★ 새 말        "5090 한 표에서 ★ 이긴다" (1/4)
+                  ⚠️ 예산은 여전히 안 맞다 — 10회 대 103회
+```
+
+⚠️ ④ 는 **네 표 중 하나**다. 3/4 은 그대로 루프가 낫고, 4090 은 1.0595 대
+1.0586 으로 0.0009 차다. ⛔ "단일이면 된다" 로 읽지 마라.
+
+### ⑤ 오토튜닝은 왜 안 바뀌었나
+
+곡선(k별 regret)은 **표만으로 계산**한다 — 규칙도 원주민도 들어가지 않는다.
+바뀐 것은 **k=0 의 "우리 규칙" 점 하나**뿐이고, 그 점이 올라가니
+(a6000 1.1004 → 1.1558) 오토튜닝이 우리를 **더 일찍** 따라잡는다.
+
+```
+표      k=0 우리규칙        random 교차 k      tpe 교차 k
+a6000   1.1004 -> 1.1558   64 -> ★ 32        64 -> ★ 32
+5090    1.0305 -> 1.0544   64 -> ★ 32       128 -> ★ 32
+4090    1.0385 -> 1.0586  128 -> ★ 32       128 -> ★ 32
+h100    1.0494 -> 1.1085 1024 -> ★ 256      512 -> ★ 64
+```
+
+⚠️ 위는 **fold0** 의 교차점이다 (`rescore-all.md`). 표 단위로 모은 값은
+`autotune-curve.md` 에 있고 거기서도 같은 방향이다 (h100 1024 → 512).
+
+★ **이것은 우리에게 불리한 정정이다.** 옛 k=0 점은 적합이 있던 채점에서
+나온 낙관적인 값이었다.
+
+### ⑥ 세 번째 종류의 변화 — 옛 머리글이 절차를 틀리게 적고 있었다
+
+`porting-cost.md` 의 머리글이 "모든 열이 `canonical_score` — 대상의 학습
+분할에서 **체제별 재적합**하고 홀드아웃에서 읽는다" 였다. 그 절차는
+D-182 에서 사라졌다. ⛔ 지우지 않고 **정정으로 이었다**.
+
+### ⑦ 재현
+
+```
+python3 -m experiments.c2_transfer_rescore --merge <f...>    # D-183 §3
+python3 -m experiments.porting_cost --merge <f...>
+python3 -m experiments.porting_shapes --dst <g>   # (a) 곡선 · 무작위
+python3 -m experiments.porting_strat  --dst <g>   # (a) 곡선 · 층화
+python3 -m experiments.porting_shapes_curve --prefix ps  --merge <f...>
+python3 -m experiments.porting_shapes_curve --prefix ps2 --merge <f...>
+python3 -m experiments.single_agent
+python3 -m experiments.autotune_report --merge
+python3 -m experiments.rescore_diff --ref 266630c   # ★ 옛↔새 대조 · 계산 0회
+python3 -m experiments.plot_data                    # ★ 그림 데이터 · 계산 0회
+```
+
+### ⑧ 남긴 것
+
+```
+docs/artifacts/rescore-all.{json,md}   ★ 옛↔새 대조 — 두 벌을 같이 싣는다
+docs/artifacts/porting-cost.csv        전이 비용 곡선 (dir,round,regret,native)
+docs/artifacts/porting-n.csv           N 곡선 (dir,N,arm,regret,native)
+docs/artifacts/autotune-curve.csv      ⛔ autotune_report 가 쓴다
+```
+
+⛔ 옛 수치를 지우지 않았다 — `rescore-all` 이 두 벌을 나란히 싣는다.
+⛔ 규칙을 다시 진화시키지 않았다. ⛔ 새 실험을 시작하지 않았다.
+
+### ⑨ 곁가지 — 시험 둘이 `main` 에서 이미 깨져 있었다
+
+D-182·D-183 이 남긴 자국이다. 둘 다 **본문이 아니라 글자를 읽고 있었다**.
+
+```
+test_canonical_scoring_pins_regret
+  옛   canonical 의 `fit_weights(` 호출에서 objective 를 읽는다
+  ⛔   D-182 가 그 호출을 없앴다 -> ValueError: substring not found
+  ★ 새  canonical 이 읽는 것이 `.regret` 뿐인가를 ★ AST 로 본다
+
+test_history_experiments_pin_their_objective
+  옛   `fit_weights(` 를 ★ 글자로 찾는다
+  ⛔   c2_rescore_check.py 의 ★ 설명문에 그 구절이 있어 걸렸다 (17행 · 95행)
+  ★ 새  AST 의 Call 만 센다 — 실제 호출 ★ 38개를 검사한다
+```
+
+★ D-182 의 `test_scoring_does_not_fit` 이 **제 설명문에 걸렸던 것과 같은
+덫**이다. 세 번째로 밟았으므로 적어 둔다: **소스를 검사하는 시험은 글자가
+아니라 AST 로 읽어라.**

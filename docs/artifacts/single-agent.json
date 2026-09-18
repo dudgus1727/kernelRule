@@ -2,9 +2,10 @@
  "aggregate": {
   "n": 4,
   "★ note": "⚠️ budgets are NOT matched — 10 LLM calls against the loop's 103 (12 rounds x 7). Stated, not corrected.",
-  "single_beats_loop": 0,
+  "note_d186": "★ D-186: 원주민과 (a) 는 ★ 적합 없이 채점한 값이고 (b) 와 _refit 만 적합한다. 옛 값은 '적합 있던 채점 + nkgroup 원주민' 이었다 (pending_fixes 22 · D-182 · D-183).",
+  "single_beats_loop": 1,
   "median_rank_of_train_winner": 1.5,
-  "median_selection_overfit": 0.003034
+  "median_selection_overfit": 0.001733
  },
  "rows": [
   {
@@ -14,17 +15,17 @@
    "llm_calls": 10,
    "chosen_i": 7,
    "chosen_train": 1.1259151547333541,
-   "chosen_holdout": 1.175046,
-   "★ train_winner_holdout_rank": 1,
-   "best_possible_holdout": 1.175046,
-   "selection_overfit": 0.0,
+   "chosen_holdout": 1.174296,
+   "★ train_winner_holdout_rank": 2,
+   "best_possible_holdout": 1.170831,
+   "selection_overfit": 0.003465,
    "train_spread": [
     1.1259151547333541,
     1.3201704266343677
    ],
    "holdout_spread": [
-    1.175046,
-    1.381415
+    1.170831,
+    1.3985
    ],
    "n_terms_median": 18.0,
    "n_paths_median": 1.0,
@@ -32,18 +33,20 @@
     "roofline_ratio"
    ],
    "c2_loop_holdout_seeds": [
-    1.091377,
-    1.094172,
-    1.106529,
-    1.112763
+    1.144908,
+    1.150272,
+    1.161354,
+    1.165942
    ],
-   "c2_loop_holdout_median": 1.100351,
+   "c2_loop_holdout_median": 1.155813,
    "c2_loop_llm_calls": 103,
    "candidates": [
     {
      "i": 0,
      "train": 1.1435339508061126,
-     "holdout": 1.24353,
+     "train_reproduced": 1.143534,
+     "train_repro_diff": 0.0,
+     "holdout": 1.170831,
      "n_terms": 20,
      "n_paths": 1,
      "branch_axes": [
@@ -53,7 +56,9 @@
     {
      "i": 1,
      "train": 1.2736159882522413,
-     "holdout": 1.290753,
+     "train_reproduced": 1.273616,
+     "train_repro_diff": 0.0,
+     "holdout": 1.290866,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -63,7 +68,9 @@
     {
      "i": 2,
      "train": 1.1895102513248372,
-     "holdout": 1.188707,
+     "train_reproduced": 1.18951,
+     "train_repro_diff": 0.0,
+     "holdout": 1.176602,
      "n_terms": 19,
      "n_paths": 1,
      "branch_axes": [
@@ -73,7 +80,9 @@
     {
      "i": 3,
      "train": 1.1603789333592973,
-     "holdout": 1.340279,
+     "train_reproduced": 1.160379,
+     "train_repro_diff": 0.0,
+     "holdout": 1.205332,
      "n_terms": 15,
      "n_paths": 1,
      "branch_axes": [
@@ -83,7 +92,9 @@
     {
      "i": 4,
      "train": 1.2236242545160076,
-     "holdout": 1.275497,
+     "train_reproduced": 1.223624,
+     "train_repro_diff": 0.0,
+     "holdout": 1.175749,
      "n_terms": 17,
      "n_paths": 1,
      "branch_axes": [
@@ -93,7 +104,9 @@
     {
      "i": 5,
      "train": 1.2814230492137748,
-     "holdout": 1.183882,
+     "train_reproduced": 1.281423,
+     "train_repro_diff": 0.0,
+     "holdout": 1.253412,
      "n_terms": 11,
      "n_paths": 1,
      "branch_axes": [
@@ -103,7 +116,9 @@
     {
      "i": 6,
      "train": 1.139112568853423,
-     "holdout": 1.249335,
+     "train_reproduced": 1.139113,
+     "train_repro_diff": 0.0,
+     "holdout": 1.17459,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -113,7 +128,9 @@
     {
      "i": 7,
      "train": 1.1259151547333541,
-     "holdout": 1.175046,
+     "train_reproduced": 1.125915,
+     "train_repro_diff": 0.0,
+     "holdout": 1.174296,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -123,7 +140,9 @@
     {
      "i": 8,
      "train": 1.3201704266343677,
-     "holdout": 1.381415,
+     "train_reproduced": 1.32017,
+     "train_repro_diff": 0.0,
+     "holdout": 1.329922,
      "n_terms": 15,
      "n_paths": 1,
      "branch_axes": [
@@ -133,7 +152,9 @@
     {
      "i": 9,
      "train": 1.2723527154154741,
-     "holdout": 1.198723,
+     "train_reproduced": 1.272353,
+     "train_repro_diff": 0.0,
+     "holdout": 1.3985,
      "n_terms": 19,
      "n_paths": 1,
      "branch_axes": [
@@ -149,17 +170,17 @@
    "llm_calls": 10,
    "chosen_i": 5,
    "chosen_train": 1.084713516940853,
-   "chosen_holdout": 1.075743,
+   "chosen_holdout": 1.045523,
    "★ train_winner_holdout_rank": 1,
-   "best_possible_holdout": 1.075743,
+   "best_possible_holdout": 1.045523,
    "selection_overfit": 0.0,
    "train_spread": [
     1.084713516940853,
     1.228018312674293
    ],
    "holdout_spread": [
-    1.075743,
-    1.309744
+    1.045523,
+    1.129935
    ],
    "n_terms_median": 13.5,
    "n_paths_median": 1.0,
@@ -167,18 +188,20 @@
     "roofline_ratio"
    ],
    "c2_loop_holdout_seeds": [
-    1.025161,
-    1.025768,
-    1.035299,
-    1.036018
+    1.036325,
+    1.052556,
+    1.056211,
+    1.087106
    ],
-   "c2_loop_holdout_median": 1.030533,
+   "c2_loop_holdout_median": 1.054384,
    "c2_loop_llm_calls": 103,
    "candidates": [
     {
      "i": 0,
      "train": 1.1174978522521224,
-     "holdout": 1.118604,
+     "train_reproduced": 1.117498,
+     "train_repro_diff": 0.0,
+     "holdout": 1.112769,
      "n_terms": 15,
      "n_paths": 1,
      "branch_axes": [
@@ -188,7 +211,9 @@
     {
      "i": 1,
      "train": 1.1006904958350385,
-     "holdout": 1.087286,
+     "train_reproduced": 1.10069,
+     "train_repro_diff": 0.0,
+     "holdout": 1.093576,
      "n_terms": 16,
      "n_paths": 1,
      "branch_axes": [
@@ -198,7 +223,9 @@
     {
      "i": 2,
      "train": 1.228018312674293,
-     "holdout": 1.131421,
+     "train_reproduced": 1.228018,
+     "train_repro_diff": 0.0,
+     "holdout": 1.113532,
      "n_terms": 14,
      "n_paths": 1,
      "branch_axes": [
@@ -208,7 +235,9 @@
     {
      "i": 3,
      "train": 1.1221894426247823,
-     "holdout": 1.224245,
+     "train_reproduced": 1.122189,
+     "train_repro_diff": 0.0,
+     "holdout": 1.112769,
      "n_terms": 15,
      "n_paths": 1,
      "branch_axes": [
@@ -218,7 +247,9 @@
     {
      "i": 4,
      "train": 1.1205656018936205,
-     "holdout": 1.309744,
+     "train_reproduced": 1.120566,
+     "train_repro_diff": 0.0,
+     "holdout": 1.129815,
      "n_terms": 11,
      "n_paths": 1,
      "branch_axes": [
@@ -228,7 +259,9 @@
     {
      "i": 5,
      "train": 1.084713516940853,
-     "holdout": 1.075743,
+     "train_reproduced": 1.084714,
+     "train_repro_diff": 0.0,
+     "holdout": 1.045523,
      "n_terms": 16,
      "n_paths": 1,
      "branch_axes": [
@@ -238,7 +271,9 @@
     {
      "i": 6,
      "train": 1.1390336604037017,
-     "holdout": 1.146699,
+     "train_reproduced": 1.139034,
+     "train_repro_diff": 0.0,
+     "holdout": 1.121922,
      "n_terms": 12,
      "n_paths": 1,
      "branch_axes": [
@@ -248,7 +283,9 @@
     {
      "i": 7,
      "train": 1.1401248982778232,
-     "holdout": 1.129798,
+     "train_reproduced": 1.140125,
+     "train_repro_diff": 0.0,
+     "holdout": 1.129935,
      "n_terms": 13,
      "n_paths": 1,
      "branch_axes": [
@@ -258,7 +295,9 @@
     {
      "i": 8,
      "train": 1.1283443378154416,
-     "holdout": 1.14515,
+     "train_reproduced": 1.128344,
+     "train_repro_diff": 0.0,
+     "holdout": 1.120777,
      "n_terms": 13,
      "n_paths": 1,
      "branch_axes": [
@@ -268,7 +307,9 @@
     {
      "i": 9,
      "train": 1.1151570913639228,
-     "holdout": 1.119477,
+     "train_reproduced": 1.115157,
+     "train_repro_diff": 0.0,
+     "holdout": 1.109572,
      "n_terms": 12,
      "n_paths": 1,
      "branch_axes": [
@@ -284,17 +325,17 @@
    "llm_calls": 10,
    "chosen_i": 6,
    "chosen_train": 1.0472717571654413,
-   "chosen_holdout": 1.080278,
-   "★ train_winner_holdout_rank": 2,
-   "best_possible_holdout": 1.074211,
-   "selection_overfit": 0.006067,
+   "chosen_holdout": 1.059504,
+   "★ train_winner_holdout_rank": 1,
+   "best_possible_holdout": 1.059504,
+   "selection_overfit": 0.0,
    "train_spread": [
     1.0472717571654413,
     1.1934789222581021
    ],
    "holdout_spread": [
-    1.074211,
-    1.231383
+    1.059504,
+    1.213269
    ],
    "n_terms_median": 16.5,
    "n_paths_median": 1.0,
@@ -302,18 +343,20 @@
     "roofline_ratio"
    ],
    "c2_loop_holdout_seeds": [
-    1.030753,
-    1.030838,
-    1.046126,
-    1.046174
+    1.030836,
+    1.054387,
+    1.062781,
+    1.067348
    ],
-   "c2_loop_holdout_median": 1.038482,
+   "c2_loop_holdout_median": 1.058584,
    "c2_loop_llm_calls": 103,
    "candidates": [
     {
      "i": 0,
      "train": 1.0761138106244312,
-     "holdout": 1.173989,
+     "train_reproduced": 1.076114,
+     "train_repro_diff": 0.0,
+     "holdout": 1.098027,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -323,7 +366,9 @@
     {
      "i": 1,
      "train": 1.058694101112696,
-     "holdout": 1.118067,
+     "train_reproduced": 1.058694,
+     "train_repro_diff": 0.0,
+     "holdout": 1.108722,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -333,7 +378,9 @@
     {
      "i": 2,
      "train": 1.1370445458785343,
-     "holdout": 1.187775,
+     "train_reproduced": 1.137045,
+     "train_repro_diff": 0.0,
+     "holdout": 1.080909,
      "n_terms": 14,
      "n_paths": 1,
      "branch_axes": [
@@ -343,7 +390,9 @@
     {
      "i": 3,
      "train": 1.1187396761250503,
-     "holdout": 1.112538,
+     "train_reproduced": 1.11874,
+     "train_repro_diff": 0.0,
+     "holdout": 1.213269,
      "n_terms": 12,
      "n_paths": 1,
      "branch_axes": [
@@ -353,7 +402,9 @@
     {
      "i": 4,
      "train": 1.1629720087731792,
-     "holdout": 1.085583,
+     "train_reproduced": 1.162972,
+     "train_repro_diff": 0.0,
+     "holdout": 1.078676,
      "n_terms": 16,
      "n_paths": 1,
      "branch_axes": [
@@ -363,7 +414,9 @@
     {
      "i": 5,
      "train": 1.1934789222581021,
-     "holdout": 1.163102,
+     "train_reproduced": 1.193479,
+     "train_repro_diff": 0.0,
+     "holdout": 1.155343,
      "n_terms": 17,
      "n_paths": 1,
      "branch_axes": [
@@ -374,7 +427,9 @@
     {
      "i": 6,
      "train": 1.0472717571654413,
-     "holdout": 1.080278,
+     "train_reproduced": 1.047272,
+     "train_repro_diff": 0.0,
+     "holdout": 1.059504,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -384,7 +439,9 @@
     {
      "i": 7,
      "train": 1.0590482257254927,
-     "holdout": 1.074211,
+     "train_reproduced": 1.059048,
+     "train_repro_diff": 0.0,
+     "holdout": 1.076655,
      "n_terms": 15,
      "n_paths": 1,
      "branch_axes": [
@@ -394,7 +451,9 @@
     {
      "i": 8,
      "train": 1.0667509126125916,
-     "holdout": 1.095892,
+     "train_reproduced": 1.066751,
+     "train_repro_diff": 0.0,
+     "holdout": 1.082168,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -404,7 +463,9 @@
     {
      "i": 9,
      "train": 1.0618676388371562,
-     "holdout": 1.231383,
+     "train_reproduced": 1.061868,
+     "train_repro_diff": 0.0,
+     "holdout": 1.083417,
      "n_terms": 16,
      "n_paths": 1,
      "branch_axes": [
@@ -420,17 +481,17 @@
    "llm_calls": 10,
    "chosen_i": 2,
    "chosen_train": 1.077043042345986,
-   "chosen_holdout": 1.159677,
-   "★ train_winner_holdout_rank": 3,
-   "best_possible_holdout": 1.139454,
-   "selection_overfit": 0.020223,
+   "chosen_holdout": 1.13907,
+   "★ train_winner_holdout_rank": 2,
+   "best_possible_holdout": 1.1137,
+   "selection_overfit": 0.02537,
    "train_spread": [
     1.077043042345986,
     1.3981918477067246
    ],
    "holdout_spread": [
-    1.139454,
-    1.480641
+    1.1137,
+    1.231129
    ],
    "n_terms_median": 14.0,
    "n_paths_median": 1.0,
@@ -438,18 +499,20 @@
     "roofline_ratio"
    ],
    "c2_loop_holdout_seeds": [
-    1.034068,
-    1.041886,
-    1.057014,
-    1.095737
+    1.083609,
+    1.099619,
+    1.117358,
+    1.156514
    ],
-   "c2_loop_holdout_median": 1.04945,
+   "c2_loop_holdout_median": 1.108488,
    "c2_loop_llm_calls": 103,
    "candidates": [
     {
      "i": 0,
      "train": 1.2015782240960151,
-     "holdout": 1.201891,
+     "train_reproduced": 1.201578,
+     "train_repro_diff": 0.0,
+     "holdout": 1.161308,
      "n_terms": 13,
      "n_paths": 1,
      "branch_axes": [
@@ -459,7 +522,9 @@
     {
      "i": 1,
      "train": 1.0773689714577337,
-     "holdout": 1.139454,
+     "train_reproduced": 1.077369,
+     "train_repro_diff": 0.0,
+     "holdout": 1.1137,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -469,7 +534,9 @@
     {
      "i": 2,
      "train": 1.077043042345986,
-     "holdout": 1.159677,
+     "train_reproduced": 1.077043,
+     "train_repro_diff": 0.0,
+     "holdout": 1.13907,
      "n_terms": 15,
      "n_paths": 1,
      "branch_axes": [
@@ -479,7 +546,9 @@
     {
      "i": 3,
      "train": 1.2932218438740712,
-     "holdout": 1.211204,
+     "train_reproduced": 1.293222,
+     "train_repro_diff": 0.0,
+     "holdout": 1.214597,
      "n_terms": 13,
      "n_paths": 1,
      "branch_axes": [
@@ -489,7 +558,9 @@
     {
      "i": 4,
      "train": 1.3981918477067246,
-     "holdout": 1.211204,
+     "train_reproduced": 1.398192,
+     "train_repro_diff": 0.0,
+     "holdout": 1.214597,
      "n_terms": 13,
      "n_paths": 1,
      "branch_axes": [
@@ -499,7 +570,9 @@
     {
      "i": 5,
      "train": 1.1214195566393403,
-     "holdout": 1.145172,
+     "train_reproduced": 1.12142,
+     "train_repro_diff": 0.0,
+     "holdout": 1.231129,
      "n_terms": 19,
      "n_paths": 1,
      "branch_axes": [
@@ -509,7 +582,9 @@
     {
      "i": 6,
      "train": 1.0795421618674415,
-     "holdout": 1.324608,
+     "train_reproduced": 1.079542,
+     "train_repro_diff": 0.0,
+     "holdout": 1.149098,
      "n_terms": 18,
      "n_paths": 1,
      "branch_axes": [
@@ -519,7 +594,9 @@
     {
      "i": 7,
      "train": 1.2230527644145617,
-     "holdout": 1.339386,
+     "train_reproduced": 1.223053,
+     "train_repro_diff": 0.0,
+     "holdout": 1.214597,
      "n_terms": 11,
      "n_paths": 1,
      "branch_axes": [
@@ -529,7 +606,9 @@
     {
      "i": 8,
      "train": 1.1914437049676339,
-     "holdout": 1.357446,
+     "train_reproduced": 1.191444,
+     "train_repro_diff": 0.0,
+     "holdout": 1.159756,
      "n_terms": 15,
      "n_paths": 1,
      "branch_axes": [
@@ -539,7 +618,9 @@
     {
      "i": 9,
      "train": 1.2717907377380013,
-     "holdout": 1.480641,
+     "train_reproduced": 1.271791,
+     "train_repro_diff": 0.0,
+     "holdout": 1.218418,
      "n_terms": 13,
      "n_paths": 1,
      "branch_axes": [

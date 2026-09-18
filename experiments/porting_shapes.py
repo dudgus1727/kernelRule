@@ -36,12 +36,14 @@ canonical_score   ⛔ 적합하지 않는다 — 받은 가중치로 채점만 �
 -> ★ 두 절차는 더 이상 같지 않다. `--verify` 의 동일성 검사는 뜻이 없다
 ```
 
-⛔ And this file **cannot run** since D-179: `_refit` calls
-`regime_of(p, hw)` with no axis, which now raises. Its numbers (D-177 ·
-D-178) stand as recorded; re-running with another axis would publish
-different numbers under the same name.
+⛔ **2026-09-18 (D-186) — 고쳤다.** D-179 이후 이 파일은 `_refit` 이
+`regime_of` 를 축 없이 불러 ★ 아예 돌지 않았다. 이제 `_refit` 이 **한 벌**을
+맞춘다 — 적합은 유지하고(그것이 본체다) 체제 분할만 없앴다.
 
-## ⚠️ What happened when the sample missed a regime
+⚠️ D-177 · D-178 의 옛 수치는 **두 벌 적합 + nkgroup 원주민** 으로 나온 것이고
+기록에 그대로 남는다. 이 파일이 지금 내는 값은 ★ 다른 수다.
+
+## ⚠️ What happened when the sample missed a regime (⛔ 옛 절차)
 
 `canonical_score` **then** fitted per regime. With N=4 a uniform sample can easily
 contain no memory-bound shape (that side is 14~21% of these tables), and
@@ -71,12 +73,12 @@ from pathlib import Path
 import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
+from experiments.c2_ref import label, native, transfer
 from experiments.f1_pipeline import _load_stage1, _splits
 from experiments.transfer_29_5 import TABLES
-from kernelrule.core.canonical import canonical_score
 from kernelrule.core.matrix import CACHE_DIR, FeatureMatrix
 from kernelrule.core.scoring import evaluate_scores, geomean
-from kernelrule.core.splits import Split, SplitSet, regime_of
+from kernelrule.core.splits import Split, regime_of
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 from kernelrule.features.loader import base_registry
@@ -107,45 +109,37 @@ def _sample(train: list, n: int, seed: int) -> list:
 
 def _refit(code: str, w0, *, table, matrix, sample: list, val: list,
            max_evals: int = 300) -> dict:
-    """Per-regime refit on `sample`, read on the whole of `val`.
+    """★ Fit **one** weight vector on `sample`, read it on the whole of
+    `val`.
 
     ★ This is the experiment's subject — "how many target shapes does a
-    transfer need to refit on". ⛔ **Not** the same procedure as
-    `canonical_score`, which since D-182 does not fit at all.
+    transfer need to refit on". ⛔ The fit **stays** (D-186 §1); what left is
+    the regime split.
 
-    One fallback: a regime with no shape in the sample is fitted on the
-    **whole sample**, flagged in the result (`pooled_regimes`).
+    ```
+    ⛔ 2026-09-18 (D-186): 예전에는 `short`/`long` 두 벌을 맞췄고, 표본이 한
+       체제를 빠뜨리면 그 체제를 표본 전체로 맞추는 대체 절차가 있었다.
+       ★ D-179 가 그 축을 지웠고 `regime_of` 가 축 없이 불리면 이제 raise 한다
+       -> 이 파일은 그동안 ★ 아예 돌지 않았다
+    ★ 지금은 한 벌이다 — 대체 절차도 필요 없다
+    ```
+
+    ⛔ **Not** `canonical_score`, which since D-182 does not fit at all.
     """
     from kernelrule.core.sandbox import compile_rule
     from kernelrule.core.weights import fit_weights, make_score_of
 
     fn = compile_rule(code)
-    reg_ho: dict = {}
-    fitted: dict = {}
-    pooled: list[str] = []
-    moved: list[bool] = []
-    for name in ("short", "long"):
-        g_ho = [p for p in val if regime_of(p, table.hw) == name]
-        if not g_ho:
-            continue
-        g_tr = [p for p in sample if regime_of(p, table.hw) == name]
-        if not g_tr:
-            # ★ the fallback — the whole sample stands in for this regime
-            g_tr = list(sample)
-            pooled.append(name)
-        fit = fit_weights(fn, matrix, table, Split("train", tuple(g_tr)),
-                          w0, max_evals=max_evals, objective="regret")
-        fitted[name] = [float(x) for x in fit.w]
-        moved.append(bool(fit.moved))
-        e = evaluate_scores(make_score_of(fn, matrix, fit.w), table, g_ho,
-                            ks=(1,))
-        for i, p in enumerate(e.shapes):
-            reg_ho[p] = e.regret[i, 0]
-    scored = [p for p in val if p in reg_ho]
-    return {"holdout": float(geomean(np.array([reg_ho[p] for p in scored]))),
-            "n_holdout": len(scored), "weights": fitted,
-            "pooled_regimes": pooled, "moved": all(moved),
-            "n_moved": sum(moved), "n_fits": len(moved)}
+    fit = fit_weights(fn, matrix, table, Split("train", tuple(sample)),
+                      np.asarray(w0, float), max_evals=max_evals,
+                      objective="regret")
+    e = evaluate_scores(make_score_of(fn, matrix, fit.w), table, val, ks=(1,))
+    return {"holdout": float(geomean(e.regret[:, 0])),
+            "n_holdout": len(e.shapes),
+            "weights": {"all": [float(x) for x in fit.w]},
+            # ⛔ D-186 — 체제가 없으니 대체도 없다. 키는 기록 호환으로 남긴다
+            "pooled_regimes": [],
+            "moved": bool(fit.moved), "n_moved": int(fit.moved), "n_fits": 1}
 
 
 def _verify(code, w0, *, table, matrix, sample, splits) -> float | None:
@@ -163,16 +157,7 @@ def _verify(code, w0, *, table, matrix, sample, splits) -> float | None:
         "scorer). The identity this checked held when D-177/D-178 ran and "
         "is recorded there. ⛔ Do not restore it by refitting in the "
         "scorer.")
-    names = {regime_of(p, table.hw) for p in sample}
-    if len(names) < 2:
-        return None
-    sp = SplitSet(train=Split("train", tuple(sample)), val=splits.val,
-                  kind=f"{splits.kind}+sample")
-    cs = canonical_score(code, np.asarray(w0, float), table=table,
-                         matrix=matrix, splits=sp)
-    r = _refit(code, w0, table=table, matrix=matrix, sample=sample,
-               val=list(splits.val.shapes))
-    return abs(cs.holdout - r["holdout"])
+    return None
 
 
 def main() -> None:
@@ -212,6 +197,10 @@ def main() -> None:
                 print(f"  ⚠️ {src}->{dst} 씨앗 없음 — 건너뜀")
                 continue
             e = json.loads(ch.read_text())
+            # ★ D-186 — 옛 값이 박힌 chosen.json 대신 ★ 재집계된 c2 를 본다
+            tr = transfer(src, dst, FOLD)
+            e["a_as_is"], e["b_refit"] = tr["a_as_is"], tr["b_refit"]
+            e["native"] = native(dst, FOLD)
             reg = _load_stage1(d, base_registry("F2", human=REGISTRY), "F2",
                                table)
             m = FeatureMatrix(table, reg, cache_dir=CACHE_DIR)
@@ -231,9 +220,12 @@ def main() -> None:
                                sample=s, val=val)
                     r.update({"rep": rep, "sample_seed": seed,
                               "shapes": [[p.M, p.N, p.K] for p in s],
-                              "n_short": sum(1 for p in s
-                                             if regime_of(p, table.hw)
-                                             == "short")})
+                              # ⛔ D-186 — 옛 `n_short` 는 없어진 축의 값이라
+                              #   뺐다. roofline 쪽 구성은 porting_strat 이 센다
+                              "n_mem": sum(
+                                  1 for p in s
+                                  if regime_of(p, table.hw, axis="roofline")
+                                  == "mem")})
                     got.append(r)
                 h = sorted(x["holdout"] for x in got)
                 rows.append({
@@ -259,7 +251,8 @@ def main() -> None:
     out = Path(a.out or OUT)
     out.write_text(json.dumps({"ns": list(NS), "repeats": REPEATS,
                                "fold": FOLD, "checks": checks,
-                               "rows": rows}, ensure_ascii=False, indent=1))
+                               "note": label(), "rows": rows},
+                              ensure_ascii=False, indent=1))
     print(f"\n  -> {out}")
 
 

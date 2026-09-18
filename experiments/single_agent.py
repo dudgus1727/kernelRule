@@ -28,6 +28,7 @@ from pathlib import Path
 import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
+from experiments.c2_ref import label
 from experiments.f1_pipeline import _load_stage1, _splits
 from experiments.transfer_29_5 import TABLES
 from kernelrule.core.canonical import canonical_score
@@ -38,6 +39,25 @@ from kernelrule.features.loader import base_registry
 
 GPUS = ("a6000", "5090", "4090", "h100")
 OUT = Path("docs/artifacts/single-agent.json")
+
+
+def _stage2_weights(code, w0, table, matrix, splits):
+    """★ stage 2 가 이미 한 적합을 되짚는다 — ⛔ 새로 해주는 것이 아니다.
+
+    `chosen.json` / `summary.json` 은 LLM 이 **제안한** `w0` 와 적합 **뒤**의
+    점수(`fit_regret`)만 남기고 **적합된 벡터는 남기지 않는다**. 같은 설정으로
+    한 번 맞추면 그 벡터가 나오고, 재현 여부는 `fit_regret` 과 대조해 확인한다.
+    """
+    from kernelrule.core.sandbox import compile_rule
+    from kernelrule.core.weights import fit_weights
+    from kernelrule.rules.checks import fitter_for
+
+    ft = fitter_for(len(w0))
+    fr = fit_weights(compile_rule(code), matrix, table, splits.train,
+                     np.asarray(w0, float), max_evals=ft["max_evals"],
+                     objective="regret", method=ft["fit_method"],
+                     n_restarts=ft["fit_restarts"])
+    return fr.w, float(fr.fit_regret)
 
 
 def _shape(code: str, shape_names: set[str]) -> dict:
@@ -84,9 +104,19 @@ def main() -> None:
         for t in s["tries"]:
             if not t.get("ok"):
                 continue
-            cs = canonical_score(t["code"], np.asarray(t["w0"], float),
-                                 table=table, matrix=m, splits=splits)
+            # ★ D-186 §2-4 — `w0` 는 LLM 이 **제안한** 값이고 `fit_regret` 은
+            #   적합 **뒤**의 점수다. D-182 로 채점기가 적합을 안 하므로 그대로
+            #   먹이면 ⛔ 적합 전 초깃값을 채점하게 된다 (c2 씨앗에서 실제로
+            #   그랬다 — D-183 §⑧).
+            #   ★ stage 2 의 적합을 **되짚어** 그 가중치를 얻고, 기록된
+            #   `fit_regret` 과 맞는지 확인한 뒤 ⛔ 적합 없이 채점한다.
+            w, tr = _stage2_weights(t["code"], t["w0"], table, m, splits)
+            cs = canonical_score(t["code"], w, table=table, matrix=m,
+                                 splits=splits)
             cands.append({"i": t["i"], "train": t["fit_regret"],
+                          "train_reproduced": round(tr, 6),
+                          "train_repro_diff": round(abs(tr - t["fit_regret"]),
+                                                    9),
                           "holdout": round(cs.holdout, 6),
                           **_shape(t["code"], names)})
         by_train = sorted(cands, key=lambda c: c["train"])
@@ -124,6 +154,7 @@ def main() -> None:
         "n": len(rows),
         "★ note": ("⚠️ budgets are NOT matched — 10 LLM calls against the "
                    "loop's 103 (12 rounds x 7). Stated, not corrected."),
+        "note_d186": label(),
         "single_beats_loop": sum(1 for r in rows
                                  if r["c2_loop_holdout_median"] is not None
                                  and r["chosen_holdout"]

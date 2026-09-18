@@ -51,6 +51,7 @@ from pathlib import Path
 import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
+from experiments.c2_ref import label, native, transfer
 from experiments.f1_pipeline import _load_stage1, _splits
 from experiments.porting_shapes import FOLD, GPUS, NS, _refit, _seed_of
 from experiments.transfer_29_5 import TABLES
@@ -211,6 +212,10 @@ def main() -> None:
                 print(f"  ⚠️ {src}->{dst} 씨앗 없음 — 건너뜀")
                 continue
             e = json.loads(ch.read_text())
+            # ★ D-186 — 재집계된 c2 값
+            tr = transfer(src, dst, FOLD)
+            e["a_as_is"], e["b_refit"] = tr["a_as_is"], tr["b_refit"]
+            e["native"] = native(dst, FOLD)
             reg = _load_stage1(d, base_registry("F2", human=REGISTRY), "F2",
                                table)
             m = FeatureMatrix(table, reg, cache_dir=CACHE_DIR)
@@ -255,7 +260,8 @@ def main() -> None:
     out = Path(a.out or OUT)
     out.write_text(json.dumps({"ns": list(NS), "repeats": REPEATS,
                                "fold": FOLD, "sampling": "stratified",
-                               "rows": rows}, ensure_ascii=False, indent=1))
+                               "note": label(), "rows": rows},
+                              ensure_ascii=False, indent=1))
     print(f"\n  -> {out}")
 
 

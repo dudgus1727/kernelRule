@@ -35,6 +35,7 @@ from pathlib import Path
 import numpy as np
 
 from experiments.autotune_curve import KS
+from experiments.c2_ref import label
 from experiments.f1_pipeline import _splits
 from experiments.transfer_29_5 import TABLES
 from kernelrule.core.scoring import geomean
@@ -147,7 +148,8 @@ def main() -> None:
                              "fold validation shapes as the curve"),
                  "interp_note": ("⚠️ k_interp is log-interpolated between "
                                  "the ks that were actually run — it is not "
-                                 "a measured k")}
+                                 "a measured k"),
+                 "note_d186": label()}
     print("=" * 104)
     print("★ 오토튜닝 곡선 — 병합 · 교차점 · 시간 환산 (D-176 §1). 0 LLM · 0 GPU")
     print("=" * 104)

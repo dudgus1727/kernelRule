@@ -95,20 +95,20 @@
      "cond_random_duplicate_rate": 0.3812,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.100351,
+     "k0_our_rule": 1.155813,
      "k0_our_rule_seeds": [
-      1.112763,
-      1.106529,
-      1.094172,
-      1.091377
+      1.161354,
+      1.144908,
+      1.150272,
+      1.165942
      ],
      "k0_vendor": 1.092486,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 59.3,
+        "k": 32,
+        "k_interp": 23.4,
         "reached": true
        },
        "vs_vendor": {
@@ -119,8 +119,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 61.2,
+        "k": 32,
+        "k_interp": 24.1,
         "reached": true
        },
        "vs_vendor": {
@@ -131,8 +131,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 95.5,
+        "k": 32,
+        "k_interp": 30.2,
         "reached": true
        },
        "vs_vendor": {
@@ -143,8 +143,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 47.2,
+        "k": 32,
+        "k_interp": 23.3,
         "reached": true
        },
        "vs_vendor": {
@@ -227,20 +227,20 @@
      "cond_random_duplicate_rate": 0.435,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 1,
-     "k0_our_rule": 1.105289,
+     "k0_our_rule": 1.153117,
      "k0_our_rule_seeds": [
-      1.102813,
-      1.069943,
-      1.107765,
-      1.1132
+      1.153773,
+      1.118613,
+      1.203423,
+      1.152461
      ],
      "k0_vendor": 1.089068,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 39.9,
+        "k": 32,
+        "k_interp": 18.9,
         "reached": true
        },
        "vs_vendor": {
@@ -251,8 +251,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 40.5,
+        "k": 32,
+        "k_interp": 20.4,
         "reached": true
        },
        "vs_vendor": {
@@ -263,8 +263,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 42.9,
+        "k": 32,
+        "k_interp": 20.5,
         "reached": true
        },
        "vs_vendor": {
@@ -275,8 +275,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 40.8,
+        "k": 32,
+        "k_interp": 20.8,
         "reached": true
        },
        "vs_vendor": {
@@ -359,20 +359,20 @@
      "cond_random_duplicate_rate": 0.3847,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.063481,
+     "k0_our_rule": 1.100942,
      "k0_our_rule_seeds": [
-      1.095856,
-      1.03887,
-      1.057436,
-      1.069526
+      1.096467,
+      1.049522,
+      1.11113,
+      1.105416
      ],
      "k0_vendor": 1.080987,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 256,
-        "k_interp": 138.5,
+        "k": 64,
+        "k_interp": 54.5,
         "reached": true
        },
        "vs_vendor": {
@@ -383,8 +383,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 125.5,
+        "k": 64,
+        "k_interp": 61.1,
         "reached": true
        },
        "vs_vendor": {
@@ -395,8 +395,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 256,
-        "k_interp": 226.1,
+        "k": 128,
+        "k_interp": 74.5,
         "reached": true
        },
        "vs_vendor": {
@@ -407,8 +407,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 256,
-        "k_interp": 142.6,
+        "k": 64,
+        "k_interp": 54.8,
         "reached": true
        },
        "vs_vendor": {
@@ -491,20 +491,20 @@
      "cond_random_duplicate_rate": 0.3711,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.122691,
+     "k0_our_rule": 1.084957,
      "k0_our_rule_seeds": [
-      1.140191,
-      1.127045,
-      1.095132,
-      1.118336
+      1.068114,
+      1.107605,
+      1.080627,
+      1.089287
      ],
      "k0_vendor": 1.06297,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 32,
-        "k_interp": 28.9,
+        "k": 64,
+        "k_interp": 59.9,
         "reached": true
        },
        "vs_vendor": {
@@ -515,8 +515,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 32.9,
+        "k": 128,
+        "k_interp": 75.4,
         "reached": true
        },
        "vs_vendor": {
@@ -527,8 +527,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 43.5,
+        "k": 128,
+        "k_interp": 103.3,
         "reached": true
        },
        "vs_vendor": {
@@ -539,8 +539,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 32,
-        "k_interp": 30.4,
+        "k": 64,
+        "k_interp": 56.0,
         "reached": true
        },
        "vs_vendor": {
@@ -627,7 +627,7 @@
    "tpe_hit_cap": 0,
    "n_shapes_exhausted_at_kmax": 1,
    "k0_vendor_pooled": 1.081488,
-   "k0_our_rule_pooled": 1.099334,
+   "k0_our_rule_pooled": 1.114872,
    "time": {
     "available": true,
     "source": "datasets/rtx-a6000-sm_86-c63710df/table.parquet",
@@ -645,7 +645,7 @@
     "random": {
      "vs_our_rule": {
       "k": 64,
-      "k_interp": 51.7,
+      "k_interp": 39.0,
       "reached": true
      },
      "vs_vendor": {
@@ -657,7 +657,7 @@
     "random_pruned": {
      "vs_our_rule": {
       "k": 64,
-      "k_interp": 55.6,
+      "k_interp": 41.4,
       "reached": true
      },
      "vs_vendor": {
@@ -668,8 +668,8 @@
     },
     "random_cond": {
      "vs_our_rule": {
-      "k": 128,
-      "k_interp": 70.7,
+      "k": 64,
+      "k_interp": 51.9,
       "reached": true
      },
      "vs_vendor": {
@@ -681,7 +681,7 @@
     "tpe": {
      "vs_our_rule": {
       "k": 64,
-      "k_interp": 48.6,
+      "k_interp": 37.0,
       "reached": true
      },
      "vs_vendor": {
@@ -766,20 +766,20 @@
      "cond_random_duplicate_rate": 0.3075,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.030533,
+     "k0_our_rule": 1.054384,
      "k0_our_rule_seeds": [
-      1.035299,
-      1.036018,
-      1.025768,
-      1.025161
+      1.052556,
+      1.087106,
+      1.036325,
+      1.056211
      ],
      "k0_vendor": 1.18811,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 50.5,
+        "k": 32,
+        "k_interp": 17.9,
         "reached": true
        },
        "vs_vendor": {
@@ -790,8 +790,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 40.3,
+        "k": 16,
+        "k_interp": 14.6,
         "reached": true
        },
        "vs_vendor": {
@@ -802,8 +802,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 117.9,
+        "k": 32,
+        "k_interp": 32.0,
         "reached": true
        },
        "vs_vendor": {
@@ -814,8 +814,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 71.6,
+        "k": 32,
+        "k_interp": 28.8,
         "reached": true
        },
        "vs_vendor": {
@@ -898,12 +898,12 @@
      "cond_random_duplicate_rate": 0.344,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.058478,
+     "k0_our_rule": 1.066371,
      "k0_our_rule_seeds": [
-      1.073014,
-      1.063812,
-      1.053144,
-      1.03327
+      1.049914,
+      1.129067,
+      1.075181,
+      1.057562
      ],
      "k0_vendor": 1.111096,
      "k0_vendor_missing": 0,
@@ -911,7 +911,7 @@
       "random": {
        "vs_our_rule": {
         "k": 32,
-        "k_interp": 24.5,
+        "k_interp": 20.2,
         "reached": true
        },
        "vs_vendor": {
@@ -923,7 +923,7 @@
       "random_pruned": {
        "vs_our_rule": {
         "k": 32,
-        "k_interp": 23.4,
+        "k_interp": 19.2,
         "reached": true
        },
        "vs_vendor": {
@@ -935,7 +935,7 @@
       "random_cond": {
        "vs_our_rule": {
         "k": 64,
-        "k_interp": 39.8,
+        "k_interp": 32.2,
         "reached": true
        },
        "vs_vendor": {
@@ -947,7 +947,7 @@
       "tpe": {
        "vs_our_rule": {
         "k": 32,
-        "k_interp": 25.0,
+        "k_interp": 20.3,
         "reached": true
        },
        "vs_vendor": {
@@ -1030,12 +1030,12 @@
      "cond_random_duplicate_rate": 0.3463,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 1,
-     "k0_our_rule": 1.082873,
+     "k0_our_rule": 1.079841,
      "k0_our_rule_seeds": [
-      1.017519,
-      1.087618,
-      1.078127,
-      1.123853
+      1.038131,
+      1.080158,
+      1.079524,
+      1.13334
      ],
      "k0_vendor": 1.146374,
      "k0_vendor_missing": 0,
@@ -1043,7 +1043,7 @@
       "random": {
        "vs_our_rule": {
         "k": 16,
-        "k_interp": 13.9,
+        "k_interp": 14.6,
         "reached": true
        },
        "vs_vendor": {
@@ -1055,7 +1055,7 @@
       "random_pruned": {
        "vs_our_rule": {
         "k": 16,
-        "k_interp": 12.1,
+        "k_interp": 12.7,
         "reached": true
        },
        "vs_vendor": {
@@ -1067,7 +1067,7 @@
       "random_cond": {
        "vs_our_rule": {
         "k": 32,
-        "k_interp": 24.9,
+        "k_interp": 26.7,
         "reached": true
        },
        "vs_vendor": {
@@ -1079,7 +1079,7 @@
       "tpe": {
        "vs_our_rule": {
         "k": 32,
-        "k_interp": 19.6,
+        "k_interp": 20.8,
         "reached": true
        },
        "vs_vendor": {
@@ -1162,20 +1162,20 @@
      "cond_random_duplicate_rate": 0.3137,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.048846,
+     "k0_our_rule": 1.024604,
      "k0_our_rule_seeds": [
-      1.043748,
-      1.042209,
-      1.053944,
-      1.069965
+      1.030396,
+      1.020577,
+      1.028231,
+      1.020976
      ],
      "k0_vendor": 1.133664,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 32,
-        "k_interp": 30.7,
+        "k": 128,
+        "k_interp": 108.7,
         "reached": true
        },
        "vs_vendor": {
@@ -1186,8 +1186,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 32,
-        "k_interp": 24.9,
+        "k": 128,
+        "k_interp": 80.2,
         "reached": true
        },
        "vs_vendor": {
@@ -1198,8 +1198,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 54.7,
+        "k": 256,
+        "k_interp": 184.3,
         "reached": true
        },
        "vs_vendor": {
@@ -1210,8 +1210,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 32,
-        "k_interp": 31.7,
+        "k": 128,
+        "k_interp": 93.1,
         "reached": true
        },
        "vs_vendor": {
@@ -1298,7 +1298,7 @@
    "tpe_hit_cap": 0,
    "n_shapes_exhausted_at_kmax": 1,
    "k0_vendor_pooled": 1.145956,
-   "k0_our_rule_pooled": 1.048446,
+   "k0_our_rule_pooled": 1.054384,
    "time": {
     "available": true,
     "source": "datasets/rtx-5090-sm_120-5bb6f403/table.parquet",
@@ -1316,7 +1316,7 @@
     "random": {
      "vs_our_rule": {
       "k": 32,
-      "k_interp": 28.5,
+      "k_interp": 24.0,
       "reached": true
      },
      "vs_vendor": {
@@ -1328,7 +1328,7 @@
     "random_pruned": {
      "vs_our_rule": {
       "k": 32,
-      "k_interp": 24.6,
+      "k_interp": 20.5,
       "reached": true
      },
      "vs_vendor": {
@@ -1340,7 +1340,7 @@
     "random_cond": {
      "vs_our_rule": {
       "k": 64,
-      "k_interp": 51.3,
+      "k_interp": 42.4,
       "reached": true
      },
      "vs_vendor": {
@@ -1351,8 +1351,8 @@
     },
     "tpe": {
      "vs_our_rule": {
-      "k": 64,
-      "k_interp": 35.2,
+      "k": 32,
+      "k_interp": 29.9,
       "reached": true
      },
      "vs_vendor": {
@@ -1437,20 +1437,20 @@
      "cond_random_duplicate_rate": 0.3083,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.038482,
+     "k0_our_rule": 1.058584,
      "k0_our_rule_seeds": [
-      1.030838,
-      1.046126,
-      1.030753,
-      1.046174
+      1.067348,
+      1.062781,
+      1.030836,
+      1.054387
      ],
      "k0_vendor": 1.109127,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 65.7,
+        "k": 32,
+        "k_interp": 27.7,
         "reached": true
        },
        "vs_vendor": {
@@ -1461,8 +1461,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 63.2,
+        "k": 32,
+        "k_interp": 26.6,
         "reached": true
        },
        "vs_vendor": {
@@ -1473,8 +1473,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 115.6,
+        "k": 64,
+        "k_interp": 52.8,
         "reached": true
        },
        "vs_vendor": {
@@ -1485,8 +1485,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 76.6,
+        "k": 32,
+        "k_interp": 27.9,
         "reached": true
        },
        "vs_vendor": {
@@ -1569,12 +1569,12 @@
      "cond_random_duplicate_rate": 0.3438,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.034661,
+     "k0_our_rule": 1.029637,
      "k0_our_rule_seeds": [
-      1.037083,
-      1.033747,
-      1.035576,
-      1.025781
+      1.026379,
+      1.028128,
+      1.058116,
+      1.031146
      ],
      "k0_vendor": 1.066731,
      "k0_vendor_missing": 0,
@@ -1582,7 +1582,7 @@
       "random": {
        "vs_our_rule": {
         "k": 128,
-        "k_interp": 64.4,
+        "k_interp": 85.2,
         "reached": true
        },
        "vs_vendor": {
@@ -1594,7 +1594,7 @@
       "random_pruned": {
        "vs_our_rule": {
         "k": 128,
-        "k_interp": 69.2,
+        "k_interp": 91.1,
         "reached": true
        },
        "vs_vendor": {
@@ -1606,7 +1606,7 @@
       "random_cond": {
        "vs_our_rule": {
         "k": 128,
-        "k_interp": 79.3,
+        "k_interp": 108.3,
         "reached": true
        },
        "vs_vendor": {
@@ -1618,7 +1618,7 @@
       "tpe": {
        "vs_our_rule": {
         "k": 64,
-        "k_interp": 43.8,
+        "k_interp": 54.2,
         "reached": true
        },
        "vs_vendor": {
@@ -1701,20 +1701,20 @@
      "cond_random_duplicate_rate": 0.3459,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 1,
-     "k0_our_rule": 1.063484,
+     "k0_our_rule": 1.116446,
      "k0_our_rule_seeds": [
-      1.05279,
-      1.085173,
-      1.074179,
-      1.04271
+      1.102961,
+      1.121998,
+      1.285111,
+      1.110894
      ],
      "k0_vendor": 1.07333,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 32,
-        "k_interp": 24.2,
+        "k": 16,
+        "k_interp": 9.5,
         "reached": true
        },
        "vs_vendor": {
@@ -1725,8 +1725,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 32,
-        "k_interp": 25.6,
+        "k": 16,
+        "k_interp": 10.8,
         "reached": true
        },
        "vs_vendor": {
@@ -1737,8 +1737,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 40.7,
+        "k": 16,
+        "k_interp": 14.3,
         "reached": true
        },
        "vs_vendor": {
@@ -1749,8 +1749,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 33.6,
+        "k": 16,
+        "k_interp": 10.2,
         "reached": true
        },
        "vs_vendor": {
@@ -1833,20 +1833,20 @@
      "cond_random_duplicate_rate": 0.314,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.033053,
+     "k0_our_rule": 1.028866,
      "k0_our_rule_seeds": [
-      1.030517,
-      1.039918,
-      1.035589,
-      1.023289
+      1.028824,
+      1.052081,
+      1.027665,
+      1.028908
      ],
      "k0_vendor": 1.063432,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 64,
-        "k_interp": 63.4,
+        "k": 128,
+        "k_interp": 85.0,
         "reached": true
        },
        "vs_vendor": {
@@ -1858,7 +1858,7 @@
       "random_pruned": {
        "vs_our_rule": {
         "k": 128,
-        "k_interp": 70.8,
+        "k_interp": 91.3,
         "reached": true
        },
        "vs_vendor": {
@@ -1869,8 +1869,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 105.2,
+        "k": 256,
+        "k_interp": 129.5,
         "reached": true
        },
        "vs_vendor": {
@@ -1882,7 +1882,7 @@
       "tpe": {
        "vs_our_rule": {
         "k": 64,
-        "k_interp": 44.1,
+        "k_interp": 58.0,
         "reached": true
        },
        "vs_vendor": {
@@ -1969,7 +1969,7 @@
    "tpe_hit_cap": 0,
    "n_shapes_exhausted_at_kmax": 1,
    "k0_vendor_pooled": 1.078236,
-   "k0_our_rule_pooled": 1.036336,
+   "k0_our_rule_pooled": 1.053234,
    "time": {
     "available": true,
     "source": "datasets/rtx-4090-sm_89-ad95d455/table.parquet",
@@ -1986,8 +1986,8 @@
    "crossing_pooled": {
     "random": {
      "vs_our_rule": {
-      "k": 64,
-      "k_interp": 62.8,
+      "k": 32,
+      "k_interp": 29.7,
       "reached": true
      },
      "vs_vendor": {
@@ -1998,8 +1998,8 @@
     },
     "random_pruned": {
      "vs_our_rule": {
-      "k": 128,
-      "k_interp": 66.2,
+      "k": 32,
+      "k_interp": 30.4,
       "reached": true
      },
      "vs_vendor": {
@@ -2010,8 +2010,8 @@
     },
     "random_cond": {
      "vs_our_rule": {
-      "k": 128,
-      "k_interp": 100.8,
+      "k": 64,
+      "k_interp": 49.3,
       "reached": true
      },
      "vs_vendor": {
@@ -2022,8 +2022,8 @@
     },
     "tpe": {
      "vs_our_rule": {
-      "k": 64,
-      "k_interp": 54.7,
+      "k": 32,
+      "k_interp": 29.6,
       "reached": true
      },
      "vs_vendor": {
@@ -2108,20 +2108,20 @@
      "cond_random_duplicate_rate": 0.1643,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.04945,
+     "k0_our_rule": 1.108488,
      "k0_our_rule_seeds": [
-      1.041886,
-      1.034068,
-      1.095737,
-      1.057014
+      1.117358,
+      1.083609,
+      1.099619,
+      1.156514
      ],
      "k0_vendor": 1.097242,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 1024,
-        "k_interp": 615.1,
+        "k": 256,
+        "k_interp": 172.4,
         "reached": true
        },
        "vs_vendor": {
@@ -2132,8 +2132,8 @@
       },
       "random_pruned": {
        "vs_our_rule": {
-        "k": 512,
-        "k_interp": 496.7,
+        "k": 256,
+        "k_interp": 155.1,
         "reached": true
        },
        "vs_vendor": {
@@ -2144,8 +2144,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 1024,
-        "k_interp": 557.3,
+        "k": 256,
+        "k_interp": 136.6,
         "reached": true
        },
        "vs_vendor": {
@@ -2156,8 +2156,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 512,
-        "k_interp": 304.5,
+        "k": 64,
+        "k_interp": 61.5,
         "reached": true
        },
        "vs_vendor": {
@@ -2240,20 +2240,20 @@
      "cond_random_duplicate_rate": 0.1901,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.083022,
+     "k0_our_rule": 1.063365,
      "k0_our_rule_seeds": [
-      1.061876,
-      1.079541,
-      1.093891,
-      1.086503
+      1.055277,
+      1.137996,
+      1.071452,
+      1.052323
      ],
      "k0_vendor": 1.121705,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 256,
-        "k_interp": 187.9,
+        "k": 512,
+        "k_interp": 296.3,
         "reached": true
        },
        "vs_vendor": {
@@ -2265,7 +2265,7 @@
       "random_pruned": {
        "vs_our_rule": {
         "k": 256,
-        "k_interp": 180.6,
+        "k_interp": 249.3,
         "reached": true
        },
        "vs_vendor": {
@@ -2276,8 +2276,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 128,
-        "k_interp": 121.6,
+        "k": 256,
+        "k_interp": 173.0,
         "reached": true
        },
        "vs_vendor": {
@@ -2289,7 +2289,7 @@
       "tpe": {
        "vs_our_rule": {
         "k": 64,
-        "k_interp": 50.5,
+        "k_interp": 62.0,
         "reached": true
        },
        "vs_vendor": {
@@ -2372,20 +2372,20 @@
      "cond_random_duplicate_rate": 0.1988,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.048741,
+     "k0_our_rule": 1.068561,
      "k0_our_rule_seeds": [
-      1.039683,
-      1.043185,
-      1.054296,
-      1.0632
+      1.064955,
+      1.065944,
+      1.071179,
+      1.076854
      ],
      "k0_vendor": 1.136977,
      "k0_vendor_missing": 0,
      "crossing": {
       "random": {
        "vs_our_rule": {
-        "k": 1024,
-        "k_interp": 588.4,
+        "k": 512,
+        "k_interp": 360.4,
         "reached": true
        },
        "vs_vendor": {
@@ -2397,7 +2397,7 @@
       "random_pruned": {
        "vs_our_rule": {
         "k": 512,
-        "k_interp": 503.1,
+        "k_interp": 333.8,
         "reached": true
        },
        "vs_vendor": {
@@ -2408,8 +2408,8 @@
       },
       "random_cond": {
        "vs_our_rule": {
-        "k": 512,
-        "k_interp": 259.1,
+        "k": 256,
+        "k_interp": 182.4,
         "reached": true
        },
        "vs_vendor": {
@@ -2420,8 +2420,8 @@
       },
       "tpe": {
        "vs_our_rule": {
-        "k": 256,
-        "k_interp": 201.1,
+        "k": 128,
+        "k_interp": 127.0,
         "reached": true
        },
        "vs_vendor": {
@@ -2504,12 +2504,12 @@
      "cond_random_duplicate_rate": 0.1677,
      "tpe_hit_cap": 0,
      "n_shapes_exhausted_at_kmax": 0,
-     "k0_our_rule": 1.039139,
+     "k0_our_rule": 1.038124,
      "k0_our_rule_seeds": [
-      1.014414,
-      1.043468,
-      1.03481,
-      1.046391
+      1.040628,
+      1.044078,
+      1.032652,
+      1.03562
      ],
      "k0_vendor": 1.127839,
      "k0_vendor_missing": 0,
@@ -2517,7 +2517,7 @@
       "random": {
        "vs_our_rule": {
         "k": 1024,
-        "k_interp": 900.2,
+        "k_interp": 928.1,
         "reached": true
        },
        "vs_vendor": {
@@ -2529,7 +2529,7 @@
       "random_pruned": {
        "vs_our_rule": {
         "k": 1024,
-        "k_interp": 763.5,
+        "k_interp": 789.4,
         "reached": true
        },
        "vs_vendor": {
@@ -2541,7 +2541,7 @@
       "random_cond": {
        "vs_our_rule": {
         "k": 512,
-        "k_interp": 392.7,
+        "k_interp": 407.9,
         "reached": true
        },
        "vs_vendor": {
@@ -2553,7 +2553,7 @@
       "tpe": {
        "vs_our_rule": {
         "k": 256,
-        "k_interp": 234.9,
+        "k_interp": 247.6,
         "reached": true
        },
        "vs_vendor": {
@@ -2640,7 +2640,7 @@
    "tpe_hit_cap": 0,
    "n_shapes_exhausted_at_kmax": 0,
    "k0_vendor_pooled": 1.120733,
-   "k0_our_rule_pooled": 1.050343,
+   "k0_our_rule_pooled": 1.068561,
    "time": {
     "available": true,
     "source": "datasets/h100-nvl-sm_90-63684546/table.parquet",
@@ -2657,8 +2657,8 @@
    "crossing_pooled": {
     "random": {
      "vs_our_rule": {
-      "k": 1024,
-      "k_interp": 542.9,
+      "k": 512,
+      "k_interp": 351.2,
       "reached": true
      },
      "vs_vendor": {
@@ -2670,7 +2670,7 @@
     "random_pruned": {
      "vs_our_rule": {
       "k": 512,
-      "k_interp": 464.5,
+      "k_interp": 314.9,
       "reached": true
      },
      "vs_vendor": {
@@ -2681,8 +2681,8 @@
     },
     "random_cond": {
      "vs_our_rule": {
-      "k": 512,
-      "k_interp": 287.8,
+      "k": 256,
+      "k_interp": 198.6,
       "reached": true
      },
      "vs_vendor": {
@@ -2693,8 +2693,8 @@
     },
     "tpe": {
      "vs_our_rule": {
-      "k": 256,
-      "k_interp": 154.2,
+      "k": 128,
+      "k_interp": 98.0,
       "reached": true
      },
      "vs_vendor": {
@@ -2707,5 +2707,6 @@
   }
  },
  "k0_note": "⛔ the k=0 points are computed on the same fold validation shapes as the curve",
- "interp_note": "⚠️ k_interp is log-interpolated between the ks that were actually run — it is not a measured k"
+ "interp_note": "⚠️ k_interp is log-interpolated between the ks that were actually run — it is not a measured k",
+ "note_d186": "★ D-186: 원주민과 (a) 는 ★ 적합 없이 채점한 값이고 (b) 와 _refit 만 적합한다. 옛 값은 '적합 있던 채점 + nkgroup 원주민' 이었다 (pending_fixes 22 · D-182 · D-183)."
 }

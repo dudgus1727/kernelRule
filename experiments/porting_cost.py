@@ -19,6 +19,12 @@ and is not put in this table.
 when `canonical_score` still **refitted** the weights on the target's
 training split. That refit is gone. ★ These recorded values stand as they
 are; re-running this script today would produce different ones.
+
+★ **2026-09-18 (D-186) — 위 줄을 정정한다.** 그 "다른 값" 을 실제로 냈고
+`porting-cost.json` 은 ★ 재집계본이다. 이제 어느 열에도 적합이 없다
+(`canonical_score` 가 D-182 에서 적합을 버렸다). 원주민과 (a)/(b) 는
+`c2_ref` 가 주는 ★ 재집계된 c2 값이다 — 옛 표의 원주민은 `nkgroup` 으로
+갈라진 ⛔ 오염된 홀드아웃에서 나왔다 (D-183 · pending_fixes 22).
 """
 
 from __future__ import annotations
@@ -33,6 +39,7 @@ from pathlib import Path
 import numpy as np
 
 import kernelrule.features.physical  # noqa: F401
+from experiments.c2_ref import native, transfer
 from experiments.f1_pipeline import _load_stage1, _splits
 from experiments.transfer_29_5 import TABLES
 from kernelrule.core.canonical import canonical_score
@@ -86,12 +93,12 @@ def main() -> None:
         rows.sort(key=lambda r: (r["src"], r["dst"]))
         Path(a.out).write_text(json.dumps(
             {"rounds": ROUNDS,
-             "note": ("⚠️ every column is canonical_score read on the "
-                      "target's holdout — the same procedure as the "
-                      "transfer table's (a)/(b)/native. ⛔ these values were "
-                      "produced while canonical_score still refitted on the "
-                      "training split; D-182 removed that refit and they "
-                      "are not reproducible today."),
+             "note": ("★ D-186 재집계. every column is canonical_score "
+                      "read on the target's holdout — ⛔ no fitting "
+                      "anywhere (D-182). native and (a)/(b) come from "
+                      "c2_ref, the re-aggregated c2 (D-183). ⛔ the old "
+                      "table fitted inside the scorer and its native "
+                      "came from a contaminated nkgroup holdout."),
              "rows": rows, "summary": _summary(rows)},
             ensure_ascii=False, indent=1))
         OUT_MD.write_text(_md(rows))
@@ -113,6 +120,10 @@ def main() -> None:
             print(f"  {d.name:24s} ★ 아직 없음")
             continue
         ch = json.loads((d / "stage2-rule-writer" / "chosen.json").read_text())
+        # ★ D-186 — 옛 값이 박힌 chosen.json 대신 ★ 재집계된 c2 를 본다
+        tr = transfer(src, dst, 0)
+        ch["a_as_is"], ch["b_refit"] = tr["a_as_is"], tr["b_refit"]
+        ch["native"] = native(dst, 0)
         T = TABLES[dst]
         table = PerfTable.from_bundle(T["bundle"], env_hash=T["env_hash"],
                                       ok_only=False)
@@ -164,12 +175,12 @@ def main() -> None:
               + f" | 원주민 {ch['native']:.4f}  호출 {calls}")
     Path(a.out).write_text(json.dumps(
         {"rounds": ROUNDS,
-         "note": ("⚠️ every column is canonical_score read on the target's "
-                  "holdout — the same procedure as the transfer table's "
-                  "(a)/(b)/native. ⛔ these values were produced while "
-                  "canonical_score still refitted on the training split; "
-                  "D-182 removed that refit and they are not reproducible "
-                  "today."),
+         "note": ("★ D-186 재집계. every column is canonical_score read "
+                  "on the target's holdout — ⛔ no fitting anywhere "
+                  "(D-182). native and (a)/(b) come from c2_ref, the "
+                  "re-aggregated c2 (D-183). ⛔ the old table fitted "
+                  "inside the scorer and its native came from a "
+                  "contaminated nkgroup holdout."),
          "rows": rows, "summary": _summary(rows)}, ensure_ascii=False,
         indent=1))
     OUT_MD.write_text(_md(rows))
@@ -229,11 +240,13 @@ def _print_summary(s: dict) -> None:
 def _md(rows: list[dict]) -> str:
     L = ["# 전이 비용 곡선 (D-175)", "",
          "> **재현** `python3 -m experiments.porting_cost` · LLM 0회",
-         ("> ⚠️ 모든 열이 `canonical_score` — 대상의 학습 분할에서 체제별 "
-          "재적합하고 홀드아웃에서 읽는다. 전이표의 (a)/(b)/원주민과 같은 "
-          "절차다."),
-         ("> ⛔ 루프 자신의 `best_val_regret` 은 **단일 적합**이라 이 표에 "
-          "넣지 않는다."), "",
+         ("> ★ **D-186 재집계.** 모든 열이 `canonical_score` — 대상의 "
+          "홀드아웃에서 읽는다. ⛔ 어디에도 적합이 없다 (D-182)."),
+         ("> ★ 원주민과 (a)/(b) 는 `c2_ref` 가 주는 ★ 재집계된 c2 값이다 "
+          "(D-183). ⛔ 옛 표의 원주민은 오염된 `nkgroup` 홀드아웃에서 "
+          "나왔다 (pending_fixes 22)."),
+         ("> ⛔ 옛 머리글은 \"학습 분할에서 체제별 재적합\" 이라 적혀 "
+          "있었다 — 그 절차는 사라졌다. 정정으로 잇는다."), "",
          "| 방향 | (a) 그대로 | (b)=r-1 | " +
          " | ".join(f"r{i}" for i in range(ROUNDS)) +
          " | 원주민 | LLM 호출 |",

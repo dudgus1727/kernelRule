@@ -637,25 +637,33 @@ def test_restarts_actually_run(known):
 
 
 def test_canonical_scoring_pins_regret():
-    """★ Final scoring is **always regret** — and it must be stated.
+    """★ Final scoring is **always regret**.
 
-    The default of `fit_weights` changed to `rank` (D-101). If
-    `canonical.py` does not state it, **every number in this project
-    silently becomes something else.** It is checked directly in the source.
+    ⛔ **2026-09-18 (D-186) — this test was failing on `main`.** It used to
+    read the `objective="regret"` on `canonical.py`'s `fit_weights(` call.
+    D-182 took the fit out of the scorer, so there is no such call and the
+    test raised `ValueError: substring not found`. ★ The invariant it was
+    protecting did **not** die with the fit: the scorer must still read
+    **regret**, never rank.
+
+    ```
+    옛 확인   canonical 의 fit_weights( 호출에 objective="regret" 이 있나
+    ★ 새 확인  canonical 이 읽는 것이 `.regret` 뿐인가 (⛔ `.rank` 가 아니다)
+    ```
+
+    Fitting is pinned separately by `test_scoring_does_not_fit` (D-182).
     """
+    import ast
     import inspect
+    import textwrap
 
-    from kernelrule.core import canonical
+    from kernelrule.core.canonical import canonical_score
 
-    src = inspect.getsource(canonical)
-    i = src.index("fit_weights(")
-    depth, k = 1, i + len("fit_weights(")
-    while depth:
-        depth += {"(": 1, ")": -1}.get(src[k], 0)
-        k += 1
-    assert 'objective="regret"' in src[i:k], (
-        "canonical does not state the objective — if the default changes, "
-        "final scoring silently changes with it")
+    tree = ast.parse(textwrap.dedent(inspect.getsource(canonical_score)))
+    read = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    assert "regret" in read, "the scorer does not read regret at all"
+    assert "rank" not in read, (
+        "the scorer is reading rank — final scoring is regret (D-101)")
 
 
 def test_history_experiments_pin_their_objective():
@@ -665,22 +673,30 @@ def test_history_experiments_pin_their_objective():
     The moment the default changed, the 20 scripts that simply called
     `fit_weights` **all started measuring something else.** It is the kind
     that changes silently, so it is pinned by a test.
+
+    ⛔ **2026-09-18 (D-186) — this test was failing on `main`.** It matched
+    the **text** `fit_weights(`, so it hit the phrase inside
+    `c2_rescore_check.py`'s **docstrings** (which explain what
+    `fit_weights(val_split=...)` does) and demanded an objective from prose.
+    ★ It now walks the **AST** and only real calls count — the same trap
+    `test_scoring_does_not_fit` fell into and fixed (D-182).
     """
+    import ast
     from pathlib import Path
 
     bad = []
     for f in sorted(Path("experiments").glob("*.py")):
-        s = f.read_text()
-        i = 0
-        while True:
-            j = s.find("fit_weights(", i)
-            if j < 0:
-                break
-            depth, k = 1, j + len("fit_weights(")
-            while depth and k < len(s):
-                depth += {"(": 1, ")": -1}.get(s[k], 0)
-                k += 1
-            if "objective=" not in s[j:k]:
-                bad.append(f"{f.name}:{s[:j].count(chr(10)) + 1}")
-            i = k
+        try:
+            tree = ast.parse(f.read_text())
+        except SyntaxError:                       # ⛔ 구문이 깨진 파일은 딴 시험의 몫
+            continue
+        for n in ast.walk(tree):
+            if not isinstance(n, ast.Call):
+                continue
+            name = (n.func.id if isinstance(n.func, ast.Name)
+                    else getattr(n.func, "attr", None))
+            if name != "fit_weights":
+                continue
+            if not any(k.arg == "objective" for k in n.keywords):
+                bad.append(f"{f.name}:{n.lineno}")
     assert not bad, f"calls that do not state the objective: {bad}"
