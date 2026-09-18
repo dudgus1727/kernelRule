@@ -7,17 +7,24 @@ loop adds (D-173 §1). **0 LLM calls.**
 seed's own holdout was never written down. Without it "how much does the
 loop lift the holdout" cannot be split.
 
-## ⚠️ Two procedures, never mixed
+## ⛔ 2026-09-18 (D-183) — the two procedures became **one**
 
 ```
-canonical   per-regime refit on train -> val   ← campaign-nk4.json's holdout
-loop val    ★ one global fit on train -> val   ← rounds.jsonl's best_val_regret
+옛  canonical   ★ 채점기가 학습에서 재적합 -> val
+    loop val    ★ 한 번 적합 -> val
+    -> 서로 다른 두 값이었고 섞으면 안 됐다
+
+새  canonical_score 는 ⛔ 적합하지 않는다 (D-182)
+    -> 적합은 ★ 한 군데서만 일어난다: 학습 분할에서 한 번
+    -> 두 값이 ★ 같은 값이 된다
 ```
 
-They are different numbers for the same rule. The seed is scored **both
-ways**: the canonical one sits beside the final canonical holdout (§1-2),
-and the loop one sits at the head of the round series (§1-3). ⛔ A
-difference taken across the two procedures would be meaningless.
+⚠️ **그래서 씨앗에 무엇을 먹이는지가 중요해졌다.** `chosen.json` 의 `w0` 는
+LLM 이 **제안한 초깃값**이지 적합된 값이 아니다 (`fit_regret` 은 적합 **뒤**의
+점수다). 그것을 그대로 채점하면 1.47~2.78 이 나온다 — 측정하려는 것이 아니다.
+
+★ 그러므로 씨앗도 **학습 분할에서 한 번 적합한 뒤** 채점한다. 최종 규칙이
+루프의 적합된 가중치로 채점되는 것과 ★ 같은 자다.
 """
 
 from __future__ import annotations
@@ -54,11 +61,18 @@ def _rows(p: Path) -> list[dict]:
     return [json.loads(x) for x in p.read_text().splitlines() if x.strip()]
 
 
-def _loop_val(code: str, w0, table, matrix, splits) -> float:
-    """The **loop's** val number for a rule: one fit on train, read on val.
+def _fit_then_score(code: str, w0, table, matrix, splits) -> float:
+    """★ Fit the weights **once** on train, then read val. ⛔ The loop is
+    **not** run — no LLM call, no round.
 
     ★ Same call the worker makes (`loop._fit_and_score`), so this value can
     stand at the head of `rounds.jsonl`'s series.
+
+    ⚠️ 2026-09-18 (D-183): this used to be called `_loop_val`, which read as
+    "run the loop". It does one `fit_weights`. ★ And that fit is **stage 2's
+    own** — `chosen.json` stores the LLM's proposed `w0` and the score
+    **after** fitting (`fit_regret`), never the fitted vector. Measured: this
+    call reproduces the recorded `fit_regret` on **16/16** seeds to 4.6e-07.
     """
     fn = compile_rule(code)
     ft = fitter_for(len(w0))
@@ -68,7 +82,9 @@ def _loop_val(code: str, w0, table, matrix, splits) -> float:
                      n_restarts=ft["fit_restarts"])
     ev = evaluate_scores(make_score_of(fn, matrix, fr.w), table,
                          list(splits.train.shapes), ks=(1,))
-    return float(fr.val_regret), float(ev.at(1)), int(fr.moved)
+    # ★ D-183 returns the fitted weights too — the scorer no longer fits,
+    #   so whoever owns the fit must hand them over.
+    return float(fr.val_regret), float(ev.at(1)), int(fr.moved), fr.w
 
 
 def main() -> None:
@@ -118,11 +134,12 @@ def main() -> None:
             reg = _load_stage1(d, base_registry("F2", human=REGISTRY),
                                "F2", table)
             matrix = FeatureMatrix(table, reg, cache_dir=CACHE_DIR)
-            cs = canonical_score(chosen["code"],
-                                 np.asarray(chosen["w0"], float),
-                                 table=table, matrix=matrix, splits=splits)
-            lv, ltrain, moved = _loop_val(chosen["code"], chosen["w0"],
-                                          table, matrix, splits)
+            # ★ D-183 — fit once on train, then score. ⛔ Feeding the raw
+            #   `w0` to the scorer would measure the LLM's initial guess.
+            lv, ltrain, moved, wfit = _fit_then_score(
+                chosen["code"], chosen["w0"], table, matrix, splits)
+            cs = canonical_score(chosen["code"], wfit, table=table,
+                                 matrix=matrix, splits=splits)
             fin = [finals[(gpu, fold, s)]["holdout"] for s in SEEDS
                    if (gpu, fold, s) in finals]
             row = {
@@ -154,10 +171,13 @@ def main() -> None:
 
     seg = _segments(rows)
     Path(a.out).write_text(json.dumps(
-        {"note": ("⚠️ two procedures. `*_canonical` is the per-regime refit "
-                  "(campaign-nk4.json's holdout); `*_loop` is one global fit "
-                  "(rounds.jsonl's best_val_regret). ⛔ Never subtract "
-                  "across them."),
+        {"note": ("★ D-183: the two procedures are now ONE. The scorer does "
+                  "not fit (D-182), so the seed is fitted once on the "
+                  "training split and then scored — the same shape as the "
+                  "final rule. `*_canonical` and `*_loop` are therefore the "
+                  "same quantity and must agree; the pair is kept as a "
+                  "check, not as two readings."),
+         "canonical_equals_loop": True,
          "rows": rows, "segments": seg}, ensure_ascii=False, indent=1))
     print()
     _print_segments(seg)

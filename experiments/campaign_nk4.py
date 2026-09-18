@@ -65,9 +65,30 @@ def _rows(path: Path) -> list[dict]:
     return [json.loads(x) for x in path.read_text().splitlines() if x.strip()]
 
 
-def _best_by_train(arc: list[dict]) -> dict:
-    """★ The best by **training** score. It does not look at the holdout
-    (§10.2)."""
+def _best_by_train(arc: list[dict], run: Path | None = None) -> dict:
+    """★ The rule the run **ended with** — by training score, ⛔ never the
+    holdout (§10.2).
+
+    ⛔ 2026-09-18 (D-183): this was `min(arc, key=regret)`. On an **exact
+    tie** that picks whichever line comes first in `archive.jsonl`, which is
+    not the rule the archive kept: `Archive.best` only moves on
+    `_key(e) < _key(best) - tol`, so the **first** rule to become best stays.
+
+    ```
+    실측  c2-h100-f2-s0 — 세 규칙이 학습 1.053852132000 으로 완전 동점
+          archive.best ★ r0044 (val 1.064955)  ·  min() ★ r0046 (val 1.065637)
+          -> 집계가 ★ 내보낸 규칙과 다른 규칙의 점수를 싣고 있었다
+    ```
+
+    ★ So the archive's own answer is read from `bests.jsonl` when it is
+    there, and `min` is only the fallback for a run without it.
+    """
+    if run is not None:
+        bp = run / "bests.jsonl"
+        if bp.exists():
+            b = _rows(bp)
+            if b:
+                return b[-1]
     return min(arc, key=lambda e: e["regret"])
 
 
@@ -93,8 +114,11 @@ def measure_run(gpu: str, fold: int, seed: int, table, shape_names) -> dict:
     if not (d / "rounds.jsonl").exists():
         return {"run": tag, "missing": True}
     rounds = _rows(d / "rounds.jsonl")
+    # ★ what the loop itself wrote — `archive.best.val_regret` at the last
+    #   round, i.e. the answer this run ended with, scored on this split.
+    recorded_holdout = float(rounds[-1]["best_val_regret"])
     arc = _rows(d / "archive.jsonl")
-    best = _best_by_train(arc)
+    best = _best_by_train(arc, d)
     # ⛔ 2026-09-17 — 여기에 "nkgroup" 이 **상수로** 박혀 있었다. c2 는
     #   `nkband` 로 돌았는데 집계는 nkgroup 분할로 채점했고, fold0·fold1 은
     #   홀드아웃이 **100% 학습 형상**이었다 (pending_fixes 22).
@@ -144,7 +168,16 @@ def measure_run(gpu: str, fold: int, seed: int, table, shape_names) -> dict:
         "run": tag, "gpu": gpu, "fold": fold, "seed": seed,
         "split_kind": splits.kind,
         # -- §5-2 -----------------------------------------------------------
-        "holdout": round(cs.holdout, 6),
+        # ★ 2026-09-18 (D-183): the holdout is **read** from the run's own
+        #   `rounds.jsonl`, not recomputed. The loop already scored its
+        #   answer on this split, and reading removes the whole class of bug
+        #   this campaign was re-aggregated for — an aggregator picking the
+        #   wrong split or registry (pending_fixes 22).
+        #   ⚠️ `cs.holdout` is kept beside it as a **check**: measured across
+        #   all 64 runs, they agree to 4.9e-07 (the artefact rounds to 6dp).
+        "holdout": round(recorded_holdout, 6),
+        "holdout_recomputed": round(cs.holdout, 6),
+        "holdout_check_diff": round(abs(recorded_holdout - cs.holdout), 9),
         "in_sample": round(cs.in_sample, 6),
         "by_regime": {k: round(v, 6) for k, v in cs.by_regime.items()},
         "n_holdout": cs.n_holdout,
