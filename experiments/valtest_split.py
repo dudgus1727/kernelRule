@@ -62,7 +62,7 @@ import kernelrule.features.physical  # noqa: F401
 from experiments.f1_pipeline import _load_stage1, _splits
 from experiments.transfer_29_5 import TABLES
 from kernelrule.core.matrix import CACHE_DIR, FeatureMatrix
-from kernelrule.core.scoring import evaluate_scores
+from kernelrule.core.scoring import evaluate_scores, geomean
 from kernelrule.core.table import PerfTable
 from kernelrule.features import REGISTRY
 from kernelrule.features.loader import base_registry, load_generated
@@ -71,6 +71,10 @@ GPUS = ("a6000", "5090", "4090", "h100")
 SEEDS = (0, 1, 2, 3)
 N_SPLITS = 20
 OUT = Path("docs/artifacts/valtest-split.json")
+#: ★ D-185 — the same experiment with the **stratification removed**. Only
+#: the split function changes; everything else must stay identical or the
+#: two are not comparable.
+OUT_RANDOM = Path("docs/artifacts/valtest-random.json")
 
 
 def _rows(p: Path) -> list[dict]:
@@ -80,6 +84,22 @@ def _rows(p: Path) -> list[dict]:
 def _seed_of(*parts) -> int:
     h = hashlib.sha256("|".join(map(str, parts)).encode()).hexdigest()
     return int(h[:8], 16)
+
+
+def _halve_random(shapes, rng) -> tuple[list[int], list[int]]:
+    """★ D-185 — ⛔ 층화 없이 무작위로 반씩.
+
+    D-184 가 M 3분위로 층화해 쪼갰고 **안 쓴다** 로 판정했다. ★ 층화가 그
+    판정을 만들었는지는 모른다 — 이 함수가 그것을 가른다. ⛔ 다른 것은
+    하나도 바꾸지 않는다.
+    """
+    n = len(shapes)
+    idx = [int(j) for j in rng.permutation(n)]
+    h = n // 2
+    # ★ 남는 하나는 번갈아 — 한쪽이 계속 커지지 않게 (층화 쪽과 같은 규칙)
+    if n % 2 and rng.random() < 0.5:
+        h += 1
+    return sorted(idx[:h]), sorted(idx[h:])
 
 
 def _halve(shapes, rng) -> tuple[list[int], list[int]]:
@@ -107,14 +127,19 @@ def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
     ap.add_argument("--gpu", default=None)
+    # ★ D-185 — the only knob that changes the experiment.
+    ap.add_argument("--random", action="store_true",
+                    help="⛔ 층화 없이 무작위로 쪼갠다 (D-185)")
+    ap.add_argument("--splits", type=int, default=N_SPLITS)
     ap.add_argument("--merge", nargs="*", default=None)
-    ap.add_argument("--out", default=str(OUT))
+    ap.add_argument("--out", default=None)
     a = ap.parse_args()
     if a.merge:
         rows: list[dict] = []
         for f in a.merge:
             rows += json.loads(Path(f).read_text())["rows"]
-        res = {"n_runs": len(rows), "n_splits": N_SPLITS,
+        n_sp = len(rows[0]["splits"]) if rows else 0
+        res = {"n_runs": len(rows), "n_splits": n_sp,
                "verdict_line": ("(B-A) median vs the spread over 20 splits; "
                                 "fixed before looking (D-184 §4)"),
                "rows": rows, "summary": _summary(rows)}
@@ -169,10 +194,12 @@ def main() -> None:
                 per = np.array(per)                        # (rounds, shapes)
                 # ★ (A) 학습 regret 최고 = 마지막 줄 (누적 최고)
                 ia = int(np.argmin([e["regret"] for e in best]))
-                rng = np.random.default_rng(_seed_of(tag, "valtest"))
+                rng = np.random.default_rng(
+                    _seed_of(tag, "valtest-rand" if a.random else "valtest"))
+                halve = _halve_random if a.random else _halve
                 sp_rows = []
-                for it in range(N_SPLITS):
-                    vi, ti = _halve(hold, rng)
+                for it in range(a.splits):
+                    vi, ti = halve(hold, rng)
                     gv = np.exp(np.log(per[:, vi]).mean(axis=1))
                     gt = np.exp(np.log(per[:, ti]).mean(axis=1))
                     ib, ic = int(np.argmin(gv)), int(np.argmin(gt))
@@ -209,9 +236,10 @@ def main() -> None:
                       f"{r['BA_median']:+.4f}  (C−A) {r['CA_median']:+.4f}  "
                       f"val이 test최고를 맞힘 {r['agree_frac']:.0%}",
                       flush=True)
-    out = Path(a.out)
+    out = Path(a.out or (OUT_RANDOM if a.random else OUT))
     out.write_text(json.dumps({"rows": rows, "skipped": skipped,
-                               "n_splits": N_SPLITS},
+                               "n_splits": a.splits,
+                               "stratified": not a.random},
                               ensure_ascii=False, indent=1))
     print(f"\n  건너뛴 실행 {len(skipped)}\n  -> {out}")
 
@@ -235,11 +263,47 @@ def _per_shape(code, w, table, matrix, hold) -> list[float]:
     return [float(e.regret[order[(p.M, p.N, p.K)], 0]) for p in hold]
 
 
+def _abs_stats(rows: list[dict]) -> dict:
+    """★ D-185 §3-1 — ⛔ 차이만 내지 않는다. **절대값이 본체다.**
+
+    ```
+    전체    64 x 쪼개기 수 개 전부의 ★ 중앙과 기하평균
+    GPU별  ★ 실행별로 쪼개기를 기하평균한 뒤 ★ GPU 기하평균
+           (D-184 의 대조군 값이 이 집계로 나온 것임을 확인했다)
+    ```
+    """
+    out: dict = {"n_points": sum(len(r["splits"]) for r in rows),
+                 "overall": {}, "per_gpu": {}}
+    for k in "ABC":
+        v = [sp[k] for r in rows for sp in r["splits"]]
+        out["overall"][k] = {"median": round(st.median(v), 6),
+                             "geomean": round(float(geomean(np.array(v))), 6)}
+    for g in sorted({r["gpu"] for r in rows}):
+        rs = [r for r in rows if r["gpu"] == g]
+        out["per_gpu"][g] = {
+            k: round(float(geomean(np.array(
+                [geomean(np.array([sp[k] for sp in r["splits"]]))
+                 for r in rs]))), 6) for k in "ABC"}
+    return out
+
+
 def _summary(rows: list[dict]) -> dict:
     ba = [r["BA_median"] for r in rows]
     ca = [r["CA_median"] for r in rows]
     sp = [r["BA_spread"] for r in rows]
+    ab = _abs_stats(rows)
+    # ★ D-185 §4 — the verdict is on the **absolute** test regret.
+    #   ⛔ Fixed before looking at any random-split number.
+    ga, gb = ab["overall"]["A"]["geomean"], ab["overall"]["B"]["geomean"]
+    spread = st.median(sp)
     return {"n_runs": len(rows),
+            "absolute": ab,
+            "★ verdict_abs": ("쓸 만하다" if (ga - gb) > spread
+                              else "안 쓴다"),
+            "★ verdict_abs_line": ("(A) - (B) of the overall test geomean "
+                                   "vs the median split spread; fixed "
+                                   "before looking (D-185 §4)"),
+            "A_minus_B_geomean": round(ga - gb, 6),
             "BA_median_of_medians": round(st.median(ba), 6),
             "BA_mean": round(st.mean(ba), 6),
             "BA_spread_median": round(st.median(sp), 6),
@@ -253,6 +317,16 @@ def _summary(rows: list[dict]) -> dict:
 
 
 def _print(s: dict) -> None:
+    ab = s["absolute"]
+    print(f"\n  ★ 절대 test regret — 전체 {ab['n_points']}개")
+    for k in "ABC":
+        print(f"     ({k}) 중앙 {ab['overall'][k]['median']:.4f}  "
+              f"gm {ab['overall'][k]['geomean']:.4f}")
+    print("     GPU 별 (A)/(B)/(C) — 실행별 기하평균 뒤 GPU 기하평균")
+    for g, v in ab["per_gpu"].items():
+        print(f"       {g:6s} {v['A']:.4f} / {v['B']:.4f} / {v['C']:.4f}")
+    print(f"     ★ (A)−(B) gm {s['A_minus_B_geomean']:+.4f}  vs 폭 중앙 "
+          f"{s['BA_spread_median']:.4f}  -> ★ 판정 {s['★ verdict_abs']}")
     print(f"\n  ★ 실행 {s['n_runs']}")
     print(f"     (B−A) 중앙 {s['BA_median_of_medians']:+.4f} "
           f"· 평균 {s['BA_mean']:+.4f} "
