@@ -1,0 +1,126 @@
+{
+ "name": "H02 R7_compact16 + gated split-K quadratic (b = C5 std-ratio / 1)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    s = 0.0\n    s = s + f.log_quantized_work_ratio * w[0]\n    s = s + f.split_overhead_fraction * w[1]\n    s = s + f.serial_fixup_traffic_ratio * w[2]\n    s = s + np.log2(f.operand_tile_traffic_ratio) * w[3]\n    s = s + f.resident_block_scarcity * w[4]\n    s = s + f.pipeline_fill_drain_fraction * w[5]\n    s = s + f.shared_memory_pressure * w[6]\n    s = s + f.register_file_pressure * w[7]\n    s = s + f.has_spill * w[8]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[9]\n    s = s + np.log2(1.0 + f.edge_waste) * w[10]\n    s = s + f.tile_roofline_deficit * w[11]\n    s = s + np.log2(1.0 + f.instruction_density) * w[12]\n    s = s + f.k_tail_waste * w[13]\n    s = s + f.parallel_reduction_traffic_fraction * w[14]\n    s = s + f.thread_work_granularity_deficit * w[15]\n    if p.log_flops >= 33.2131 and p.output_work_per_sm < 234057:\n        # split-K sweet spot: log2 K-loop iterations per serial split, interior optimum (quadratic)\n        L = np.log2(f.mainloop_iteration_count / (1.0 + f.serial_reduction_dependency * f.mainloop_iteration_count))\n        s = s + L * w[16] + np.square(L) * w[17]\n    return s\n",
+   "w0": [
+    10.202482107038037,
+    16.55176925336035,
+    0.7148482868646322,
+    2.321528892180142,
+    -0.23993987302210937,
+    -12.238455163598548,
+    -3.543721510887886,
+    2.1257863981776595,
+    23.438535647031827,
+    0.04507270884721146,
+    3.269232760867678,
+    3.82654908965828,
+    -2.2807597771150654,
+    2.130483399752431,
+    5.593554056316115,
+    -0.37337607793994954,
+    -33.16880674886332,
+    3.0153460680784834
+   ],
+   "extra_features": [
+    "docs/artifacts/a6000-probe/features/cand__feat_pershape.jsonl"
+   ],
+   "gate": "p.log_flops >= 33.2131 and p.output_work_per_sm < 234057",
+   "gate_source": "L1/s19 fold gate (train)",
+   "b": 3.0153460680784834,
+   "w0_base_source": "R7_compact16.PROBE.json per_fold[f].w (official fit on fold-f train)"
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    s = 0.0\n    s = s + f.log_quantized_work_ratio * w[0]\n    s = s + f.split_overhead_fraction * w[1]\n    s = s + f.serial_fixup_traffic_ratio * w[2]\n    s = s + np.log2(f.operand_tile_traffic_ratio) * w[3]\n    s = s + f.resident_block_scarcity * w[4]\n    s = s + f.pipeline_fill_drain_fraction * w[5]\n    s = s + f.shared_memory_pressure * w[6]\n    s = s + f.register_file_pressure * w[7]\n    s = s + f.has_spill * w[8]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[9]\n    s = s + np.log2(1.0 + f.edge_waste) * w[10]\n    s = s + f.tile_roofline_deficit * w[11]\n    s = s + np.log2(1.0 + f.instruction_density) * w[12]\n    s = s + f.k_tail_waste * w[13]\n    s = s + f.parallel_reduction_traffic_fraction * w[14]\n    s = s + f.thread_work_granularity_deficit * w[15]\n    if p.log_flops >= 32.5 and p.output_work_per_sm < 234057:\n        # split-K sweet spot: log2 K-loop iterations per serial split, interior optimum (quadratic)\n        L = np.log2(f.mainloop_iteration_count / (1.0 + f.serial_reduction_dependency * f.mainloop_iteration_count))\n        s = s + L * w[16] + np.square(L) * w[17]\n    return s\n",
+   "w0": [
+    23.035744463862688,
+    40.73200784990222,
+    1.666168431415511,
+    11.868599687723659,
+    -1.9594823752755992,
+    -20.14884585464756,
+    -8.425599925862407,
+    5.6839706881978245,
+    4.310826591308619,
+    3.18644295632932,
+    3.413207450805694,
+    -9.450271270339385,
+    -2.783504631451134,
+    -0.8058785462745569,
+    26.06712111829536,
+    -0.40968178548193057,
+    -74.67237190468062,
+    6.788397445880056
+   ],
+   "extra_features": [
+    "docs/artifacts/a6000-probe/features/cand__feat_pershape.jsonl"
+   ],
+   "gate": "p.log_flops >= 32.5 and p.output_work_per_sm < 234057",
+   "gate_source": "L1/s19 fold gate (train)",
+   "b": 6.788397445880056,
+   "w0_base_source": "R7_compact16.PROBE.json per_fold[f].w (official fit on fold-f train)"
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    s = 0.0\n    s = s + f.log_quantized_work_ratio * w[0]\n    s = s + f.split_overhead_fraction * w[1]\n    s = s + f.serial_fixup_traffic_ratio * w[2]\n    s = s + np.log2(f.operand_tile_traffic_ratio) * w[3]\n    s = s + f.resident_block_scarcity * w[4]\n    s = s + f.pipeline_fill_drain_fraction * w[5]\n    s = s + f.shared_memory_pressure * w[6]\n    s = s + f.register_file_pressure * w[7]\n    s = s + f.has_spill * w[8]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[9]\n    s = s + np.log2(1.0 + f.edge_waste) * w[10]\n    s = s + f.tile_roofline_deficit * w[11]\n    s = s + np.log2(1.0 + f.instruction_density) * w[12]\n    s = s + f.k_tail_waste * w[13]\n    s = s + f.parallel_reduction_traffic_fraction * w[14]\n    s = s + f.thread_work_granularity_deficit * w[15]\n    if p.log_flops >= 33.5056 and p.output_work_per_sm < 249661:\n        # split-K sweet spot: log2 K-loop iterations per serial split, interior optimum (quadratic)\n        L = np.log2(f.mainloop_iteration_count / (1.0 + f.serial_reduction_dependency * f.mainloop_iteration_count))\n        s = s + L * w[16] + np.square(L) * w[17]\n    return s\n",
+   "w0": [
+    3.2143517518842035,
+    9.574671774457354,
+    -0.06463319987627529,
+    2.857419546430925,
+    -1.3995138396274918,
+    -3.468845202253257,
+    -0.24893346826655285,
+    2.9763008677091305,
+    30.57718815754673,
+    4.1105339129987755,
+    0.07199516477318618,
+    1.4626524041349775,
+    -0.3044141791234098,
+    -0.7238713020758206,
+    4.381626324824333,
+    0.561711930992812,
+    -40.03731704099657,
+    3.639756094636052
+   ],
+   "extra_features": [
+    "docs/artifacts/a6000-probe/features/cand__feat_pershape.jsonl"
+   ],
+   "gate": "p.log_flops >= 33.5056 and p.output_work_per_sm < 249661",
+   "gate_source": "s19 restricted to (log_flops>=, output_work_per_sm<) on fold-2 train",
+   "b": 3.639756094636052,
+   "w0_base_source": "R7_compact16.PROBE.json per_fold[f].w (official fit on fold-f train)"
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    s = 0.0\n    s = s + f.log_quantized_work_ratio * w[0]\n    s = s + f.split_overhead_fraction * w[1]\n    s = s + f.serial_fixup_traffic_ratio * w[2]\n    s = s + np.log2(f.operand_tile_traffic_ratio) * w[3]\n    s = s + f.resident_block_scarcity * w[4]\n    s = s + f.pipeline_fill_drain_fraction * w[5]\n    s = s + f.shared_memory_pressure * w[6]\n    s = s + f.register_file_pressure * w[7]\n    s = s + f.has_spill * w[8]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[9]\n    s = s + np.log2(1.0 + f.edge_waste) * w[10]\n    s = s + f.tile_roofline_deficit * w[11]\n    s = s + np.log2(1.0 + f.instruction_density) * w[12]\n    s = s + f.k_tail_waste * w[13]\n    s = s + f.parallel_reduction_traffic_fraction * w[14]\n    s = s + f.thread_work_granularity_deficit * w[15]\n    if p.log_flops >= 32.5 and p.output_work_per_sm < 234057:\n        # split-K sweet spot: log2 K-loop iterations per serial split, interior optimum (quadratic)\n        L = np.log2(f.mainloop_iteration_count / (1.0 + f.serial_reduction_dependency * f.mainloop_iteration_count))\n        s = s + L * w[16] + np.square(L) * w[17]\n    return s\n",
+   "w0": [
+    9.632758916532001,
+    13.483640276300546,
+    0.9168382395926158,
+    6.363717356019576,
+    -1.9039455377307564,
+    -6.465457911058028,
+    -0.24494502004913776,
+    5.043904726516557,
+    46.29802426567062,
+    6.4058664078485315,
+    6.94771544611318,
+    0.4771985896323488,
+    -0.24177288846858191,
+    3.56448283511234,
+    1.439797120594354,
+    -0.7376690882054916,
+    -61.4786619847652,
+    5.588969271342291
+   ],
+   "extra_features": [
+    "docs/artifacts/a6000-probe/features/cand__feat_pershape.jsonl"
+   ],
+   "gate": "p.log_flops >= 32.5 and p.output_work_per_sm < 234057",
+   "gate_source": "L1/s19 fold gate (train)",
+   "b": 5.588969271342291,
+   "w0_base_source": "R7_compact16.PROBE.json per_fold[f].w (official fit on fold-f train)"
+  }
+ },
+ "_source": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/it/r1_H02/rule_A_c5.json"
+}

@@ -1,0 +1,310 @@
+[
+ {
+  "tag": "baseline_c2_s0",
+  "rule": "docs/artifacts/a6000-probe/rules/baseline_c2_s0.json",
+  "result": "docs/artifacts/a6000-probe/results/baseline_c2_s0.json"
+ },
+ {
+  "tag": "baseline_c2_s1",
+  "rule": "docs/artifacts/a6000-probe/rules/baseline_c2_s1.json",
+  "result": "docs/artifacts/a6000-probe/results/baseline_c2_s1.json"
+ },
+ {
+  "tag": "baseline_c2_s2",
+  "rule": "docs/artifacts/a6000-probe/rules/baseline_c2_s2.json",
+  "result": "docs/artifacts/a6000-probe/results/baseline_c2_s2.json"
+ },
+ {
+  "tag": "baseline_c2_s3",
+  "rule": "docs/artifacts/a6000-probe/rules/baseline_c2_s3.json",
+  "result": "docs/artifacts/a6000-probe/results/baseline_c2_s3.json"
+ },
+ {
+  "tag": "01_H01_H01a_std_w0_train_sign_x_std_ratio",
+  "iteration": 1,
+  "id": "H01",
+  "label": "H01a_std (w0 = train sign x std ratio)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/01_H01_H01a_std_w0_train_sign_x_std_ratio.json",
+  "result": "docs/artifacts/a6000-probe/results/01_H01_H01a_std_w0_train_sign_x_std_ratio.json"
+ },
+ {
+  "tag": "01_H01_H01b_robust_w0_train_sign_x_robust_std_r",
+  "iteration": 1,
+  "id": "H01",
+  "label": "H01b_robust (w0 = train sign x robust-std ratio)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/01_H01_H01b_robust_w0_train_sign_x_robust_std_r.json",
+  "result": "docs/artifacts/a6000-probe/results/01_H01_H01b_robust_w0_train_sign_x_robust_std_r.json"
+ },
+ {
+  "tag": "02_H02_A_c5_b_C5_std_ratio_f0_3_015_f1_6_788_f2",
+  "iteration": 2,
+  "id": "H02",
+  "label": "A_c5 (b = C5 std-ratio: f0 3.015, f1 6.788, f2 3.640, f3 5.589)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/02_H02_A_c5_b_C5_std_ratio_f0_3_015_f1_6_788_f2.json",
+  "result": "docs/artifacts/a6000-probe/results/02_H02_A_c5_b_C5_std_ratio_f0_3_015_f1_6_788_f2.json"
+ },
+ {
+  "tag": "02_H02_B_c5div10_b_C5_std_ratio_10_f0_0_302_f1",
+  "iteration": 2,
+  "id": "H02",
+  "label": "B_c5div10 (b = C5 std-ratio / 10: f0 0.302, f1 0.679, f2 0.364, f3 0.559)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/02_H02_B_c5div10_b_C5_std_ratio_10_f0_0_302_f1.json",
+  "result": "docs/artifacts/a6000-probe/results/02_H02_B_c5div10_b_C5_std_ratio_10_f0_0_302_f1.json"
+ },
+ {
+  "tag": "03_H06_A_linear_only_w0_b_faithful",
+  "iteration": 3,
+  "id": "H06",
+  "label": "A: linear only, w0=-b (faithful)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/03_H06_A_linear_only_w0_b_faithful.json",
+  "result": "docs/artifacts/a6000-probe/results/03_H06_A_linear_only_w0_b_faithful.json"
+ },
+ {
+  "tag": "03_H06_B_linear_only_w0_b_sign_flipped_variant",
+  "iteration": 3,
+  "id": "H06",
+  "label": "B: linear only, w0=+b (sign-flipped variant)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/03_H06_B_linear_only_w0_b_sign_flipped_variant.json",
+  "result": "docs/artifacts/a6000-probe/results/03_H06_B_linear_only_w0_b_sign_flipped_variant.json"
+ },
+ {
+  "tag": "04_H13_main_regime_free_verbatim",
+  "iteration": 4,
+  "id": "H13",
+  "label": "main (regime_free verbatim)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/04_H13_main_regime_free_verbatim.json",
+  "result": "docs/artifacts/a6000-probe/results/04_H13_main_regime_free_verbatim.json"
+ },
+ {
+  "tag": "04_H13_std_same_function_per_fold_unit_within_s",
+  "iteration": 4,
+  "id": "H13",
+  "label": "std (same function, per-fold unit-within-shape-sd reparametrisation, keep start)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/04_H13_std_same_function_per_fold_unit_within_s.json",
+  "result": "docs/artifacts/a6000-probe/results/04_H13_std_same_function_per_fold_unit_within_s.json"
+ },
+ {
+  "tag": "05_H18_A_single_resident_cta",
+  "iteration": 5,
+  "id": "H18",
+  "label": "A_single_resident_cta",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/05_H18_A_single_resident_cta.json",
+  "result": "docs/artifacts/a6000-probe/results/05_H18_A_single_resident_cta.json"
+ },
+ {
+  "tag": "05_H18_B_resident_block_scarcity",
+  "iteration": 5,
+  "id": "H18",
+  "label": "B_resident_block_scarcity",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/05_H18_B_resident_block_scarcity.json",
+  "result": "docs/artifacts/a6000-probe/results/05_H18_B_resident_block_scarcity.json"
+ },
+ {
+  "tag": "06_H19_A_guard_H01b_split_overhead_fraction_gua",
+  "iteration": 6,
+  "id": "H19",
+  "label": "A_guard (H01b + split_overhead_fraction guard outside gate, w0=+k_f)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/06_H19_A_guard_H01b_split_overhead_fraction_gua.json",
+  "result": "docs/artifacts/a6000-probe/results/06_H19_A_guard_H01b_split_overhead_fraction_gua.json"
+ },
+ {
+  "tag": "06_H19_B_guard_ramp_A_graded_large_grid_ramp_ma",
+  "iteration": 6,
+  "id": "H19",
+  "label": "B_guard_ramp (A + graded large-grid ramp max(0,log2(owps/c_f)))",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/06_H19_B_guard_ramp_A_graded_large_grid_ramp_ma.json",
+  "result": "docs/artifacts/a6000-probe/results/06_H19_B_guard_ramp_A_graded_large_grid_ramp_ma.json"
+ },
+ {
+  "tag": "07_H20_A_s1_formula",
+  "iteration": 7,
+  "id": "H20",
+  "label": "A_s1_formula",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/07_H20_A_s1_formula.json",
+  "result": "docs/artifacts/a6000-probe/results/07_H20_A_s1_formula.json"
+ },
+ {
+  "tag": "07_H20_B_H01b_formula_quad",
+  "iteration": 7,
+  "id": "H20",
+  "label": "B_H01b_formula_quad",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/07_H20_B_H01b_formula_quad.json",
+  "result": "docs/artifacts/a6000-probe/results/07_H20_B_H01b_formula_quad.json"
+ },
+ {
+  "tag": "08_H07b_H07b_main_gate_owps_4096_all_w0_unchange",
+  "iteration": 8,
+  "id": "H07b",
+  "label": "H07b_main (gate -> owps<4096, all w0 unchanged)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/08_H07b_H07b_main_gate_owps_4096_all_w0_unchange.json",
+  "result": "docs/artifacts/a6000-probe/results/08_H07b_H07b_main_gate_owps_4096_all_w0_unchange.json"
+ },
+ {
+  "tag": "08_H07b_H07b_retuned_same_gate_quadratic_w0_re_d",
+  "iteration": 8,
+  "id": "H07b",
+  "label": "H07b_retuned (same gate; quadratic w0 re-derived on train inside owps<4096)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/08_H07b_H07b_retuned_same_gate_quadratic_w0_re_d.json",
+  "result": "docs/artifacts/a6000-probe/results/08_H07b_H07b_retuned_same_gate_quadratic_w0_re_d.json"
+ },
+ {
+  "tag": "09_H21_A_H18A_ramp",
+  "iteration": 9,
+  "id": "H21",
+  "label": "A_H18A_ramp",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/09_H21_A_H18A_ramp.json",
+  "result": "docs/artifacts/a6000-probe/results/09_H21_A_H18A_ramp.json"
+ },
+ {
+  "tag": "09_H21_B_H20A_ramp",
+  "iteration": 9,
+  "id": "H21",
+  "label": "B_H20A_ramp",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/09_H21_B_H20A_ramp.json",
+  "result": "docs/artifacts/a6000-probe/results/09_H21_B_H20A_ramp.json"
+ },
+ {
+  "tag": "10_H22_A_s3_formula_s3_base_H20A_blocks",
+  "iteration": 10,
+  "id": "H22",
+  "label": "A_s3_formula (s3 base + H20A blocks)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/10_H22_A_s3_formula_s3_base_H20A_blocks.json",
+  "result": "docs/artifacts/a6000-probe/results/10_H22_A_s3_formula_s3_base_H20A_blocks.json"
+ },
+ {
+  "tag": "10_H22_B_s2_formula_s2_base_H20A_blocks",
+  "iteration": 10,
+  "id": "H22",
+  "label": "B_s2_formula (s2 base + H20A blocks)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/10_H22_B_s2_formula_s2_base_H20A_blocks.json",
+  "result": "docs/artifacts/a6000-probe/results/10_H22_B_s2_formula_s2_base_H20A_blocks.json"
+ },
+ {
+  "tag": "11_H23_A_margin_H18A",
+  "iteration": 11,
+  "id": "H23",
+  "label": "A_margin_H18A",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/11_H23_A_margin_H18A.json",
+  "result": "docs/artifacts/a6000-probe/results/11_H23_A_margin_H18A.json"
+ },
+ {
+  "tag": "11_H23_B_margin_H20A",
+  "iteration": 11,
+  "id": "H23",
+  "label": "B_margin_H20A",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/11_H23_B_margin_H20A.json",
+  "result": "docs/artifacts/a6000-probe/results/11_H23_B_margin_H20A.json"
+ },
+ {
+  "tag": "12_H24_H24_placebo_faithful_H18A_base_placebo_b",
+  "iteration": 12,
+  "id": "H24",
+  "label": "H24_placebo (faithful: H18A base, placebo branch)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/12_H24_H24_placebo_faithful_H18A_base_placebo_b.json",
+  "result": "docs/artifacts/a6000-probe/results/12_H24_H24_placebo_faithful_H18A_base_placebo_b.json"
+ },
+ {
+  "tag": "12_H24_H24B_placebo_H01b_same_placebo_on_H01b_H",
+  "iteration": 12,
+  "id": "H24",
+  "label": "H24B_placebo_H01b (same placebo on H01b = H18A without the band-P 1-CTA indicator)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/12_H24_H24B_placebo_H01b_same_placebo_on_H01b_H.json",
+  "result": "docs/artifacts/a6000-probe/results/12_H24_H24B_placebo_H01b_same_placebo_on_H01b_H.json"
+ },
+ {
+  "tag": "13_H25_H25A_perm_H18A_H18A_1cta_weight_labels_p",
+  "iteration": 13,
+  "id": "H25",
+  "label": "H25A_perm_H18A (H18A_1cta, weight labels permuted, rng 1000+f)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/13_H25_H25A_perm_H18A_H18A_1cta_weight_labels_p.json",
+  "result": "docs/artifacts/a6000-probe/results/13_H25_H25A_perm_H18A_H18A_1cta_weight_labels_p.json"
+ },
+ {
+  "tag": "13_H25_H25B_perm_H23B_H23B_margin_H20A_weight_l",
+  "iteration": 13,
+  "id": "H25",
+  "label": "H25B_perm_H23B (H23B_margin_H20A, weight labels permuted, rng 1000+f)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/13_H25_H25B_perm_H23B_H23B_margin_H20A_weight_l.json",
+  "result": "docs/artifacts/a6000-probe/results/13_H25_H25B_perm_H23B_H23B_margin_H20A_weight_l.json"
+ },
+ {
+  "tag": "14_H26_A_srt_H23B_H23B_global_split_reduction_t",
+  "iteration": 14,
+  "id": "H26",
+  "label": "A_srt_H23B (H23B + global split_reduction_traffic_ratio)",
+  "selected": true,
+  "rule": "docs/artifacts/a6000-probe/rules/14_H26_A_srt_H23B_H23B_global_split_reduction_t.json",
+  "result": "docs/artifacts/a6000-probe/results/14_H26_A_srt_H23B_H23B_global_split_reduction_t.json"
+ },
+ {
+  "tag": "14_H26_B_srt_H18A_H18A_global_split_reduction_t",
+  "iteration": 14,
+  "id": "H26",
+  "label": "B_srt_H18A (H18A + global split_reduction_traffic_ratio)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/14_H26_B_srt_H18A_H18A_global_split_reduction_t.json",
+  "result": "docs/artifacts/a6000-probe/results/14_H26_B_srt_H18A_H18A_global_split_reduction_t.json"
+ },
+ {
+  "tag": "15_H27_H27A_s3_guard_H22_A_s3_sign_search_incl",
+  "iteration": 15,
+  "id": "H27",
+  "label": "H27A_s3_guard (H22_A_s3 + sign search incl. zero + halving guard)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/15_H27_H27A_s3_guard_H22_A_s3_sign_search_incl.json",
+  "result": "docs/artifacts/a6000-probe/results/15_H27_H27A_s3_guard_H22_A_s3_sign_search_incl.json"
+ },
+ {
+  "tag": "15_H27_H27B_s2_guard_H22_B_s2_sign_search_incl",
+  "iteration": 15,
+  "id": "H27",
+  "label": "H27B_s2_guard (H22_B_s2 + sign search incl. zero + halving guard)",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/15_H27_H27B_s2_guard_H22_B_s2_sign_search_incl.json",
+  "result": "docs/artifacts/a6000-probe/results/15_H27_H27B_s2_guard_H22_B_s2_sign_search_incl.json"
+ },
+ {
+  "tag": "16_H28_H28A_poolA",
+  "iteration": 16,
+  "id": "H28",
+  "label": "H28A_poolA",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/16_H28_H28A_poolA.json",
+  "result": "docs/artifacts/a6000-probe/results/16_H28_H28A_poolA.json"
+ },
+ {
+  "tag": "16_H28_H28B_poolB",
+  "iteration": 16,
+  "id": "H28",
+  "label": "H28B_poolB",
+  "selected": false,
+  "rule": "docs/artifacts/a6000-probe/rules/16_H28_H28B_poolB.json",
+  "result": "docs/artifacts/a6000-probe/results/16_H28_H28B_poolB.json"
+ }
+]

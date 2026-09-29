@@ -1,0 +1,26 @@
+{
+ "name": "H13 regime_free (roofline-branch split-K terms, library only, unconstrained signs) — verbatim copy of an/rules/cand/regime_free.json",
+ "code": "def score(f, p, hw, w):\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    s = s + f.has_spill * w[1]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[2]\n    s = s + f.pipeline_fill_drain_fraction * w[3]\n    tl = -np.log2(np.maximum(1e-6, 1.0 - f.tail_waste))\n    if p.roofline_ratio < 1:\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[4]\n        s = s + f.tile_roofline_deficit * w[5]\n        s = s + tl * w[6]\n        s = s + f.wave_count_deficit * w[7]\n        s = s + f.serial_reduction_dependency * w[8]\n        s = s + f.parallel_reduction_traffic_fraction * w[9]\n    else:\n        s = s + np.log2(1.0 + f.instruction_density) * w[10]\n        s = s + f.occupancy_deficit * w[11]\n        s = s + f.resident_block_scarcity * w[12]\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[13]\n        s = s + tl * w[14]\n        s = s + f.wave_count_deficit * w[15]\n        s = s + f.serial_reduction_dependency * w[16]\n        s = s + f.parallel_reduction_traffic_fraction * w[17]\n    return s\n",
+ "w0": [
+  0.5,
+  10.0,
+  0.1,
+  1.0,
+  1.0,
+  1.0,
+  1.0,
+  -1.0,
+  1.0,
+  1.0,
+  1.0,
+  1.0,
+  1.0,
+  1.0,
+  1.0,
+  0.5,
+  1.0,
+  1.0
+ ],
+ "extra_features": [],
+ "_source": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/it/r1_H13/rule_main.json"
+}

@@ -1,0 +1,973 @@
+{
+ "lenses": [
+  {
+   "lens": "table",
+   "summary": "Measured side by side, the a6000 table differs from the other three in three ways, and rules built on the current library cannot handle any of them. (1) The a6000 has one sharp optimum. On 40 of 45 compute-bound shapes the best config is a single family (128x128x32, 2x2 warps, 3 stages); the other GPUs top out at 11 to 18. Every other tile costs 7 to 25% more, against under 1% on the 5090 and 4090. The small-tile penalty tracks how much the operands overflow the 6 MB L2 (Spearman +0.86). (2) Whether split_k>=3 wins is a coin flip on the a6000 (31/65, 1.0 bit of entropy) and depends on the regime: memory-bound 3/20, compute-bound with few waves 28/36, many waves 0/9. On the other GPUs one fixed split-K choice is nearly always right, and even the best linear fit over the library axes cannot pick split_k well on the a6000 (in-family 1.038 in-sample, 1.066 on held-out groups, against 1.02 on the others). (3) Rules cannot see the CTA swizzle, and the lexicographic tie-break lands on swizzle width 1. On the a6000 that turns the dominant kernel into a trap on large grids: 1.177 in the many-wave regime and 1.0375 overall, against 1.003 to 1.014 elsewhere. Timer resolution is not the cause: the 5090 and 4090 times sit on the same 1.024 us grid. My one official probe tested a table-derived edit (add a large-grid branch and a memory-bound branch to the evolved rule). It improved the evolved s0 rule on both metrics: inner-CV 1.1177 to 1.1036, pooled holdout 1.1149 to 1.0949, beating the vendor in 1 of 4 folds. It still loses to the vendor pooled (1.0815). The rest of the gap sits in the compute-bound few-wave shapes, where tile and split-K choice go wrong.",
+   "findings": [
+    {
+     "claim": "Hardware facts: the a6000 has 10-16x less L2, the lowest bandwidth and the fewest SMs of the four, but its ridge point equals the 4090's, so compute-to-bandwidth ratio alone does not set it apart.",
+     "evidence": "a6000: 84 SM, 116.1 TF effective, 729.7 GB/s, ridge 159.1, L2 6 MB. 5090: 170, 208.2, 1767, 117.9, 96 MB. 4090: 128, 157.3, 984, 159.9, 72 MB. h100: 132, 419.4, 4023, 104.3, 60 MB.",
+     "reproduce": "cd /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/table && python3 load.py && python3 folds.py a6000 (etc.) && python3 a1_basic.py  (out_a1.txt)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Timer resolution and short shapes are not a6000-specific causes. The 1.024 us fallback tick is a bookkeeping difference: the 5090 and 4090 times sit on the same 1.024 us grid. The a6000's kernels are also longer than the 5090's and h100's.",
+     "evidence": "Share of all times within 3% of a 1.024 us multiple (uniform would be 6%): a6000 0.86, 5090 0.93, 4090 0.70, h100 0.04. Median best_ms: 0.256 / 0.184 / 0.247 / 0.149. Share of shapes with best < 0.5 ms: 69% / 69% / 63% / 76%. Near-twin shapes 1500 vs 1536 have the same top-1 on the a6000 (median abs log ratio 0.005).",
+     "reproduce": "python3 a7_noise.py; plus the 1.024 us grid check in the session (phase histogram of t/1.024 us); a1_basic.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "On the a6000 the compute-bound optimum is essentially one kernel family. On the other GPUs it is spread over several.",
+     "evidence": "The modal family is best on this many compute-bound shapes: a6000 (128x128x32 w2x2 st3) 40/45, 5090 11/53, 4090 16/50, h100 18/54. Best tile is 128x128x32 on 43/45 a6000 compute-bound shapes. Across all 65 a6000 shapes: 3 stages on 54, 2x2 warps on 51. Every split-K optimum on the a6000 is serial (0 parallel; 5090 has 9 parallel).",
+     "reproduce": "python3 a2_optimum.py; python3 a11_onekernel.py; python3 a13_sk_curve.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The a6000 tile landscape is sharp and the good set is narrow. Smaller tiles cost about 25% there against about 1% on the 5090 and 4090, and that penalty tracks operand working set over L2. Interpretation: the 6 MB L2 cannot absorb the extra operand reloads of small tiles.",
+     "evidence": "Second-best tile over best, geometric mean on compute-bound shapes: 1.069 / 1.007 / 1.004 / 1.011; share of shapes above 3%: 0.89 / 0.04 / 0.00 / 0.04. Best-in-tile over best for 64x128x32: 1.246 / 1.013 / 1.011 / 1.325; for 128x256x32: 1.109 / 1.117 / 1.052 / 1.051. Share of candidates within 5% of best: 0.54% / 4.4% / 4.8% / 0.17%. Small tile over 128x128 against (MK+NK)*2/L2: Spearman +0.86 on the a6000 (+0.19 / -0.17 / +0.26 elsewhere). a6000 shapes whose operands fit L2: 0.981 (n=4); shapes that do not: 1.252 (n=41).",
+     "reproduce": "python3 a14_tile_sharp.py; python3 a15_tile_table.py; python3 a16_l2.py; a1_basic.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The split-K decision is maximally uncertain on the a6000, and its sign flips with regime. Elsewhere a near-constant policy works. In the memory-bound regime the a6000 already runs at 77-89% of DRAM bandwidth without split-K; the 5090 splits there.",
+     "evidence": "Best has sk>=3: 31/65 / 49/65 / 6/63 / 11/63; label entropy 0.998 / 0.805 / 0.454 / 0.668 bits. Hungry shapes by regime: a6000 mb 3/20, few 28/36, many 0/9; 5090 mb 6/12, few 41/47. DRAM utilisation of the best sk<=2 config on GEMV-like shapes: a6000 0.77-0.89, 5090 0.62-0.80. The a6000 table also has no sk=5 or 7 (grid 1,2,3,4,6,8,12,16); these are the 5090's most common optima (sk7: 18, sk5: 11).",
+     "reproduce": "python3 a5_sk_policy.py; python3 a6_regime.py; a2_optimum.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Within the dominant family, split_k is the least linearly predictable from the library axes on the a6000. The a6000 optimum keeps the per-split K-slice near 1.0-1.4K and stops splitting above about 1000 tiles; the 5090 targets 0.6-0.9K and splits even at 70 waves. No library axis sees the per-split loop length (mainloop_iteration_count and pipeline_fill_drain_fraction use ceil(K/tile_k) and ignore split_k), but adding that axis did not fix the a6000.",
+     "evidence": "Convex CE fit over 20 library axes, sk and mode choice inside the family (in-sample / leave-(N,K)-group-out / always sk=1): a6000 1.038 / 1.066 / 1.088; 5090 1.020 / 1.022 / 1.249; 4090 1.028 / 1.024 / 1.086; h100 1.024 / 1.024 / 1.096. Adding a K-slice axis: a6000 1.032 / 1.065 (no change), 5090 1.014 / 1.014.",
+     "reproduce": "python3 a25_sk_within.py; python3 a25_sk_within.py kslice; per-shape best-sk list printed in the session with a13-style code",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The swizzle trap. Rules and features cannot see ext_swizzle: the identity widths 1/2/4/8 are identical in every visible column, and horizontal differs only in inst_total. The lexicographic tie-break therefore lands on swid1. On the a6000, width 1 makes the dominant kernel 13-43% slower on large grids. This cost is small on the other GPUs.",
+     "evidence": "Cost of the variant a rule can actually reach (min of hz1 and id1) for the best config: a6000 1.0375 (many-wave 1.177, max 1.43), 5090 1.0080, 4090 1.0141, h100 1.0033. With the tie-break on id4 instead: a6000 1.0023. Swapping the best config's swizzle to hz1: 1.118 / 1.021 / 1.075 / 1.008. Floor for a swizzle-blind rule is small (a6000 1.0056), but on 20 of 65 a6000 shapes the reachable optimum is a different family (e.g. 256x128 w4x2 st4 on 8192x11008).",
+     "reproduce": "python3 a21_swizzle.py; python3 a23_reachable.py; python3 a24_trap.py; python3 a27_tiebreak.py; the inst_total check is in the session (8192x11008x4096 frame)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Moving the tie-break among feature-identical identity-swizzle variants from swid1 to swid4 is an exact emulation, with no refit. It alone lets the frozen c2 native a6000 rules beat the vendor in folds 2 and 3. Folds 0 and 1 are unaffected: their loss is split-K and tile.",
+     "evidence": "Median over seeds, 13 reproducible a6000 runs: folds 1.1558/1.1531/1.0965/1.0984 become 1.1554/1.1413/1.0752/1.0609 (vendor 1.0925/1.0891/1.0810/1.0630); swid2 and swid8 are similar. 5090 fold 2: 1.0798 to 1.0351. 4090 fold 2: 1.1164 to 1.1065. h100 about unchanged.",
+     "reproduce": "python3 a4_picks.py GPU (rescores the c2 final rules; 3 a6000 runs whose recomputed holdout differs from campaign2.json are excluded) ; python3 a28_subst.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The a6000 is the only GPU where the library axes cannot fit even the training shapes below the vendor's holdout level, in either the loop's rules or an idealised convex linear ranker.",
+     "evidence": "Median train regret of the c2 final rules: a6000 1.081, 5090 1.031, 4090 1.025, h100 1.047 (vendor holdout 1.0815 / 1.146 / 1.078 / 1.121). Convex CE linear fit over the 20 axes, swizzle-reachable candidates, best in-sample over 9 design and tau settings: a6000 1.10 (1.0965 with the extra L2 axis), 5090 1.027, 4090 1.049, h100 1.064. Fold-honest best: a6000 1.087 (vendor 1.0815), 5090 1.031, 4090 1.045, h100 1.072.",
+     "reproduce": "python3 a19_linfit.py --gpus GPU --design flat|regime|regime3 --tau 0.003|0.01|0.03 [--extra l2wave2]  (run_a19.sh; outputs out_a19_*.txt)",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Decomposing holdout regret by choice shows the a6000 rules lose on split-K class, tile and in-class sk, not on the kernel variant. The vendor's edge is picking the right tile in the few-wave regime; it is no better than the rules at split-K class.",
+     "evidence": "Native rules, total = class x tile x sk x variant: a6000 1.1305 = 1.0254 x 1.0335 x 1.0372 x 1.0284; 5090 1.0634 = 1.0075 x 1.0113 x 1.0167 x 1.0265; 4090 1.0687 = 1.0052 x 1.0156 x 1.0075 x 1.0390; h100 1.0768 = 1.0062 x 1.0326 x 1.0163 x 1.0197. Vendor a6000 1.0815 = 1.0134 x 1.0200 x 1.0161 x 1.0296. Tile factor in the few regime: vendor 1.004, rule 1.044. Split-K class accuracy, rule: 0.566 (22/104 hungry picked) / 0.808 / 0.766 / 0.877. Vendor: 0.600 / 0.585 / 0.873 / 0.889.",
+     "reproduce": "python3 a12_decomp.py; python3 a17_class_acc.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "By regime, the evolved a6000 rule already beats the vendor on memory-bound shapes. It loses on compute-bound few-wave shapes and badly on many-wave shapes, and the many-wave loss is the swizzle trap.",
+     "evidence": "c2_evolved_s0 probe holdout: mb 1.063 vs vendor 1.107; few (n=36) 1.138 vs 1.080; many (n=9) 1.141 vs 1.032. Example: 8192^3, the rule picks 128x128x32 2x2 st3 sk1 with width-1 swizzle at 1.43; the same kernel with id8 is 1.000.",
+     "reproduce": "python3 a9_probe_regime.py; python3 regime_split.py ../../res/c2_evolved_s0.json; python3 a20_linpicks.py 0.03 flat",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Relative to static baselines, the vendor is strongest on the a6000. Neighbour smoothness is not a6000-specific: the h100 is worse there.",
+     "evidence": "Fold-honest static top-1, pooled: a6000 1.135 vs vendor 1.0815; 5090 1.078 vs 1.146; 4090 1.079 vs 1.078; h100 1.265 vs 1.121. Three regime static keys on the a6000: 1.0895. Transfer regret of a neighbour shape's best config along M: 1.061 / 1.044 / 1.044 / 1.109. kNN lookup: 1.151 / 1.074 / 1.097 / 1.293.",
+     "reproduce": "python3 a8_static.py; python3 a18_smooth.py; python3 a26_knn.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Edit and test iterations with the cheap screen (same folds, inner parts and objective as the probe, CMA 800x1). The screen is calibrated to the probe: evolved s0 scores 1.1137 inner / 1.1173 holdout, against 1.1177 / 1.1149 in the probe. Only the large-grid branch helped consistently.",
+     "evidence": "Inner-CV / holdout65 for each rule. r01 flat 15 axes: 1.1146 / 1.1193. r02 two regimes, 30 w: 1.1446 / 1.1396. r03 split-K only when compute-bound: 1.1846 / 1.1810. r05 flat plus regime corrections: 1.1236 / 1.1101. r07 flat plus 2 new axes (split_mainloop_log_iterations, l2_wave_operand_pressure): 1.1226 / 1.1216. r08: 1.1372 / 1.1305. r09 evolved s0 + mb/many branches: 1.0949 / 1.0951. r10 many-branch only: 1.1075 / 1.1044 (many 1.141 to 1.077). r11 mb-branch only: 1.1118 / 1.1171. r13 evolved s1 base: 1.0948 / 1.1048. r12 s1 + branches: 1.0903 / 1.1018. r14 r09 + few branch: 1.1129 / 1.0946.",
+     "reproduce": "python3 screen.py <abs path>/rules/rNN_*.json --evals 800 --restarts 1 --workers 12  (results in rules/*.screen.txt|json); python3 regime_split.py rules/*.screen.json",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "The official a6000_probe (the one run allowed) on r09 = evolved s0 plus a memory-bound branch and a large-grid branch improves both inner-CV and holdout over the same rule without the branches. It still loses to the vendor pooled.",
+     "evidence": "inner-CV 1.1036 (baseline 1.1177); pooled holdout 1.0949 (baseline 1.1149); vendor 1.0815. Folds 1.0981 / 1.1538 / 1.0965 / 1.0341 vs vendor 1.0925 / 1.0891 / 1.0810 / 1.0630: beats the vendor in 1/4 folds (baseline 0/4). By regime: many 1.1406 to 1.0765, few 1.1382 to 1.1141, mb 1.0632 to 1.0692. Hard (sk>=3) shapes 1.1273 to 1.1048, sk>=3 picked 12/31 (was 13/31).",
+     "reproduce": "cd /home/piai/workspace/kernelRule && python3 -m experiments.a6000_probe --rule /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/table/rules/r09_evolved_s0_regimefix.json --out .../an/table/probe/r09_probe.json --workers 8",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Interpretation: the a6000 loses because its optimum is a narrow peak set by memory hierarchy (L2 capacity, rasterization, K-slice length), which the physics-lite library axes do not describe. The other three GPUs have either wide plateaus (5090, 4090) or a weak vendor (5090, h100), so the same vocabulary is enough there.",
+     "evidence": "Combines the tile-L2 correlation (+0.86 on the a6000 only), the swizzle trap (a6000 1.0375 vs at most 1.014 elsewhere), the split-K predictability gap (1.066 vs 1.022-1.024), the train-fit floor (1.081 vs 1.025-1.047) and vendor strength (a6000 vendor/static 0.95 vs 1.06 on the 5090).",
+     "reproduce": "see a16_l2.py, a24_trap.py, a25_sk_within.py, a8_static.py",
+     "kind": "interpretation",
+     "strength": "moderate"
+    }
+   ],
+   "candidate_edits": [
+    {
+     "name": "large-grid (+ memory-bound) correction branches",
+     "cause_addressed": "The swizzle trap on many-wave shapes (a swizzle-blind 2-block 128x128 kernel costs 1.18-1.43 there), and split-K being useless in the memory-bound regime.",
+     "what_to_change": "Append to the rule before `return s`: `if p.roofline_ratio < 1: s += w[n]*f.serial_reduction_dependency + w[n+1]*f.tail_waste` / `elif p.output_work_per_sm > 200000: s += w[n+2]*f.resident_block_scarcity + w[n+3]*f.register_file_pressure` (w0 = 0 for the new weights). Already probed on evolved s0 (rules/r09_evolved_s0_regimefix.json). The 2e5 threshold is about 12 waves of 128x128 tiles, but I picked it after seeing all 65 shapes, so it carries mild selection bias.",
+     "expected_effect": "Measured in the probe: many regime 1.14 to 1.08, pooled holdout 1.1149 to 1.0949, inner-CV 1.1177 to 1.1036, 1/4 folds beating the vendor. The loop could get this by allowing a shape-level branch on output_work_per_sm in the seed."
+    },
+    {
+     "name": "swizzle-aware tie-break or visible swizzle width (infrastructure, needs a kernelrule change and the user's decision)",
+     "cause_addressed": "Rules cannot see ext_swizzle. make_tiebreak is lexicographic, so the feature-identical identity variants resolve to swid1, the worst width on the a6000.",
+     "what_to_change": "Either break ties among feature-identical swizzle variants toward identity width 4 (e.g. a secondary key before kernel_id), or add swizzle width to Config and RAW_FIELDS (currently kept in ext by D-75).",
+     "expected_effect": "Exact emulation on the frozen c2 native rules: a6000 folds 1.1558/1.1531/1.0965/1.0984 become 1.1554/1.1413/1.0752/1.0609, beating the vendor in folds 2 and 3 with no refit. 5090 fold 2: 1.0798 to 1.0351. The other GPUs are neutral or slightly better."
+    },
+    {
+     "name": "split-K-aware loop-length axis",
+     "cause_addressed": "mainloop_iteration_count and pipeline_fill_drain_fraction ignore split_k, so no axis encodes the per-CTA K-slice that the a6000 (about 1.2K) and the 5090 (about 0.7K) each target.",
+     "what_to_change": "Library axis split_mainloop_log_iterations = log2(ceil(ceil(K/split_k)/tile_k)); the code is in an/table/features_table.jsonl. Optionally recompute pipeline_fill_drain_fraction with per-split iterations.",
+     "expected_effect": "Convex in-family test: 5090 1.022 to 1.014; the a6000 is unchanged (1.066). Under CMA-800 in r07/r08 it gave no gain. Low priority for the a6000 alone, but it removes a vocabulary blind spot."
+    },
+    {
+     "name": "L2-per-wave operand pressure axis",
+     "cause_addressed": "The small-tile and large-grid penalties on the a6000 track operand working set over L2, and no config-level library axis relates tile or split to L2 capacity.",
+     "what_to_change": "Library axis l2_wave_operand_pressure = log2(bytes of A rows + B columns touched by the resident CTAs (min(grid, SM*blocks), raster along N) over one K-slice / L2), clipped at 1/64. Code in an/table/features_table.jsonl.",
+     "expected_effect": "Small: convex in-sample on the a6000 goes from 1.1007 to 1.0965, fold-honest from 1.111 to 1.107. With CMA-800 (r07/r08) it did not improve. Worth testing only together with a few-regime tile prior."
+    },
+    {
+     "name": "few-wave compute-bound tile and split-K prior",
+     "cause_addressed": "The remaining gap in the probe is the few regime: rule 1.114 vs vendor 1.080, tile factor 1.044 vs 1.004, class accuracy 0.57.",
+     "what_to_change": "The simple branch version (r14: resident_block_scarcity, log2 operand_tile_traffic_ratio, tail_waste, wave_count_deficit and serial_reduction_dependency re-weighted when compute-bound and output_work_per_sm <= 2e5) did not help inner-CV (1.1129). The next thing to test is a larger fit budget or multi-restart for these weights, since the a6000 train fit is itself at 1.08.",
+     "expected_effect": "Unproven. The in-family oracle says a perfect sk choice would take the few regime to about 1.02 within the 128x128 family."
+    }
+   ]
+  },
+  {
+   "lens": "rules",
+   "summary": "The a6000 rules are built much like the rules for the other GPUs: similar weight counts, 3 if-branches and 17-18 library axes. What differs is where they put wave_count_deficit and the sign it gets. In most a6000 seed rules (folds 0-2) that axis is a single global term with no branch. On a6000 the fitter gives it a large negative weight, which works as a blanket \"use as few waves as possible\" preference. That preference is right for the memory-bound small-M shapes, where split_k=1 with at most one wave wins. It also blocks split-K on the compute-bound mid-size shapes, which is where all of a6000's split-K gains are. 7 of 16 a6000 runs (all 4 fold-0 runs) pick split_k>=3 on 0 of the 31 split-K-hungry shapes; on the other GPUs this happens in 0-1 runs out of 16. Getting rid of that term is not enough, because split-K on a6000 is a needle: on its split-K-hungry shapes the configs within 3% of best (median 12) all come from one family, 128x128x32 with 64x64 warps, 3 stages and serial split-K. On other GPUs the near-best set spans 8-37 families, and fill axes like tail_waste do not predict which a6000 split-K candidate wins. The rules that do win on the hard shapes (4 native runs plus the 5090-ported rule) share three traits in the compute-bound branch: near-zero wave_count_deficit, a strong penalty on parallel split-K traffic, and penalties on resident_block_scarcity and operand-tile traffic. My one a6000_probe run refit the 5090 source structure on every fold, and it did worse than the native rules (pooled holdout 1.1628 vs 1.1149). So the porting win came from that run's weights, not from the structure alone. A small new rule that puts the split-K axes inside each roofline branch reached a fold-0 holdout of 1.0544, against vendor 1.0925 and native 1.1499. A control with the same axes but the split-K terms global scored 1.1354 and picked no split-K. This is one fold only, and my diagnosis looked at all 65 shapes, so it needs the official 4-fold probe.",
+   "findings": [
+    {
+     "claim": "a6000 final rules rarely choose split-K on the shapes that need it, far less than on any other GPU; 7/16 a6000 runs choose it on none.",
+     "evidence": "On shapes whose optimum has split_k>=3, the share where the rule's top-1 pick also has split_k>=3 (median over 16 runs, train / fold-holdout): a6000 0.29/0.35; 5090 0.88/0.87; 4090 0.77/0.72; h100 0.58/0.49. Runs with 0 split_k>=3 picks on hard shapes: a6000 7/16 (f0-s0..s3, f1-s3, f2-s0, f3-s1); 5090 1/16 (f1-s1); 4090 1/16 (f3-s1); h100 0/16 (lowest 0.36). Hard-shape regret of those 7 a6000 runs is 1.145-1.189; vendor on the same 31 shapes is 1.0695. Median train regret: a6000 1.081 vs 5090 1.031, 4090 1.025, h100 1.047, so a6000 rules underfit training too.",
+     "reproduce": "cd /home/piai/workspace/kernelRule; PYTHONPATH=$PWD python3 SCR/dyn.py --jobs 8 && python3 SCR/agg.py && python3 SCR/perrun.py a6000   (SCR=/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/rules; outputs agg.out, perrun.out, dyn/*.json)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The term that works against split-K in a6000 rules is wave_count_deficit (=1/waves) with a negative effective weight. Split-K adds waves, which lowers this value and so raises (worsens) the score. tail_waste pulls toward split-K on every GPU but is far too weak on a6000 to win.",
+     "evidence": "Sibling test: A = the fastest split_k>=3 config, A1 = the same config with split_k=1, on hard shapes where A is really >5% faster (a6000 true t(A)/t(A1) geomean 0.852). The rule scores A better than A1 in 32% of pairs on a6000, vs 82% on 5090, 91% on 4090, 62% on h100. Per-axis swap attribution (score std units, + = against split-K): a6000 wcd +1.60, tail -0.26; 5090 tail -0.23, wcd -0.13; 4090 tail -3.09, wcd +1.13; h100 wcd +0.82, tail -0.75. On hard shapes where the pick has sk<3 and regret>1.02, wcd accounts for 86.5% of the score gap between pick and true best (a6000, n=338 cases). On 5090 (n=68) the gap is mostly instruction_density and register_file_pressure. Exact linear-in-w decomposition for c2-a6000-f0-s0: mean s(A)-s(A1) = +4.09 sd; w[15]=-82.6*wcd gives +3.20 and w[2]=-142.7*wcd gives +1.04, while tail gives -0.16.",
+     "reproduce": "SCR/dyn.py (sib_att, gap_att), SCR/agg.py -> agg.out; SCR/wdecomp.py runs/c2-a6000-f0-s0 -> wdecomp.out",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The effect depends on regime. a6000 rules give wcd a strongly negative effect on memory-bound shapes, and in about half the runs also on compute-bound shapes, where the split-K gains are. Across runs, the more negative the compute-bound wcd effect, the worse the hard-shape regret. The same relation holds on h100 but not on 5090.",
+     "evidence": "Signed standardized effect cov(X, s-s_{X:=median})/(sd X * sd s), median over 16 runs, memory-bound / compute-bound shapes: wcd a6000 -0.423/-0.035; 5090 -0.035/-0.000; 4090 -0.024/-0.046; h100 -0.311/-0.247. Runs with compute-bound wcd effect < -0.05: a6000 7/16 (all fold-0 runs, -0.41 to -1.01), 5090 1/16. Spearman(compute-bound wcd effect, hard-shape regret) over 16 runs: a6000 -0.78 (p<0.001), h100 -0.69 (p=0.003), 4090 -0.38 (p=0.14), 5090 +0.21 (p=0.43). Same effect vs split-K picks on hard shapes: a6000 +0.80 (p<0.001). The ported 5090->a6000 rule has -1.009 memory-bound and +0.029 compute-bound, a clean regime split.",
+     "reproduce": "python3 SCR/regime_eff.py -> regime_eff.out; Spearman snippet inline in session (uses SCR/dyn/*.json + SCR/pvals.json)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The blanket wcd term comes from the seed rule and its first fit, and runs that start there tend to stay there (path dependence). a6000 seeds put wcd as a global term; 5090 seeds mostly leave wcd out.",
+     "evidence": "Stage-2 seed placement of the split-K axes: a6000 folds 0/1/2 have wave_count_deficit and tail_waste global (no branch); the fold-3 seed has none of the 5 split-K axes. 5090 seeds have no wcd in folds 0-2 and put tail only in the roofline<1 branch. In a6000 fold 0, all four seeds share the same round-0 best rule (train 1.1175) with global wcd weight -1.48e4, and all four end with 0/31 split-K picks. 5090 final rules put wcd inside the roofline branches with separate signs (e.g. c2-5090-f0-s2: -12.9 memory-bound, +62.7 compute-bound). The a6000 fold-0 finals keep it global (f0-s1 -2.71e4, f0-s2 -5.82e5, f0-s3 -132) or split it on log_flops<35 (f0-s0 -143/-83), which mixes both regimes.",
+     "reproduce": "inline AST scripts over runs/c2-*-f*/stage2-rule-writer/chosen.json and runs/c2-*/bests.jsonl (first and last lines); static parse: SCR/static_parse.py -> SCR/rules_static.json",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Why the fitter wants wcd<0 on a6000: split-K is harmful for most a6000 candidates, including on the hard shapes, and tail_waste does not predict which split-K candidates win there. On 5090 it does. In the no-split-K rules, wcd<0 is effectively the only split-K cost term.",
+     "evidence": "Sibling pairs (same config, split_k>1 vs 1; sk1 time within 1.5x of shape best), share where split-K is faster and geomean time ratio: a6000 compute-bound hard serial 0.26 / 1.144x, parallel 0.10 / 1.229x; compute-bound easy serial 0.03 / 1.358x, parallel 0.00 / 1.511x; memory-bound easy serial 0.40 / 1.060x. 5090 compute-bound hard serial 0.47 / 1.041x; memory-bound hard 0.87 / 0.850x. corr(dlog t, d tail_waste) on compute-bound hard pairs: a6000 +0.020 (serial) / -0.036 (parallel) vs 5090 +0.359 / +0.402. No-refit ablation (wcd set to its within-shape median on compute-bound shapes only): split-K picks on hard shapes rise to 0.94 in the no-split-K rules, but those rules collapse (f0-s0 train 1.101->2.248, f2-s0 1.085->2.711, f3-s1 1.101->2.033). Median val over 16 runs: 1.109 -> 1.203; val improves in 1/16 runs. Signed effects of serial_reduction_dependency and parallel_reduction_traffic_fraction in those rules are about 0.",
+     "reproduce": "SCR/fillsign2.py a6000 5090 -> fillsign2.out; SCR/fillsign.py -> fillsign.out; SCR/ablate.py a6000 -> ablate_a6000.log/.json",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "a6000's split-K-hungry shapes are needle shapes: every near-best candidate is one config family, 128x128x32 with 64x64 warps, 3 stages and 2 blocks/SM, using serial split-K 3-12. No other GPU has this.",
+     "evidence": "Candidates within 3% of the best (median over shapes) / number of (tile, warp, stages) families in that set / share of the top family: a6000 hard 12 / 1 / 1.00; a6000 easy 68 / 16 / 0.15; 5090 hard 524 / 37 / 0.06; 5090 easy 129 / 27; 4090 hard 241 / 27; h100 hard 39 / 8 / 0.15. On a6000 compute-bound hard shapes, 303 of 314 near-best split_k>=3 candidates are 128x128x32 w64x64 st3 bps2, all serial. On 5090 the most common family holds 947 of about 21.8k. Among split_k>=3 serial candidates, this family sits at the 90th/94th percentile of tail_waste/wcd (few extra waves) and at the 10th-20th percentile of thread_work_granularity_deficit, operand_tile_traffic_ratio, resident_block_scarcity, tile_roofline_deficit and serial_reduction_dependency. Also: 29/31 a6000 hard shapes are compute-bound (roofline_ratio>=1), all have output_work_per_sm>=12480, and 0 of the 11 shapes with output_work_per_sm<4096 are hard (5090: 8 of 14).",
+     "reproduce": "SCR/nearbest.py; SCR/skwho.py a6000 5090; SCR/needle_axes.py; SCR/pvals.py (-> pvals.json)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The a6000 rules fall into three outcome classes on the 31 hard shapes. Only the rules that pick the needle family with split_k>=3 beat the vendor there. They share compute-bound wcd near 0, a strong parallel-traffic penalty, and positive penalties on resident_block_scarcity and/or operand_tile_traffic_ratio in the compute-bound regime. The rules in the other classes lack these terms.",
+     "evidence": "Picks that are needle family with sk>=3 on the 31 hard shapes: f2-s1 15, f2-s2 21, f3-s0 20, f3-s3 24, pc-50902a6000 19 -> hard geomean 1.036-1.053. Split-K in the wrong family (mostly sk3 serial with another tile; 78 of 78 such picks serial): f1-s0/s1/s2, f2-s3, f3-s2, pc-40902a6000 -> 1.10-1.14. No split-K: the 7 wcd<0 runs -> 1.145-1.189; f2-s0 even picks the right family on 29/31 shapes but with sk<3. The vendor picks needle with sk>=3 on 13/31 (hard 1.0695). Class medians of the signed compute-bound effect on hard shapes (needle / wrong family / no split-K): wcd +0.004/-0.020/-0.867; parallel_reduction_traffic_fraction +0.504/+0.230/0.000; resident_block_scarcity +0.652/0.000/-0.002; operand_tile_traffic_ratio +0.479/0.000/0.000. Wrong-family rules f3-s2 and pc-4090 reward scarcity (-0.925, -0.966). The 5090 native medians on compute-bound shapes are prtf +0.541 and rbs +0.433; the a6000 native median prtf on hard shapes is +0.051. The seed layout puts operand_tile_traffic_ratio only in the roofline<1 branch.",
+     "reproduce": "SCR/pickfam.py (-> pickfam.json); class-effect and per-run snippets inline (read SCR/dyn/*.json, SCR/pvals.json); SCR/vendor_fam.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The shape branches a6000 rules use for split-K follow the 5090/h100 idea that low output work means split-K. On a6000 those branches contain none of the split-K-hungry shapes. The branch axes and thresholds are otherwise the same on all GPUs, so the difference is in the data, not the structure the LLM writes.",
+     "evidence": "Rules with split-K-axis statements under output_work_per_sm < 256/1000/1024/2048/4096: a6000 8/16, 5090 7/16, 4090 11/16, h100 8/16. Most common branch tests: roofline_ratio<1 in almost every rule on every GPU; a6000 output_work_per_sm<256 (4), <4096 (3), log_flops<35 (3), log_min_dim<6 (3); 5090 output_work_per_sm<1024 (4 if, plus 12/8 np.where >=/<1024). Other structural medians (a6000 / 5090 / 4090 / h100): weights 35.5 / 46 / 35.5 / 41; if 3/3/3/3; np.where 5 / 4.5 / 6.5 / 4.5; library axes 17 / 18 / 17.5 / 18; loop-made axes used in total 47 / 32 / 28 / 25 (a6000 invented the most new axes, none of which fixed split-K).",
+     "reproduce": "SCR/static_parse.py; SCR/structstats.py; gating-count snippet inline",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Why the porting rules do better on a6000 fold 0. pc-5090 has a regime-split wcd with a large penalty on parallel split-K and on operand traffic and resident-block scarcity in the compute-bound branch, which lands on the needle family. pc-4090 escapes the blanket suppression through a tail_loss x wcd interaction but picks the wrong family (it rewards scarcity).",
+     "evidence": "pc-50902a6000 = the c2-5090-f0-s2 structure plus 3 CTA-locality terms. Fitted wcd weights: w[12]=-2.81e5 (roofline<1) and w[24]=+66 (compute-bound) -> signed effect -1.009 / +0.029. Compute-bound effects: prtf +0.43, otr +0.85, rbs +0.91. It picks the needle with sk>=3 on 19/31 hard shapes (hard 1.036, easy 1.0605, my plain-regret recomputation on the 17 fold-0 holdout shapes 1.0366; porting-cost.json canonical curve 1.054-1.059). pc-40902a6000: tail_loss*wcd (w=+2830) contributes -1.81 sd toward split-K and global wcd (w=-1616) +1.27 sd against; it prefers the split-K sibling 43% of the time but picks the needle 0/31 (rbs effect -0.966), hard 1.139 (native fold-0 runs 1.178-1.189).",
+     "reproduce": "SCR/wdecomp.py runs/pc-50902a6000-f0-s0 runs/pc-40902a6000-f0-s0 -> wdecomp.out; SCR/regime_eff.py; SCR/pickfam.py",
+     "kind": "interpretation",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Under the fixed a6000_probe protocol, the 5090 source structure on its own does not beat the native rules. Most of the porting win lies in the weights the porting loop found, not in the transplanted code.",
+     "evidence": "a6000_probe on the c2-5090-f0-s2 final code with 5090 w0, CMA-refit on each fold's train: pooled holdout (65) 1.1628 vs native c2_evolved_s0 1.1149 and vendor 1.0815; inner-CV 1.1635 vs 1.1177; 0/4 folds beat vendor; per fold 1.1406/1.2673/1.1679/1.0845. It picks split_k>=3 on 18/31 hard shapes (native 13/31), hard 1.1188 (native 1.1273), but easy shapes degrade to 1.2045 (native 1.1038; fold 1 easy 1.451). Fold-0 train 1.1357 vs 1.0719 reached by the porting loop. This agrees with porting-cost.json b_refit 1.1143 vs the loop curve at 1.054.",
+     "reproduce": "python3 -m experiments.a6000_probe --rule SCR/port5090_s2.json --out SCR/probe_port5090_s2.json --workers 8 (built by SCR/make_port.py)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "A compact rule that puts the split-K axes inside the roofline branches, and lets operand-tile traffic and resident-block scarcity act in the compute-bound branch, beats the vendor on fold 0. The same axes with the split-K terms global fall back into the no-split-K basin.",
+     "evidence": "Fit on fold-0 train with the probe's own _fit_task (CMA, 2 restarts, 2000 evals), read on the 17 fold-0 holdout shapes. regime_free (18 weights): train 1.0975, holdout 1.0544, hard (n=11) 1.0392 with split_k>=3 on 8/11, easy 1.0829; fitted wcd -3.31 (memory-bound) / +0.70 (compute-bound). regime_signed (np.abs on rbs, otr, cmp-wcd, cmp-prtf): holdout 1.0725, hard 1.0481 (10/11), easy 1.1188. global_ctrl (seed layout, split-K axes global, no compute-bound otr): train 1.1300, holdout 1.1354, hard 1.1684 with 0/11 split-K picks, fitted wcd -5.85. Fold-0 references: vendor 1.0925, native probe 1.1499, 5090 structure 1.1406. Caveats: one fold only; the design was fixed before these fits but drew on a diagnosis that looked at all 65 shapes, including this holdout.",
+     "reproduce": "PYTHONPATH=/home/piai/workspace/kernelRule python3 SCR/fold0_fit.py SCR/cand/regime_signed.json SCR/cand/regime_free.json SCR/cand/global_ctrl.json -> SCR/cand/fold0_fit.log",
+     "kind": "measurement",
+     "strength": "moderate"
+    }
+   ],
+   "candidate_edits": [
+    {
+     "name": "regime_free: split-K block per roofline branch",
+     "cause_addressed": "A global wave_count_deficit gets fitted strongly negative (right for memory-bound small-M a6000 shapes) and then suppresses split-K on the compute-bound shapes where all a6000 split-K gains are. Also, operand-tile traffic and resident-block scarcity, which point to the needle family, are missing from the compute-bound branch.",
+     "what_to_change": "Rule file SCR/cand/regime_free.json (18 weights, 2 paths, library axes only). Global terms: log2(1+edge_waste), has_spill, log2(1+spill_traffic_ratio), pipeline_fill_drain_fraction. Let tl = -log2(max(1e-6, 1-tail_waste)). if p.roofline_ratio < 1: log2(operand_tile_traffic_ratio), tile_roofline_deficit, tl, wave_count_deficit, serial_reduction_dependency, parallel_reduction_traffic_fraction, each with its own weight. else: log2(1+instruction_density), occupancy_deficit, resident_block_scarcity, log2(operand_tile_traffic_ratio), tl, wave_count_deficit, serial_reduction_dependency, parallel_reduction_traffic_fraction, each with its own weight. w0 = [0.5,10,0.1,1, 1,1,1,-1,1,1, 1,1,1,1,1,0.5,1,1]. Run the full 4-fold a6000_probe; so far only fold 0 has been measured.",
+     "expected_effect": "Removes the no-split-K basin: the memory-bound wcd weight goes negative while the compute-bound one stays at or above 0 (fold-0 fit: -3.31 / +0.70). Fold 0 measured 1.0544 vs vendor 1.0925 and native 1.1499, with 8/11 hard shapes on split-K. I expect the pooled holdout to beat native 1.1149 clearly and to reach or beat vendor 1.0815 in most folds; inner-CV should confirm."
+    },
+    {
+     "name": "regime_signed: the same with sign constraints",
+     "cause_addressed": "The fixed CMA fitter often lands in the wrong basin: wcd negative everywhere, or scarcity rewarded, which picks the wrong split-K family (f3-s2 and pc-4090 have rbs effect -0.93/-0.97). The probe's fitter takes no bounds.",
+     "what_to_change": "As regime_free, but in the compute-bound branch write resident_block_scarcity*np.abs(w[12]), log2(operand_tile_traffic_ratio)*np.abs(w[13]), wave_count_deficit*np.abs(w[15]) and parallel_reduction_traffic_fraction*np.abs(w[17]) (file SCR/cand/regime_signed.json). This fixes the physically motivated signs inside the code, so no fitter bounds are needed.",
+     "expected_effect": "More split-K picks on hard shapes (fold 0: 10/11, hard 1.0481) and more stable across seeds, but easy shapes somewhat worse (fold 0 easy 1.1188 vs 1.0829 unconstrained; holdout 1.0725). Worth probing to see whether inner-CV prefers the stability."
+    },
+    {
+     "name": "Seed and editor constraint: no global wave_count_deficit",
+     "cause_addressed": "Path dependence. The a6000 fold-0 to fold-2 seeds carry wcd as a global term; in fold 0 all 4 seeds start from the same round-0 fit (wcd weight -1.48e4) and all 4 finish with 0/31 split-K picks. 5090 seeds have no wcd in 3/4 folds, and 5090 finals put wcd inside the roofline branches with opposite signs.",
+     "what_to_change": "In the stage-2 rule-writer, the loop editor prompt, or a static check: reject rules where wave_count_deficit, tail_waste, serial_reduction_dependency or parallel_reduction_traffic_fraction appear outside a p.roofline_ratio branch (or require separate weights per roofline side). Also require operand_tile_traffic_ratio and resident_block_scarcity to appear in the compute-bound branch as well as the memory-bound one.",
+     "expected_effect": "Fewer a6000 runs in the no-split-K basin (currently 7/16) and more runs that find the 128x128x32 w64x64 st3 serial split-K family (currently 4/16 native), with hard-shape regret moving from about 1.13 toward the 1.04-1.05 those runs achieve. No effect expected on 5090, whose runs already avoid the basin (1/16)."
+    },
+    {
+     "name": "Explicit parallel split-K penalty in the compute-bound branch",
+     "cause_addressed": "On a6000, none of the near-best candidates on hard shapes uses parallel split-K, and parallel siblings are slower 90% of the time (geomean 1.229x). Native a6000 rules barely penalise parallel traffic (prtf effect +0.051 on hard shapes, vs 5090 +0.458 and pc-5090 +0.43), so any split-K reward also pulls in parallel candidates.",
+     "what_to_change": "Add s = s + np.where(p.roofline_ratio < 1, 0.0, 1.0) * np.where(f.parallel_reduction_traffic_fraction > 0, 1.0, 0.0) * np.abs(w[k]), with w0[k] set to about the score's typical within-shape spread (for example the largest existing compute-bound weight), to any a6000 rule or to regime_free.",
+     "expected_effect": "Removes parallel split-K picks on compute-bound shapes, so any split-K pull lands on serial candidates. Small but reliable gain on hard shapes, with no cost on easy ones."
+    },
+    {
+     "name": "Mechanical gating of the evolved rules (gated_s0.json)",
+     "cause_addressed": "Direct A/B of the wcd hypothesis on the existing evolved rules (c2_evolved_s0 baseline: pooled 1.1149).",
+     "what_to_change": "SCR/gated_s0.json (built by SCR/make_gated.py). In each fold's seed-0 final rule, multiply every stand-alone wcd*w term by mem_gate = np.where(p.roofline_ratio < 1, 1.0, 0.0), and append cmp_gate*wcd*w[n] (w0 0) and cmp_gate*tl*w[n+1] (w0 = |existing tail weight|). check_rule passes on all 4 folds.",
+     "expected_effect": "Uncertain; lower priority than regime_free. Without refitting, the gated fold-0 and fold-2 rules score train 2.25 and 2.71, because wcd<0 was their only split-K cost. CMA has to recover from there, and the native rules have no parallel penalty or needle-selecting terms, so at best a partial gain on folds 0 and 2."
+    }
+   ]
+  },
+  {
+   "lens": "logs",
+   "summary": "Only on a6000 does the loop start behind the vendor on its own training shapes: the seed rule is 3.7–8.5% worse than the vendor in-sample, while on 5090, 4090 and H100 it starts 0.2–6.4% ahead. The loop improves train more on a6000 than on any other GPU but only reaches vendor parity in-sample (−1.1% to +2.0%), and a train-to-holdout gap of about +0.048 then puts every fold behind. Between 47% and 74% of the leftover train loss sits on split-K shapes. The diagnostic report shows this (45% of shown cases are split-K misses) and the analyst writes split-K hypotheses as often as on 5090 (29% vs 31%). Split-K edits still never pay, for two reasons. First, 76% of them gate split-K to the \"small output / short dimension\" regime, where 0% of a6000 shapes want split-K. Second, all five split-K axes rise monotonically with split_k, so pushing a rule toward split-K jumps to split_k=16. On a6000 the right split_k is 3–4 and split_k=16 costs 1.325; on 5090 it costs only 1.034. One probe (a train-chosen gate plus a quadratic term in log2 K-iterations per split, added to the c2 evolved rule) moved the pooled holdout from 1.1149 to 1.0834 (vendor 1.0815) and inner-CV from 1.1177 to 1.0869. It beats the vendor in folds 0 and 2, ties fold 3, and still loses fold 1.",
+   "findings": [
+    {
+     "claim": "a6000 is the only GPU where the loop starts BEHIND the vendor in-sample, and it ends only at vendor parity in-sample, so the train-to-holdout gap puts every fold behind the vendor.",
+     "evidence": "Seed train / vendor train per fold. a6000: 1.1175/1.0776=1.037, 1.1405/1.0790=1.057, 1.1550/1.0817=1.068, 1.1803/1.0876=1.085. 5090: 0.998, 0.939, 0.978, 0.936. 4090: 0.982, 0.981, 0.974, 0.972. H100: 0.972, 0.976, 0.963, 0.967. Final loop train (4-seed median) / vendor train on a6000: 1.0989/1.0776, 1.0761/1.0790, 1.0722/1.0817, 1.0751/1.0876, i.e. +2.0%, −0.3%, −0.9%, −1.1%. The other GPUs end 4.5–9% ahead (5090 final train about 1.03 vs vendor 1.13–1.16). Median gap (holdout − train) at the end: a6000 +0.048, 5090 +0.021, 4090 +0.019, H100 +0.017. Median total train gain from the seed (log): a6000 −0.063, 5090 −0.051, 4090 −0.027, H100 −0.034. The a6000 loop is working hardest, but it starts furthest back.",
+     "reproduce": "python3 /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/logs/s01_rounds.py c2 ; s27_misc.py (section d) ; s13_foldmix.py ; s02_context.py (same dir, run from repo root)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The a6000 in-sample deficit is almost entirely on split-K shapes. On the other train shapes the evolved rule already beats the vendor by 2–5%.",
+     "evidence": "Final c2 rules on a6000 train, median of 4 seeds. Shapes whose optimum has split_k>=3: rule 1.1764/1.1134/1.0833/1.0768 vs vendor 1.0637/1.0640/1.0744/1.0748 (folds 0–3). Other shapes: rule 1.0432/1.0383/1.0636/1.0763 vs vendor 1.0877/1.0937/1.0899/1.0991. Share of the rule's train log-regret on split-K shapes: 0.73/0.74/0.61/0.47. Median split_k>=3 picks on those train shapes: 0/20, 7.5/24, 14.5/26, 11/23. On 5090 folds 0–1 the rules pick split-K on 31/31 and 33/34 of these shapes, with regret 1.037 and 1.043.",
+     "reproduce": "python3 /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/logs/s02_context.py (output in s02.out; a6000 all folds, 5090 f0–f1)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The diagnostic report does show the split-K problem, and the analyst does react to it. On a6000, however, the problem never shrinks over the 12 rounds, while on 5090 and 4090 it largely goes away.",
+     "evidence": "Share of shown cases that are split-K misses (optimum split_k>=3, pick <3), over all analyze reports: a6000 45% (52% of the shown log-regret), 5090 24%, 4090 14%, H100 26%. Share of hypotheses about split-K: a6000 29%, 5090 31%, 4090 19%, H100 22%. Per-round miss share, round 0 → round 11: a6000 0.47 → 0.44 (flat); 5090 0.57 → 0.06; 4090 0.20 → 0.07; H100 0.30 → 0.23. D-187 splitk runs: 0.39 → 0.44. The loop fails to act on the evidence, not to see it.",
+     "reproduce": "s05_reports.py c2 ; s06_report_rounds.py c2 ; s06_report_rounds.py splitk a6000 ; s27_misc.py (section c) (same dir)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The editor aims split-K at the wrong regime on a6000. It keeps gating split-K to 'small output per SM / short dimension', the textbook regime where 0% of a6000 shapes want split-K. The regime that does want it (large K work, medium output) is never isolated by any a6000 run.",
+     "evidence": "76% of a6000 split-K proposals contain an output_work_per_sm< or log_min_dim< gate (median threshold 256); D-187 raises this to 82%. Share of a6000 shapes that want split-K inside vs outside common gates: owps<256 0/4 vs 49%; owps<1024 0/6 vs 51%; owps<4096 0/11 vs 56%; log_min_dim<6 0/12 vs 57%. On H100 the same prior is correct: 40–50% inside vs 13–15% outside. On 5090 it is also wrong (21% vs 78%), but 66% of 5090 shapes want split-K, so a global 'prefer split-K' still works. Best balanced accuracy of any shape condition a run wrote, for separating split-K shapes on its fold's train: a6000 median 0.75 (max 0.80); 0/16 runs reach 0.85 or more. A 2-axis gate chosen on each fold's train only (log_flops>=~33 AND output_work_per_sm<~2.3e5; fold 2 uses roofline_ratio>=1.33 instead of log_flops) reaches train balanced accuracy 0.90–0.94 and holdout 0.72–0.94.",
+     "reproduce": "s18_prior.py ; s16_loop_gates.py c2 ; s19_foldgates.py ; the inline count of small-output gates is reproduced by s18_prior.py's proposal counter (same dir)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Every split-K-responsive library axis rises or falls monotonically with split_k, so any single linear term that favours split-K drives picks to split_k=16. On a6000 that jumps off a cliff: the right split_k is 3–4 and the regret curve is sharply peaked. On 5090 it is flat at the top. This is why split-K edits help on 5090 but fail on a6000.",
+     "evidence": "Shapes where split_k>=3 wins, regret of the best config at a fixed split_k. a6000 (n=30, optimum split_k=3 on 14 shapes, 4 on 8): sk3 1.018, sk4 1.032, sk8 1.071, sk16 1.325. 5090 (n=43, optimum 5–7–12): sk7 1.014, sk16 1.034. H100 (n=11): sk16 1.324. 4090 (n=5): sk16 1.036. Pushing a split-K term into the frozen c2-evolved rule on a6000 fold-0 train: adding 100×wave_count_deficit inside the gate flips 14/23 shapes, 14 of them to split_k=16, and train goes 1.1010 → 1.4616. At 300× all 23 go to split_k=16 and train is 1.7665. Fold 1 at 300×: 28/28 go to split_k=16, train 2.09. Folds 0, 1 and 3 show the same flat-then-cliff shape. In fold 2 the base weights (up to 7.4e5) block any flip up to 1e5×.",
+     "reproduce": "s24_skcurve.py ; s22_sweep.py 0,1,2,3 (s22.out) ; s23_skpicked.py 0,1 (same dir)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Inside the loop, edits that add split-K axes do not pay on a6000. The fitting protocol also often cannot reproduce even the parent rule.",
+     "evidence": "Edits that newly add a reduction axis, median / best-decile change in train log-regret: a6000 +0.0065 / −0.014; 5090 −0.0002 / −0.037; 4090 −0.0002 / −0.0065; H100 +0.0010 / −0.012; D-187 a6000 +0.0109 / −0.013. Children that keep every parent axis still end worse than the parent on train in 51.5% of cases on a6000, vs 34% on 5090, 45% on 4090 and 43% on H100. On a6000 this rises to 59% when the parent's max|w| exceeds 1000; no other GPU shows that rise. Median parent max|w|: a6000 843, 5090 121. Code read: the child is refit from the editor's w0 (median max|w0| 22.6) with CMA, 1 restart, 300 evaluations and a per-coordinate step of 0.6·max(|w0|,1). It is not warm-started from the parent's fitted w. The weight a split-K term needs before it changes any pick (fold 0/1 train) is serial_reduction_dependency ~1.2e3–1.5e3, tail_waste ~190, wave_count_deficit ~80–120, and ~3e5 in fold 2. Editors seed new split-K terms at a median |w0| of 1–2.",
+     "reproduce": "s07_skedits.py c2 ; s07_skedits.py splitk a6000 ; s08_nested.py c2 ; s17_neww0.py c2 ; s20_build_gate_rule.py (s20.out prints the needed |w|) (same dir)",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Fold 0 on a6000 is a train/holdout mismatch: optimizing train moves the rule away from what the holdout needs. Folds 2–3 behave like the other GPUs but start too far behind.",
+     "evidence": "Fraction of each run's 10 best-train proposals whose holdout beats the seed's round-0 holdout: a6000 f0 0.10, f1 0.60, f2 0.95, f3 0.82. Other GPUs: 0.70–1.00, except 4090 f2 at 0.45. Spearman(train, holdout) over scored proposals: a6000 f0 +0.48 … f3 +0.81. All 4 fold-0 seeds end worse on holdout than at round 0 (1.1233 → 1.145–1.166) while train improves 1.1175 → 1.089–1.102. The fold-0 holdout is 65% split-K shapes vs 42% of its train (nkband split); the fold-0 rules pick split-K on 0/11 of those holdout shapes. Folds 2–3: holdout 1.1435 → 1.0904 and 1.1677 → 1.0863, still above the vendor's 1.0810 and 1.0630.",
+     "reproduce": "s27_misc.py (section b) ; s13_foldmix.py ; s01_rounds.py c2 (same dir)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The a6000 loop had not converged at round 11. It has the steepest late train slope of the four GPUs, and holdout was still falling in the last rounds.",
+     "evidence": "Geomean over 16 runs, train at round 6 → round 11: a6000 1.0993 → 1.0828 (−0.0165); 5090 −0.0127; 4090 −0.0060; H100 −0.0061. a6000 holdout at rounds 9 → 11: 1.1446 → 1.1217. The last round that improved train has median 11 on a6000, 10.5–11 on the others. Interpretation: more rounds would help, but at about −0.003 per round, roughly 14 more rounds would be needed to beat the vendor. The mechanism in the findings above is the bigger lever.",
+     "reproduce": "s27_misc.py (section a) ; s01_rounds.py c2 (same dir)",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Among edits that became a new best on a6000, split-K edits are the only theme whose holdout gain exceeds its train gain. Pipeline/stage edits improve train but not holdout, unlike on 5090.",
+     "evidence": "Best-changing edits on a6000, summed log change over 16 runs: split-K n=48, train −0.282, holdout −0.438; pipeline/stages n=51, train −0.270, holdout +0.060; shape-regime gates n=82, train −0.493, holdout −0.181. On 5090: pipeline n=63, train −0.320, holdout −0.272; gates train −0.522, holdout −0.550. Swizzle/locality edits appear in 13% of a6000 new bests vs 1–2% on 5090 and H100. Themes come from a regex on the edit's 'changes' text; one edit can count under several themes.",
+     "reproduce": "s21_themes.py c2 (same dir)",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "The porting run that did well on a6000 won by starting from a structure where split-K is on by default. The a6000 feedback afterwards moved train, not holdout. The win is shown for fold 0 only.",
+     "evidence": "pc-50902a6000-f0-s0: round 0 is already at train 1.0919 / holdout 1.0541, about the same train as the native 12-round fold-0 finals (1.089–1.102) but with far better holdout (vs 1.145–1.166). Rounds 1–5, including a new swizzle-locality axis in round 1, take train 1.0919 → 1.0719 while holdout stays at 1.048–1.061. The seed structure has a K-length proxy, serial_reduction_dependency×(1+wave_count_deficit+grid terms) gated by output_work_per_sm<4096, and loop-made grid_cta_count and split_k_partition_sync_count axes. But campaign2-transfer b_refit for 5090→a6000 in folds 1–3 is 1.255, 1.216 and 1.182, worse than native. Fold 0 is exactly where the native train signal is misaligned, so the porting evidence does not carry over to other folds.",
+     "reproduce": "s04_lineage.py pc 50902a6000 0 0 ; python3 -c \"import json; [print(c) for c in json.load(open('docs/artifacts/campaign2-transfer.json'))['cells'] if c['dst']=='a6000']\"",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "PROBE (the one a6000_probe run): adding a split-K term with an interior optimum inside a train-chosen gate to the c2 evolved rule roughly closes the vendor gap on pooled holdout and improves inner-CV in every fold.",
+     "evidence": "Rule: c2_evolved_s0 per fold, plus 'if <train-chosen gate>: s += L*w[n] + L^2*w[n+1]' with L = log2(mainloop_iteration_count / (1 + serial_reduction_dependency*mainloop_iteration_count)), which is log2 of K-loop iterations per serial split (for serial configs serial_reduction_dependency·mainloop_iteration_count = split_k−1 exactly). w0 comes from a frozen-base train sweep, centre c=5.5 in folds 0, 2 and 3 (split 3); scale b=100, 1, 3e5, 1. Pooled holdout over 65 shapes: 1.1149 → 1.0834 (vendor 1.0815). Inner-CV: 1.1177 → 1.0869, better in all 4 folds (1.0997→1.0764, 1.0958→1.0909, 1.1172→1.0916, 1.1586→1.0885). Holdout by fold: f0 1.1499 → 1.0775 (vendor 1.0925, win); f1 1.1448 → 1.1364 (vendor 1.0891, loss; fold 1 loses on non-split-K shapes, 1.149); f2 1.0967 → 1.0581 (vendor 1.0810, win); f3 1.0681 → 1.0637 (vendor 1.0630, tie). split_k>=3 picks on split-K holdout shapes 13/31 → 26/31; regret on those shapes 1.127 → 1.068. Caveats: only 1 seed; the gate and w0 were chosen on the full train, so inner-CV is somewhat optimistic; the idea of an interior-optimum term came from all-65-shape curves (s24).",
+     "reproduce": "python3 -m experiments.a6000_probe --rule /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/logs/rule_L1_sweetspot.json --out OUT.json --workers 8 (result: .../an/logs/probe_L1_sweetspot.json; w0 from s25_sweetspot.py and s25b_sweetspot_big.py; gates from s19_foldgates.py)",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Interpretation of why only a6000 loses: it is the one table where all three conditions hold. (1) About half the shapes want split-K (46%), so ignoring split-K costs the most (2.4%). (2) The wanted split_k is small and sharply peaked (around 43 K-iterations per split), which monotone axes cannot express. (3) The vendor heuristic is unusually strong (1.08 on train). On 5090 split-K is the majority and more split is safe; on 4090 and H100 few shapes need split-K.",
+     "evidence": "Share of shapes where the split-K class wins: a6000 46%, 5090 66%, 4090 8%, H100 17%. Best constant split-K policy: a6000 1.0242, 5090 1.0177, 4090 1.0018, H100 1.0069. Optimal log2(iterations per split): a6000 median 5.42 (IQR 5.00–5.42); 5090 4.68. Vendor train regret: a6000 1.078–1.088; 5090 1.130–1.158; H100 1.115–1.129; 4090 1.068–1.083.",
+     "reproduce": "s11_skpolicy.py ; s26_iters_per_split.py ; s24_skcurve.py ; s13_foldmix.py (same dir)",
+     "kind": "interpretation",
+     "strength": "moderate"
+    }
+   ],
+   "candidate_edits": [
+    {
+     "name": "library axis: K-iterations per split (non-monotone split-K handle)",
+     "cause_addressed": "All 5 split-K-responsive library axes are monotone in split_k. Any split-K term therefore drives picks to split_k=16 (fold-0 train 1.10 → 1.46–1.77), so split-K edits cannot improve train on a6000.",
+     "what_to_change": "Add a config-level library axis log2_iters_per_split = log2(ceil(K/tile_k)/split_k) (the same for serial and parallel modes), described as 'per-split K-loop length; split-K pays until this falls to a hardware-dependent sweet spot'. Rules then use it as a quadratic, w_a·x + w_b·x² with w_b>0 (optimum at −w_a/2w_b), inside a split-K regime. It is already expressible today as log2(mainloop_iteration_count/(1+serial_reduction_dependency·mainloop_iteration_count)) for serial configs.",
+     "expected_effect": "A smooth path from 'no split-K' to 'the right split-K', avoiding split_k=16. The probe version (quadratic in this quantity inside a gate) gave pooled holdout 1.1149 → 1.0834 and inner-CV 1.1177 → 1.0869, and split_k>=3 picks 13/31 → 26/31."
+    },
+    {
+     "name": "rule edit to test further: gated interior-optimum split-K block on all 4 evolved seeds",
+     "cause_addressed": "The evolved a6000 rules lock split-K out (0/20 picks on fold-0 train). The only gate the loop ever wrote for split-K was the wrong 'small output' regime.",
+     "what_to_change": "For each c2 a6000 seed s0–s3 and fold, append: if p.log_flops >= T1 and p.output_work_per_sm < T2 (T1≈32.5–33.2, T2≈2.34e5, chosen on train by s19_foldgates.py; fold 2 used p.output_work_per_sm < 2.5e5 and p.roofline_ratio >= 1.33): s += L*w[n] + L*L*w[n+1], with L = log2(mainloop_iteration_count/(1+serial_reduction_dependency*mainloop_iteration_count)). Set w0 = (−2·b·5.5, b), with b the smallest value on a train sweep (1…3e6) that flips the gated shapes (100, 1, 3e5 and 1 in folds 0–3 for s0). Score with a6000_probe. Also try a single fold-independent gate and c=5.5 to remove per-fold tuning.",
+     "expected_effect": "If it holds across seeds, pooled holdout ≈1.08–1.09 (s0 gave 1.0834 vs vendor 1.0815), with wins in folds 0 and 2 and a tie in fold 3. Fold 1 would still lose on non-split-K shapes (1.149)."
+    },
+    {
+     "name": "loop: warm-start child fits and scale new terms",
+     "cause_addressed": "51.5% of nested a6000 children end worse than their parent on train, because the fit restarts from the editor's w0 with CMA 1×300 evals and a step of 0.6·max(|w0|,1). New split-K terms are born at |w0|≈1–2 but need 1e2–3e5 to change any pick.",
+     "what_to_change": "In RoundLoop._evaluate_candidate / _fit_and_score: (a) for every weight whose code line survives unchanged from the parent, start from the parent's fitted value; (b) for each new weight, run a 1-D line search on train over ±10^k (k=0…6) with the other weights frozen, and use the best as w0; (c) always evaluate 'parent weights + new weights = 0' first and keep the better of that and the CMA result, so a nested child can never be worse than its parent; (d) set the CMA per-coordinate std from the line-search scale.",
+     "expected_effect": "Nested-edit regressions fall from about 50% toward 0, and split-K edits get a fair test. Expected train gain per accepted split-K edit moves toward what 5090 shows (best decile −0.037 log vs −0.014 on a6000)."
+    },
+    {
+     "name": "diagnostic report: 'where split-K wins on this GPU' block and per-term push",
+     "cause_addressed": "The report shows split-K misses (45% of cases) but not which shape regime wants split-K. The editor falls back on the textbook 'small output' prior, wrong here: 0% of a6000 shapes inside owps<4096 want split-K. The report also shows feature differences but not which weighted term keeps split-K out.",
+     "what_to_change": "Add a train-split-only block. (1) Share of shapes where split-K wins, by quantile bins of p.log_flops × p.output_work_per_sm and by the gates the current rule uses. (2) For those shapes, the distribution of the optimal log2(K-iterations per split) and the regret at split_k=16 vs the best split_k (a6000: 1.325 vs 1.018). (3) Per case, the top-3 weighted term differences w_i·(f_i(best) − f_i(pick)), so e.g. 'wave_count_deficit × −55341 pushes against the best by +X' becomes visible.",
+     "expected_effect": "Fewer small-output split-K gates (currently 76–82% of a6000 split-K proposals) and gates near log_flops≥33 ∧ owps<2.3e5. The split-K miss share should fall over rounds as it does on 5090 (0.57 → 0.06), instead of staying flat (0.47 → 0.44)."
+    },
+    {
+     "name": "seed/budget for a6000",
+     "cause_addressed": "The a6000 seed starts 3.7–8.5% behind the vendor in-sample (the other GPUs start ahead), and the loop is still improving at round 11 at the steepest slope.",
+     "what_to_change": "(a) Give stage 2 a split-K-aware seed candidate that already has the gated interior-optimum block. Porting the 5090 structure is weaker evidence: fold 0 1.0541, but b_refit in folds 1–3 was 1.18–1.26. (b) Run a6000 for 20 rounds instead of 12 and compare inner-CV at rounds 12 and 20.",
+     "expected_effect": "The loop starts from about vendor parity in-sample instead of 6% behind, so the train-to-holdout gap no longer decides the fold. The extra rounds alone are worth about −0.003 of train per round."
+    }
+   ]
+  },
+  {
+   "lens": "features",
+   "summary": "On a6000, how fast a config gets as split_k grows is U-shaped, and where the bottom sits depends on the shape. Inside the optimum's own config, time is flat on average for split_k 1 to 6 (about 1.07 to 1.10 of best) and then climbs steeply. On 5090 one global choice works (split_k=5 gives 1.032), and on 4090 and h100 split_k=1 does. The library's split-K axes all move one way as split_k grows, so the fitted a6000 rules end up paying for split-K: in the fold-0 baseline, the score for 384x4096x4096 gets steadily worse as split_k goes up, driven by a negative weight on wave_count_deficit. On a6000 alone, two shape axes predict which shapes want split_k>=3: output_work_per_sm < ~2.34e5 and log_flops > ~32.5 give 0.908 holdout accuracy (majority 0.523), while on the other GPUs the same test does no better than majority. A derived axis built only from library axes (dcrit, the waves x per-CTA-work critical path relative to split_k=1) picks split_k within 2.6% of best on a6000. Re-choosing split_k with it in the baseline's holdout picks would take 1.1149 to 1.0814, level with the vendor's 1.0815. The one official probe (baseline + P-gated dcrit) improved inner-CV from 1.1177 to 1.0931 and holdout from 1.1149 to 1.1061, but still loses to the vendor in all 4 folds: fold 0 reached 1.0969 (vendor 1.0925), fold 1 got worse, and folds 2-3 did not change because CMA barely moved the new weight.",
+   "findings": [
+    {
+     "claim": "a6000's split-K response inside the optimum's base config is U-shaped with a shape-dependent minimum, so no single global split_k preference works; on 5090 (interior minimum at sk=5) and on 4090/h100 (sk=1) a global preference does work.",
+     "evidence": "Profile gm over shapes of t(sk)/t(best sk), serial mode, optimum's base: a6000 sk1 1.084, sk2 1.071, sk3 1.072, sk4 1.103, sk6 1.079, sk8 1.156, sk16 1.361. 5090 sk1 1.209 down to sk5 1.032, sk7 1.050. 4090 sk1 1.029 rising to sk16 1.204. Best single global sk: a6000 sk2 1.0710; 5090 sk5 1.0324; 4090 sk1 1.0287; h100 sk1 1.1687. With a P branch on a6000: sk3 inside P gives 1.0399 (n=36), sk1 outside gives 1.0080 (n=29).",
+     "reproduce": "D=/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/features; (repo root) PYTHONPATH=$PWD python3 $D/dump.py <gpu> for the 4 GPUs; then cd $D && python3 sk_profile.py && python3 sk_profile2.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Only on a6000 can a p.* condition on two shape axes predict which shapes want split_k>=3: P = output_work_per_sm < ~2.34e5 AND log_flops > ~32.5.",
+     "evidence": "Axes fixed, thresholds fit on each fold's train only. a6000 pooled holdout 59/65 = 0.908 (majority 0.523); per fold 0.882/0.938/0.875/0.938, thresholds (234057, 33.21), (234057, 32.5), (249661, 32.5), (234057, 32.5). Same predictor: 5090 0.631 (majority 0.738), 4090 0.889 (majority 0.905), h100 0.810 (majority 0.825). Fixed P over all 65 a6000 shapes: TP 31, FP 5, FN 0. Free search, best single stump is log_flops > 32.5-33.2 (train 0.76-0.82); best 2-condition rule is owps < 2.34e5 & log_flops > 32.5 (train 0.92-0.94) in 3/4 folds.",
+     "reproduce": "cd $D && python3 sk_predict.py && python3 sk_predict2.py && python3 shape_mod.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "A derived axis built only from library axes, dcrit = log2(ceil(w)*(iters/sk + 2(sk-1)) / (ceil(w/sk)*iters)), captures the a6000 split-K gain cleanly. tail_waste used alone over-splits badly.",
+     "evidence": "Choosing split_k inside the optimum's base config: a6000 dcrit 1.0266 vs sk=1 1.0887, tail_waste 1.3208, best global sk 1.0710. 5090 dcrit 1.0454 (worse than its global sk5 1.0324); 4090 1.0123; h100 1.0322. Library-axis form: sk = 1 + srd*iters + prcf*2K; ceil(w) = 1/wave_count_deficit; w = ceil(w)*(1 - tail_waste).",
+     "reproduce": "cd $D && python3 sk_within.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Splitting native holdout regret by config dimension shows a6000's excess is in tile choice and split-K choice. Swizzle loss (~1.7%) is shared with 5090 and 4090.",
+     "evidence": "Product of tile x split-K x warps/stages x swizzle; c2 natives, 16 runs, holdout. a6000 1.0384 x 1.0497 x 1.0119 x 1.0175 = 1.1222. 5090 1.0124 x 1.0221 x 1.0082 x 1.0169 = 1.0609. 4090 1.0167 x 1.0117 x 1.0217 x 1.0169 = 1.0687. h100 1.0308 x 1.0226 x 1.0151 x 1.0050 = 1.0754. a6000 vendor 1.0208 x 1.0290 x 1.0250 x 1.0046 = 1.0815. Probe-refit baseline: 1.0305 x 1.0449 x 1.0142 x 1.0209 = 1.1149. Inside P, a6000 natives pick sk<3 on 88/144 holdout cases (regret 1.1337); 5090 natives pick 128x128 with sk 5-16 (1.0497).",
+     "reproduce": "(repo root) PYTHONPATH=$PWD python3 $D/score_native.py <gpu>; PYTHONPATH=$PWD python3 $D/picks.py <scratchpad>/a6k/res/c2_evolved_s0.json $D/probe_picks_c2s0.json; cd $D && python3 decomp.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Counterfactual: keep the rule's own tile, warps, stages and swizzle, but re-choose split_k by dcrit only on shapes inside P. This closes the a6000 gap to the vendor, and the same edit does not help 5090.",
+     "evidence": "Probe-refit baseline holdout picks, per-fold train-only P thresholds: 1.1149 -> 1.0814 at c=2 (c=1: 1.0827; c=4: 1.0890); vendor 1.0815. Natives (16 runs): a6000 1.1222 -> 1.0903; 5090 1.0609 -> 1.0827 (worse); 4090 1.0687 -> 1.0699; h100 1.0754 -> 1.0659. Caveat: c was picked by looking at all 65 shapes; c=1..2 give similar results.",
+     "reproduce": "cd $D && python3 sk_counterfactual_pf.py && python3 sk_counterfactual.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The single official probe evaluation of baseline + P-gated dcrit moved inner-CV and holdout the same way (better), but the rule still loses to the vendor in 4/4 folds. The gain is concentrated in fold 0.",
+     "evidence": "inner-CV 1.0931 (baseline 1.1177); pooled holdout 1.1061 (baseline 1.1149); vendor 1.0815; hard shapes 1.1106 (baseline 1.1273), 15/31 picked sk>=3 (baseline 13/31). By fold, holdout (baseline): f0 1.0969 (1.1499, vendor 1.0925); f1 1.1656 (1.1448), mostly from 512x4096x11008 going 1.095 -> 1.449; f2 1.0967 (same); f3 1.0681 (same). CMA moved the in-P dcrit weight from 56 to 291 (f0), 72 (f1), 7.4 (f2), 0.75 (f3).",
+     "reproduce": "python3 $D/make_probe_rule.py <scratchpad>/a6k/res/c2_evolved_s0.json; python3 -m experiments.a6000_probe --rule $D/rules/probe_dcrit_P.json --out $D/rules/probe_dcrit_P.result.json --workers 8 (result saved there)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Why the fitted rules suppress split-K: their split-K-responsive terms fall monotonically with split_k, with a negative weight on wave_count_deficit. That sign is common on every GPU, but it only hurts where half the shapes need split_k 3-12 (a6000).",
+     "evidence": "Baseline f0, 384x4096x4096, 128x128x32 base, serial: score by sk 1/2/3/4/6/8/16 = -750/-467/-467/-373/-326/-298/-241 (lower is picked), time/best = 1.507/1.176/1.074/1.044/1.015/1.058/1.140. Linear wave_count_deficit terms in final c2 rules, negative/positive: a6000 20/5, 4090 21/2, h100 18/4, 5090 20/16. Share of shapes whose optimum has sk>=3: a6000 31/65, 5090 48/65, 4090 6/63, h100 11/63. Score std over candidates is 5583, so a new term started at O(1-10) cannot change picks.",
+     "reproduce": "(repo root) PYTHONPATH=$PWD python3 $D/inspect_score.py <scratchpad>/a6k/res/c2_evolved_s0.json 0 384x4096x4096; python3 $D/wsign.py; cd $D && python3 sk_overview.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The benefit of dcrit is hidden by weight scale. The same axis added at w0=10, or evaluated with baseline weights fixed, barely changed picks; the CMA step (0.6*max(|w0|,1)) could not reach the weight scale needed.",
+     "evidence": "Exploratory 4-fold fits without inner-CV (not probe runs): baseline + P-split qloss/fix terms at w0=10 gave pooled holdout 1.1152 (baseline 1.1149), with f2's new weights still exactly 10 after fitting. Neutralising the split-K axes to their sk=1 equivalents + dcrit at w0=10 gave 1.1514 (train got worse in 3/4 folds). Fixed-weight line search (lambda chosen on train, grid up to 1e4): only fold 0 took a non-zero in-P lambda (56), pooled holdout 1.1089. The probe started at w0=56 and CMA pushed it to 291 in f0.",
+     "reproduce": "cd $D && python3 make_rules.py <scratchpad>/a6k/res/c2_evolved_s0.json; (repo root) PYTHONPATH=$PWD python3 $D/quickfit.py $D/rules/qfix.json out.json (likewise dcrit_sk1.json); PYTHONPATH=$PWD python3 $D/linesearch3.py <scratchpad>/a6k/res/c2_evolved_s0.json 2.0 nosib",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Univariate axis behaviour that differs on a6000. tail_waste (declared higher_is_worse) points the wrong way in the competitive region most strongly on a6000. Residency and smem axes that are informative on 5090 and 4090 are flat on a6000. Operand-traffic sensitivity is shared with h100, so it is not unique to a6000.",
+     "evidence": "Head (fastest 10%) Spearman vs log t, median (share of shapes >0). tail_waste: a6000 -0.21 (0.12), auc_near 0.78, optimum percentile 0.82; 5090 +0.08 (0.68), auc 0.61; 4090 -0.00 (0.49); h100 -0.17 (0.31). On sk>=3 shapes: a6000 -0.18 (0.13) vs 5090 +0.11 (0.85). All-candidate Spearman: resident_block_scarcity a6000 +0.02 (0.58) vs 5090 +0.35 (0.98), 4090 +0.18 (0.95); shared_memory_pressure +0.04 vs +0.30/+0.15; register_file_pressure -0.26 (0.31) vs +0.07/-0.07/+0.02. operand_tile_traffic_ratio head: a6000 +0.31 (0.94), h100 +0.35 (1.00), 5090 +0.04, 4090 +0.05. Share of shapes where the optimum has minimal tail_waste: a6000 0.00, 5090 0.03, 4090 0.62, h100 0.08.",
+     "reproduce": "cd $D && python3 axes.py && python3 axes_report.py all && python3 axes_report.py hard",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "The a6000 problem is under-fitting by the vocabulary and rule class, not extra overfitting. Even a per-shape in-sample linear fit over the library axes has a much higher top-1 floor on a6000.",
+     "evidence": "c2 final train regret gm: a6000 1.0828 vs 5090 1.0333, 4090 1.0272, h100 1.0466. Mean train-to-holdout log gap is similar: 0.035 vs 0.026/0.039/0.027. Per-shape OLS over 20 axes + 3 transforms (in-sample, fit on each shape separately), top-1 regret all-candidates / head-10%: a6000 1.1699/1.0645; 5090 1.0747/1.0178; 4090 1.0640/1.0253; h100 1.0751/1.0488.",
+     "reproduce": "python3 $D/traingap.py; cd $D && python3 linfit.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Swizzle lives in ext, so the library cannot see it. Only instruction_density separates horizontal-1 from the identity variants, and among swizzle variants it points the wrong way (fewer instructions = no swizzle = slower). The effect is strongest on a6000 (6 MB L2), but the swizzle loss that native rules actually suffer is similar on 5090 and 4090.",
+     "evidence": "Tie-break variant at the optimum's base: a6000 1.1195, 5090 1.0222, 4090 1.0754, h100 1.0713. Per-variant cost on a6000: ho1 1.1127, id1 1.0426, id2-8 ~1.007 (5090 ho1 1.0209). Within-group Spearman(instruction_density, log t) over the top-30 bases: a6000 -0.707, 5090 -0.395, 4090 -0.354, h100 -0.354. Always taking the lowest-instruction variant costs 1.0771 vs 1.0133/1.0565/1.0256. Best-possible regret without instruction_density: a6000 1.0299 vs <=1.0069 elsewhere. Example 8192^3, 128x128x32 64x64 st3: id1 1.424, ho1 1.420, id8 1.000 on a6000, vs <=1.001 on 5090. Realised swizzle factor in natives: 1.0175/1.0169/1.0169/1.0050; vendor 1.003-1.005.",
+     "reproduce": "cd $D && python3 swizzle.py && python3 swizzle2.py && python3 swizzle3.py && python3 alias.py && python3 decomp.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "a6000 has a sharp stage-3 optimum that no monotone stage axis can express. Adding one stage costs a6000 5% even when no resident CTA is lost, versus about 1% on the other GPUs.",
+     "evidence": "Optimum at stages=3 on 54/65 a6000 shapes (44 of them at 2 CTAs/SM). Stage profile over the top-30 groups: a6000 st2 1.160, st3 1.021, st4 1.078, st5 1.095. 4090 st3 1.030, st4 1.016. 5090 st3 1.056, st4 1.042. One stage deeper without losing a resident CTA: a6000 1.050, 5090 1.014, 4090 1.008, h100 1.013. Within-group sign consistency of pipeline_fill_drain_fraction: a6000 0.52, 5090 0.78.",
+     "reproduce": "cd $D && python3 stages.py && python3 stage_resid.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Shape-level axes that other GPUs' rules branch on are nearly empty on a6000. l2_working_set_pressure is saturated by the 6 MB L2, so the p.l2_working_set_pressure<0.5 split used by 5090 rules selects almost nothing.",
+     "evidence": "Median l2_working_set_pressure / share of shapes < 0.5: a6000 0.93 / 0.03; 5090 0.48 / 0.57; 4090 0.55 / 0.33; h100 0.60 / 0.27. Share with roofline<1: a6000 0.31 vs 0.14-0.21 elsewhere.",
+     "reproduce": "cd $D && python3 shape_dist.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Mechanism (interpretation): a6000 is the only table where (a) the best tile is large (128x128, stage 3, 2 CTAs/SM), (b) 84 SMs make wave quantisation matter, and (c) the right split-K depth depends on the shape. The library's split-K axes change monotonically with split_k and wave_count_deficit mixes the tile scale with the split-K scale, so a linear rule learns 'less split-K' from over-splitting cases. It then cannot pick split_k 3-6 where it pays; a P branch plus dcrit is the missing vocabulary. Tile errors (128x256 sk1 picked instead of 128x128 sk3-6) are the other face of the same missing split-K term.",
+     "evidence": "Combines the findings above: U-shaped profile and flat average; P predictive only on a6000; negative wave_count_deficit weights; the counterfactual reaching 1.0814; probe inner-CV and holdout both improving.",
+     "reproduce": "see the scripts cited in the findings above",
+     "kind": "interpretation",
+     "strength": "moderate"
+    }
+   ],
+   "candidate_edits": [
+    {
+     "name": "library axis: splitk_critical_path (dcrit)",
+     "cause_addressed": "Split-K response on a6000 is U-shaped with a shape-dependent minimum; the library's split-K axes (tail_waste, wave_count_deficit, serial_reduction_dependency, parallel_reduction_*) are monotone in split_k, so one weight cannot choose sk 3-6 on some shapes and sk 1 on others.",
+     "what_to_change": "Add a config-level axis (direction higher_is_worse): iters=ceil(K/tile_k); sk=cfg.split_k; ctas=ceil(M/tile_m)*ceil(N/tile_n); w=ctas*sk/(hw.sm_count*max_blocks_per_sm); w1=w/sk; value = log2( ceil(w)*(ceil(iters/sk) + 2*(sk-1)) / (max(1,ceil(w1))*iters) ). It is 0 at split_k=1 and negative when split-K shortens the critical path. Rules can already build it from library axes: it_=max(mainloop_iteration_count,1); sk_=1+serial_reduction_dependency*it_+parallel_reduction_compute_fraction*2*p.K; cw=1/wave_count_deficit; w=cw*(1-tail_waste); dcrit=log2(cw*(it_/sk_+2*(sk_-1))/(max(ceil(w/sk_),1)*it_)).",
+     "expected_effect": "Within the optimum's base, split_k choice drops from 1.071 (best global sk) to 1.026 on a6000. Probe (baseline + P-gated dcrit): inner-CV 1.1177 -> 1.0931, holdout 1.1149 -> 1.1061, fold 0 1.1499 -> 1.0969."
+    },
+    {
+     "name": "p.* branch for the a6000 split-K regime",
+     "cause_addressed": "Split-K need on a6000 is a clean function of two shape axes, but the evolved rules branch on log_flops<35 / roofline<1 / owps<1024, which cut across it.",
+     "what_to_change": "In the rule: `if p.output_work_per_sm < A and p.log_flops > B:` with its own weight on dcrit (and ideally its own weights on the split-K-responsive axes); A about 2.34e5-2.50e5, B about 32.5-33.2, fitted on train. Optional transferable shape axis: ref_tile_waves = M*N/(128*128*2*hw.sm_count), where P is about ref_tile_waves < 7.1 and log_flops > 32.5.",
+     "expected_effect": "0.908 holdout accuracy separating split_k>=3 shapes on a6000 (majority 0.523). Counterfactual on the baseline's holdout picks, re-choosing sk by dcrit only inside P: 1.1149 -> 1.0814 (vendor 1.0815). Gives no gain on other GPUs, where the predicate is no better than majority."
+    },
+    {
+     "name": "scale-aware initial weight for newly added terms",
+     "cause_addressed": "The rule score spread is about 5.6e3 while dcrit is O(1). Terms started at w0=1-10 never changed picks (qfix 1.1152 vs 1.1149; one fold's new weights stayed exactly at 10), and the CMA step is 0.6*max(|w0|,1). The probe needed weights of 72-291.",
+     "what_to_change": "When a proposal adds a term, set its w0 to std_train(score)/std_train(term), computed over train candidates in the competitive region, with the sign of the term's head-rho. Or pass per-coordinate CMA_stds on that scale. Keep all other weights at their previous fit.",
+     "expected_effect": "New axes get explored at a scale that can change top-1 picks, so the loop can find gains like the probe's fold 0 (1.1499 -> 1.0969) instead of discarding the axis as useless."
+    },
+    {
+     "name": "split wave terms into tile scale and split-K scale",
+     "cause_addressed": "wave_count_deficit and tail_waste mix 'bigger tiles means fewer waves' with 'split-K means more waves'. Fitted a6000 rules put a negative weight on wave_count_deficit (20/25 linear terms), which penalises every split-K step.",
+     "what_to_change": "Offer tile-scale versions at split_k=1, wave_count_deficit_tile = 1/ceil(w/sk) and tail_waste_tile = 1 - (w/sk)/ceil(w/sk), and leave all split-K dependence to dcrit. Must be combined with the scale-aware init: without it this variant fit worse (quickfit pooled holdout 1.1514, train worse in 3/4 folds).",
+     "expected_effect": "Removes the sign conflict between the tile scale and the split-K scale. Untested at the right weight scale, so the effect is unknown."
+    },
+    {
+     "name": "stage-depth axis",
+     "cause_addressed": "a6000 has a sharp stage-3 optimum (st3 1.021 vs st4 1.078). Adding one stage costs 1.050 even without losing a resident CTA (<=1.014 elsewhere). pipeline_fill_drain_fraction=(stages-1)/iters is monotone and vanishes for long K.",
+     "what_to_change": "Expose cfg.stages (a legal non-ext Config field) as an axis, e.g. stage_excess = max(0, stages-3), plus an indicator for stages==2. Inside a rule it is recoverable as st = 1 + f.pipeline_fill_drain_fraction*f.mainloop_iteration_count when not capped.",
+     "expected_effect": "Lets the rule express a non-monotone stage preference. Should reduce the warps/stages factor, which is small for natives (1.0119) but 1.0250 for the vendor. Mainly guards against picking stages 4-6 on a6000."
+    },
+    {
+     "name": "swizzle-aware tie-break or rasterization axis",
+     "cause_addressed": "Swizzle is in ext and invisible to the library. Exact-score ties go to the lexicographic tie-break (swhz1/swid1), the slowest variants on a6000 (1.1195 at the optimum's base vs 1.022-1.075 elsewhere). instruction_density is the only proxy and points the wrong way (-0.707 within group).",
+     "what_to_change": "Either (a) break exact-score ties toward the largest swizzle_n (identity 8 > 4 > 2 > 1 > horizontal 1), which is a scoring-harness change, or (b) add an L2-rasterization axis using swizzle_n and hw.l2_bytes. (b) conflicts with the §4.3 no-ext rule and needs a design decision.",
+     "expected_effect": "Recovers roughly the swizzle factor native rules pay (1.0175 on a6000 vs vendor 1.0046), about 1.3 points of the a6000-vs-vendor gap. Similar gains on 5090 and 4090 (1.0169)."
+    }
+   ]
+  },
+  {
+   "lens": "pershape",
+   "summary": "On a6000 our rule loses to the vendor in three places: where the output tile grid covers about 1 to 5 waves, it under-splits (split_k=1 on 11 of 19 regime-D shapes, where the best split is 2 to 12). On mid-to-large M it picks the 128x256x32 tile with 1 resident CTA per SM (CTA = thread block) instead of 128x128x32 with 3 stages and 2 per SM. On the 7 huge shapes (20 or more waves) it gets the swizzle-1 variant of 128x128, costing 1.33 to 1.44. The vendor does well on a6000 almost by construction. Its top-1 is nearly always CUTLASS's default 128x128x32 w64x64 tile, which is the a6000 optimum family on 71% of shapes (29% on 5090, 21% on 4090, 6% on h100). Its split_k, stage and swizzle choices are also calibrated for a6000 and badly off on 5090. The a6000 split-K curve is a narrow V (always taking the largest split costs 1.32 on split-K-hungry shapes), while on 5090 it is a plateau (1.046). So a monotone axis like wave_count_deficit with a linear weight can only reach an end of the range. The evolved a6000 rules gave it a negative weight and became anti-split. That axis also treats lower occupancy as more waves, which feeds the 1-CTA/SM 128x256 pick. I added two split-K-aware axes, a quantized critical-path work ratio (log_quantized_work_ratio) and a per-split fill/drain overhead term (split_overhead_fraction), in a compact 16-term flat rule. In the single official a6000_probe run it scored holdout 1.0801 vs vendor 1.0815 and baseline 1.1149, with inner-CV 1.1007 vs 1.1177, and won 2 of 4 folds. This is not a universal improvement: on 5090 the same rule screens at 1.0849, worse than the evolved rule's 1.0432.",
+   "findings": [
+    {
+     "claim": "Per-shape attribution of the a6000 gap (ours 1.1149 vs vendor 1.0815, pooled 65-shape holdout). Changing one axis of our pick (split_k alone) already beats the vendor. The loss comes from the tile choice, split-K and swizzle, and is partly offset by our wins on M<=32.",
+     "evidence": "One-axis repair of our pick (best time among candidates that differ only on that axis): fix split_k -> 1.0703, tile+warp -> 1.0689, swizzle -> 1.0949, stages -> 1.1036, swizzle+split_k -> 1.0488. The same repair on the vendor pick: stages -> 1.0613, split_k -> 1.0633. Per-shape log-gap total (ours minus vendor) is 1.978. It splits into shapes whose best repair is tile+warp (14 shapes, +1.836), split_k (16, +1.007) and swizzle (6, +0.900), minus shapes already within 2% (24, -1.528). The biggest losses are 512x512x512 (ours 1.818 with 128x256 sk8 parallel, vendor 1.000), 384x4096x4096 (1.507 at sk1, vendor sk3 1.074), 8192x8192x8192 (1.436 with 128x128 st3 swizzle-1, vendor 256x128 swizzle-4 1.031), 8192x11008x4096 and 8192x12288x4096 (1.334, vendor swizzle-8 1.03), and 1500/1536/2048x4096x4096 (128x256 st4 sk1 at 1.25, vendor 1.06/1.10).",
+     "reproduce": "cd /home/piai/workspace/kernelRule && PYTHONPATH=$PWD python3 /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/pershape/ps1_pershape.py ; then ps4_ablate.py ; ps7_attrib.py (same dir; per-shape table in pershape_a6000.json)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "By regime (waves = 128x128 output tiles / SM count), a6000 loses to the vendor everywhere except M<=32. On 5090, in the regime where we win biggest, our rule matches the large optimal split while the vendor stays at split_k=1.",
+     "evidence": "a6000, probe baseline, ours vs vendor: M<=32 1.0205 vs 1.1295 (12/12 wins); waves<1 1.1717 vs 1.0749; 1-2.5 waves 1.1776 vs 1.1138; 2.5-5 waves 1.1169 vs 1.0751 (our split_k=1 on 11/19, best 2..12); 5-20 waves 1.0870 vs 1.0551; >=20 waves 1.1799 vs 1.0299 (0/7). 5090 (native c2 s0), 1-2.5 waves: ours 1.0227 vs vendor 1.1899, our split_k 5-16, best 5-12, vendor split_k=1 on 10/15. One-axis repair on 5090: vendor fix split_k 1.146 -> 1.0801, ours 1.0432 -> 1.0221.",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps9_regimes.py ; ps6_native.py 0 (-> native_s0.json) ; ps10_ablate_all.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The shape of the split-K curve is what sets a6000 apart. On a6000 the optimum is interior (a narrow V), so over-splitting is punished hard; on 5090 the curve is flat once split_k >= 3.",
+     "evidence": "Shapes where split_k=1 costs more than 5% (sk-needy). a6000 (n=25): split_k=1 1.1449, largest split_k 1.3245, split_k>=8 1.0931; best split_k mostly 3-4, with K/split_k about 1024-1365. 5090 (n=32): 1.1248 / 1.0456 / 1.028. 4090 (n=6): 1.0853 / 1.0646 / 1.031. h100 (n=11): 1.2494 / 1.3307 / 1.1203. Shapes with an interior optimum: a6000 20/65, 5090 10/65, 4090 4/63, h100 8/63. Example, 1024x4096x4096: a6000 split_k 1:1.17, 4:1.00, 16:1.37; 5090 1:1.10, 7:1.00, 16:1.02.",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps13_skcurve.py (curves in skcurve_{gpu}.json)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Inside the 128x128x32 w64x64 family, a one-parameter physical model picks split_k as well as the vendor on a6000 and better elsewhere. The model is log2(quantized critical-path work) + a*(stages+1)/(K iterations per split). The fitted per-split overhead a is 4-8x larger on a6000 than on 5090. No library axis carries this: mainloop_iteration_count and pipeline_fill_drain_fraction ignore split_k.",
+     "evidence": "a chosen on each fold's train, applied to holdout. a6000: 1.0335 (vendor's split_k 1.0335, split_k=1 1.1792), a in [2,1,1,2]. 5090: 1.0211 (vendor 1.0698), a in [0.25,0.25,0.5,0.25]. 4090: 1.0181 (vendor 1.0488). h100: 1.0211 (vendor 1.0403). serial_reduction_dependency = (split_k-1)/ceil(K/tile_k) is tiny, e.g. 0.023 at K=4096, split_k=4.",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps16_sk_model.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The evolved a6000 rule works against split-K through wave_count_deficit, and the same axis rewards 1-CTA/SM configs. Its weight is negative (lower score is picked), so fewer waves are preferred. Because the axis divides by max_blocks_per_sm, dropping from 2 to 1 resident CTA looks like more waves. The final tile choice between 128x256 st4 and 128x128 st3 comes down to terms worth about 0.25.",
+     "evidence": "Fold-0 probe weights: w[15]=-72.4 (large branch) and w[2]=-565.6 (small branch). Fold-2: w[2]=-356442. On 2048x4096x4096, our 128x256x32 st4 split_k=1 (regret 1.244, score -18.687) beats 128x128x32 st3 split_k=3 (regret 1.002, score -8.317); the wave_count_deficit term alone gives -10.867. Against 128x128 st3 horizontal-swizzle-1 split_k=1 (regret 1.077) the margin is only -0.247: shared_memory_stride_alias_risk -0.150, resident_block_scarcity (w=-0.144) -0.072, fill-drain -0.025. On 384x4096x4096 the w[2] term gives -424 in favour of split_k=1 (1.507) over split_k=6 (1.015). wave_count_deficit at 1024x4096x4096 is 0.5 for st2/st3 (2 CTA/SM) and 0.25 for st4-st6 (1 CTA/SM).",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps12_terms.py ; ps11_stagefeat.py 1024x4096x4096",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The a6000 search space has one sharp peak: 128x128x32 w64x64 with 3 stages and 2 resident CTAs per SM. Quality is non-monotone in both stages and resident-CTA count, so a linear weight on a monotone axis cannot land on it without a counter-term. On 5090 and 4090 several tile families come within about 4% of the best.",
+     "evidence": "Median fraction of candidates within 5% of the best: a6000 0.54%, 5090 4.44%, 4090 4.84%, h100 0.17%. Tile-family floors, a6000: 128x128x32 1.0324, 128x128x64 1.1095, 128x256x32 1.1317, 64x128x32 1.1731. 5090: 64x128x32 1.0135, 64x64x32 1.0216, 128x128x32 1.0324, 128x64x32 1.0375. 128x128x32 is the optimum tile on 71% of a6000 shapes (5090 29%, 4090 21%, h100 6%). Stage floors in the a6000 family: st2 1.0545, st3 1.0016, st4 1.0723, st5 1.0744. Resident-CTA class floors for M>=256 (1 / 2 / 3+ CTAs): a6000 1.0518 / 1.0069 / 1.2791; 5090 1.083 / 1.0026 / 1.0143; 4090 1.031 / 1.0049 / 1.0412; h100 1.0173 / 1.0356 / 1.2181.",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps8_tilefam.py ; ps5_swizzle.py ; ps17_blocks.py ; ps2_floors.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "How the vendor (nvMatmulHeuristics, targeting CUTLASS) decides on a6000. The top-1 tile is almost always the default 128x128x32 w64x64, and the list is not ranked by its own predicted time. split_k > 1 only when the 128x128 grid is at most about 3 waves and K >= 2048, and it grows with K. Stages are 3 when it splits and 5 when it does not. Swizzle is above 1 exactly when grid_m >= 24. This split-K choice is good on a6000 and poor on 5090; our rule is the opposite.",
+     "evidence": "Top-1 = 128x128x32 w64x64 on 62/66 (a6000), 64/66 (5090), 56/64 (4090, h100). The top-1 is not the minimum pred_ms entry on 59/66 a6000 shapes. a6000 raw split_k by number of 128x128 tiles T: T=32 -> 2; 64 -> 1; 86 -> 6; 96 -> 3; 128 -> 1; 172 -> 4; 192 -> 1; T=256 by K: <=1024 -> 1, 2048-4100 -> 3, 8192/11008 -> 4, 16384 -> 5; 264 and 344 -> 2; >=384 -> 1 (except T=512 at K=11008 -> 3). Stages: 24 of 32 split picks use st3; 23 of 33 unsplit picks use st5. Swizzle: grid_m <=18 always 1, >=24 always 4 or 8. Split_k quality within the family, needy shapes: a6000 vendor 1.0465 (within 2% on 23/41) vs ours 1.0902 (17/41); 5090 vendor 1.0755 (12/54) vs ours 1.0370 (40/54). The vendor's own stage choice costs it about 2% on a6000 (fixing stages alone: 1.0815 -> 1.0613).",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps14_vendor_sk.py ; ps2_floors.py (floors_{gpu}.json holds vend_sk/vend_st/vend_sw per shape) ; the vendor pred_ms ordering check is an inline one-off: python3 over datasets/baselines/vendor-*.json (list order vs min pred_ms)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Swizzle matters most on a6000 (6MB L2), and rules cannot see swizzle 2/4/8. The identity-swizzle variants share every visible field (cfg.ext is banned); horizontal-1 differs only in inst_total. A swizzle-free way out exists: 256x128x32 st4 horizontal-1 on M=8192. The evolved rule does not take it.",
+     "evidence": "Forcing the swizzle variant a rule would get by tie-break, at the optimum's other axes: a6000 1.1183 (30/65 above 5%), 5090 1.0222 (6), 4090 1.0749 (12), h100 1.0084 (0). Working set above 4x L2: 56/65 shapes on a6000, 1/65 on 5090. On 8192x11008x4096, 128x128x32 st3 identity-1 takes 8827 us vs 6639 us with swizzle 8 (x1.33); inst_total is 1912 for every identity variant and 1896 for horizontal-1. Best swizzle-1 floor on a6000 is 1.0056; on M=8192, N>=8192 shapes 256x128x32 st4 horizontal-1 reaches 1.014-1.031.",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps5_swizzle.py ; ps5b_blindfloor.py ; ps2_floors.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "The static top-1 in a6000_probe is chosen on the holdout itself (an oracle). It is 128x128x32 w64x64 st3 with swizzle 2-8 and split_k 3-4 serial. It is strong in folds 0 and 3 because those folds are whole N=4096/K=4096 and N=12288 M-sweeps: the alignment-8 kernel is valid on every shape there, and split_k 2-3 sits near the bottom of the V. Folds 1 and 2 contain K in {128, 256}, K/N=4098/4100 and 512^3, where it is missing or poor.",
+     "evidence": "Oracle picks: f0 swizzle 8, split_k 4 -> 1.0589; f3 swizzle 2, split_k 3 -> 1.0408; f1 swizzle 4, split_k 2 -> 1.2190 (covers 87.5% of shapes); f2 swizzle 4, split_k 3 -> 1.1039. The fair version, chosen on train (swizzle 4, split_k 2), scores f0 1.0787 (beats vendor 1.0925) and f3 1.0668 (vendor 1.0630). The same kernel at split_k 3 gets f0 1.0757 and f3 1.0409. Pooled over covered shapes: swizzle-4 1.1151, swizzle-1 1.1608, split_k=1 1.2313. On the fold-0 M-sweep with M>=768, the fixed config scores 1.001-1.050 while ours scores 1.06-1.25.",
+     "reproduce": "PYTHONPATH=$PWD python3 .../an/pershape/ps3_static.py ; ps15_static_pershape.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The official probe run (the only one) of a compact 16-term flat rule with the two new split-K axes brings a6000 level with the vendor. Holdout and inner-CV both improve. Ablations show both new axes are needed: one is the left side of the V, the other the right.",
+     "evidence": "a6000_probe on cand/R7_compact16.json: pooled holdout 1.0801 (vendor 1.0815, baseline 1.1149); inner-CV 1.1007 (baseline 1.1177). Folds: 1.0822 / 1.0866 / 1.0826 / 1.0692 vs vendor 1.0925 / 1.0891 / 1.0810 / 1.0630 (2 of 4 won). Hard/easy shapes: 1.0901 / 1.0711 (baseline 1.1273 / 1.1038). Regime >=20 waves: 1.0399 (baseline 1.1799). New-axis weights are positive in all 4 folds, with overhead/work ratio 1.4-3.0. Screens at a reduced budget (600 evals, 1 restart; not official): R7 1.0859; without split_overhead 1.1131 (split_k=16 picks appear); without the work ratio 1.1700 (split_k=1 almost everywhere); library-only analogue (wave_count_deficit, tail_waste, serial_reduction_dependency) 1.1034; evolved s0 1.1172; flat 20-axis 1.1358. Caveat: I read holdout on about 14 screens before choosing R7, so the holdout number is somewhat optimistic; inner-CV does not use holdout and also improved.",
+     "reproduce": "python3 -m experiments.a6000_probe --rule /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/pershape/cand/R7_compact16.json --out OUT.json --workers 8 (result: cand/R7_compact16.PROBE.json); screens: PYTHONPATH=$PWD python3 .../an/pershape/screen.py cand/<R>.json 600 1",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "The compact rule is an a6000 fix, not a general improvement. On 5090, where the curve is a plateau, the evolved rule stays better.",
+     "evidence": "R7_compact16 screened on 5090 (600 evals): pooled holdout 1.0849 (folds 1.0514 / 1.1601 / 1.0535 / 1.0824), vs 5090 native evolved c2 s0 1.0432 and vendor 1.146.",
+     "reproduce": "SCREEN_GPU=5090 PYTHONPATH=$PWD python3 .../an/pershape/screen_gpu.py cand/R7_compact16.json 600 1 (output copied to cand/R7_compact16.5090.screen600.out.json)",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Likely physical cause (not measured directly). a6000 has 84 SMs, 6MB L2 and 730 GB/s. Each extra serial split-K slice, and each 1-CTA/SM tile, pays a partial-tile fix-up through DRAM plus pipeline prologue and epilogue, so the split-K and occupancy optima are interior. On 5090 (170 SMs, 96MB L2) splitting is nearly free and the evolved rule's monotone push to split works. The vendor's CUTLASS-default choices happen to be right for Ampere a6000.",
+     "evidence": "Consistent with the fitted per-split overhead a (1-2 on a6000 vs 0.25-0.5 on 5090); the over-split penalty at split_k=16 falling with K on a6000 (K=2048 about 2.2x, 4096 1.37-1.48x, 16384 1.01x) vs 1.02-1.06x on 5090; and the 3+-CTA class floor (1.279 on a6000 vs 1.014 on 5090).",
+     "reproduce": "ps13_skcurve.py, ps16_sk_model.py, ps17_blocks.py (the physical mechanism itself is not measured)",
+     "kind": "interpretation",
+     "strength": "moderate"
+    }
+   ],
+   "candidate_edits": [
+    {
+     "name": "split-K V axes in the library",
+     "cause_addressed": "No library axis sees the per-split cost: mainloop_iteration_count and pipeline_fill_drain_fraction ignore split_k, and serial_reduction_dependency is tiny. wave_count_deficit is a coarse 1/ceil(waves) that is monotone in split_k. So the a6000 interior split-K optimum cannot be represented.",
+     "what_to_change": "Add two config axes (code in /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/pershape/cand/feat_pershape.jsonl). (1) log_quantized_work_ratio = log2(max(1, ceil(ctas/(sm_count*blocks))*blocks*tile_m*tile_n*ceil(K/(tile_k*split_k))*tile_k / (M*N*K/sm_count))), where ctas = ceil(M/tile_m)*ceil(N/tile_n)*split_k and blocks = max_blocks_per_sm. (2) split_overhead_fraction = min(4, (stages+1)/max(1, ceil(K/(tile_k*split_k)))). Give the weights positive starting values; the fitted ratio overhead/work was 1.4-3.0 on a6000.",
+     "expected_effect": "Picks split_k near the bottom of the V. In the official probe (with edit 2) holdout went 1.1149 -> 1.0801 and inner-CV 1.1177 -> 1.1007. The >=20-wave regime went 1.1799 -> 1.0399, because the work ratio also moves huge shapes to 128x256/256x128 tiles and away from 128x128 at swizzle 1."
+    },
+    {
+     "name": "compact16 seed rule for a6000",
+     "cause_addressed": "The evolved a6000 rules carry conflated or irrelevant terms (wave_count_deficit with negative weights, deep log_flops/roofline branches). CMA settles on anti-split, 1-CTA/SM solutions; branching on roofline made it worse (1.1088 vs 1.0859 in screening).",
+     "what_to_change": "Flat rule, no branches, 16 weights, lower score = picked. Terms in order: log_quantized_work_ratio, split_overhead_fraction, serial_fixup_traffic_ratio, log2(operand_tile_traffic_ratio), resident_block_scarcity, pipeline_fill_drain_fraction, shared_memory_pressure, register_file_pressure, has_spill, log2(1+spill_traffic_ratio), log2(1+edge_waste), tile_roofline_deficit, log2(1+instruction_density), k_tail_waste, parallel_reduction_traffic_fraction, thread_work_granularity_deficit. w0 = [1,1.5,0.5,0.2,0.2,0.5,0.2,0.2,5,1,0.5,0.5,0.2,0.5,1,0.2]. File: cand/R7_compact16.json. Use it as the a6000 stage-2 seed or loop parent in place of the stage-2 chosen rule. Do not use it on 5090.",
+     "expected_effect": "a6000 pooled holdout about 1.080 (vendor 1.0815). Wins folds 0 and 1; folds 2 and 3 are within 0.002 and 0.006 of the vendor. On 5090 it is worse than the evolved rule (screen 1.0849 vs 1.0432), so apply it to a6000 only."
+    },
+    {
+     "name": "single_resident_cta indicator",
+     "cause_addressed": "On a6000 quality is non-monotone in resident CTAs per SM (1 CTA 1.0518, 2 CTAs 1.0069, 3+ CTAs 1.2791). A linear weight on 1/blocks (resident_block_scarcity) is fitted negative, which keeps 128x256/256x128 1-CTA tiles on M=1000-2048 shapes (still about 1.09-1.13 after the probe).",
+     "what_to_change": "Add the axis single_resident_cta = 1.0 if cfg.max_blocks_per_sm <= 1 else 0.0 (file cand/feat_pershape2.jsonl) as a 17th term on top of compact16, with w0 = 0.5 (file cand/R9_compact17_1cta.json).",
+     "expected_effect": "Screen (600 evals): pooled holdout 1.0859 -> 1.0798, folds 1.0753 / 1.0865 / 1.1021 / 1.0559 (beats the vendor in f0, f1 and f3). The weight fitted positive in 3 of 4 folds, and 128x128x32 picks rose from 21 to 36 of 65. The gain is within the ~0.011 run-to-run spread I saw from changing only the starting weights, so it needs the official probe."
+    },
+    {
+     "name": "de-conflate wave_count_deficit / fix per-split iteration axes",
+     "cause_addressed": "wave_count_deficit divides by max_blocks_per_sm, so a config with lower occupancy looks like it has more waves (0.25 for 1-CTA vs 0.5 for 2-CTA at 1024x4096x4096). mainloop_iteration_count and pipeline_fill_drain_fraction use ceil(K/tile_k), ignoring split_k.",
+     "what_to_change": "In the shared library or the a6000 editor vocabulary: either compute waves as ceil(ctas/sm_count) without the max_blocks factor, or drop wave_count_deficit in favour of log_quantized_work_ratio. Redefine the iteration count as ceil(K/(tile_k*split_k)) and fill/drain as (stages-1)/that. Do not swap the axis inside the existing evolved rule: R5 did exactly that and screened worse (1.1484).",
+     "expected_effect": "The library-only compact analogue already screens better than the evolved rule (1.1034 vs 1.1172). With per-split iterations fixed, the loop's own axes should reach the compact16 level without hand-made axes. Not validated by the official probe."
+    },
+    {
+     "name": "stage-2/editor prompt hint for interior optima",
+     "cause_addressed": "The loop keeps adding monotone split-K 'benefit' terms; with a single weight such a term can only push to an end of the range, and on a6000 both ends are bad (largest split 1.32, split_k=1 1.14).",
+     "what_to_change": "Put one line in the a6000 diagnostic report: the split-K optimum is interior (best split_k 3-4, K/split_k about 1024-1365), so each split-K benefit term needs a counter-term that grows with split_k/K (per-split fill/drain or fix-up). Also report per-shape largest-split vs split_k=1 regret, as ps13_skcurve.py computes it.",
+     "expected_effect": "Stops CMA fitting a negative weight on wave_count_deficit. Should lift split_k>=3 picks on the 31 hard shapes above the current 13-14. Speculative: not tested."
+    }
+   ]
+  },
+  {
+   "lens": "shift",
+   "summary": "On a6000 the rule's main problem is in-sample, not generalisation. On its own training shapes the c2 final rule only ties the vendor (pooled train 1.0804 vs vendor 1.0815 on those shapes). On the other GPUs the rules beat vendor in-sample by 5-10%. a6000's train-to-holdout gap (+0.036 log) is in the normal range (5090 +0.026, 4090 +0.040, h100 +0.027), and a shift in the share of split-K-hungry shapes explains only +0.005 of it. Taking away the whole generalisation gap would only bring a6000 to a tie (1.0808 vs 1.0815), not a win. A large part of the in-sample failure comes from the weight fit, and this happens only on a6000: the same flat 20-axis rule improves on a6000 holdout by 4.8% with a bigger fit budget or standardised weight coordinates, while the other GPUs gain at most 0.8% or get worse. Over 10 screening iterations and one official probe, fit fixes moved a6000 from about 1.12-1.14 to about 1.09-1.10. That is robustly better than the c2 baseline but still behind the vendor, and only the log-plus-standardised variant improved both inner-CV and holdout. A plain nearest-neighbour config lookup built from the same training split scores 1.0418 and beats vendor in all 4 folds, so the training data does carry enough information across (N,K) bands; the rule and its fit do not extract it.",
+   "findings": [
+    {
+     "claim": "a6000's c2 rules are no better than the vendor even on their own training shapes. Rules on the other GPUs beat vendor in-sample by 5-10%.",
+     "evidence": "Pooled train (4-seed median, loop weights, no refit), rule vs vendor on the same train shapes: a6000 1.0804 vs 1.0815 (ratio 0.999); 5090 1.0299 vs 1.1460 (0.899); 4090 1.0267 vs 1.0782 (0.952); h100 1.0474 vs 1.1207 (0.935). a6000 per fold rule/vendor on train: 1.0198, 0.9973, 0.9912, 0.9885. Rescored per-shape values match the loop logs exactly (max abs diff 0).",
+     "reproduce": "cd /home/piai/workspace/kernelRule; PYTHONPATH=$PWD python3 SCR/s2_pop.py; PYTHONPATH=$PWD python3 SCR/s3_rescore.py a6000 5090 4090 h100; python3 SCR/s8_combine.py   (SCR=/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/an/shift)",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "a6000's train-to-holdout gap is ordinary. If the rule did as well on holdout as on train, it would only tie the vendor.",
+     "evidence": "Holdout/train ratio from loop logs, gm over folds: a6000 1.0318, 5090 1.0259, 4090 1.0307, h100 1.0211. Pooled holdout: a6000 1.1238 vs vendor 1.0815 (+0.0383 log). Counterfactual 'holdout = train' gives 1.0808 (-0.0006 log), which removes 102% of the deficit but is a tie, not a win. Keeping the train margin vs vendor instead gives 1.0809. On the other GPUs the same size of gap is absorbed by a 5-10% in-sample margin.",
+     "reproduce": "python3 SCR/s1_gap.py; python3 SCR/s8_combine.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "On a6000, holdout loss comes from within-group degradation, not from a changed mix of split-K-hungry shapes. The mix matters only in fold 0.",
+     "evidence": "Pooled log gap: a6000 +0.0356 = composition +0.0052 + within-group +0.0304; 5090 +0.0262 (+0.0004/+0.0258); 4090 +0.0395 (+0.0001/+0.0394); h100 +0.0271 (+0.0015/+0.0256). a6000 fold 0: +0.0518 = +0.0268 composition + 0.0251 within; the holdout is 65% hungry (11/17) vs 42% (20/48) in train. On 5090 the fold-0 hungry share also jumps (66%→94%) but composition adds only +0.002, because that rule does equally well on both classes.",
+     "reproduce": "python3 SCR/s9_decomp.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Every nkband fold holds out whole (N,K) groups, and the layout is the same on all four GPUs (fold 0 = the whole (4096,4096) group). So 'never saw the band' cannot by itself explain an a6000-only loss. Crossing bands is also not harder on a6000.",
+     "evidence": "Held-out groups per fold are identical in kind on all GPUs (s2 output). Nearest-neighbour config transfer from other groups only (LOGO) vs any other shape (LOSO), 1-NN: a6000 1.0623/1.0459 (x1.016), 5090 1.0328/1.0186 (x1.014), 4090 1.0817/1.0380 (x1.042), h100 1.1010/1.0712 (x1.028).",
+     "reproduce": "PYTHONPATH=$PWD python3 SCR/s7_nn.py; python3 SCR/s4_grid.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The training split has enough information to beat the vendor on every a6000 holdout band. A trivial lookup (take the fastest config of the nearest training shape in log M,N,K) beats both vendor and the evolved rule.",
+     "evidence": "FOLD1 (neighbours only from that fold's train) on a6000 holdout per fold: 1.0415/1.0801/1.0331/1.0137 vs vendor 1.0925/1.0891/1.0810/1.0630 vs c2 1.1558/1.1531/1.1009/1.0850; pooled 1.0418 (hungry 1.0300, rest 1.0527). Distance from c2 rule to lookup: a6000 1.124/1.042 = x1.079; 5090 x1.032; 4090 x1.033; h100 x0.98.",
+     "reproduce": "PYTHONPATH=$PWD python3 SCR/s7_nn.py; python3 SCR/s7b_nn_fold.py",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "The loop's per-rule fit budget (CMA 1 restart x 300 evals, via fitter_for) is binding only on a6000. With the same flat 20-axis rule, more budget cuts a6000 holdout by 4.8%, while the other GPUs change by less than 1% or get worse.",
+     "evidence": "Flat 20-axis rule, pooled train/holdout at budgets 1x300 / 2x2000 / 4x8000: a6000 1.1252/1.1425, 1.0993/1.1195, 1.0766/1.0888; 5090 1.0656/1.0657, 1.0534/1.0671, 1.0525/1.0750; 4090 1.0539/1.0644, 1.0526/1.0540, 1.0490/1.0562; h100 1.0914/1.0953, 1.0705/1.0959, 1.0737/1.0885. Best of 6 random starts at the loop budget, train: a6000 1.1092 vs 5090 1.0588, 4090 1.0510, h100 1.0794. The spread across starts is not larger on a6000 (sd log 0.016 vs 0.037/0.034/0.014), so a6000 needs a longer search, not a luckier start.",
+     "reproduce": "PYTHONPATH=$PWD python3 SCR/s5_flat.py GPU 10; PYTHONPATH=$PWD python3 SCR/s16_budget.py GPU 8; PYTHONPATH=$PWD python3 SCR/s14_diag.py a6000 12; python3 SCR/s17_budget_table.py; PYTHONPATH=$PWD python3 SCR/s22_lottery.py GPU loop 6 6",
+     "kind": "measurement",
+     "strength": "strong"
+    },
+    {
+     "claim": "Standardising the weight coordinates (each axis divided by its within-shape sd on train) gets most of the big-budget gain at the probe budget on a6000. On the other GPUs the same change raises train fit but hurts holdout, which means only a6000 is under-fit.",
+     "evidence": "Flat20, 2x2000, raw vs standardised, pooled train/holdout: a6000 1.0993/1.1195 vs 1.0696/1.0896; 5090 1.0534/1.0671 vs 1.0437/1.0719; 4090 1.0526/1.0540 vs 1.0404/1.0659; h100 1.0705/1.0959 vs 1.0626/1.1352. Axis within-shape sd spans 8e-6 (instruction_density) to 31 (mainloop_iteration_count) on every GPU. The split-K-responsive axes are small-scale (tail_waste 0.064, serial_reduction_dependency 0.049, parallel_reduction_compute_fraction 5e-4). This is an interpretation: those axes need large weights that a short CMA run with step 0.6*max(|w|,1) does not reach.",
+     "reproduce": "PYTHONPATH=$PWD python3 SCR/s18_scales.py a6000 5090 4090 h100; PYTHONPATH=$PWD python3 SCR/fit_eval.py OUT.json SCR/rules/Z_flat_std_GPU.json --gpu GPU --restarts 2 --evals 2000",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "The official probe (the one allowed run) on the standardised flat rule reproduced holdout 1.0896 (2/4 folds beat vendor, split-K>=3 picked on 20/31 hungry shapes vs 13/31 for baseline). But inner-CV got worse (1.1293 vs baseline 1.1177), so the gain is not confirmed. Replicate starts show 1.0896 was a lucky draw.",
+     "evidence": "Probe per fold, holdout vs vendor: 1.0993/1.0925, 1.1448/1.0891, 1.0636/1.0810, 1.0526/1.0630; inner 1.0996/1.1097/1.1270/1.1822. Same rule from 3 random w0: holdout 1.1050, 1.1027, 1.1029; gm of the 4 draws about 1.100. Log+standardised variant (Zm_log): holdout 1.0997 and inner-CV 1.0989, both better than baseline (1.1149/1.1177) but still behind vendor 1.0815.",
+     "reproduce": "python3 -m experiments.a6000_probe --rule SCR/rules/Z_flat_std_a6000.json --out SCR/probe_Z_flat_std.json --workers 8; PYTHONPATH=$PWD python3 SCR/fit_eval.py SCR/it10.json SCR/rules/Zrep1.json SCR/rules/Zrep2.json SCR/rules/Zrep3.json; PYTHONPATH=$PWD python3 SCR/fit_eval.py SCR/it9_inner.json SCR/rules/Zm_log.json --inner",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Across 21 fitted a6000 rule variants, holdout follows train level with a stable gap of about 2.4% (log). Matching the vendor on holdout needs train regret of about 1.05; the evolved rule sits at about 1.08.",
+     "evidence": "Log train vs log holdout over 21 variants (It1-It10 plus flat20 budgets): Pearson 0.65, Spearman 0.66, slope 0.87, mean gap 0.024. Extrapolated train level for holdout = 1.0815 is 1.0512 (this is an extrapolation). Probe baseline: inner-train +0.0296 and hold-train +0.0272 log, so an unseen band costs no more than unseen shapes inside seen bands.",
+     "reproduce": "python3 SCR/s13_probe_inner.py; inline correlation over SCR/it*.json (see transcript script)",
+     "kind": "interpretation",
+     "strength": "moderate"
+    },
+    {
+     "claim": "On a6000 the rule misses split-K even on the training shapes. Split-K hunger on a6000 is shaped like a band (mid output-tile counts, compute-bound shapes), and the loop's usual split-K gate 'p.output_work_per_sm < c' points the wrong way on a6000.",
+     "evidence": "Train hungry shapes, share where the rule picks split_k>=3: a6000 30% (fold 0: 0% in all 4 seeds; train-hungry regret 1.1764 vs vendor 1.0637); 5090 88%; 4090 81%; h100 61%. log2(128x128 tiles per SM), hungry vs rest medians: a6000 +1.61 vs +0.19; 5090 +0.61 vs +2.18; h100 -0.62 vs +2.29. Classifier accuracy on a6000: interval 0.83 vs single cut 0.69 vs majority 0.52; other GPUs gain nothing from an interval. The gate output_work_per_sm<4096 opens for 0/31 hungry and 11/34 non-hungry a6000 shapes (P(hungry|open) 0.00), vs 0.57 on 5090 and 0.40 on h100. Hungry share on a6000: compute-bound 29/45, memory-bound 2/20. Caveat: rules with roofline- or band-gated split-K terms did not help robustly (It1 R1 1.1074 / It3 1.0979; Zm_roofSK 1.1507; bandSK 1.1177-1.1180).",
+     "reproduce": "python3 SCR/s11_waves.py; python3 SCR/s12_gate.py; python3 SCR/s8_combine.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "On a6000 both the split-K choice and the tile/warp/stages choice are about twice as costly in-sample as on the other GPUs, and a6000 configs are less forgiving within the best macro-tile.",
+     "evidence": "Train regret = sk-loss x rest-loss: a6000 1.0827 = 1.0405 x 1.0406; 5090 1.0333 = 1.0149 x 1.0182; 4090 1.0272 = 1.0082 x 1.0189; h100 1.0466 = 1.0109 x 1.0353. Inside the best (tile, split_k, mode) group, the 25th-percentile sibling is slower than the best by: a6000 1.0881, 5090 1.0572, 4090 1.0407, h100 1.0870.",
+     "reproduce": "PYTHONPATH=$PWD python3 SCR/s10_splitloss.py; PYTHONPATH=$PWD python3 SCR/s15_spread.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "Once fitted properly, the evolved c2 structure is no better than a flat linear rule on a6000. Refitting it from its loop weights does not leave the loop's basin.",
+     "evidence": "c2_evolved_s0: 2x2000 holdout 1.1149 → 4x8000 holdout 1.1123 (train unchanged, about 1.084). Re-parametrised to unit scale (E0): 1.1193 from the kept start, 1.1216 from a neutral start. Flat standardised rule: 1.0856-1.1050.",
+     "reproduce": "PYTHONPATH=$PWD python3 SCR/fit_eval.py SCR/it3.json SCR/rules/R1_flat_roofSK.json /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/rules/c2_evolved_s0.json --restarts 4 --evals 8000; PYTHONPATH=$PWD python3 SCR/s21_stdize.py <c2_evolved_s0.json> E0; PYTHONPATH=$PWD python3 SCR/fit_eval.py SCR/it8.json SCR/rules/E0_keep.json SCR/rules/E0_neutral.json",
+     "kind": "measurement",
+     "strength": "moderate"
+    },
+    {
+     "claim": "The loop's selection signal (train regret) predicts holdout about as well on a6000 as on the other GPUs, so rule selection is not the a6000-specific problem.",
+     "evidence": "Median Spearman(fit, val) over every scored rule per run: a6000 +0.62, 5090 +0.73, 4090 +0.51, h100 +0.66. val(train-best)/min val: a6000 1.0255, 5090 1.0188, 4090 1.0287, h100 1.0200.",
+     "reproduce": "python3 SCR/s6_proxy.py",
+     "kind": "measurement",
+     "strength": "moderate"
+    }
+   ],
+   "candidate_edits": [
+    {
+     "name": "standardised-fit-coordinates",
+     "cause_addressed": "The loop's short CMA fit cannot reach the large weights the small-scale split-K axes need, so a6000 rules are under-fit in-sample.",
+     "what_to_change": "In the fit only (the rule text stays the same), re-parametrise every weight: w[i] -> c_i*w[i], with c_i = 1/mean over the fold's TRAIN shapes of the within-shape sd of term_i = score(e_i)-score(0). Use the median-sd variant for plain axes (see s18_scales.py / Z_flat_std). Keep CMA, with steps now in unit coordinates. Tested file: SCR/rules/Z_flat_std_a6000.json; general wrapper: SCR/s21_stdize.py.",
+     "expected_effect": "a6000 flat rule at 2x2000 goes from holdout 1.1195 to 1.0896 (1.100 average over 4 starts), train from 1.099 to 1.070. On 5090/4090/h100 it slightly hurts holdout, so turn it on per GPU only when inner-CV improves."
+    },
+    {
+     "name": "budget-gate-by-sensitivity",
+     "cause_addressed": "fitter_for gives every rule with more than 8 weights CMA 1x300, which is binding on a6000 only.",
+     "what_to_change": "Before a campaign, fit the flat 20-axis rule on train at 1x300 and at 4x8000. If train improves by more than 2% log (a6000: 4.4%; others 0.5-1.6%), use at least 2x2000 (better 4x8000, or standardised coordinates) for every loop fit on that table.",
+     "expected_effect": "The flat rule on a6000: holdout 1.1425 at 1x300 → 1.1195 at 2x2000 → 1.0888 at 4x8000. Evolved rules should start from a train level near 1.07 instead of 1.08-1.10, since holdout follows train with about 2.4% gap."
+    },
+    {
+     "name": "log-standardised-flat-seed",
+     "cause_addressed": "Heavy-tailed axes (operand_tile_traffic_ratio, mainloop_iteration_count, spill_traffic_ratio, instruction_density, tile_aspect_mismatch) plus bad conditioning.",
+     "what_to_change": "Seed rule (stage 2) or baseline: flat sum over the 20 config axes, with log2(1+x) for those 5 axes, each term multiplied by 1/mean within-shape train sd. File: SCR/rules/Zm_log.json (per-fold constants).",
+     "expected_effect": "The only variant where both metrics improve over the c2 baseline: inner-CV 1.0989 vs 1.1177 and holdout 1.0997 vs 1.1149. Still behind vendor 1.0815, so it is a better starting point, not a fix."
+    },
+    {
+     "name": "drop-inverted-splitK-gate-prior",
+     "cause_addressed": "The loop keeps proposing 'split-K helps when p.output_work_per_sm < c' (c = 256-4096). On a6000 that gate opens for 0/31 hungry shapes and 11/34 non-hungry ones.",
+     "what_to_change": "In the a6000 diagnostic report, show P(best split_k>=3 | gate open/closed) for each output_work_per_sm constant used by the rule. Also show that hunger sits at 2-12 output tiles per SM and on compute-bound shapes (29/45 vs 2/20). Do not hard-code a new gate: roofline- and band-gated split-K terms overfit in my tests (Zm_roofSK 1.1507, bandSK 1.118).",
+     "expected_effect": "Keeps the loop from spending rounds on a gate that points the wrong way on a6000. On its own this is not expected to close the deficit (uncertain)."
+    },
+    {
+     "name": "report-in-sample-vendor-margin",
+     "cause_addressed": "On a6000 the loop cannot see that its rule is only at vendor level in-sample (1.0804 vs 1.0815), while a typical 2.4-3.6% gap will be added on holdout.",
+     "what_to_change": "Add one line per round to the diagnostic and to the selection log: train regret / vendor regret on the same train shapes, and the target train level vendor_train/exp(typical gap), about 1.05 on a6000.",
+     "expected_effect": "Moves effort from generalisation tricks (val/test splitting did not help, D-184/185, consistent with the ordinary gap) to in-sample fit, which is the binding constraint on a6000."
+    }
+   ]
+  }
+ ],
+ "synthesis": {
+  "causes": [
+   {
+    "cause": "C1 (rank 1). Split-K is represented only by monotone axes, while the a6000 split-K optimum is interior and sharp: best split_k is 3-4 (K-slice about 1.0-1.4K) and over-splitting is punished hard. A linear term can only push picks to one end of the range, so the fitted a6000 rules settle on 'no split-K', mostly through a negative wave_count_deficit weight. This is the largest single part of the vendor gap.",
+    "evidence": "MERGE CHECK (A6K/an/merge/m1_classgap.py, A6K=/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k, run from the repo root with PYTHONPATH=$PWD). The baseline c2_evolved_s0 pooled log gap to the vendor is +0.0304. It splits into: split-K-hungry class (31 shapes with optimum sk>=3) +0.0251 (rule 1.127, vendor 1.069); large-grid class +0.0138; mid-easy class +0.0103; M<=32 class -0.0187. SHAPE OF THE CURVE: on hungry shapes a6000 costs 1.018 at sk3 and 1.325 at sk16, against 1.034 at sk16 on the 5090 (logs s24_skcurve.py). Largest split_k on needy shapes: 1.3245 on a6000 vs 1.0456 on 5090 (pershape ps13). Best single global sk: a6000 1.071 vs 5090 1.032 (features sk_profile). All 5 split-K-responsive axes are monotone in split_k. Adding 100x wave_count_deficit (wcd) inside a gate sends 14/23 fold-0 train shapes to sk16, and train goes 1.1010 -> 1.4616 (logs s22). SYMPTOM: when the sk>=3 sibling is truly >5% faster, rules score it better in 32% of pairs, vs 82/91/62% on 5090/4090/h100. 7/16 a6000 runs pick sk>=3 on 0/31 hungry shapes, vs <=1/16 on each other GPU. Spearman(compute-bound wcd effect, hard-shape regret) is -0.78 (rules dyn/agg/regime_eff). INTERVENTIONS (official 4-fold probes, verified from the result JSONs): (a) the L1 probe adds a gated quadratic in log2(K-iterations per split). Hungry class 1.127 -> 1.068, sk>=3 picks 13/31 -> 26/31, pooled 1.1149 -> 1.0834, inner-CV 1.1177 -> 1.0869, and inner-CV improves in all 4 folds. (b) The R7 probe uses a flat rule with a V pair (log_quantized_work_ratio + split_overhead_fraction): pooled 1.0801, inner-CV 1.1007. In R7 ablation screens, dropping the overhead term brings back sk16 picks (1.1131) and dropping the work ratio gives sk1 almost everywhere (1.1700).",
+    "confidence": "high",
+    "contradictions": "(1) Table lens: a LINEAR K-slice axis (split_mainloop_log_iterations) gave no gain (in-family CE 1.066 unchanged; r07/r08 at 1.1216/1.1305). This is consistent with C1, since a linear log K-slice term is still monotone in split_k. Only the quadratic/V forms helped, and both are measured by 4-fold probes. (2) Features lens: the dcrit probe reached only 1.1061, 0/4 folds. CMA left the fold-2/3 dcrit weights at 7.4/0.75 and those folds did not change at all (1.0967/1.0681). That points to weight scale (C5), not to a wrong axis. (3) Rules lens blames the SIGN of wcd. Features lens shows negative linear wcd weights on every GPU (a6000 20/5, 4090 21/2, h100 18/4, 5090 20/16), so the sign is common and only costly where about half the shapes need an interior split_k. Winner: the L1 probe, which brought hungry-class regret down to vendor level (1.068 vs 1.069)."
+   },
+   {
+    "cause": "C2 (rank 2, the enabling condition for C1). On the a6000, split-K need sits in a band P: log_flops >= ~32.5 AND output_work_per_sm < ~2.34e5. No loop run ever isolated it. The loop's textbook gate ('small output per SM => split-K') is inverted on this GPU.",
+    "evidence": "MERGE CHECK m1_classgap.py: P holds all 31 hungry shapes and 5 of the 34 others. Features sk_predict (thresholds fit on train per fold): holdout accuracy 0.908 vs majority 0.523. The same predictor on 5090/4090/h100 gets 0.631/0.889/0.810 vs majority 0.738/0.905/0.825. The gate owps<4096 opens for 0/31 hungry shapes and 11/34 others (shift s12, logs s18). P(hungry|gate open) is 0.00 on a6000, vs 0.57 on 5090 and 0.40 on h100. 76% of a6000 split-K proposals carry an owps< or log_min_dim< gate (82% in D-187). The best gate any loop run wrote has median balanced accuracy 0.75, and 0/16 runs reach 0.85 (logs s16/s18/s19). By regime: memory-bound 3/20, compute-bound few-wave 28/36, many-wave 0/9 (table a6_regime). The L1 probe, which uses this gate, is the 4-fold evidence cited in C1.",
+    "confidence": "high",
+    "contradictions": "Roofline as the split-K gate. The rules lens's regime_free (split-K terms inside roofline branches) reached fold-0 holdout 1.0544 against native 1.1499. Other lenses found roofline branching worse: pershape R8 1.1088 vs 1.0859 at screen level, shift Zm_roofSK 1.1507, table r03 'split-K only when compute-bound' 1.1810. roofline>=1 includes the 9 many-wave shapes, and 0/9 of them are hungry. regime_free covers one fold only and was designed after seeing all 65 shapes; the P-gated L1 result covers 4 folds. P wins. regime_free still deserves its own 4-fold probe (H13)."
+   },
+   {
+    "cause": "C3 (rank 3). Large-grid swizzle trap. Rules cannot see ext_swizzle, and the lexicographic tie-break lands on swizzle width 1 (id1 or hz1). On the a6000 (6 MB L2), the dominant 128x128 st3 kernel at width 1 costs 1.33-1.44 on the M=8192 shapes, where the vendor picks swizzle 4/8 and is near-perfect.",
+    "evidence": "MERGE CHECK m1_classgap.py: the 9 shapes with output_work_per_sm > 2e5 cost the baseline 1.141 vs vendor 1.032. That is +0.0138 log, about 45% of the pooled gap. The split-K fix L1 leaves this class unchanged at 1.142. Per shape, 8192^3 at 128x128 st3: id1 1.424 and hz1 1.420 vs id8 1.000 on a6000; the same spread is <=1.001 on 5090 (features swizzle, table a24). The cost of the reachable variant at the optimum is 1.0375 on a6000 vs 1.003-1.014 on the other GPUs (table a23/a24). Exact tie-break emulation (swid4) on the frozen c2 rules takes folds 2/3 from 1.0965/1.0984 to 1.0752/1.0609 with no refit, beating the vendor (table a28). A swizzle-blind way out exists through tile choice. Large-grid class: R7 1.040, Z_flat_std 1.068, r09 (a resident_block_scarcity + register_file_pressure branch for owps>2e5) 1.077. The official r09 probe: pooled 1.1149 -> 1.0949, inner-CV 1.1177 -> 1.1036.",
+    "confidence": "high",
+    "contradictions": "Features and table decompositions say the AVERAGE swizzle/variant factor of native rules is similar across GPUs: features 1.0175 vs 1.0169/1.0169/1.0050; table 1.0284 vs 1.0265/1.0390/1.0197. The average hides where the loss sits. On a6000 it is concentrated in 9 huge shapes (1.33-1.44 each), exactly where the vendor is almost perfect (it uses swizzle>1 whenever grid_m>=24, per pershape ps14). The trap is a6000-specific against this vendor, not in average magnitude. Both measurements hold; the class-level one is what explains the loss."
+   },
+   {
+    "cause": "C4 (rank 4). The a6000 has a sharp single-family optimum: 128x128x32, 64x64 warps, 3 stages, 2 CTAs/SM. The vendor's CUTLASS default hits it by construction. The library mis-ranks occupancy and stages: wave_count_deficit divides by max_blocks_per_sm, so a 1-CTA 128x256 config looks like it has more waves, and the stage preference is non-monotone.",
+    "evidence": "The modal family is best on 40/45 compute-bound a6000 shapes, vs 11/53, 16/50, 18/54 on the other GPUs. Second-best tile gm 1.069 vs 1.007/1.004/1.011. Share of candidates within 5% of best: 0.54% vs 4.4%/4.8% on 5090/4090 (table a11/a14). Vendor top-1 is 128x128x32 w64x64 on 62/66 a6000 shapes, and that is the a6000 optimum tile on 71% of shapes vs 29/21/6% on 5090/4090/h100 (pershape ps14/ps8). Tile factor in the few-wave regime: vendor 1.004 vs rule 1.044 (table a12). 1500/1536/2048x4096x4096 get 128x256 st4 sk1 at about 1.25; on 2048x4096x4096 the wcd term alone gives -10.9 in favour of the 1-CTA pick (pershape ps12). Stages: st3 1.021 vs st4 1.078; one extra stage without losing a CTA costs 1.050 vs <=1.014 elsewhere (features stages). Resident-CTA floors (1 / 2 / 3+): 1.052 / 1.007 / 1.279. MERGE CHECK: the mid-easy class (13 shapes) adds +0.0103 log in the baseline. 512^3 alone (128x256 sk8 parallel, 1.818) adds about 0.009 of that. R7 brings mid-easy to 1.120 (vendor 1.102) and 512^3 to 1.082.",
+    "confidence": "medium",
+    "contradictions": "Overlaps with C1. The 1500-2304 errors are '128x256 sk1 instead of 128x128 sk3', and those are hungry shapes. The L2 story (small-tile penalty vs working set over L2, Spearman +0.86 on a6000 only) is not yet a working axis: l2_wave_operand_pressure did not help under CMA-800 (table r07/r08). The single_resident_cta indicator (R9) screened 1.0798 vs 1.0859, inside the ~0.011 start-to-start noise. So the measurement is strong but no proven lever exists yet."
+   },
+   {
+    "cause": "C5 (rank 5; amplifier, not an independent source). Weight scale and fit conditioning. The evolved a6000 rules carry very large weights. New terms seeded at |w0| of 1-10 cannot change a pick within the CMA step of 0.6*max(|w0|,1), and the per-rule fit budget binds only on a6000. This is why the loop, and several analyst edits, could not find the C1-C3 fixes.",
+    "evidence": "Parent max|w| median: 843 on a6000 vs 121 on 5090. Nested children that end worse than their parent: 51.5% vs 34/45/43%, rising to 59% when max|w|>1000 (logs s08). Within-shape score std is 5583 in the fold-0 baseline, and fold-2 weights reach 7.4e5 (features inspect_score). A new split-K term needs |w| of about 80-1.5e3 in folds 0/1 and about 3e5 in fold 2 to flip any pick, but editors seed them at median |w0| 1-2 (logs s17/s20). Flat20 holdout at fit budgets 1x300 / 2x2000 / 4x8000: a6000 1.1425/1.1195/1.0888; 5090 1.0657/1.0671/1.0750; 4090 1.0644/1.0540/1.0562; h100 1.0953/1.0959/1.0885 (shift s16/s17). dcrit probe: CMA moved the in-P weight from 56 to 291/72/7.4/0.75 across folds, and folds 2-3 did not change. L1 worked only after its w0 scale came from a frozen-base train sweep (b = 100, 1, 3e5, 1 per fold).",
+    "confidence": "medium",
+    "contradictions": "Fit fixes alone did not close the gap under the probe. The standardised flat20 probe reached holdout 1.0896, but inner-CV was 1.1293, worse than the baseline's 1.1177. Replicates from other starts gave 1.1027-1.1050, so 1.0896 was a lucky draw (shift). Refitting evolved s0 at 4x8000 gives 1.1123 and does not leave its basin. Conclusion: C5 hides C1-C4 fixes; it does not cause the gap by itself."
+   },
+   {
+    "cause": "C6 (context: why the same errors cost the match only on the a6000). The vendor is unusually strong on the a6000, and the rule reaches only vendor parity even on its own training shapes. On the other GPUs, a normal train-to-holdout gap is absorbed by a 5-10% in-sample margin.",
+    "evidence": "Seed train / vendor train: a6000 1.037-1.085 vs 0.94-1.00 on the other GPUs (logs s01/s13). Final c2 pooled train vs vendor on the same shapes: a6000 1.0804 vs 1.0815; 5090 1.0299 vs 1.1460; 4090 1.0267 vs 1.0782; h100 1.0474 vs 1.1207 (shift s3/s8). Vendor within-family split-K on needy shapes: a6000 vendor 1.0465 vs rule 1.0902; 5090 vendor 1.0755 vs rule 1.0370 (pershape ps14). Fold-honest static top-1 vs vendor: a6000 1.135 vs 1.0815; 5090 1.078 vs 1.146 (table a8). The rule already beats the vendor on M<=32 (1.020 vs 1.130, merge m1), which is what keeps the pooled gap small.",
+    "confidence": "high",
+    "contradictions": "None on the facts. This is the reason a6000 alone loses, not a separate lever."
+   },
+   {
+    "cause": "C7 (rank 6). Loop path dependence. The a6000 seeds and the editor's priors keep the search in the anti-split basin. Better prompts (D-187) did not get it out.",
+    "evidence": "The a6000 fold 0-2 seeds carry wave_count_deficit and tail_waste as global terms. All 4 fold-0 seeds share the same round-0 best rule (global wcd weight -1.48e4), and all 4 end at 0/31 split-K picks (rules static_parse/wdecomp). The share of split-K misses in the diagnostic report stays flat on a6000 (0.47 -> 0.44 from round 0 to 11), against 0.57 -> 0.06 on 5090 (logs s06). Edits that add a reduction axis change train by a median +0.0065 on a6000 vs about 0 elsewhere (logs s07). The D-187 re-run had median holdout 1.1130 vs 1.1149.",
+    "confidence": "medium",
+    "contradictions": "Porting looked like an escape: pc-5090->a6000 reached fold-0 holdout 1.0541. But the 5090 final structure, refit under the probe, scores 1.1628 pooled, with the mid-easy class at 1.415 (merge m1; rules probe_port5090_s2.json). campaign2-transfer b_refit for folds 1-3 is 1.18-1.26. The porting gain was the fold-0 weights and basin, not a transferable structure. Path dependence acts through C1/C5; it is not a lever of its own."
+   },
+   {
+    "cause": "C8 (weak). Generalisation or fold shift (band hold-out, overfitting).",
+    "evidence": "Holdout-minus-train log gap: a6000 0.036 vs 5090 0.026, 4090 0.040, h100 0.027 (shift s1/s9). Features traingap gives 0.035 vs 0.026/0.039/0.027. The counterfactual 'holdout = train' only ties the vendor (1.0808). A shift in the share of hungry shapes explains +0.005 pooled, and +0.027 in fold 0 (holdout 65% hungry vs 42% in train). A 1-NN config lookup over each fold's train shapes scores 1.0418 pooled and beats the vendor in 4/4 folds (shift s7b), so the data does transfer across (N,K) bands. Median Spearman(train, holdout) over scored rules: a6000 +0.62, vs 0.73/0.51/0.66.",
+    "confidence": "low",
+    "contradictions": "The logs lens reports an end-of-loop median gap of +0.048 on a6000 vs +0.017-0.021 elsewhere (per-run holdout minus train regret). The shift and features measures use the same pooled-log definition on every GPU, put 4090 at the same level as a6000, and separate composition from within-group effects. They win. The only a6000-specific shift is the fold-0 hungry share."
+   },
+   {
+    "cause": "C9 (refuted). Timer resolution, measurement noise, too few loop rounds, and the structure of other GPUs' rules.",
+    "evidence": "Share of times within 3% of a 1.024 us multiple: a6000 0.86, 5090 0.93, 4090 0.70. Near-twin shapes 1500 vs 1536 have the same top-1 (table a7). Train slope over rounds 6-11 is -0.0165 on a6000 vs -0.006 to -0.013 elsewhere, so about 14 more rounds would be needed at -0.003 per round (logs s27; this is an interpretation). The 5090 structure refit on a6000: 1.1628 (rules probe).",
+    "confidence": "low",
+    "contradictions": "None."
+   }
+  ],
+  "hypotheses": [
+   {
+    "id": "H01",
+    "cause_tested": "C1 + C3 are additive: split-K and the large-grid trap are separate parts of the gap (post-hoc routing estimate in m1_classgap.py: 1.0701).",
+    "change": "per_fold. Start from A6K/an/logs/rule_L1_sweetspot.json (A6K=/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k). Keep each fold's code, w0 and extra_features. Append before `return s`:\n`if p.roofline_ratio >= 1 and p.output_work_per_sm > 200000:\n    s = s + f.resident_block_scarcity * w[n] + f.register_file_pressure * w[n+1]`\nThis is r09's large-grid branch. Leave out r09's memory-bound branch, which did not help alone (r11 1.1171). n = len(w0) of that fold (30/36/43/33). New w0 = 0, 0 as in r09, or r09's fitted values. The L1 gate already excludes owps>=234057, so the two blocks do not overlap.",
+    "confirm_if": "Pooled holdout <= 1.0715 (vendor 1.0815 minus 0.01; start-to-start noise is about 0.01) and inner-CV < 1.0869 (L1). Large-grid class (9 shapes) gm <= 1.08 while the hungry class stays <= 1.075 (read per class with A6K/an/merge/m1_classgap.py after adding the result file).",
+    "refute_if": "The large-grid class stays > 1.12, or the hungry class regresses above 1.09. That would mean the two corrections interfere under the joint refit and do not add up.",
+    "is_control": false
+   },
+   {
+    "id": "H02",
+    "cause_tested": "C1 on top of C3/C4. R7 already fixes the large-grid and mid-easy classes (1.040, 1.120) but leaves the hungry class at 1.090 (14/31 sk>=3 picks). An interior-optimum split-K block should close that part.",
+    "change": "Single code for all folds. extra_features = [A6K/an/pershape/cand/feat_pershape.jsonl]. Take the R7_compact16 code (16 weights) and append before `return s`:\n`if p.log_flops >= 32.5 and p.output_work_per_sm < 234057:\n    L = np.log2(f.mainloop_iteration_count / (1.0 + f.serial_reduction_dependency * f.mainloop_iteration_count))\n    s = s + L * w[16] + L * L * w[17]`\nSet w0[16:18] = (-11*b, b), which puts the centre at 5.5. Choose b as the smallest value that changes train picks with R7's per-fold fitted weights frozen (the logs s25_sweetspot.py procedure), and use the median b over folds so one w0 serves every fold.",
+    "confirm_if": "Pooled holdout < 1.0701 (below both R7 1.0801 and vendor minus 0.01), inner-CV < 1.1007, sk>=3 picked on >= 22/31 hungry shapes, hungry gm <= 1.075, and the large-grid class stays <= 1.05.",
+    "refute_if": "Hungry gm >= 1.085 or sk>=3 picks <= 16/31. That would mean R7's V pair already covers what the quadratic encodes, or that a flat rule cannot host a gated block without losing its large-grid gains.",
+    "is_control": false
+   },
+   {
+    "id": "H03",
+    "cause_tested": "C3 fixed through a swizzle-blind tile shift. R7's work-ratio axis moves huge shapes to 256x128/128x256 tiles (large-grid class 1.040), while r09's resident_block_scarcity/register_file_pressure branch only reached 1.077.",
+    "change": "per_fold from rule_L1_sweetspot.json. Add A6K/an/pershape/cand/feat_pershape.jsonl to each fold's extra_features. Append:\n`if p.output_work_per_sm > 200000:\n    s = s + f.log_quantized_work_ratio * w[n] + np.log2(f.operand_tile_traffic_ratio) * w[n+1]`\nw0 = (1.0, 0.2) * k, where k = within-shape std of the fold's base score / std of the axis over train candidates. This keeps new terms at a scale that can change picks (C5).",
+    "confirm_if": "Large-grid class <= 1.05 and pooled holdout lower than H01's by >= 0.005, with inner-CV not worse.",
+    "refute_if": "The large-grid class stays >= 1.07. Then R7's large-grid gain came from its flat global structure, not from the work-ratio axis, and H02 is the right route.",
+    "is_control": false
+   },
+   {
+    "id": "H04",
+    "cause_tested": "Regime mixing in flat rules. R7 gives back the M<=32 regime (1.043 vs baseline 1.020, vendor 1.130), which is where rules beat the vendor.",
+    "change": "Single code: H02 plus a small-M branch. Wrap the H02 body in `if p.log_min_dim < 6:` (selects M in {1, 8, 32}). In that branch, give separate weights w[18..23] to np.log2(f.operand_tile_traffic_ratio), f.tile_roofline_deficit, np.log2(1.0 + f.edge_waste), f.split_overhead_fraction, f.parallel_reduction_traffic_fraction and f.serial_fixup_traffic_ratio; keep the remaining terms shared. w0 of the new weights = R7's w0 for the same terms. Same extra_features as H02.",
+    "confirm_if": "M<=32 class gm <= 1.025, pooled holdout lower than H02's by >= 0.004, and inner-CV not worse than H02's.",
+    "refute_if": "M<=32 class unchanged (>= 1.04), or inner-CV worse. That would mean the branch overfits 12 shapes and the flat form is not what costs small M.",
+    "is_control": false
+   },
+   {
+    "id": "H05",
+    "cause_tested": "Robustness of C2. L1's gate thresholds, the fold-2 roofline gate and the scale b were each chosen per fold, and the interior-optimum idea came from curves over all 65 shapes. Does the gain survive a fixed, formula-based version?",
+    "change": "per_fold, because the bases are each fold's own evolved s0 code. The appended block is identical in every fold: gate `p.log_flops >= 32.5 and p.output_work_per_sm < 234057`, centre 5.5, and b = 0.1 * std_within_shape_train(base score) / std_within_shape_train(L*L), a formula with no sweep. Weights are (-11*b, b). Everything else is as in rule_L1_sweetspot.json.",
+    "confirm_if": "Pooled holdout <= 1.09, inner-CV <= 1.09, and sk>=3 picked on >= 22/31 hungry shapes.",
+    "refute_if": "Pooled holdout > 1.10. Then L1's 1.0834 depended on per-fold tuning, and the C2 gate should be treated as partly selected on holdout.",
+    "is_control": false
+   },
+   {
+    "id": "H06",
+    "cause_tested": "CONTROL for C1 (interior optimum). A monotone split-K term at the right scale inside the right gate should NOT help.",
+    "change": "per_fold, as rule_L1_sweetspot.json but with the `L*L*w[n+1]` line deleted. Keep only `L*w[n]`, with w0 = -b at the same per-fold scale b (100, 1, 3e5, 1). Shorten w0 by one so there are no index gaps.",
+    "confirm_if": "(C1 holds, control behaves) Hungry gm >= 1.11 and pooled holdout >= 1.10. The picks either jump to split_k 12-16 or stay at 1.",
+    "refute_if": "Pooled holdout <= 1.09 with hungry picks at sk 3-6. Then the V/interior explanation is wrong: any split-K term at the right scale inside P is enough.",
+    "is_control": true
+   },
+   {
+    "id": "H07",
+    "cause_tested": "CONTROL for C2 (gate location). The same quadratic behind the loop's textbook 'small output' gate should NOT help.",
+    "change": "per_fold, as rule_L1_sweetspot.json but with every fold's gate replaced by `if p.output_work_per_sm < 4096:`. That gate contains 0/31 hungry shapes and 11/34 others. w0 unchanged.",
+    "confirm_if": "(C2 holds) Pooled holdout 1.11-1.12 and sk>=3 on hungry shapes about 13/31, the same as the baseline.",
+    "refute_if": "Pooled holdout <= 1.095. Then where split-K is allowed matters less than how it is scored, and C2 is not a separate cause.",
+    "is_control": true
+   },
+   {
+    "id": "H08",
+    "cause_tested": "CONTROL for C1 against extra branch capacity. Two axes that do not respond to split_k, put inside the same P gate, should NOT help.",
+    "change": "per_fold, as rule_L1_sweetspot.json but with the two gated lines replaced by `s = s + f.shared_memory_pressure * w[n] + f.register_file_pressure * w[n+1]`. Both axes are flat with respect to split_k. Same gate, w0 = (b, b) at L1's per-fold scale.",
+    "confirm_if": "(C1 holds) sk>=3 on hungry shapes stays about 13/31 and pooled holdout is about 1.11.",
+    "refute_if": "Pooled holdout improves by >= 0.02 over the baseline. Then L1's gain came from extra P-branch capacity or refit luck, not from the split-K form.",
+    "is_control": true
+   },
+   {
+    "id": "H09",
+    "cause_tested": "C5 (weight scale hides good axes). The dcrit axis failed in folds 2-3 only because CMA could not reach the needed scale.",
+    "change": "per_fold. Start from A6K/an/features/rules/probe_dcrit_P.json and change ONLY the w0 of the in-P dcrit weight in every fold. Set it to std_within_shape_train(base score) / std_within_shape_train(dcrit), with the sign that makes lower dcrit preferred (roughly 1e2 to 1e5 depending on fold). Code unchanged.",
+    "confirm_if": "Fold 2 and fold 3 holdout move from their unchanged 1.0967/1.0681, sk>=3 on hungry shapes rises from 15/31 to >= 22/31, and pooled holdout < 1.095.",
+    "refute_if": "CMA again shrinks the weight to near 0 and folds 2-3 stay unchanged, or picks rise but pooled gets worse. Then dcrit is the weaker axis (L works where dcrit does not) and scale was not the issue.",
+    "is_control": false
+   },
+   {
+    "id": "H10",
+    "cause_tested": "C2, necessity of the shape gate. Could the quadratic's centre alone encode when to split?",
+    "change": "per_fold, as rule_L1_sweetspot.json but with the `if` gate removed, so the L and L*L lines apply to every shape. Same w0.",
+    "confirm_if": "(Gate needed) Pooled holdout > 1.095, with the large-grid and memory-bound classes worse than under L1 (e.g. 8192x4096x4096 pushed to split).",
+    "refute_if": "Pooled holdout <= 1.085. Then the P gate is unnecessary: a simpler, gate-free split-K term that should transfer better across GPUs.",
+    "is_control": false
+   },
+   {
+    "id": "H11",
+    "cause_tested": "Robustness of C1 across base seeds. L1 was measured on the s0 base only.",
+    "change": "per_fold. Base = A6K/res/c2_evolved_s1.json. Append the same gated quadratic block as L1 (L1's per-fold gates, centre 5.5), with b found by the same frozen-base train sweep (logs s25_sweetspot.py applied to s1). Use the s1 runs' features.jsonl.",
+    "confirm_if": "Pooled holdout <= 1.09, sk>=3 on hungry shapes >= 22/31, and inner-CV improves on the s1 baseline.",
+    "refute_if": "Pooled holdout > 1.10. Then L1's gain is specific to the s0 base.",
+    "is_control": false
+   },
+   {
+    "id": "H12",
+    "cause_tested": "C4. The single-family occupancy and stage peak (2 CTAs/SM, 3 stages) is what still limits the flat R7 rule on mid-easy and 1500-2304 shapes.",
+    "change": "Single code. Start from A6K/an/pershape/cand/R9_compact17_1cta.json (extra_features feat_pershape.jsonl + feat_pershape2.jsonl). Add a new jsonl with two config axes: stage_excess = max(0, cfg.stages - 3) and stage_short = 1.0 if cfg.stages == 2 else 0.0. Add them as w[17] and w[18] with w0 = 0.5 each.",
+    "confirm_if": "Pooled holdout < 1.0701 and inner-CV < 1.1007, mid-easy class <= 1.11, and 128x128x32 picks >= 36/65.",
+    "refute_if": "Pooled holdout within +-0.011 of R7's 1.0801 (start-to-start noise). Then occupancy and stage peaks are not the binding limit once split-K and the large grid are handled.",
+    "is_control": false
+   },
+   {
+    "id": "H13",
+    "cause_tested": "C1 as framed by the rules lens (sign of wcd mixed across regimes) and roofline as the split-K gate. The fold-0 result (1.0544) has not yet been tested on 4 folds.",
+    "change": "Single code, library axes only: A6K/an/rules/cand/regime_free.json, used as is (18 weights). It has split-K and wcd terms with separate weights in each roofline branch, and operand_tile_traffic_ratio and resident_block_scarcity in the compute-bound branch.",
+    "confirm_if": "Pooled holdout < 1.10 and sk>=3 on hungry shapes >= 20/31. In >= 3/4 folds the fitted wcd weight is < 0 in the memory-bound branch and >= 0 in the compute-bound branch.",
+    "refute_if": "Pooled holdout >= 1.1149 or 0/4 folds beat the vendor. Then the fold-0 gain was fold-specific and roofline is the wrong split-K gate, which supports C2's P gate.",
+    "is_control": false
+   },
+   {
+    "id": "H14",
+    "cause_tested": "CONTROL separating 'negative wcd sign' (rules lens) from 'monotone vocabulary' (C1). Removing the anti-split term without an interior counter-term should NOT help if C1 is right.",
+    "change": "per_fold: A6K/an/rules/gated_s0.json, used as is. In each fold's s0 rule, every standalone wcd term is multiplied by np.where(p.roofline_ratio < 1, 1.0, 0.0), plus cmp_gate*wcd and cmp_gate*tail-loss terms. There is no quadratic or overhead term.",
+    "confirm_if": "(C1 holds) Pooled holdout >= 1.105. Either CMA rebuilds an anti-split term (sk>=3 on hungry <= 15/31), or picks overshoot to split_k >= 8 (hungry gm >= 1.10).",
+    "refute_if": "Pooled holdout <= 1.09 with hungry picks mostly at sk 3-6. Then the wcd sign alone was the cause, and the V form is not needed.",
+    "is_control": true
+   },
+   {
+    "id": "H15",
+    "cause_tested": "C5 on a structurally correct rule: is the fit still the bottleneck once the split-K and large-grid structure is right?",
+    "change": "per_fold. Take the H01 rule and apply shift's standardising re-parametrisation (A6K/an/shift/s21_stdize.py): multiply each term by 1/(mean within-shape sd on that fold's TRAIN), and rescale w0 to match, so CMA works in unit coordinates. No change to the rule's logic.",
+    "confirm_if": "Inner-CV improves over H01 by >= 0.005 and pooled holdout does not get worse.",
+    "refute_if": "Inner-CV unchanged or worse. Then once the structure is right the fit budget no longer binds, and C5 matters only for discovery inside the loop.",
+    "is_control": false
+   },
+   {
+    "id": "H16",
+    "cause_tested": "'Better base from another GPU'. Did the refit 5090 structure fail (pooled 1.1628, mid-easy 1.415) only because it lacked the a6000 V block?",
+    "change": "per_fold. Start from A6K/an/rules/port5090_s2.json (the c2-5090-f0-s2 final code with 5090 w0) and append L1's P-gated quadratic block. b comes from a train sweep with the 5090-structure weights frozen after one refit.",
+    "confirm_if": "Pooled holdout < 1.10 and mid-easy class < 1.20.",
+    "refute_if": "Pooled holdout >= 1.12. Then other GPUs' structures are a worse starting point than a6000's own evolved rule, and porting should not be used as the a6000 base.",
+    "is_control": false
+   },
+   {
+    "id": "H17",
+    "cause_tested": "C7 path dependence. Does the porting basin (pc-50902a6000-f0-s0, fold-0 holdout 1.0541) survive the probe's CMA refit when warm-started, and does it carry to other folds?",
+    "change": "per_fold. Code = final rule of runs/pc-50902a6000-f0-s0 (last line of bests.jsonl), with that run's features.jsonl. w0 = its fitted w in all four folds (fold 0 uses its own weights; folds 1-3 start from the fold-0 weights).",
+    "confirm_if": "(Path dependence confirmed) Fold 0 <= 1.07 while folds 1-3 are >= 1.12. The basin carries within fold 0 but is not a transferable base.",
+    "refute_if": "Fold 0 also > 1.10: the refit leaves the basin, so a warm start does not help. Or all folds <= 1.09: the porting rule is a good base after all, and C7 is weaker than C1 as an explanation.",
+    "is_control": false
+   }
+  ]
+ }
+}

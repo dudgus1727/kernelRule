@@ -1,0 +1,1057 @@
+{
+ "protocol": {
+  "fit": {
+   "method": "cma",
+   "n_restarts": 2,
+   "max_evals": 2000
+  },
+  "n_inner": 4,
+  "design": "nkband",
+  "gpu": "a6000",
+  "library": "k7-1 (27축)",
+  "extra_features": [
+   "runs/c2-a6000-f0-s3/features.jsonl",
+   "runs/c2-a6000-f1-s3/features.jsonl",
+   "runs/c2-a6000-f2-s3/features.jsonl",
+   "runs/c2-a6000-f3-s3/features.jsonl"
+  ]
+ },
+ "aggregate": {
+  "n_folds_ok": 4,
+  "holdout_gm_65": 1.125811,
+  "inner_cv_gm": 1.086841,
+  "vendor_gm_65": 1.081488,
+  "folds_beating_vendor": 0,
+  "holdout_by_fold": {
+   "0": 1.168641,
+   "1": 1.152434,
+   "2": 1.092468,
+   "3": 1.089287
+  },
+  "inner_by_fold": {
+   "0": 1.103393,
+   "1": 1.091312,
+   "2": 1.084111,
+   "3": 1.069168
+  },
+  "sk_ge3_picked_on_hard": "10/31",
+  "hard_gm": 1.159518,
+  "easy_gm": 1.095932
+ },
+ "per_fold": {
+  "0": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 4,
+    "depth": 2,
+    "n_weights": 40,
+    "features": [
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "mainloop_iteration_count",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "pipeline_stage_family",
+     "register_file_pressure",
+     "resident_block_scarcity",
+     "serial_reduction_dependency",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "split_k_slices",
+     "tail_waste",
+     "thread_work_granularity_deficit",
+     "tile_aspect_mismatch",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.088618,
+   "inner_cv_gm": 1.103393,
+   "holdout_gm": 1.168641,
+   "vendor_gm": 1.092486,
+   "static_top1": 1.058933,
+   "c2_native_median": 1.155813,
+   "beats_vendor": false,
+   "n_hold": 17,
+   "hold_sk_ge3": {
+    "n": 11,
+    "picked_ge3": 0,
+    "gm": 1.228398,
+    "vendor_gm": 1.080156
+   },
+   "hold_sk_lt3_gm": 1.066534,
+   "sk_picked_hold": {
+    "2": 4,
+    "1": 13
+   },
+   "w": [
+    25.89011676294802,
+    45.59190474364143,
+    -110.38121609148014,
+    385.9056129707589,
+    -0.9023002272890515,
+    -8.805530015310604,
+    -8.935941490342332,
+    -2.9571786431976688,
+    -0.03181367289371412,
+    581.9457114840989,
+    0.18191635823621455,
+    1.225889588491861,
+    -70.3483967644819,
+    -0.7659206765378692,
+    -0.6291726641664174,
+    3.1591917765504642,
+    -9.652048222267862,
+    0.5375489404879686,
+    2.009031745807636,
+    0.6946275772259107,
+    -6.358379337028075,
+    1.3187124112471054,
+    2.398368610222238,
+    -3.598880719982964,
+    0.4540847385694584,
+    -26.198946881873013,
+    -9.443735718632649,
+    -0.8704007177332685,
+    -2.822071396040147,
+    438.94236875006186,
+    31.514901871073874,
+    0.7656993554567969,
+    -0.5223174868615698,
+    -0.3679257165432077,
+    3.4490841071243117,
+    -2.2342120884142997,
+    1.044138777303365,
+    -0.6584095830328959,
+    7.9170122448274265,
+    -0.6594073233143001
+   ],
+   "moved": true,
+   "regret": {
+    "1x4096x4096": 1.034482706711362,
+    "8192x4096x4096": 1.0698529020133003,
+    "512x4096x4096": 1.1325967330547566,
+    "32x4096x4096": 1.0338982538750485,
+    "256x4096x4096": 1.0909091243156925,
+    "128x4096x4096": 1.0781250266453526,
+    "1024x4096x4096": 1.1812864760547395,
+    "2048x4096x4096": 1.2411128729350112,
+    "4096x4096x4096": 1.123677147207176,
+    "1500x4096x4096": 1.245867782137139,
+    "3000x4096x4096": 1.0601265488579632,
+    "384x4096x4096": 1.507352943536751,
+    "768x4096x4096": 1.6119999743886304,
+    "8x4096x4096": 1.034482706711362,
+    "1536x4096x4096": 1.245360834393023,
+    "1000x4096x4096": 1.1812864760547395,
+    "2304x4096x4096": 1.1532693021720852
+   },
+   "picks": {
+    "1x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "8192x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "256x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "64x256x32",
+     "tile_best": "64x128x32"
+    },
+    "1024x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1500x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "3000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "384x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "768x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "1536x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2304x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    }
+   }
+  },
+  "1": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 3,
+    "depth": 2,
+    "n_weights": 25,
+    "features": [
+     "cta_traversal_locality_loss",
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "mainloop_iteration_count",
+     "multistage_family_indicator",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "register_file_pressure",
+     "resident_block_scarcity",
+     "serial_reduction_dependency",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "swizzle_neighborhood_discontinuity",
+     "tail_waste",
+     "thread_work_granularity_deficit",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.085836,
+   "inner_cv_gm": 1.091312,
+   "holdout_gm": 1.152434,
+   "vendor_gm": 1.089068,
+   "static_top1": 1.218962,
+   "c2_native_median": 1.153117,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 7,
+    "picked_ge3": 0,
+    "gm": 1.1768,
+    "vendor_gm": 1.088647
+   },
+   "hold_sk_lt3_gm": 1.133832,
+   "sk_picked_hold": {
+    "2": 4,
+    "1": 11,
+    "4": 1
+   },
+   "w": [
+    7.9451687410246725,
+    108.0354177432465,
+    -1.4006420886474313,
+    9.597161184216985,
+    -99.2671506972031,
+    -2.5384001284883473,
+    23.78058438032074,
+    2.0795495784025175,
+    -11.038029987261176,
+    1.0489383165072814,
+    -211.35521644149674,
+    -10.244534402059877,
+    -4.872296008288544,
+    8.963046524630329,
+    1.2429529106601804,
+    -1.2891183776347226,
+    0.16254055567439873,
+    -9.338885085616445,
+    3.947106036283979,
+    -1.259822065400424,
+    -424.99466049189664,
+    -0.32683848609034283,
+    0.958333489038966,
+    0.19054452605096997,
+    1.4806988547690585
+   ],
+   "moved": true,
+   "regret": {
+    "1x4096x11008": 1.014598545573201,
+    "8192x4096x11008": 1.3578052857810863,
+    "512x4096x11008": 1.1968326340073394,
+    "512x512x512": 1.4630682316148955,
+    "32x4096x11008": 1.0144927582079126,
+    "256x4096x11008": 1.1176470408404404,
+    "128x4096x11008": 1.0188778947906048,
+    "128x4096x256": 1.0909091209750312,
+    "1024x4096x11008": 1.2298716279969475,
+    "1024x4096x256": 1.0270269366754754,
+    "1024x4096x4098": 1.3165887481871306,
+    "1024x4096x128": 1.3076923453636864,
+    "1024x4098x4096": 1.1600000598707392,
+    "2048x4096x11008": 1.1060963381449107,
+    "4096x4096x11008": 1.1246563027034533,
+    "8x4096x11008": 1.014598545573201
+   },
+   "picks": {
+    "1x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "8192x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 12,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x512x512": {
+     "sk_pick": 4,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x64x32"
+    },
+    "32x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "256x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "64x256x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "64x128x32",
+     "tile_best": "64x64x32"
+    },
+    "1024x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 8,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x4098": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x256x32"
+    },
+    "1024x4096x128": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x64x32"
+    },
+    "1024x4098x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    }
+   }
+  },
+  "2": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 4,
+    "depth": 2,
+    "n_weights": 41,
+    "features": [
+     "cta_l2_footprint_ratio",
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "mainloop_iteration_count",
+     "multistage_alignment_compatibility",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "register_file_pressure",
+     "serial_reduction_dependency",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "split_k_independent_cta_load",
+     "stage_family_control_cost",
+     "tail_waste",
+     "thread_work_granularity_deficit",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.08165,
+   "inner_cv_gm": 1.084111,
+   "holdout_gm": 1.092468,
+   "vendor_gm": 1.080987,
+   "static_top1": 1.10387,
+   "c2_native_median": 1.100942,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 5,
+    "picked_ge3": 4,
+    "gm": 1.128602,
+    "vendor_gm": 1.044115
+   },
+   "hold_sk_lt3_gm": 1.076428,
+   "sk_picked_hold": {
+    "2": 4,
+    "1": 5,
+    "3": 6,
+    "4": 1
+   },
+   "w": [
+    41.40427031606755,
+    17.342835553693536,
+    75.70038730298913,
+    -0.8443482024268758,
+    -84.89988548692568,
+    -9.529992474136758,
+    6.4033714348142645,
+    -1.1482855914491799,
+    2.1349398728838276,
+    4.341748115553647,
+    1.4096280314102814,
+    -0.21697204194431635,
+    -1.3420082660175512,
+    5.333048528459635,
+    -16.725059835946315,
+    6.4033836252797744,
+    1.1274705123971218,
+    236.54503541776785,
+    -1.047619737570539,
+    -13.727889469663504,
+    123.17984634962079,
+    0.0762421905136024,
+    147.0668361694255,
+    13.050893329242742,
+    19.50832973582401,
+    -4.523660010437243,
+    1.6729111927696998,
+    38.096077381794316,
+    28.167669105497552,
+    -0.857584309413169,
+    -67.19168076646004,
+    62.681144153551166,
+    1.362016415604315,
+    0.2459041401148236,
+    2.4772305376975132,
+    1.2334500937335116,
+    -0.3885588436765936,
+    1.0460594459624981,
+    0.5456736157574011,
+    4.61291843482024,
+    2.3526771702571803
+   ],
+   "moved": true,
+   "regret": {
+    "1x11008x4096": 1.007246326379627,
+    "8192x11008x4096": 1.0171217261489185,
+    "512x11008x4096": 1.1636771398477583,
+    "32x11008x4096": 1.093525161780137,
+    "256x11008x4096": 1.2056452043517267,
+    "128x11008x4096": 1.0654761698527278,
+    "128x4096x1024": 1.043478274623738,
+    "1024x11008x4096": 1.118544543445288,
+    "1024x4096x1024": 1.0934579757007494,
+    "1024x4096x512": 1.11290326555544,
+    "1024x4096x4100": 1.069408746322181,
+    "1024x1024x1024": 1.2121211720332916,
+    "1024x4100x4096": 1.0951009194210535,
+    "2048x11008x4096": 1.0836352679928452,
+    "4096x11008x4096": 1.0490542253354465,
+    "8x11008x4096": 1.0724637910395636
+   },
+   "picks": {
+    "1x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "8192x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x11008x4096": {
+     "sk_pick": 4,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "256x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x64x32",
+     "tile_best": "128x64x32"
+    },
+    "1024x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x512": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x4100": {
+     "sk_pick": 3,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x1024x1024": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4100x4096": {
+     "sk_pick": 3,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    }
+   }
+  },
+  "3": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 4,
+    "depth": 1,
+    "n_weights": 36,
+    "features": [
+     "axis_tile_fit_imbalance",
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "register_file_pressure",
+     "resident_block_scarcity",
+     "serial_reduction_dependency",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "swizzle_access_conflict_exposure",
+     "tail_waste",
+     "thread_work_granularity_deficit",
+     "tile_aspect_mismatch",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.067658,
+   "inner_cv_gm": 1.069168,
+   "holdout_gm": 1.089287,
+   "vendor_gm": 1.06297,
+   "static_top1": 1.040848,
+   "c2_native_median": 1.084957,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 8,
+    "picked_ge3": 6,
+    "gm": 1.075303,
+    "vendor_gm": 1.05446
+   },
+   "hold_sk_lt3_gm": 1.103453,
+   "sk_picked_hold": {
+    "2": 4,
+    "1": 5,
+    "3": 4,
+    "6": 1,
+    "4": 1,
+    "8": 1
+   },
+   "w": [
+    -0.07487151983989812,
+    74.71702367471417,
+    0.7330315611619851,
+    41.026135340611,
+    100.50287664089196,
+    -37.50247043817378,
+    -0.35487066074078066,
+    321.93738534061157,
+    -178.6762846205369,
+    -56.438126269078126,
+    -2.3512479984087866,
+    -15.10208196026098,
+    -300.5195287051183,
+    4.0,
+    -113.29571325443031,
+    0.2862831961227542,
+    0.5177118390981199,
+    13.110328991619305,
+    5.378949503219491,
+    1.5322732003718502,
+    -1.866686425798467,
+    -11.614204871705379,
+    -2.3266393338713613,
+    1.6335464923280392,
+    -1.145822969062093,
+    3.58282964277751,
+    -0.4900902737822215,
+    0.7484290112501725,
+    7.124933029371153,
+    1.5756830390988563,
+    2.750979182031597,
+    39.0553946820691,
+    -24.663592305610013,
+    8.86448290523882,
+    100.0,
+    220.0
+   ],
+   "moved": false,
+   "regret": {
+    "1x12288x4096": 1.0130718997763,
+    "8192x12288x4096": 1.3344357256208481,
+    "8192x8192x8192": 1.4356451408181858,
+    "512x12288x4096": 1.0041151977506453,
+    "32x12288x4096": 1.0196078021091717,
+    "256x12288x4096": 1.0862745988721638,
+    "128x4096x16384": 1.032110069084216,
+    "128x12288x4096": 1.2400000066523043,
+    "1024x4096x8192": 1.0371517170134423,
+    "1024x4096x16384": 1.0544435981264682,
+    "1024x4096x2048": 1.0952381282356356,
+    "1024x12288x4096": 1.0021097207039247,
+    "2048x12288x4096": 1.0,
+    "2048x2048x2048": 1.1010638223762317,
+    "4096x12288x4096": 1.055485433337928,
+    "8x12288x4096": 1.0196078021091717
+   },
+   "picks": {
+    "1x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "8192x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8192x8192x8192": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "256x12288x4096": {
+     "sk_pick": 6,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x16384": {
+     "sk_pick": 4,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x64"
+    },
+    "128x12288x4096": {
+     "sk_pick": 8,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x8192": {
+     "sk_pick": 3,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x16384": {
+     "sk_pick": 3,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x2048": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x2048x2048": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    }
+   }
+  }
+ },
+ "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/rules/c2_evolved_s3.json",
+ "rule": {
+  "name": "c2 evolved s3",
+  "per_fold": {
+   "0": {
+    "code": "def score(f, p, hw, w):\n    # Compress output-boundary overhang so very large edge tiles do not dominate.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Final-wave underfill is a separate loss from fixed dispatch/startup cost.\n    s = s + f.tail_waste * w[1]\n    # Reverse the wave-deficit preference: a small grid has less amortization.\n    s = s + f.wave_count_deficit * w[2]\n    # Preserve both the qualitative spill event and its traffic severity.\n    s = s + f.has_spill * w[3]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    # Short reductions expose pipeline fill/drain and absolute loop-control work.\n    s = s + f.pipeline_fill_drain_fraction * w[5]\n    s = s + f.pipeline_stage_family * w[6]\n    s = s + np.log2(1.0 + f.mainloop_iteration_count) * w[7]\n    if p.output_work_per_sm < 256 or p.output_aspect_imbalance > 0.75 or p.log_min_dim < 7:\n        # Sparse or skinny outputs are especially sensitive to tile geometry and thread amortization.\n        s = s + f.tile_aspect_mismatch * w[8]\n        s = s + f.thread_work_granularity_deficit * w[9]\n        s = s + np.log2(1.0 + f.edge_waste) * w[10]\n        if p.roofline_ratio < 1:\n            # In the memory-bound sparse regime, replicated operands and weak tile intensity cost bandwidth.\n            s = s + np.log2(f.operand_tile_traffic_ratio) * w[11]\n            s = s + f.tile_roofline_deficit * w[12]\n            # Split-K is useful here when it supplies missing waves, but its partition count and reduction costs remain real.\n            s = s + np.log2(f.split_k_slices) * w[36]\n            s = s + f.wave_count_deficit * np.log2(f.split_k_slices) * w[37]\n            s = s + f.wave_count_deficit * w[16]\n            s = s + f.serial_reduction_dependency * w[17]\n            s = s + f.parallel_reduction_traffic_fraction * w[18]\n            s = s + f.parallel_reduction_compute_fraction * w[19]\n        else:\n            # In the compute-bound sparse regime, issue work and limited residency dominate.\n            s = s + np.log2(1.0 + f.instruction_density) * w[13]\n            s = s + f.occupancy_deficit * w[14]\n            s = s + f.resident_block_scarcity * w[15]\n            # Extra split-K waves can help underfilled outputs, subject to serial and parallel reduction overhead.\n            s = s + np.log2(f.split_k_slices) * w[38]\n            s = s + f.wave_count_deficit * np.log2(f.split_k_slices) * w[39]\n            s = s + f.wave_count_deficit * w[20]\n            s = s + f.serial_reduction_dependency * w[21]\n            s = s + f.parallel_reduction_traffic_fraction * w[22]\n            s = s + f.parallel_reduction_compute_fraction * w[23]\n    else:\n        # Large rectangular saturated outputs form a distinct tile-selection regime.\n        if p.output_aspect_imbalance > 0.75 and p.log_flops > 40:\n            # Here the global wave preference is deliberately weakened so geometry and tail waste decide.\n            s = s + f.wave_count_deficit * w[29]\n            s = s + f.tail_waste * w[30]\n            s = s + f.tile_aspect_mismatch * w[31]\n            s = s + f.thread_work_granularity_deficit * w[32]\n            s = s + np.log2(1.0 + f.edge_waste) * w[33]\n            # Resource cliffs are joint effects: pressure matters most when it also removes resident CTAs.\n            s = s + f.shared_memory_pressure * f.resident_block_scarcity * w[34]\n            s = s + f.register_file_pressure * f.resident_block_scarcity * w[35]\n        else:\n            # For other saturated outputs, select the appropriate memory or compute bottleneck without adding another path.\n            s = s + np.where(p.roofline_ratio < 1, np.log2(f.operand_tile_traffic_ratio), 0.0) * w[24]\n            s = s + np.where(p.roofline_ratio < 1, f.tile_roofline_deficit, 0.0) * w[25]\n            s = s + np.where(p.roofline_ratio < 1, 0.0, np.log2(1.0 + f.instruction_density)) * w[26]\n            s = s + np.where(p.roofline_ratio < 1, 0.0, f.occupancy_deficit) * w[27]\n            s = s + np.where(p.roofline_ratio < 1, 0.0, f.resident_block_scarcity) * w[28]\n            # Add the same joint allocation penalty in the saturated regime, where oversized row tiles create cliffs.\n            s = s + f.shared_memory_pressure * f.resident_block_scarcity * w[34]\n            s = s + f.register_file_pressure * f.resident_block_scarcity * w[35]\n    return s",
+    "w0": [
+     22.5,
+     28.0,
+     -131.7,
+     325.6,
+     -0.18,
+     -7.2,
+     -32.6,
+     -3.8,
+     0.023,
+     410.8,
+     -0.055,
+     1.36,
+     -62.8,
+     -4.85,
+     -1.32,
+     5.67,
+     -24.0,
+     1.63,
+     2.92,
+     3.27,
+     -4.64,
+     1.53,
+     1.19,
+     -5.94,
+     -3.33,
+     -19.24,
+     0.39,
+     -0.39,
+     -3.39,
+     344.3,
+     32.6,
+     1.11,
+     -0.53,
+     -0.32,
+     4.43,
+     -2.3,
+     1.0,
+     -1.0,
+     11.0,
+     -1.0
+    ],
+    "extra_features": [
+     "runs/c2-a6000-f0-s3/features.jsonl"
+    ]
+   },
+   "1": {
+    "code": "def score(f, p, hw, w):\n    # Output-tile overhang: compress the wide edge-waste range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Any register spill introduces exceptionally expensive local-memory accesses.\n    s = s + f.has_spill * w[1]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[2]\n    # A nearly empty final wave leaves a rapidly growing fraction of the GPU idle.\n    s = s + (-np.log2(np.maximum(1.0e-6, 1.0 - f.tail_waste))) * w[3]\n    # A one-wave or nearly one-wave grid also pays launch/dispatch startup and\n    # fails to amortize grid scheduling, so wave deficit is an explicit penalty.\n    s = s + f.wave_count_deficit * w[4]\n    # Pipeline prologue/epilogue cost is poorly amortized by short reductions.\n    s = s + f.pipeline_fill_drain_fraction * w[5]\n    # Serial split-K partitions introduce an accumulator dependency.\n    s = s + f.serial_reduction_dependency * w[6]\n    # The multistage family has a fixed family-level cost, especially when it is not amortized.\n    s = s + f.multistage_family_indicator * w[15]\n    s = s + f.multistage_family_indicator * f.pipeline_fill_drain_fraction * w[16]\n    # Long mainloops can amortize multistage setup and expose its steady-state advantage.\n    s = s + f.multistage_family_indicator * np.log2(f.mainloop_iteration_count) * w[17]\n    if p.roofline_ratio < 1.0:\n        # In the bandwidth-bound regime, replicated operand loads dominate.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[7]\n        # Low-intensity CTA tiles directly increase bandwidth pressure.\n        s = s + f.tile_roofline_deficit * w[8]\n        # Parallel split-K partials add global-memory traffic in this regime.\n        s = s + f.parallel_reduction_traffic_fraction * w[9]\n        # Traversal locality is a cache/geometry-sensitive proxy for the discrete\n        # swizzle policy; expose both its baseline cost and its L2-pressure interaction.\n        s = s + f.cta_traversal_locality_loss * w[20]\n        s = s + f.cta_traversal_locality_loss * p.l2_working_set_pressure * w[21]\n        # The discrete 2x2 swizzle transitions add a separate cache/TLB disruption cost.\n        s = s + f.swizzle_neighborhood_discontinuity * w[22]\n        s = s + f.swizzle_neighborhood_discontinuity * p.l2_working_set_pressure * w[23]\n    else:\n        # In the compute-bound regime, front-end instruction overhead is exposed.\n        s = s + np.log2(1.0 + f.instruction_density) * w[10]\n        # Thread-slot underfill reduces latency hiding for arithmetic pipelines.\n        s = s + f.occupancy_deficit * w[11]\n        # Register allocation pressure limits concurrent latency-hiding CTAs.\n        s = s + f.register_file_pressure * w[12]\n        # Shared-memory allocation pressure limits CTA residency and buffering.\n        s = s + f.shared_memory_pressure * w[13]\n        # Parallel split-K reduction arithmetic adds compute work in this regime.\n        s = s + f.parallel_reduction_compute_fraction * w[14]\n        # Keep the discrete swizzle effect active even when traversal locality is\n        # not used by the compute-bound model.\n        s = s + f.swizzle_neighborhood_discontinuity * w[24]\n        if p.log_min_dim > 8.0 and p.output_aspect_imbalance < 0.25:\n            # For large, square compute-bound GEMMs, granularity is less harmful when\n            # scarce residency is being used efficiently by a low-deficit tile.\n            s = s + f.thread_work_granularity_deficit * (1.0 - f.resident_block_scarcity) * w[18]\n            # Reward the complementary case: extra CTA scarcity is acceptable when\n            # the tile has enough intra-CTA work to amortize its thread overhead.\n            s = s + f.resident_block_scarcity * (1.0 - f.thread_work_granularity_deficit) * w[19]\n    return s",
+    "w0": [
+     8.277384947876524,
+     85.91854097213054,
+     -0.1982519031472992,
+     2.911029107322434,
+     -34.38181187046306,
+     -2.269454135733269,
+     10.599349431222134,
+     0.6593101139142628,
+     -3.474583228513218,
+     1.1418867857098656,
+     -93.23397343841077,
+     -3.189522007052898,
+     -1.6720715472544987,
+     3.0764443802547823,
+     -0.5223336529188809,
+     3.7402904617140886,
+     0.5397718185968712,
+     -4.604296178486517,
+     1.4714307826971877,
+     -0.5809469586958843,
+     -99.0,
+     1.0,
+     1.0,
+     1.0,
+     0.5
+    ],
+    "extra_features": [
+     "runs/c2-a6000-f1-s3/features.jsonl"
+    ]
+   },
+   "2": {
+    "code": "def score(f, p, hw, w):\n    # Output-boundary overwork, compressed because edge waste spans hundreds.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Final-wave idle time grows sharply as the usable wave fraction vanishes.\n    s = s + np.log2(1.0 / np.clip(1.0 - f.tail_waste, 1e-6, 1.0)) * w[1]\n    # Register spilling introduces a severe local-memory latency penalty.\n    s = s + f.has_spill * w[2]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[3]\n    # A large CTA footprint is costly when the shape's working set pressures L2.\n    s = s + np.where(p.l2_working_set_pressure > 0.5,\n                     np.log2(1.0 + f.cta_l2_footprint_ratio),\n                     0.0) * w[23]\n    # Misaligned shapes make the multistage async-copy family a compatibility risk.\n    s = s + np.where(p.alignment_deficit > 0.25,\n                     f.multistage_alignment_compatibility,\n                     0.0) * w[24]\n    # Extra pipeline state-machine groups impose a discrete control cost.\n    s = s + np.log2(1.0 + f.stage_family_control_cost) * w[25]\n    # State-management cost is more exposed when shared memory limits residency.\n    s = s + np.log2(1.0 + f.stage_family_control_cost) * f.shared_memory_pressure * w[26]\n    # Parallel split-K materialization adds global-memory traffic.\n    s = s + f.parallel_reduction_traffic_fraction * w[20]\n    # Parallel split-K also adds reduction arithmetic beyond ordinary accumulation.\n    s = s + f.parallel_reduction_compute_fraction * w[21]\n    # Fixed thread-level coordination is amortized by useful CTA output work.\n    s = s + f.thread_work_granularity_deficit * w[22]\n    if p.output_work_per_sm < 256:\n        s = s + f.wave_count_deficit * w[4]\n        s = s + f.pipeline_fill_drain_fraction * w[5]\n        s = s + np.log2(f.mainloop_iteration_count) * w[6]\n        if p.roofline_ratio < 1:\n            s = s + np.log2(f.operand_tile_traffic_ratio) * w[7]\n            s = s + f.tile_roofline_deficit * w[8]\n        else:\n            s = s + np.log2(1.0 + f.instruction_density) * w[9]\n            s = s + f.occupancy_deficit * w[10]\n            s = s + f.register_file_pressure * w[11]\n    else:\n        # Saturated grids trade coverage against serial split-K waiting.\n        s = s + f.wave_count_deficit * (1.0 - f.serial_reduction_dependency) * w[12]\n        s = s + f.wave_count_deficit * f.serial_reduction_dependency * w[27]\n        s = s + f.serial_reduction_dependency * np.log2(f.mainloop_iteration_count) * w[28]\n        # More independent split-K CTAs can repair residual scheduling undercoverage;\n        # serial dependency reduces the useful part of that added parallelism.\n        s = s - np.log2(1.0 + f.split_k_independent_cta_load) * f.wave_count_deficit * (1.0 - f.serial_reduction_dependency) * w[40]\n        s = s + f.pipeline_fill_drain_fraction * w[13]\n        s = s + np.log2(f.mainloop_iteration_count) * w[14]\n        # Separate modestly saturated grids from deeply saturated grids.  The\n        # roofline alternatives remain shape-selected without adding paths.\n        if p.output_work_per_sm < 4096:\n            s = s + np.where(p.roofline_ratio < 1,\n                             np.log2(f.operand_tile_traffic_ratio),\n                             0.0) * w[38]\n            s = s + np.where(p.roofline_ratio < 1,\n                             f.tile_roofline_deficit,\n                             0.0) * w[39]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.register_file_pressure * np.log2(f.operand_tile_traffic_ratio),\n                             0.0) * w[32]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.register_file_pressure * np.log2(1.0 + f.cta_l2_footprint_ratio),\n                             0.0) * w[33]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.pipeline_fill_drain_fraction * np.log2(1.0 + f.stage_family_control_cost),\n                             0.0) * w[34]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             np.log2(1.0 + f.instruction_density),\n                             0.0) * w[35]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.occupancy_deficit,\n                             0.0) * w[36]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.register_file_pressure,\n                             0.0) * w[37]\n        else:\n            s = s + np.where(p.roofline_ratio < 1,\n                             np.log2(f.operand_tile_traffic_ratio),\n                             0.0) * w[15]\n            s = s + np.where(p.roofline_ratio < 1,\n                             f.tile_roofline_deficit,\n                             0.0) * w[16]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.register_file_pressure * np.log2(f.operand_tile_traffic_ratio),\n                             0.0) * w[29]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.register_file_pressure * np.log2(1.0 + f.cta_l2_footprint_ratio),\n                             0.0) * w[30]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.pipeline_fill_drain_fraction * np.log2(1.0 + f.stage_family_control_cost),\n                             0.0) * w[31]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             np.log2(1.0 + f.instruction_density),\n                             0.0) * w[17]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.occupancy_deficit,\n                             0.0) * w[18]\n            s = s + np.where(p.roofline_ratio >= 1,\n                             f.register_file_pressure,\n                             0.0) * w[19]\n    return s",
+    "w0": [
+     24.32475639577846,
+     6.652855953033915,
+     46.893187802232596,
+     -0.07968999783292097,
+     -114.70655955444246,
+     -33.6255503633349,
+     3.5994143340623044,
+     0.26890614242899635,
+     -3.7189774785407943,
+     1.8057225684667062,
+     1.4542562077820276,
+     0.40476357985648903,
+     -0.15427516258685237,
+     5.031942120739495,
+     -4.559893549296146,
+     3.6301655952262877,
+     -0.261233143957206,
+     155.5280085949138,
+     0.6750306139218643,
+     -10.669261273713117,
+     63.684117544672525,
+     0.8081578608274217,
+     78.01909927509789,
+     -9.33914229605477,
+     10.222791333182336,
+     -2.8576621473250112,
+     0.8044863675197134,
+     21.16877040710274,
+     11.593352143269597,
+     -0.39839948595652436,
+     -23.525177286970084,
+     29.12394442062358,
+     1.3001160947098303,
+     0.18430950283635453,
+     1.2842311645700557,
+     0.8795081395924048,
+     -0.2011533162504562,
+     0.6578722054690535,
+     1.3353370597786467,
+     1.9955511734244105,
+     1.0
+    ],
+    "extra_features": [
+     "runs/c2-a6000-f2-s3/features.jsonl"
+    ]
+   },
+   "3": {
+    "code": "def score(f, p, hw, w):\n    # Boundary overhang increases executed work; compress the wide edge-waste range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # A register spill introduces very expensive local-memory traffic.\n    s = s + f.has_spill * w[1]\n    # Spill severity distinguishes a small spill from sustained local-memory traffic.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[2]\n    # A scarce CTA residency pool reduces latency hiding in every regime.\n    s = s + f.resident_block_scarcity * w[3]\n    if p.roofline_ratio < 1:\n        # In the bandwidth-bound regime, replicated operand loads directly increase traffic.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[4]\n        # Low tile arithmetic intensity adds pressure to the bandwidth bottleneck.\n        s = s + f.tile_roofline_deficit * w[5]\n        # Shared-memory allocation can reduce the resident CTA pool and buffering capacity.\n        s = s + f.shared_memory_pressure * w[6]\n        # Register allocation can independently reduce latency-hiding CTAs.\n        s = s + f.register_file_pressure * w[7]\n    else:\n        # In the compute-bound regime, front-end instruction overhead competes with tensor issue.\n        s = s + np.log2(1.0 + f.instruction_density) * w[8]\n        # Residual tile-level load pressure matters when cache reuse is poor, even above the shape roofline.\n        s = s + (np.log2(f.operand_tile_traffic_ratio) / 20.0) * f.tile_roofline_deficit * p.l2_working_set_pressure * w[33]\n        # Compute-bound kernels benefit from resources that hide execution latency.\n        s = s + f.occupancy_deficit * w[9]\n        # Register pressure directly limits concurrent compute CTAs and execution latency hiding.\n        s = s + f.register_file_pressure * w[10]\n        # Shared-memory pressure can constrain buffering and resident compute CTAs.\n        s = s + f.shared_memory_pressure * w[11]\n    # With little output work per SM, split-K can create useful CTA waves, but only\n    # when its serial dependency does not erase that wave-creation benefit.\n    if p.output_work_per_sm < 4096:\n        reduction_scale = 1.0 + np.clip((p.log_flops - 20.0) / 20.0, 0.0, 1.0)\n        s = s + f.wave_count_deficit * (1.0 - f.serial_reduction_dependency) * reduction_scale * w[12]\n        # Serial split-K boundaries are a direct dependency cost, not a benefit.\n        s = s + f.serial_reduction_dependency * w[13]\n        s = s + f.parallel_reduction_traffic_fraction * w[14]\n        s = s + f.parallel_reduction_compute_fraction * w[15]\n        # Parallel reduction overhead is most harmful when there is little serial\n        # dependency to avoid, so price traffic against the available serial benefit.\n        s = s + f.parallel_reduction_traffic_fraction * (1.0 - f.serial_reduction_dependency) * w[34]\n        s = s + f.parallel_reduction_compute_fraction * (1.0 - f.serial_reduction_dependency) * w[35]\n    else:\n        # Once output parallelism is ample, extra split-K waves are launch overhead\n        # rather than a remedy, so all split-K effects are priced as costs.\n        s = s + f.wave_count_deficit * w[16]\n        s = s + f.serial_reduction_dependency * w[17]\n        s = s + f.parallel_reduction_traffic_fraction * w[18]\n        s = s + f.parallel_reduction_compute_fraction * w[19]\n    # Swizzle exposure has a direct effect, but its sign and strength can change with geometry.\n    s = s + f.swizzle_access_conflict_exposure * w[20]\n    # Tile/output aspect mismatch changes whether exposed swizzle accesses are harmful.\n    s = s + f.swizzle_access_conflict_exposure * (f.tile_aspect_mismatch / 20.0) * w[21]\n    s = s + f.swizzle_access_conflict_exposure * p.output_aspect_imbalance * w[22]\n    # With scarce residency, the same access exposure can alter scheduling and latency hiding.\n    s = s + f.swizzle_access_conflict_exposure * f.resident_block_scarcity * w[23]\n    # Rectangular outputs make aggregate boundary waste more informative about the short axis.\n    s = s + np.log2(1.0 + f.edge_waste) * p.output_aspect_imbalance * w[24]\n    # A short output axis amplifies the cost of an imbalanced final CTA wave.\n    s = s + f.tail_waste * p.output_aspect_imbalance * w[25]\n    # Axis imbalance also makes insufficient CTA partitioning more costly than its scalar proxy suggests.\n    s = s + f.wave_count_deficit * p.output_aspect_imbalance * w[26]\n    # Narrow output-axis tiles amortize thread scheduling overhead less effectively.\n    s = s + f.thread_work_granularity_deficit * p.output_aspect_imbalance * w[27]\n    # Directional tile fit identifies axis-specific predication beyond scalar aspect measures.\n    s = s + f.axis_tile_fit_imbalance * w[28]\n    # The directional penalty is stronger when the output matrix is highly rectangular.\n    s = s + f.axis_tile_fit_imbalance * p.output_aspect_imbalance * w[29]\n    # Axis-specific tail waste compounds when the final wave is poorly filled.\n    s = s + f.axis_tile_fit_imbalance * f.tail_waste * w[30]\n    # Axis-specific tile fit matters more when the grid has a wave deficit.\n    s = s + f.axis_tile_fit_imbalance * f.wave_count_deficit * w[31]\n    # Directional predication and scarce resident CTAs jointly reduce useful scheduling choices.\n    s = s + f.axis_tile_fit_imbalance * f.resident_block_scarcity * w[32]\n    return s",
+    "w0": [
+     -0.07487151983989812,
+     74.71702367471417,
+     0.7330315611619851,
+     41.026135340611,
+     100.50287664089196,
+     -37.50247043817378,
+     -0.35487066074078066,
+     321.93738534061157,
+     -178.6762846205369,
+     -56.438126269078126,
+     -2.3512479984087866,
+     -15.10208196026098,
+     -300.5195287051183,
+     4.0,
+     -113.29571325443031,
+     0.2862831961227542,
+     0.5177118390981199,
+     13.110328991619305,
+     5.378949503219491,
+     1.5322732003718502,
+     -1.866686425798467,
+     -11.614204871705379,
+     -2.3266393338713613,
+     1.6335464923280392,
+     -1.145822969062093,
+     3.58282964277751,
+     -0.4900902737822215,
+     0.7484290112501725,
+     7.124933029371153,
+     1.5756830390988563,
+     2.750979182031597,
+     39.0553946820691,
+     -24.663592305610013,
+     8.86448290523882,
+     100.0,
+     220.0
+    ],
+    "extra_features": [
+     "runs/c2-a6000-f3-s3/features.jsonl"
+    ]
+   }
+  }
+ }
+}
