@@ -1114,7 +1114,28 @@ def stage3(a, d: Path, table, base: FeatureRegistry, splits,
     out.mkdir(parents=True, exist_ok=True)
     budget = Budget(max_calls=3000, max_input_tokens=60_000_000,
                     max_output_tokens=8_000_000)
-    for s in range(a.n_seeds):
+    # ★ 2026-09-18 (D-187 §4) — `--seed-index` runs **one** seed of the
+    #   n_seeds, so the seeds of a fold can be separate processes.
+    #
+    #   ⛔ It changes nothing about what a run is. `run_id` and the loop
+    #   seed are computed from `s` exactly as the sequential loop computes
+    #   them, and D-172 §X already made each seed start from the stage-1
+    #   state again — the sequential loop shares nothing between seeds. So
+    #   this is a **scheduling** change, not a condition change (D-137: it
+    #   belongs in the commit column, not the tag).
+    #
+    #   Why it was needed: the campaign was running four processes (one per
+    #   fold) on a 48-core machine at load 5, because the per-round cost is
+    #   LLM latency. Four seeds in sequence made a fold ~8h.
+    seeds = (range(a.n_seeds) if a.seed_index is None
+             else (a.seed_index,))
+    if a.seed_index is not None and not 0 <= a.seed_index < a.n_seeds:
+        raise SystemExit(
+            f"--seed-index {a.seed_index} is outside --n-seeds "
+            f"{a.n_seeds}. The index has to be the one the sequential run "
+            f"would have used, or the run_id and the loop seed stop "
+            f"matching.")
+    for s in seeds:
         run_id = f"{d.name}-s{s}"
         # ★ A fresh registry and matrix per seed — the stage-1 state, which
         #   is `base` plus what stage 1 accepted, and nothing the loop added.
@@ -1242,6 +1263,12 @@ def main() -> None:
                          "arm** — the human 24 and the F1 library can be "
                          "compared under the same prompt")
     ap.add_argument("--n-seeds", type=int, default=3)
+    ap.add_argument("--seed-index", type=int, default=None, metavar="S",
+                    help="run only seed index S of --n-seeds, so the seeds "
+                         "of one fold can be separate processes (D-187 §4). "
+                         "★ The run_id and the loop seed are the ones the "
+                         "sequential run would have used — it schedules, it "
+                         "does not change the condition")
     ap.add_argument("--rounds", type=int, default=12,
                     help="the number of rounds. ★ 2026-09-06 (D-140): "
                          "reverted 24 -> 12. The evidence supporting 24 "

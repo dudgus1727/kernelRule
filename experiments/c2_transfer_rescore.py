@@ -62,13 +62,13 @@ def _rows(p: Path) -> list[dict]:
     return [json.loads(x) for x in p.read_text().splitlines() if x.strip()]
 
 
-def _best_of(gpu: str, fold: int):
+def _best_of(gpu: str, fold: int, prefix: str = "c2"):
     """★ 그 (표, fold) 가 끝낸 규칙 — 4시드 중 ★ 학습 점수 최소.
     ⛔ 홀드아웃을 보지 않는다. 각 시드의 답은 `bests.jsonl` 의 마지막 줄이다
     (D-183 §2-1: 동점에서 `min(archive)` 와 갈린다)."""
     out = None
     for s in SEEDS:
-        bp = Path(f"runs/c2-{gpu}-f{fold}-s{s}/bests.jsonl")
+        bp = Path(f"runs/{prefix}-{gpu}-f{fold}-s{s}/bests.jsonl")
         if not bp.exists():
             continue
         e = _rows(bp)[-1]
@@ -77,10 +77,10 @@ def _best_of(gpu: str, fold: int):
     return out if out else (None, None)
 
 
-def _registry(gpu: str, fold: int, seed: int, table):
-    reg = _load_stage1(Path(f"runs/c2-{gpu}-f{fold}"),
+def _registry(gpu: str, fold: int, seed: int, table, prefix: str = "c2"):
+    reg = _load_stage1(Path(f"runs/{prefix}-{gpu}-f{fold}"),
                        base_registry("F2", human=REGISTRY), "F2", table)
-    fp = Path(f"runs/c2-{gpu}-f{fold}-s{seed}/features.jsonl")
+    fp = Path(f"runs/{prefix}-{gpu}-f{fold}-s{seed}/features.jsonl")
     if fp.exists():
         for f in load_generated(fp, table=table):
             if f.name not in reg._items:
@@ -94,6 +94,14 @@ def main() -> None:
     ap.add_argument("--fold", type=int, default=None)
     ap.add_argument("--merge", nargs="*", default=None)
     ap.add_argument("--out", default=str(OUT))
+    # ★ D-187 §4-1 — the same procedure with a **different source campaign**.
+    #   ⛔ Not a second implementation: (a)/(b)/native must stay one piece of
+    #   code or the two arms stop being comparable (the D-37 family).
+    #   The target side never changes, so `native` stays c2's.
+    ap.add_argument("--src-prefix", default="c2",
+                    help="run-dir prefix the SOURCE rule is read from")
+    ap.add_argument("--src", nargs="*", default=None,
+                    help="only these source tables (default: all)")
     a = ap.parse_args()
     if a.merge:
         cells = []
@@ -126,7 +134,9 @@ def main() -> None:
         sp = {g: _splits(tables[g], fold=f, k=4, design=DESIGN) for g in GPUS}
         native_cache: dict = {}
         for src in GPUS:
-            e, seed = _best_of(src, f)
+            if a.src and src not in a.src:
+                continue
+            e, seed = _best_of(src, f, a.src_prefix)
             if e is None:
                 continue
             for dst in GPUS:
@@ -134,7 +144,7 @@ def main() -> None:
                     continue
                 tB, sB = tables[dst], sp[dst]
                 hold = list(sB.val.shapes)
-                regB = _registry(src, f, seed, tB)
+                regB = _registry(src, f, seed, tB, a.src_prefix)
                 mB = FeatureMatrix(tB, regB, cache_dir=CACHE_DIR)
                 w = np.asarray(e["w"], float)
                 # (a) ★ the source's weights as they are — 0 fits
@@ -168,6 +178,7 @@ def main() -> None:
                                       ).run(ks=(1,)).by_k[1]["all"])
                 cells.append({
                     "fold": f, "src": src, "dst": dst, "src_seed": seed,
+                    "src_prefix": a.src_prefix,
                     "n_holdout": len(hold),
                     "a_as_is": round(float(ga), 6),
                     "b_refit": round(float(gb), 6),
