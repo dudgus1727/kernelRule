@@ -1,0 +1,18 @@
+{
+ "name": "P1 pool time-model + split-K model + operand traffic (current contract)",
+ "code": "def score(f, p, hw, w):\n    # Time model (pool): busiest-SM compute path, L2->SM feed (re-priced by kappa = w[0]) and DRAM feed overlap as a p=2 norm.\n    t = np.sqrt(np.square(f.tm_crit_ratio) + np.square(w[0] * f.tm_l2_ratio) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[1] * f.tm_regstaged + w[2] * f.tm_cta_warps\n    # Split-K time model with an interior optimum (fill/epilogue per round, serial fix-up at DRAM), in log2 time.\n    s = s + w[3] * f.splitk_roofline_log_time\n    # L2->SM operand traffic over compulsory bytes (small tiles thrash the 6 MB L2).\n    s = s + w[4] * np.log2(f.operand_tile_traffic_ratio)\n    # Tie-break among raster variants that differ only in inst_total: raster along the shorter grid side.\n    if p.M > p.N:\n        s = s + w[5] * 0.001 * f.tm_log_inst\n    else:\n        s = s + w[6] * 0.001 * f.tm_log_inst\n    return s\n",
+ "w0": [
+  0.5,
+  0.6,
+  1.6,
+  10.0,
+  5.0,
+  1.0,
+  -1.0
+ ],
+ "extra_features": [
+  "docs/artifacts/a6000-rules/features/pool_current.jsonl"
+ ],
+ "ext_contract_features": [],
+ "_source": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/pool/rules/P1_current.json"
+}

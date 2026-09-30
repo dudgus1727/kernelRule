@@ -1,0 +1,15 @@
+{
+ "name": "K1a = J1e with the DRAM leg replaced by one consistent width-1 DRAM count (dram_w1_*; 3 weights, current contract)",
+ "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster (pool feature dram_w1_*): panels fetched once per one-CTA-per-SM\n    # K-lockstep window (whole grid if co-resident in one round), re-fetched across windows unless the reuse distance fits L2,\n    # plus C write, split-K partials, spills; DRAM time / ideal compute time. Replaces J1e's tm_dram_ratio + ref/rbs double count.\n    # SM roof as in J1e: the L2->SM feed (priced at DRAM bandwidth, kappa at its physical bound 1) overlaps the math of the\n    # same SM, so the SM runs at the slower of the two; DRAM keeps the imperfect-overlap p=2 combination.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Pure tie-break among raster variants that differ only in inst_total: sign fixed by physics (shorter-side raster),\n    # scale fixed at P1's prior 1e-3 per log2(inst) (<< one score unit = 0.1 log2 time), so it is not a fitted feature.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s\n",
+ "w0": [
+  0.6,
+  1.6,
+  10.0
+ ],
+ "extra_features": [
+  "docs/artifacts/a6000-rules/features/pool_current.jsonl",
+  "docs/artifacts/a6000-rules/features/pool_K1.jsonl"
+ ],
+ "ext_contract_features": [],
+ "_source": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/rules_r3_K1/K1a.json"
+}

@@ -1,0 +1,16 @@
+{
+ "name": "K3c = K3b with tm_cta_warps replaced by tm_barrier_domain (alignment-coupled barrier domain; 2 weights) [EXTENDED CONTRACT]",
+ "code": "def score(f, p, hw, w):\n    # EXTENDED CONTRACT. Time model: busiest-SM compute path, L2->SM feed and DRAM feed overlap as a p=2 norm.\n    # kappa (L2 feed price) fixed at its physical bound 1.0 (every DRAM byte passes through L2; sat there in all 20 I3c fits).\n    # The raster deficit enters the DRAM leg: tm_dram_ratio * 2^l2_locality_deficit is this raster's own DRAM time.\n    d = f.tm_dram_ratio * np.power(2.0, f.l2_locality_deficit)\n    t = np.sqrt(np.square(f.tm_crit_ratio) + np.square(f.tm_l2_ratio) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_barrier_domain\n    # Split-K time model with an interior optimum (fill/epilogue per round, serial fix-up at DRAM). It is a log2 time\n    # factor like the norm's 10*log2(t), so its consistent weight is the norm's scale, 10 (physics-fixed, not fitted).\n    s = s + 10.0 * f.splitk_roofline_log_time\n    # Latency path of the busiest SM (J4b, copied exactly). Little's law: its CTAs stream n*ceil(K/(tk*sk)) k-steps while\n    # only min(n, blocks/SM)*(stages-1) k-step loads are in flight -> 2^splitk_sm_latency_rounds_log serial round trips;\n    # each serial split-K slice after the first adds 2 more (wait on the predecessor's partial: read, then write);\n    # serial_reduction_dependency * mainloop_iteration_count = split_k - 1 for serial mode, 0 otherwise.\n    # L = 1 us loaded memory latency (fixed prior, J4b). t0 = 2MNK/peak is the unit of tm_crit_ratio, so lat/crit is the\n    # latency path over the compute path. It is a log2 time factor, so its weight is the norm's scale 10 (fixed, not fitted).\n    t0 = 2.0 * p.M * p.N * p.K / (hw.peak_tflops_f16 * 1e12)\n    rounds = np.power(2.0, f.splitk_sm_latency_rounds_log) + 2.0 * f.serial_reduction_dependency * f.mainloop_iteration_count\n    lat = rounds * 1e-6 / t0\n    s = s + 10.0 * np.log2(np.maximum(1.0, lat / f.tm_crit_ratio))\n    # Pure tie-break among raster variants that differ only in inst_total (I2b/J3b): sign fixed by physics (raster along\n    # the shorter grid side: M>N -> +1, else -1), scale fixed at the 1e-3 prior per log2(inst) (<< one score unit), not fitted.\n    if p.M > p.N:\n        sgn = 1.0\n    else:\n        sgn = -1.0\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s\n",
+ "w0": [
+  0.6,
+  1.6
+ ],
+ "extra_features": [
+  "docs/artifacts/a6000-rules/features/pool_current.jsonl",
+  "docs/artifacts/a6000-rules/features/K3_features.jsonl"
+ ],
+ "ext_contract_features": [
+  "docs/artifacts/a6000-rules/features/pool_ext.jsonl"
+ ],
+ "_source": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/rules_r3_K3/K3c_barrier_domain.json"
+}

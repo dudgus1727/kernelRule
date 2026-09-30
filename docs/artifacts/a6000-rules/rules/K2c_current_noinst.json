@@ -1,0 +1,16 @@
+{
+ "name": "K2c: the winner of J2d/K2a/K2b (J2d) without the log2(operand_tile_traffic_ratio) term (4 weights, current contract, no tm_log_inst)",
+ "code": "def score(f, p, hw, w):\n    # Raster: the current contract cannot see swizzle, and with no inst_total tie-break every raster variant of a tile\n    # scores exactly the same, so which raster runs is outside the rule's control (the harness breaks the tie by config\n    # identity). J2d's raster-robust cost: the worst of the two width-1 orientations, max(A-panel, B-panel refetch),\n    # scaled by (1 + serial split-K partial bytes / compulsory bytes) (partial round trips evict the panels from L2),\n    # times blocks per SM (panel reuse needs K-lockstep; the lockstep window is one CTA per SM).\n    ref = np.maximum(f.a_refetch_bw_demand, f.b_refetch_bw_demand) * (1.0 + f.splitk_partial_bytes_ratio)\n    d = f.tm_dram_ratio + ref / f.resident_block_scarcity\n    # Time model: busiest-SM compute path, L2->SM feed (kappa = w[0]) and DRAM feed incl. raster refetch, p=2 norm.\n    t = np.sqrt(np.square(f.tm_crit_ratio) + np.square(w[0] * f.tm_l2_ratio) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[1] * f.tm_regstaged + w[2] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[3] * f.splitk_roofline_log_time\n    return s\n",
+ "w0": [
+  0.5,
+  0.6,
+  1.6,
+  10.0
+ ],
+ "extra_features": [
+  "docs/artifacts/a6000-rules/features/pool_current.jsonl",
+  "docs/artifacts/a6000-rules/features/pool_K2.jsonl"
+ ],
+ "ext_contract_features": [],
+ "_source": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/rules_r3_K2/K2c.json"
+}

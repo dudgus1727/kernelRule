@@ -1,0 +1,405 @@
+{
+ "designers": [
+  {
+   "angle": "timemodel",
+   "feature_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_timemodel/feat_timemodel.jsonl",
+   "contract": "current",
+   "features": [
+    {
+     "name": "tm_log_est",
+     "physics": "Headline analytic time model: log2(estimated time / ideal compute time 2MNK/peak). It combines three pipelines as a p=2 norm (imperfect overlap). (a) Compute critical path of the busiest SM: ceil(CTAs/sm_count) CTAs, each running its padded K-slice iterations plus fill/drain work. Fill/drain is (stages-1) prologue loads, the epilogue tile write and, for serial split-K, the partial read. It is counted in mainloop-iteration equivalents and divided by the number of co-resident CTAs that can hide it. The serial split-K semaphore chain is added on top. (b) L2->SM operand traffic plus spill traffic, priced at DRAM bandwidth. This is an upper bound because hw has no L2 bandwidth field. (c) Compulsory DRAM bytes plus split-K partials (f16 in this bundle) and spills. The parallel reduce pass is added. No fitted constants.",
+     "spearman_mean": 0.809,
+     "pick_lo_mean": 1.1523,
+     "best_classes": "Best single axis on big/hungry/mid. Mean over folds of pick_lo: big 1.067, hungry 1.144, mid 1.187, small 1.200. The best single library axes get big 1.346, hungry 1.403, mid 1.351, small 1.095. Spearman 0.80-0.82 in every fold; the best library axis is 0.42."
+    },
+    {
+     "name": "tm_crit_ratio",
+     "physics": "Compute critical path over ideal per-SM work, kept as its own component. It uses SM-granular waves ceil(CTAs/sm_count), which fitted the needle family's split-K curves better than slot-granular waves (R2 0.82 vs 0.74 with unit coefficient). It includes padded tiles and K-slices, fill/drain hidden by co-resident CTAs, and the serial chain of (sk-1) partial round trips.",
+     "spearman_mean": 0.423,
+     "pick_lo_mean": 2.9348,
+     "best_classes": "Not usable alone: its minimum is tiny tiles (big 6.96, hungry 3.53, mid 2.12, small 1.38). It is meant to go inside the norm with tm_l2_ratio and tm_dram_ratio. Within the 128x128x32 w4 st3 b2 family it tracks the measured split-K curve."
+    },
+    {
+     "name": "tm_l2_ratio",
+     "physics": "L2->SM operand bytes (every CTA loads (tile_m+tile_n)*tile_k per iteration) plus spill reload/store, divided by DRAM bandwidth and ideal compute time. For unpadded tiles this equals ridge*bytes*(1/tm+1/tn)/2, the L2 feed a tile needs at peak in DRAM-bandwidth units. This is why small tiles cost 25-30% on the 6 MB-L2 a6000. A rule should scale it by w = 1/kappa. CMA fits gave |w| = 0.45-0.62 in all 8 fold fits, i.e. effective L2 bandwidth about 2x DRAM.",
+     "spearman_mean": 0.607,
+     "pick_lo_mean": 1.3642,
+     "best_classes": "Best single axis for big (1.069) and useful for hungry (1.292). Poor alone on mid (1.866) and small (1.361). Without it the time model collapses: surrogate inner-CV goes from 1.049 to 1.49."
+    },
+    {
+     "name": "tm_dram_ratio",
+     "physics": "DRAM bytes / bandwidth over ideal compute time. Operands that fit in L2 are read once. Otherwise each co-resident set (min(CTAs, sm_count*max_blocks_per_sm)) re-reads the operand panels it spans, rastered along the shorter grid side, which is the raster the tm_log_inst tie-break selects. Serial split-K adds 2(sk-1)MN partial bytes and parallel adds sk*MN, both in the output type; spill traffic is added too.",
+     "spearman_mean": 0.661,
+     "pick_lo_mean": 1.4069,
+     "best_classes": "Memory-bound shapes. In the plain featdiag (ties resolve to horizontal-1) small is 1.361. With the raster tie-break term, small is 1.028 on fold-0 train. It is a component of the norm; alone, hungry is 1.305 and big 1.478."
+    },
+    {
+     "name": "tm_reduce_ratio",
+     "physics": "Time of the separate parallel split-K reduction kernel ((sk+1)*M*N*bytes at DRAM bandwidth) over ideal compute time. It cannot overlap the GEMM, so it is added outside the norm.",
+     "spearman_mean": 0.206,
+     "pick_lo_mean": 1.7276,
+     "best_classes": "Component only; zero for serial or sk=1. The loop's section 8.4 duplicate check would flag it (Spearman 0.956 vs parallel_reduction_compute_fraction)."
+    },
+    {
+     "name": "tm_res_inv",
+     "physics": "1 / CTAs actually co-resident on the busiest SM, min(ceil(CTAs/sm_count), max_blocks_per_sm). A second CTA hides barrier, stage-fill and epilogue stalls. On large shapes, 1-CTA 128x128 variants lose 4-8% to the 2-CTA kernel.",
+     "spearman_mean": 0.053,
+     "pick_lo_mean": 2.7647,
+     "best_classes": "Efficiency correction only. It is redundant in the rule (dropping it changes surrogate inner-CV by -0.0002). It equals resident_block_scarcity except on grids smaller than sm_count*bps, and the section 8.4 check flags it as a duplicate (1.000)."
+    },
+    {
+     "name": "tm_cta_warps",
+     "physics": "log2(warps per CTA). Each mainloop iteration ends in a CTA-wide barrier, and the expected wait for the slowest warp grows like log(number of warps). With the tile fixed, more warps also means smaller warp tiles. Fitted weight is positive and stable in every fold of rule B (1.4-2.1 per log2, i.e. about 10-15% time per doubling).",
+     "spearman_mean": -0.132,
+     "pick_lo_mean": 1.4047,
+     "best_classes": "Rule correction. With tm_log_est + tm_regstaged, surrogate inner-CV goes from 1.083 to 1.048 (hungry 1.122 -> 1.049). Alone: big 1.382, hungry 1.253."
+    },
+    {
+     "name": "tm_warps_inv",
+     "physics": "1 / warps resident on the busiest SM (latency hiding), counting only CTAs that actually co-reside.",
+     "spearman_mean": 0.152,
+     "pick_lo_mean": 1.7276,
+     "best_classes": "Redundant with tm_cta_warps (drop-one ablation: 1.0476 either way). The fitted sign is unstable across folds."
+    },
+    {
+     "name": "tm_regstaged",
+     "physics": "Flag for the 2-stage register-staged mainloop, which has only one iteration of compute to cover each global load; multistage cp.async kernels keep stages-1 loads in flight. On large compute-bound shapes the 2-stage 128x128 kernel is about 4.5% slower than the 3-stage one. The time model otherwise favours it for its shorter prologue.",
+     "spearman_mean": 0.066,
+     "pick_lo_mean": 1.4704,
+     "best_classes": "Essential in the rule: dropping it moves surrogate inner-CV from 1.049 to 1.121 (mid 1.068 -> 1.22, hungry 1.046 -> 1.111)."
+    },
+    {
+     "name": "tm_log_inst",
+     "physics": "log2 of the static SASS instruction count. It is mainly the only current-contract field that separates the horizontal-raster variant (fewer instructions in 92% of configs) from the identity-raster variants of an otherwise identical kernel. The rule uses it only as a tie-breaker (1e-4*w or 1e-3*w), choosing the raster along the shorter grid side.",
+     "spearman_mean": 0.078,
+     "pick_lo_mean": 1.7339,
+     "best_classes": "As a tie-breaker it is worth about 0.03-0.04. Train regret of rule A's fitted weights is 1.080 without the steer vs 1.043 with it (big 1.124 -> 1.034, hungry 1.089 -> 1.044). Surrogate inner-CV is 1.076 without it vs 1.049 with it. CMA picked the identity raster for M<=N in 8/8 fold fits."
+    }
+   ],
+   "dev_rule_runs": [
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_timemodel/rules/tm_A.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_timemodel/rules/tm_A.dev.json",
+     "inner_cv_gm": 1.054355,
+     "inner_by_class": "big 1.0846 (vendor 1.0324), hungry 1.0477 (vendor 1.0695), mid 1.0656 (vendor 1.1018), small 1.0372 (vendor 1.1295). Folds 1.0580/1.0442/1.0621/1.0533 vs vendor-on-train 1.0776/1.0790/1.0817/1.0876: beats the vendor in 4/4 folds. Pooled vendor 1.0815; baseline c2 evolved s0 1.1177. 8 weights, 2 paths."
+    },
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_timemodel/rules/tm_B.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_timemodel/rules/tm_B.dev.json",
+     "inner_cv_gm": 1.053735,
+     "inner_by_class": "big 1.0849, hungry 1.0478, mid 1.0640, small 1.0351. Folds 1.0560/1.0483/1.0600/1.0508, beats the vendor in 4/4 folds. Same terms as A, but the time term has a fixed scale (10*log2 t) so there is no redundant scale weight; 7 weights. Same result as A, so the leftover big-class gap is not fitter conditioning."
+    }
+   ],
+   "summary": "What the features capture: a per-config analytic kernel-time model. The headline tm_log_est is log2(est time / 2MNK/peak). It is a p=2 norm of three things: the busiest SM's compute path (SM-granular waves, padded tiles and K-slices, fill/drain hidden by co-resident CTAs, serial split-K chain), the L2->SM operand feed and the DRAM feed. The parallel reduce pass is added. It uses only hw.* and cfg fields.\n\nStrength, from featdiag on train shapes only: Spearman 0.809 (0.80-0.82 in every fold) vs 0.42 for the best library axis, and pick-the-minimum regret 1.152 vs 1.509. It is the best single axis on big (1.067), hungry (1.144) and mid (1.187).\n\nWhat a linear rule cannot do by itself: combining the components linearly scores 1.14 in my surrogate, against 1.05 combined through the norm. So the nonlinear time model must live in a feature or in the rule.\n\nHow to combine them. Put the components into the norm inside the rule and give the L2 term one weight:\nt = sqrt(crit^2 + (w*l2)^2 + dram^2) + reduce\nscore = log2(t) + a*tm_regstaged + b*tm_cta_warps (+ tm_res_inv, optional)\nThen add a tiny tie-break term 1e-4*w'*tm_log_inst, with a separate w' for M>N and M<=N. CMA put w at 0.45-0.62 in all 8 fold fits, which makes L2 about 2x DRAM bandwidth. The tie-break chose identity raster for M<=N in 8/8 fits, matching the physics prior (raster along the shorter grid side).\n\nDev results (probe --dev, holdout hidden), inner-CV vs vendor 1.0815 and baseline 1.1177:\n- tm_A: 1.0544; by class big 1.085, hungry 1.048, mid 1.066, small 1.037.\n- tm_B (fixed time scale, one less weight): 1.0537.\nBoth beat the vendor in 4/4 folds, and in hungry, mid and small. They lose only on big (vendor 1.032). Big is 1.034 on the full-train fits but 1.085 in inner-CV.\n\nDrop-one ablation, my own 4-fold softmin surrogate screen (train shapes only; 1.049 vs the probe's 1.054, so about 0.005 optimistic):\n- time model is essential: 1.336 without it;\n- tm_regstaged is essential: 1.121 without it;\n- the raster tie-break is worth 0.027: 1.076 without it;\n- tm_res_inv and tm_warps_inv are redundant;\n- minimal set tm_log_est + tm_regstaged + tm_cta_warps: 1.048.\n\nPhysical facts established on the way:\n- The split-K optimum is set by SM-granular quantization against per-CTA fill/drain of about 4-5 iterations plus a serial chain of about 2-4 iterations per extra slice.\n- Split-K partials are f16 here (partials_dtype), not the acc type.\n- Tile ranking on large shapes tracks L2 feed demand: 64x128 costs 1.29-1.33, 64x256 1.16, 128x128 1.01.\n- 1-CTA and 2-stage variants lose 4-8%.\n\nWays to improve the loop and its agents:\n(1) The single biggest lever is infrastructure, not features. Feature-identical raster variants tie and the tie-break picks horizontal-1. Even an oracle restricted to hz1 scores 1.032 (hungry 1.058) vs 1.007 for id1. Expose raster/swizzle as a common field, or make the tie-break prefer identity; the inst_total trick is an artifact.\n(2) Add hw.l2_bandwidth (microbenchmark). Then kappa becomes physics, not a fitted weight.\n(3) Give the FeatureWriter a time-model scaffold (busiest-SM path, L2 feed, DRAM feed, p-norm), and allow longer features or features that reference other features. MAX_LINES=12 forced packed code.\n(4) Seed the RuleWriter with the norm structure and physical w0 (log-time weight 1, L2 weight 0.5).\n(5) The section 8.4 duplicate check samples shapes where tm_res_inv equals resident_block_scarcity. It should include small-grid shapes.\n(6) Fix FIELD_MEANING: acc_bytes_per_element is not the partial size in this bundle.\n(7) Add a cheap softmin surrogate screen, calibrated within about 0.005 of the probe, and weight-stability reporting (w_log-time ranged 1.8-33 across folds) to the loop's diagnostics.",
+   "caveats": "1. Tie-break proxy. tm_log_inst (inst_total) is used as a raster tie-breaker. It is legal under the current contract but is a codegen-artifact proxy for cfg.ext swizzle type. It holds on the a6000 bundle (hz has fewer instructions in 92% of configs and never more) and may not transfer.\n2. Design exposure. Designs were explored on fold-0 train shapes, which include 3/4 of the other folds' holdouts. featdiag and my 4-fold surrogate screen used every fold's train shapes, so the design has seen all 65 shapes' times in train roles. No holdout results or holdout regrets were read, and only 2 probe --dev runs were used.\n3. Choices informed by the data (no fitted constants inside features):\n   - p=2 norm form;\n   - SM-granular waves;\n   - L2 priced at DRAM bandwidth in the headline feature (a bound; the rule fits kappa);\n   - rule literals 1e-4/1e-3 (tie-break size) and 10.0 (time scale);\n   - w0 priors for the tie-break sign (+1 for M>N, -1 for M<=N) and kappa (0.5);\n   - tm_cta_warps uses the warp width 32 (lanes per warp, not a GPU value).\n4. Big class remains worse than the vendor in inner-CV (1.085 vs 1.032). On 8192-row grids, 128x128 kernels at swizzle 1 are 1.3x slower than 256x128 even though my raster/L2 models predict identical DRAM traffic. Visible physics does not explain it; a big-grid branch did not help in the surrogate (overfits with few big shapes).\n5. Duplicates. Under the loop's section 8.4 check, tm_res_inv (vs resident_block_scarcity) and tm_reduce_ratio (vs parallel_reduction_compute_fraction) would be refused. All 10 load with load_generated; the other 8 pass full section 8.3 validation.\n6. Surrogate optimism. The surrogate numbers use a softmin L-BFGS fitter and are about 0.005 more optimistic than the probe's CMA. Only the two dev runs are official.\n7. Weight stability. Fold weights vary widely (e.g. w on log-time 1.8-33 in tm_A), so the regret landscape is flat. Only kappa, the tie-break sign, tm_cta_warps and tm_regstaged were stable."
+  },
+  {
+   "angle": "memory",
+   "feature_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_memory/feat_memory.jsonl",
+   "contract": "current",
+   "features": [
+    {
+     "name": "log_roofline_time_mraster",
+     "physics": "log2(max(t_compute, t_DRAM) / shape roofline time). t_compute: waves = ceil(CTAs/(SMs x resident CTAs)); each wave costs resident CTAs x per-CTA flops at peak/SM, which covers wave quantisation, occupancy sharing and tile/K-slice padding. t_DRAM = bytes / hw.bandwidth_gbps. Bytes = compulsory A+B+C, plus A-panel refetches under the default M-first CTA order (reused only by the ~W/gm columns co-resident in a wave, and across waves only if A's K-slice fits hw.l2_bytes), plus split-K partials. Serial partials cost 2(sk-1) tile round trips, free in L2 when a tile's slices are co-resident or the reuse window fits L2. Parallel partials are written and read back unless they fit L2. max() models perfect overlap; the no-overlap sum variant was tested and was worse in combination.",
+     "spearman_mean": 0.2364,
+     "pick_lo_mean": 2.2146,
+     "best_classes": "Surrogate, small-M branch, library base 1.0826 -> 1.0777: mid 1.127 -> 1.086, big 1.186 -> 1.195 (slightly worse). In a flat library rule: 1.101 -> 1.084 (mid 1.127 -> 1.083, small 1.111 -> 1.072). Official M1 vs M0 ablation (this feature plus a_refetch): mid 1.118 -> 1.111, big 1.183 -> 1.168, hungry 1.055 -> 1.056, small 1.016 -> 1.019. CMA kept its weight positive and grew it 2-4x in all 4 folds. Largest single fix: 512x512x512, 1.82 -> 1.08 (steers away from a 16-CTA 128x128 grid). Models the identity raster; the horizontal-raster version was worse (1.0809 vs 1.0777), because the fitted rule receives the identity build."
+    },
+    {
+     "name": "a_refetch_bw_demand",
+     "physics": "DRAM bandwidth demand of A-panel refetches as a fraction of the ridge balance, under the M-first raster: ridge x b/(2 tile_n) x min(1, gm/W) x (1 - 1/gn) x max(0, 1 - L2/(A K-slice bytes)). A value near 1 means the refetches alone saturate DRAM at peak compute. Split-K shrinks the K-slice until it fits L2.",
+     "spearman_mean": -0.1341,
+     "pick_lo_mean": 1.9996,
+     "best_classes": "Hungry: surrogate 1.060 -> 1.052 alone, and 1.0635 -> 1.050 on top of the roofline term (total 1.0777 -> 1.0714). Its fitted weight is NEGATIVE in all 4 official folds (-2.9 to -43.7), so it works as a correction that softens the refetch penalty inside log_roofline_time_mraster, not as a standalone higher-is-worse cost. Against the identity-raster slowdown it has Spearman +0.51 over 10.9k (shape, config) pairs."
+    },
+    {
+     "name": "b_refetch_bw_demand",
+     "physics": "Mirror of a_refetch for the column-first raster, i.e. the horizontal width-1 build the tie-break returns unless a rule prefers more instructions. B panels are refetched per row block unless co-resident in a wave or B's K-slice fits L2: ridge x b/(2 tile_m) x min(1, gn/W) x (1 - 1/gm) x miss.",
+     "spearman_mean": -0.148,
+     "pick_lo_mean": 2.2004,
+     "best_classes": "Diagnostic value: Spearman +0.78 (Pearson +0.75) with the slowdown of the horizontal-1 variant against the best swizzle of the same config, over 10.9k (shape, config) pairs on training shapes. That slowdown is the a6000 large-grid swizzle trap, and it is also why 64-row tiles run 2-2.7x slower on wide grids. Rule value is small: surrogate 1.0826 -> 1.081 (hungry 1.053), and nothing on top of roofline + a_refetch (1.0720 vs 1.0714)."
+    },
+    {
+     "name": "log_dram_intensity_deficit",
+     "physics": "Memory-roofline position of the whole launch: log2(ridge x DRAM bytes / executed flops), with the same byte model as the roofline feature (compulsory, A refetch, split-K partials) and padded flops. >0 means memory-bound on this GPU even with perfect overlap. Intended as the memory-bound-regime indicator.",
+     "spearman_mean": 0.1941,
+     "pick_lo_mean": 11.8078,
+     "best_classes": "No gain; slightly harmful as a linear term. Surrogate 1.0826 -> 1.0865 alone and 1.0777 -> 1.0784 on top of the roofline term. The roofline-time feature already carries this information in time units."
+    },
+    {
+     "name": "splitk_partial_bytes_ratio",
+     "physics": "Split-K partial-sum DRAM bytes over compulsory bytes. Serial: 2(sk-1) partial-tile round trips, absorbed by L2 when one slice's grid fits a wave (reuse = W x tile bytes) or the reuse window fits hw.l2_bytes. Parallel: sk partials written, then read back unless they fit L2.",
+     "spearman_mean": 0.4166,
+     "pick_lo_mean": 1.7276,
+     "best_classes": "Hungry only, and only inside a branched rule: surrogate 1.060 -> 1.050, total 1.0826 -> 1.0761. In a FLAT rule it is harmful: 1.101 -> 1.125, hungry 1.060 -> 1.087, because it rises monotonically with split_k and the fit uses it to suppress split-K, the C1 failure mode. On top of the roofline term it trades mid for hungry: mid 1.085 -> 1.106, total 1.0714 -> 1.075. pick_lo 1.7276 is only the tie-break value shared by every axis that is constant at sk=1."
+    }
+   ],
+   "dev_rule_runs": [
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_memory/rules/M1_mem_smallbranch.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_memory/dev_M1.json",
+     "inner_cv_gm": 1.074393,
+     "inner_by_class": "big 1.1677, hungry 1.0558, mid 1.1106, small 1.0186. Vendor on the same shapes: 1.0324 / 1.0695 / 1.1018 / 1.1295 (pooled 1.0815). Baseline c2 evolved s0: 1.124 / 1.119 / 1.206 / 1.022 (pooled 1.1177). Inner-CV per fold: 1.0716 / 1.0810 / 1.0653 / 1.0797 vs vendor 1.0776 / 1.0790 / 1.0817 / 1.0876, so 3 of 4 folds are below the vendor. Split_k>=3 picked on 73 of 93 hungry train cases (baseline 32/93). Structure: if p.M <= 32 / else, each branch with 20 library axes + log_roofline_time_mraster + a_refetch_bw_demand (44 weights)."
+    },
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_memory/rules/M0_lib_smallbranch_ablation.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_memory/dev_M0_ablation.json",
+     "inner_cv_gm": 1.076832,
+     "inner_by_class": "ABLATION: the same recipe and structure with the library axes only (40 weights). big 1.1831, hungry 1.0549, mid 1.1182, small 1.0159. Per fold: 1.0727 / 1.0656 / 1.0940 / 1.0752. Split_k>=3 on 68/93. Against M1 the memory features give -0.0024 pooled; per fold f0 -0.001, f1 +0.015 (worse), f2 -0.029, f3 +0.005 (worse). That is inside the documented ~0.01 weight-permutation noise, so it is not a confirmed gain."
+    }
+   ],
+   "summary": "WHAT THE FEATURES CAPTURE. All five are per-config DRAM/L2 time quantities, and every constant comes from hw.* or the config:\n- log_roofline_time_mraster (main feature): wave-quantised compute time vs DRAM time, max(), over the shape's roofline time. The DRAM side counts compulsory bytes, operand refetches the 6 MB L2 cannot absorb, and split-K partials.\n- a_refetch_bw_demand and b_refetch_bw_demand: the refetch streams alone, as a fraction of DRAM bandwidth at peak compute, one per CTA raster order.\n- log_dram_intensity_deficit: memory-roofline position of the whole launch.\n- splitk_partial_bytes_ratio: split-K partial-sum traffic, L2-aware.\n\nA physics finding along the way: b_refetch_bw_demand predicts the a6000 swizzle trap well. It has Spearman +0.78 with the slowdown of the horizontal width-1 variant, the one a swizzle-blind rule receives.\n\nHOW STRONG. Single-feature diagnostics are weak (roofline-time Spearman +0.24), and single-feature pick_lo is dominated by tie-break artifacts.\n\nFor rule-level value I built a fast surrogate: a listwise softmax fit with standardized terms and reachable targets (explained in the first recipe point below), on the probe's inner-CV partition, seconds per run. It is faithful: official featdiag reproduced my harness exactly, and the official CMA dev score (1.0744) landed near the surrogate's 1.0714. In the surrogate, the roofline-time feature is the only strong addition: mid 1.127 -> 1.086. A-refetch helps hungry slightly, B-refetch and the DRAM deficit add nothing on top, and split-K bytes helps hungry only inside a branched rule.\n\nOFFICIAL DEV RESULTS (both evaluations used):\n- M1, rule with memory features: inner-CV 1.0744, vendor 1.0815, c2 baseline 1.1177. 3 of 4 folds are under the vendor, and split_k>=3 is picked on 73/93 hungry train cases.\n- M0, ablation (same recipe, library axes only): 1.0768.\n\nSo the features' own contribution is only 0.0024, is fold-inconsistent, and sits inside the noise. Almost all of the 1.1177 -> ~1.075 gain comes from the FITTING RECIPE, not from new vocabulary:\n(1) Each term divided by its train sd (config-only statistics, no times), so CMA's 0.6x|w| relative steps make sense.\n(2) w0 from a smooth listwise fit whose targets use the time of the tie-break winner of each feature-identical group (\"reachable targets\"), not the group's fastest member.\n(3) One p.M <= 32 branch. Physically, a single row block for every tile, so the kernel just streams B.\nThe big class is still unsolved: 1.17-1.18 vs vendor 1.03.\n\nHOW TO COMBINE IN A RULE:\n- Use log_roofline_time_mraster as one positive-weight term. It replaces the monotone split-K and occupancy axes' job, gives an interior split-K optimum, and avoids tiny grids.\n- Optionally pair it with a_refetch_bw_demand, which fits NEGATIVE as a correction.\n- Do not use splitk_partial_bytes_ratio or log_dram_intensity_deficit as flat linear terms: they are monotone in split_k and push the fit toward no split-K.\n- The raster assumption must match the build the rule receives. The fitted rules give instruction_density a negative weight, which selects the identity build (M-first), so use the _mraster/a_ feature. If a rule prefers fewer instructions, it gets the horizontal build and b_refetch is the matching one.\n\nLOOP / AGENT IMPROVEMENTS suggested by this process:\n(a) Put the recipe into the loop: standardize every term, warm-start CMA from a listwise surrogate fit with reachable targets (fit_weights already has an init_objective hook), and warm-start children from the parent's fitted w. The recipe alone takes the library-only rule from 1.1177 to 1.0768.\n(b) Screen FeatureWriter proposals by marginal inner-CV gain in a fixed base rule via the surrogate (seconds each), instead of single-feature pick_lo. Pick_lo equals 1.7276 for any axis that is constant at sk=1.\n(c) Analyst and diagnostic prompts should cite the \"reachable best\" (the tie-break winner), not the table best. Swizzle-2/4/8 winners are unreachable and mislead hypotheses.\n(d) Make CTA raster/swizzle a common field, as was done for stages in D-161, or fix the tie-break. Today instruction_density silently chooses the raster, and the big class (about 0.02 of the pooled gap) cannot be fixed by memory physics without it.\n(e) Require a same-recipe ablation for every feature claim. Without M0, the 0.043 gain would have been credited to the features.\n(f) In dev mode, derive w0 per inner part so inner-CV is leak-free.",
+   "caveats": "- The holdout was never read, and a6000_probe ran only with --dev (2 runs). But the union of the four folds' train shapes is all 65 shapes. Feature forms (the raster choice, the refetch sharing term, the M<=32 branch) and the surrogate hyperparameters (sigma 0.015, l2 1e-3) were chosen by looking at train-shape times and surrogate inner-CV on those same shapes, so the reported inner-CV is somewhat optimistic.\n- w0 for each fold came from a surrogate fit on that fold's full train set, so each inner-CV part starts from weights that saw its held-out quarter. This is the same leakage the c2 baseline's loop w0 has, and the probe applies it to M1 and M0 alike, so the comparison is fair but both absolute numbers are optimistic.\n- The memory features' official gain over the ablation (0.0024) is within the ~0.01 weight-permutation noise documented in the ledger, and it is worse in folds 1 and 3. Treat it as unconfirmed. The robust result is the fitting recipe.\n- a_refetch_bw_demand is declared higher_is_worse, but its fitted weight is negative in every fold, so its physical story as a standalone cost does not hold.\n- The refetch model does not explain why 128x128 (2 CTA) is much slower than 256x128 (1 CTA) on 8192-row grids under the same raster: their per-wave DRAM traffic is identical in every model I tried (sync wave, phase offset, per-CTA intensity). The big-class gap needs raster/swizzle visibility (the extended contract), not more memory volume modelling.\n- Both raster-specific features encode which CTA order the kernel uses. That depends on tie-break and inst_total artifacts rather than an exposed field, so it can change if kernel ids or the tie-break change.\n- Several model variants were rejected in the surrogate: bandwidth scaled by the number of active SMs (worse, 1.105), the horizontal-raster roofline (worse), and a shape-gated instruction_density sign used to choose the raster (did not fix big; hurt mid). Split-K partial bytes hurt a flat rule.\n- Surrogate and probe numbers are train-shape inner-CV only. Nothing here was measured on the holdout or on other GPUs.\n- Reproduction scripts are under /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_memory/work/: harness.py (feature diagnostics), surr.py (surrogate inner-CV) and build_rule.py (rule plus w0 generation). Official featdiag output is feat_memory/featdiag_memory.json."
+  },
+  {
+   "angle": "splitk",
+   "feature_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_splitk/splitk_features.jsonl",
+   "contract": "current",
+   "features": [
+    {
+     "name": "splitk_roofline_log_time",
+     "physics": "log2 of a closed-form time model divided by the ideal time 2MNK/peak. On the busiest SM, n=ceil(tiles*sk/sm_count) CTAs each run ceil(K/(tile_k*sk)) k-steps. Each round of co-resident CTAs (ceil(n/max_blocks_per_sm) rounds) exposes a fixed cost once: the pipeline prologue (stages-1 k-steps) plus the epilogue (writing the output tile, and reading it back first for serial slices; converted to k-steps by output-tile bytes / per-k-step operand bytes). The kernel time is max(this SM time, DRAM time). DRAM time counts the compulsory bytes plus 2(sk-1)*M*N serial fix-up round trips, charged at hw.bandwidth_gbps with no L2 credit. Parallel mode adds a separate (2sk+1)-plane reduction pass. More splits fill idle SMs and even out the last wave, while per-round overhead and fix-up traffic grow, so the minimum over split_k is interior and moves with the shape.",
+     "spearman_mean": 0.5293,
+     "pick_lo_mean": 2.7374,
+     "best_classes": "Split-K argmin inside the shape's best tile family lands within 2% of the optimum on 92.3% of train shapes (fold mean), vs 43.1% for the best library split axis and 52.3% for always-sk3: big 100%, hungry 90.3% (best library axis 0%), mid 100%, small 83.3%; family regret gm 1.005. It has the highest within-shape Spearman of any axis (library best is edge_waste at +0.419). As a standalone picker it is poor (pick_lo small 1.36, mid 1.75, big 6.9) because it ignores tile efficiency."
+    },
+    {
+     "name": "splitk_excess_log",
+     "physics": "The same model at this split_k/mode, divided by the model's own minimum over serial split counts 1..32 for the same tile, computed inside the feature. It is 0 at the physics-predicted split count and positive on both sides, and the tile's own efficiency cancels. It is the split-K selector meant to carry a large rule weight.",
+     "spearman_mean": 0.4976,
+     "pick_lo_mean": 1.8943,
+     "best_classes": "Same split-K hit rate as the full model: 92.3% (hungry 90.3%, small 83.3%, big/mid 100%). Its pick_lo is the best of the new axes (big 1.54, hungry 1.47, mid 1.52; small 5.78 because it is blind to tiles). Its fitted weight was positive in 4/4 folds in both dev rules (1.4 to 105). With the c2-s0 loop weights kept, re-choosing split_k inside the base rule's picked kernel moves train gm from 1.0884 to 1.0589 (hungry 1.118 to 1.060; vendor 1.0815 / 1.0695). If the visible kernel is chosen perfectly, choosing sk by this axis gives 1.0098 (hungry 1.014), vs 1.064 (hungry 1.125) with the best library split axis."
+    },
+    {
+     "name": "splitk_gain_log",
+     "physics": "The time model at this split_k/mode divided by the model for the same tile at split_k=1. It is 0 at sk=1, negative where splitting pays and positive when over-splitting. It carries the split trade-off alone, but it rewards tiles whose unsplit grid is poorly balanced.",
+     "spearman_mean": 0.3212,
+     "pick_lo_mean": 9.4164,
+     "best_classes": "Same argmin as the full model inside a family (92.3%; hungry 90.3%). Across tiles it is harmful: adding it to c2-s0 at weights 10/30/100 raised train gm from 1.0884 to 1.102/1.175/1.288. Use splitk_excess_log instead; this one is kept only as a diagnostic."
+    },
+    {
+     "name": "splitk_sm_critical_path_log",
+     "physics": "The compute side only: the busiest SM's k-steps plus per-round prologue/epilogue exposure (parallel mode also pays its reduction pass, converted to per-SM MMA-work units), over the ideal per-SM share. It has no DRAM roof. Unlike log_quantized_work_ratio, it does not charge a partial round as full.",
+     "spearman_mean": 0.5295,
+     "pick_lo_mean": 2.7733,
+     "best_classes": "Split-K hit 81.5%: big 100%, hungry 87.1%, mid 92.3%, but small only 41.7%, because memory-bound shapes need the DRAM roof. log_quantized_work_ratio gets 9.2% serial-only. This is a component; use it only where the full model is not wanted."
+    },
+    {
+     "name": "splitk_fixup_roof_excess",
+     "physics": "The log2 factor by which split-K partial-sum traffic lengthens max(SM time, DRAM time). Serial mode re-reads and re-writes M*N once per extra split; parallel mode writes sk partial planes and runs a reduction pass. It is 0 while the traffic hides under the compute roof and rises steeply for large sk on large outputs.",
+     "spearman_mean": 0.2693,
+     "pick_lo_mean": 1.7276,
+     "best_classes": "A component, zero for most configs. It only separates over-splitting on large outputs (explains sk=16 costing 1.4-1.6 on big grids). Split-K hit alone is 24.6% (small 83%, mid 46%, big/hungry 0%). Not useful by itself."
+    },
+    {
+     "name": "splitk_sm_latency_rounds_log",
+     "physics": "Little's law on the busiest SM: n=ceil(tiles*sk/SMs) CTAs stream n*ceil(K/(tk*sk)) k-steps, while only min(n, max_blocks_per_sm)*(stages-1) k-step loads can be in flight at once, so the SM serialises at least steps/inflight memory latencies. It is the latency-bound twin of the compute critical path. Deeper pipelines, more co-resident CTAs and moderate splitting (which spreads the stream over idle SMs) all reduce it.",
+     "spearman_mean": 0.1883,
+     "pick_lo_mean": 8.1908,
+     "best_classes": "Not a split selector: it decreases monotonically with split_k (hit 0-11%). Its value is tile choice on latency-bound shapes: small-class pick_lo is 1.127, level with the best library axes (log_quantized_work_ratio 1.10, register_file_pressure 1.12). Adding it to R1 in both roofline branches (R2) cut inner-CV from 1.0801 to 1.0595: big 1.062 to 1.045, mid 1.179 to 1.112, small 1.075 to 1.045. Its fitted weights were positive in 4/4 folds in both branches."
+    }
+   ],
+   "dev_rule_runs": [
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_splitk/rules/R1.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_splitk/dev_R1.json",
+     "inner_cv_gm": 1.080138,
+     "inner_by_class": "big 1.0619 (vendor 1.0324), hungry 1.0486 (1.0695), mid 1.1786 (1.1018), small 1.0747 (1.1295). By fold: f0 1.0883 (vendor 1.0776), f1 1.0582 (1.0790), f2 1.0799 (1.0817), f3 1.0947 (1.0876). sk>=3 on 67/93 hard train picks. One code for all folds, 17 weights: splitk_excess_log + splitk_roofline_log_time + spill/edge terms, then a roofline_ratio<1 branch with library tile terms (operand traffic, tile roofline, fill/drain, residency, instruction density, occupancy, register/smem pressure). Baseline c2 s0 dev is 1.1177."
+    },
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_splitk/rules/R2.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_splitk/dev_R2.json",
+     "inner_cv_gm": 1.059464,
+     "inner_by_class": "big 1.0448 (vendor 1.0324), hungry 1.0482 (1.0695), mid 1.1116 (1.1018), small 1.0448 (1.1295). By fold: f0 1.0800 (vendor 1.0776, a tie/loss), f1 1.0460 (1.0790), f2 1.0513 (1.0817), f3 1.0613 (1.0876). sk>=3 on 71/93 hard train picks. This is R1 plus splitk_sm_latency_rounds_log in both roofline branches, 19 weights, one code for all folds. Pooled it is 0.022 below the vendor's 1.0815 and 0.058 below c2-s0's 1.1177, and about level with the ledger's best hand edit H28 (inner 1.0550), which uses fold-specific code."
+    }
+   ],
+   "summary": "What the features capture: split-K on the a6000 is a trade-off between filling idle SMs / evening out the last wave (more splits help) and fixed costs that grow with splits: per-round pipeline prologue and epilogue, serial fix-up round trips of the output to DRAM, and the parallel reduction pass. Every library split axis is monotone in split_k. On train shapes they either always pick sk=1 (43% hit, 0% on hungry shapes) or push toward sk=16 (under 13%). splitk_roofline_log_time puts both sides into one closed-form time, so its minimum over split_k is interior by construction. Its argmin inside each shape's best tile family is within 2% of the optimum on 92% of train shapes (hungry 90%), and it has the best within-shape Spearman of any axis (+0.53 vs +0.42). The measured curves are reproduced closely: on 1024x4096x4096 the measured sk1..16 costs are 1.17/1.05/1.01/1.00/1.01/1.05/1.37 and the model gives 1.13/1.02/1.00/1.00/1.06/1.07/1.26. splitk_excess_log is the same model divided by its own best split count, so it fixes split_k without biasing tile choice. splitk_sm_latency_rounds_log (Little's law on the busiest SM) is the memory-latency twin; it helps pick deep-pipeline / high-residency tiles on narrow and GEMV-like shapes.\n\nHow strong: if the visible kernel is chosen well, choosing sk by the model gives gm 1.0098 vs 1.064 with the best library split axis. Two official dev runs (holdout hidden): R1 (17 weights, one code for all folds) scored inner-CV 1.0801. R2 (R1 + latency rounds) scored 1.0595, against vendor 1.0815 on the same shapes and baseline c2-s0 1.1177. R2 beats the vendor in 3 of 4 folds and in the hungry and small classes; big (1.045 vs 1.032) and mid (1.112 vs 1.102) are close but not won. The physics signs survived CMA: the excess, time and latency weights were positive in 4/4 folds.\n\nHow to combine in a rule: use splitk_excess_log with a large positive weight (it is 0 at the predicted sk, so it does not bias tile choice), plus splitk_roofline_log_time with a moderate weight as the cross-tile time estimate. Add splitk_sm_latency_rounds_log in both roofline branches. Keep library tile terms that do not change with split_k (operand_tile_traffic_ratio, resident_block_scarcity, register/smem pressure, has_spill, instruction_density). Drop the monotone library split axes (wave_count_deficit, tail_waste, serial_reduction_dependency). Do not add splitk_gain_log at large weight: it drags tile choice toward badly balanced tiles.\n\nLoop and agent improvements suggested by this run:\n(1) FeatureWriter should be asked for time-model features: several effects combined inside the feature in time units (max/sum) whose optimum is interior, not separate monotone ratios. A linear rule could not rebuild the interior optimum from monotone parts: adding one of these to c2-s0 at fixed weights did nothing.\n(2) Add a split-K hit-rate diagnostic to featdiag: the argmin over split_k inside the best kernel family. pick_lo unfairly punishes axes that only choose split_k (excess: 92% hit, pick_lo 1.89).\n(3) Add a visible-kernel ceiling diagnostic: the best regret reachable given tie-breaks over hidden fields is 1.0056. That tells the loop whether the loss is in split, tile or hidden fields; here it moved to tile/raster choice.\n(4) Expose CTA raster order as a common field, or randomise the tie-break. Horizontal and identity width-1 kernels differ only in inst_total (1896 vs 1912), so instruction_density quietly acts as a raster selector (its compute-branch weight is negative in every fold). The physics I found: the raster should run along the shorter grid axis. When a wave's per-k-step operand footprint leaves only about 12-20 k-steps of L2 window, the operand shared by CTAs far apart in launch order is fetched again for each CTA, and the kernel hits the memory roof. The 128x128 2-CTA tile does so under either raster on 8192x11008/12288, while 256x128 / 128x256 1-CTA tiles avoid it. This belongs to the swizzle designer.\n(5) RuleWriter should prefer compact one-code rules built on physics features and use sign stability across folds as an acceptance check. R2 (19 weights) beat per-fold evolved rules of 28-41 weights in the same protocol.\n(6) Give features shared helpers (a critical-path / DRAM-roof library), or relax the 12-line / no-range limit. The excess feature has to repeat the model inside one long list comprehension.",
+   "caveats": "- The holdout was never read, and the probe was only run with --dev. However, all design analysis used train-shape times, and the union of the four folds' train sets is all 65 shapes, as featdiag also states. So the feature shapes were designed having seen every shape; only the weights are fold-clean.\n- I chose among discrete, physically motivated model structures by their pooled train split-K hit rate. The comparisons were: fix-up charged at DRAM (0.923) vs L2 credit when the partial fits (0.846); prologue = stages-1 (0.923) vs 1 / 0 / stages+1 (0.908 / 0.892 / 0.877); overhead per co-resident round vs per CTA; the per-SM fair-share bandwidth cap removed (it hurt, 0.72 vs 0.85). No numeric constant was fitted. The DRAM-only fix-up is an upper bound physically; the data preferred it.\n- Assumptions: partials are held in the output element type (the table's partials_dtype is f16). Compulsory operand bytes are used for the DRAM roof, with no raster/L2 reuse model. splitk_excess_log minimises over a literal list of split counts 1..32 (a search range, not hardware).\n- Besides the 2 official dev runs, I ran untrained fixed-weight screens and two in-sample (train-only) CMA fits on fold 0 (R1 1.0811, R2 1.0354 train gm) as expressiveness checks before spending the dev runs. These are not inner-CV.\n- Fit-path noise was not measured (no --perm run); the ledger puts it at about ±0.01. R2's fold-0 inner-CV (1.0800) does not beat the vendor there (1.0776).\n- Part of R2's gain probably comes from instruction_density acting as a raster (swizzle-type) selector via inst_total, which is an artifact rather than physics. Transfer to other GPUs is untested.\n- Remaining losses are outside split-K: the identity-width-1 trap on 4096^3 (1.15), 512^3 tile choice (1.27), and alignment variants a448/a228, which tie the vendor.\n- I deleted the large scratch pickles to save space. Rebuild them with cache.py and the feature dump command (about 1 minute) before running skhit2.py. skhit_train_v2.json and featdiag_v2.json hold the reported numbers."
+  },
+  {
+   "angle": "swizzle",
+   "feature_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_swizzle/ext_swizzle.jsonl",
+   "contract": "extended",
+   "features": [
+    {
+     "name": "l2_locality_deficit",
+     "physics": "The launch order comes from the CUTLASS 2.x GemmUniversal swizzle, read off the mangled names. Identity<N> gives band width w = 8/4/2/1 by CUTLASS get_log_tile (gn>=6/3/2). w consecutive CTAs share an A slab, the users of a B slab are w launches apart, and the next band re-reads every A slab gm*w launches later. Horizontal is one band as wide as the grid. A re-read hits L2 with probability min(1, hw.l2_bytes / D), where D is the LRU stack distance: the distinct slab bytes launched in the gap, gm*a + w*b for A and a + w*b for B, with a and b = tile_m and tile_n times K-slice times bytes. Reuse inside the first wave is concurrent and always hits, weighted by f1 = resident CTAs / CTAs. The feature is log2 of this raster's DRAM operand bytes over the best raster the kernel can realise for the same tile and split (identity 1/2/4/8 or horizontal). It is 0 for that best variant and 0 on single-wave grids. It separates swizzle variants and adds no offset between tiles.",
+     "spearman_mean": 0.0045,
+     "pick_lo_mean": 1.9348,
+     "best_classes": "It is a tie-breaker, not a tile chooser. Within groups that differ only in swizzle, at the optimum's base (train, fold mean), picking by min feature vs the blind tie-break: big 1.317 -> 1.001, hungry 1.157 -> 1.013, mid 1.017 -> 1.017, small 1.006 -> 1.006. Within-group Spearman +0.62. Spread on single-wave grids is exactly 0. Over the top groups (within 10% of the optimum): big 1.211 -> 1.004, hungry 1.093 -> 1.007. As a whole-shape single selector it is useless (by class big 2.25, hungry 1.81, mid 1.88, small 2.16). Best reachable floor over all train shapes: 1.027-1.034 blind -> 1.004-1.006."
+    },
+    {
+     "name": "raster_memory_time_ratio",
+     "physics": "t_mem/t_compute = (raster-model operand bytes + C write + split-K partial round trips) * hw.ridge_point / 2MNK. Partials are 2(s-1)MN acc bytes for serial and 2sMN for parallel. It is the roofline ratio under the config's own launch order. Above 1 the config is DRAM-bound even when the shape's roofline says compute-bound: the 6 MB L2 trap.",
+     "spearman_mean": 0.4919,
+     "pick_lo_mean": 4.6076,
+     "best_classes": "Highest whole-shape Spearman of any axis measured (library best is edge_waste at 0.42). Near-best Spearman (t<=1.5x best): big 0.34, hungry 0.26, mid 0.40, small 0.30. Within swizzle groups it matches l2_locality_deficit (big 1.001, hungry 1.013). Min-picking alone is poor (big 12.3, hungry 6.95, mid 2.72, small 1.36): it prefers huge tiles."
+    },
+    {
+     "name": "raster_memory_excess",
+     "physics": "log2(max(1, raster_memory_time_ratio)): the term a thrashing raster adds to log time under a roofline (log t = log t_comp + max(0, log t_mem/t_comp)). It is 0 for configs the model calls compute-bound.",
+     "spearman_mean": 0.4778,
+     "pick_lo_mean": 1.5762,
+     "best_classes": "Best single-feature whole-shape pick of the set: big 1.503, hungry 1.612, mid 1.786, small 1.361, against library best pick_lo 1.509 (mainloop_iteration_count). But it ties at 0 for trapped configs the model calls compute-bound. At the optimum's base: big 1.030, hungry 1.045, against 1.001 and 1.013 for the deficit. So the absolute calibration of the model is weaker than its ranking."
+    },
+    {
+     "name": "l2_raster_traffic_ratio",
+     "physics": "log2 of the launch-gap-model DRAM operand bytes over the compulsory (M+N)*K bytes. It covers the L2 locality of tile, raster and K-slice together; split-K shortens the slabs and raises the hit rate.",
+     "spearman_mean": 0.0579,
+     "pick_lo_mean": 1.8926,
+     "best_classes": "Within swizzle groups it is identical to l2_locality_deficit (big 1.001, hungry 1.013). Near-best cross-tile Spearman is about 0 (big -0.01, hungry -0.04, mid 0.14, small 0.37), so it adds nothing across tiles. Whole-shape by class: big 3.11, hungry 1.87, mid 1.88, small 1.36."
+    },
+    {
+     "name": "l2_wave_traffic_ratio",
+     "physics": "Control model (lockstep waves, the task hint). Each wave of sm_count*max_blocks_per_sm CTAs loads its distinct A and B slabs once: act/w rows by w columns, or for horizontal act/gn rows of the full width. Nothing is reused across waves. log2 of traffic over compulsory; 0 on single-wave grids.",
+     "spearman_mean": 0.3249,
+     "pick_lo_mean": 7.152,
+     "best_classes": "At the optimum's base: big 1.000, hungry 1.022 (the gap model gets 1.013). Best cross-tile signal of my set, near-best Spearman big 0.35, hungry 0.31, mid 0.25, small 0.37, though operand_tile_traffic_ratio is 0.53 in big. It gets one anchor wrong: it ranks 256x128 horizontal-1 below 128x128 width-1 on 8192x11008x4096, while the analysis measures the opposite. That is why the gap model is primary."
+    }
+   ],
+   "dev_rule_runs": [
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_swizzle/rule_R7_swz.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_swizzle/dev_R7_swz.json",
+     "inner_cv_gm": 1.069081,
+     "inner_by_class": "EXTENDED CONTRACT. Compact flat rule: R7_compact16 (16 library and cand__feat_pershape axes, no gates) plus one term, f.l2_locality_deficit*w[16] (w0 1.0). Result by class: big 1.0116, hungry 1.0701, mid 1.1199, small 1.0571. Vendor on the same shapes: big 1.0324, hungry 1.0695, mid 1.1018, small 1.1295, pooled 1.0815. R7 without the term had inner-CV 1.1007 (earlier probe, same inner-CV procedure). Per fold 1.0926/1.0989/1.1104/1.1009 became 1.0567/1.0701/1.0919/1.0578, better in 4/4 folds. It beats the vendor's train number in 3/4 folds; fold 2 is 1.0919 against 1.0817. Fitted swizzle weight is positive in every fold: +11.5, +2.25, +6.04, +1.00. split_k>=3 was picked on 76/93 hungry train instances. R7's class breakdown was never measured, so the per-class baseline for this run is missing."
+    },
+    {
+     "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_swizzle/rule_s0_swz.json",
+     "result_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/feat_swizzle/dev_s0_swz.json",
+     "inner_cv_gm": 1.088927,
+     "inner_by_class": "EXTENDED CONTRACT. Ablation against the known dev baseline: c2 evolved s0, per fold, plus the one term f.l2_locality_deficit*w[n] (w0 1.0). Result: big 1.0247 (baseline 1.124), hungry 1.1107 (1.119), mid 1.1503 (1.206), small 1.0204 (1.022). Pooled 1.1177 -> 1.0889. Per fold 1.0997/1.0958/1.1172/1.1586 became 1.0953/1.0862/1.0895/1.0849, better in 4/4 folds. The big class ends below the vendor (1.0324). Fitted weight +2.58, +1.93, +1.11, +0.29. split_k>=3 picks on hungry train went from 32/93 to 35/93: this base's negative wave_count_deficit weights still block split-K."
+    }
+   ],
+   "summary": "What the features capture. CTA rasterization decides how often A and B operand slabs are re-read from DRAM once they fall out of the a6000's 6 MB L2. I modelled the CUTLASS 2.x launch order exactly. Identity<N> gives band width w (CUTLASS log_tile rule); horizontal is one band as wide as the grid. L2 reuse is scored by launch gap: a re-read hits with probability min(1, L2 / distinct slab bytes launched in the gap). Reuse inside the first wave is concurrent and always hits. Every constant comes from hw.sm_count, hw.l2_bytes and hw.ridge_point, from the config/shape itself, or from CUTLASS's own width thresholds. Nothing is fitted to the table.\n\nThis launch-gap model is the only one I tried that agrees with all three anchor points in the analysis: 128x128 width-1 slow, 128x128 width-8 fast, 256x128 horizontal-1 fast. The main feature, l2_locality_deficit, is log2 of this raster's DRAM operand bytes over the tile's best realisable raster. It is 0 for the best variant and on single-wave grids, and positive for width 1 and horizontal on many-wave grids.\n\nHow strong they are. As a swizzle tie-breaker the result is near-perfect. At the optimum's base the blind tie-break costs big 1.317 and hungry 1.157; the feature brings these to 1.001 and 1.013. Within-group Spearman is +0.62. As whole-shape selectors the features are weak, and they are not meant to be. raster_memory_time_ratio has the highest whole-shape Spearman of any axis (0.49).\n\nIn rules, one term was enough:\n- R7_compact16 + f.l2_locality_deficit: inner-CV 1.1007 -> 1.0691, better in all 4 folds and below the vendor's 1.0815. By class: big 1.012 (vendor 1.032), hungry 1.070 (1.069), small 1.057 (1.130), mid 1.120 (1.102).\n- c2 evolved s0 + the same term: 1.1177 -> 1.0889, and big 1.124 -> 1.025.\nThe fitted weight was positive in all 8 fits.\n\nThe swizzle trap also hides split-K. This is a train-only check, no rule fit. With the blind tie-break, the best reachable split_k>=3 config beats split_k<3 on only 13-14 of 20-26 hungry shapes per fold. With the feature choosing the swizzle it wins on 18-23, and the oracle gets 19-25. Part of cause C1 (rules avoid split-K) is therefore C3: the split-K variant a swizzle-blind rule can reach is width 1. This fits R7+swz picking split_k>=3 on 76/93 hungry train instances.\n\nHow to combine them in a rule. Add f.l2_locality_deficit as one flat positive term with no gate; it is already 0 wherever swizzle cannot matter. Keep tile and split-K choice on the existing axes: operand_tile_traffic_ratio, and the V pair log_quantized_work_ratio + split_overhead_fraction. Do not use raster_memory_excess as the swizzle term, because it ties at 0 on trapped configs. l2_wave_traffic_ratio or raster_memory_time_ratio are candidates for a later cross-tile term; I did not test them in a rule.\n\nSuggestions for the loop and agents:\n1. Promote a transferable raster descriptor to the common Config, as D-161 did for stages. For example raster_band (CTAs that share an A slab in a row = effective swizzle width; horizontal = grid width) and raster_major. CUTLASS 3 raster order and Triton GROUP_M map onto it. l2_locality_deficit then becomes current-contract.\n2. Before evolving, add a visibility audit: find groups of configs that no visible feature separates but whose times spread more than 5%, and fix the tie-break so it does not land on the worst variant. That would have exposed this trap in round 0.\n3. Score feature proposals by group-conditional metrics (same config except the target axis) and by a train-only reachable-floor check, not only whole-shape pick_lo. Whole-shape Spearman for the most useful feature here is 0.004.\n4. When a visible decision such as split-K looks unlearnable, check whether an invisible axis flips which variant is reachable before adding more split-K axes.\n5. A single-term ablation on two bases gave a clean attribution with 2 evaluations. The loop should budget paired ablations like this.",
+   "caveats": "EXTENDED CONTRACT only. The features read cfg.ext swizzle_n and swizzle_type (CUTLASS SM80 words), so they do not transfer as written, and their numbers must not be mixed with current-contract numbers. The current-contract loader rejects the file, as expected: 15 lines > 12, plus the ext reads. The ext-contract loader accepts all 5.\n\nHoldout was never run; these are dev inner-CV numbers only. The weight-permutation noise measured in H25 is about 0.01-0.04. The gains here are larger (pooled -0.03 on both bases, big -0.10 on s0), but R7's per-class inner-CV baseline was never measured, so the class attribution rests on the s0 ablation. On R7+swz, fold 2 (1.0919) is still above vendor-train (1.0817), and mid (1.120) is still worse than the vendor (1.102).\n\nDesign exposure. The four folds' train shapes together cover all 65 shapes, and the physics anchors (8192^3 and 8192x11008x4096 swizzle costs) came from the full-table analysis. The diagnostics themselves were per fold, train only.\n\nModel limits:\n- The launch-gap model is an LRU stack-distance approximation with a soft hit rate.\n- At large K it ranks width 2 < 4 < 8, where the data treat them as near-ties (about 1.007).\n- Its absolute level is weak: raster_memory_excess calls some trapped configs compute-bound.\n- l2_raster_traffic_ratio carries no cross-tile signal.\n- The 1.7% swizzle cost in the mid class is not explained.\n- max_blocks_per_sm enters only through the first-wave fraction.\n\nThe split-K masking result is an oracle-over-groups analysis on train shapes (best reachable per group), not a fitted rule. The two dev runs used the full budget of 2; no further iterations were run."
+  }
+ ],
+ "review": {
+  "pool_current": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/pool/pool_current.jsonl has 14 features. It was built from 21 current-contract designer features, with 7 dropped.\n\nKEPT:\n- time model (tm): tm_log_est, tm_crit_ratio, tm_l2_ratio, tm_dram_ratio, tm_regstaged, tm_cta_warps, tm_log_inst\n- memory: log_roofline_time_mraster, a_refetch_bw_demand, b_refetch_bw_demand, splitk_partial_bytes_ratio\n- split-K: splitk_roofline_log_time, splitk_excess_log, splitk_sm_latency_rounds_log\n\nDROPPED (reasons also in pool/dropped.json). Duplicates were judged by within-shape rank correlation between feature values over the 65 fold shapes, which uses no times.\n- tm_reduce_ratio: rank 1.000 with library parallel_reduction_traffic_fraction and parallel_reduction_compute_fraction. Removing it from the tm norm changes no pick (surrogate 1.0500 both ways).\n- tm_res_inv: 0.983 with library resident_block_scarcity, whose Spearman is 0.058 against 0.053.\n- tm_warps_inv: 0.990 with library occupancy_deficit. It equals tm_res_inv x 2^-tm_cta_warps, and its sign is unstable.\n- splitk_sm_critical_path_log: 0.944 with splitk_roofline_log_time, and Spearman ties (0.5295 vs 0.5293). I kept the roofline version: it adds the DRAM roof, hits the right split-K 92% of the time vs 82%, and is the one validated in the R1/R2 rules.\n- splitk_gain_log: harmful across tiles (tm-norm surrogate 1.050 -> 1.062). Its information is inside splitk_excess_log.\n- splitk_fixup_roof_excess: a component of splitk_roofline_log_time's DRAM roof. It has rank 0.66 with splitk_partial_bytes_ratio, which has the better Spearman (0.417 vs 0.269).\n- log_dram_intensity_deficit: no gain on top of the roofline term, and it hurts on the norm (1.050 -> 1.057). pick_lo 11.8.\n\nWhat changed from the designer files:\n- Code is copied verbatim.\n- expected_range is widened where the a6000 table falls outside the declared range: tm_log_est to 16, tm_crit to 5000, tm_l2/tm_dram to 5e4, b_refetch to 8, and splitk_excess_log min to -1 (observed min -0.092, which matters because the exponent guard reads the declared min). a_refetch was widened to 8 for symmetry.\n- A 'Pool note:' with usage evidence is appended to each rationale.\n\nValidation:\n- load_generated(Path(F), table=t) loads 14/14, none shape-level.\n- Diagnostics are in pool/diag_current.json (holdout 'not read'). The numbers match the designers' own runs exactly: tm_log_est Spearman 0.8095 / pick_lo 1.1523, and so on.",
+  "pool_ext": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/pool/pool_ext.jsonl holds EXTENDED CONTRACT features only (they read cfg.ext swizzle). There are 3 of the 5 swizzle designer features:\n- l2_locality_deficit, the primary one\n- raster_memory_time_ratio, with expected_range widened to 512 (observed max 177.6)\n- l2_wave_traffic_ratio\n\nDropped:\n- raster_memory_excess equals log2(max(1, raster_memory_time_ratio)): within-shape rank 0.968, lower Spearman (0.478 vs 0.492), and a rule can rebuild it with np.log2(np.maximum(1, f.raster_memory_time_ratio)).\n- l2_raster_traffic_ratio is the deficit plus a per-tile offset. It is identical to the deficit inside swizzle groups, carries about 0 near-best cross-tile signal, and adds no gain on top of the deficit (surrogate 1.031 -> 1.032).\n\nNo designer submitted warp features. I checked whether one is needed: ext warp_m/warp_n is ambiguous given (tile, threads) in 28 of 41 combinations. But within the best config family of each fold-0 train shape, warp variants differ by at most about 1.5%, except 8192^3 (1.15) and 128x4096x256 (1.09). So a warp feature is low priority.\n\nValidation:\n- experiments.a6000_probe._load_ext_contract loads all 3.\n- The current-contract loader rejects the file, as it should (17 lines > 12, plus the cfg.ext reads).\n- Diagnostics are in pool/diag_ext.json (holdout 'not read'): deficit 0.0045 / 1.9348, time_ratio 0.4919 / 4.6076, wave 0.3249 / 7.152. They match the designer's run.\n\nThese numbers must never be mixed with current-contract numbers.",
+  "ranked": [
+   {
+    "name": "tm_log_est",
+    "contract": "current",
+    "spearman_mean": 0.8095,
+    "pick_lo_mean": 1.1523,
+    "role": "The time model as ONE linear term. Best single axis in the pool (pick_lo big 1.067, hungry 1.144, mid 1.187, small 1.200). Use it in linear or library rules. In a rule that rebuilds the norm from tm_crit, tm_l2 and tm_dram it is redundant (surrogate 1.0379 -> 1.0382). Linear form + regstaged + cta_warps + splitk_roofline_log_time + log2 operand_tile_traffic_ratio scores 1.0436, against 1.0379 in norm form. Covers big, hungry and mid."
+   },
+   {
+    "name": "tm_l2_ratio",
+    "contract": "current",
+    "spearman_mean": 0.6072,
+    "pick_lo_mean": 1.3642,
+    "role": "Norm component: L2->SM operand feed priced at DRAM bandwidth, times a fitted kappa (w0 0.5). CMA put |kappa| at 0.43-1.9 across the P1/P2 folds. In the surrogate kappa 0.35 or 0.7 costs about 0.01, so fit it. This is the 6 MB L2 physics. Best single axis on big (1.069). Without it the norm collapses (tm designer: 1.049 -> 1.49)."
+   },
+   {
+    "name": "tm_crit_ratio",
+    "contract": "current",
+    "spearman_mean": 0.4229,
+    "pick_lo_mean": 2.9348,
+    "role": "Norm component: the busiest SM's critical path (SM-granular waves, padded K-slices, fill/drain hidden by co-resident CTAs, serial split-K chain). It sets wave and split-K placement inside the norm. Useless alone, because its minimum is tiny tiles. The whole norm is essential: without it surrogate P1 goes 1.038 -> 4.58."
+   },
+   {
+    "name": "tm_dram_ratio",
+    "contract": "current",
+    "spearman_mean": 0.6615,
+    "pick_lo_mean": 1.4069,
+    "role": "Norm component: DRAM bytes (L2-fit test, refetch along the shorter raster side, split-K partials, spill) over ideal compute. Carries memory-bound and small shapes inside the norm."
+   },
+   {
+    "name": "tm_regstaged",
+    "contract": "current",
+    "spearman_mean": 0.0661,
+    "pick_lo_mean": 1.4704,
+    "role": "Essential correction next to the norm. Drop-one in the surrogate: 1.038 -> 1.118 (mid 1.057 -> 1.226, small 1.032 -> 1.141). Weight positive in 8/8 CMA fold fits (P1/P2 dev)."
+   },
+   {
+    "name": "splitk_roofline_log_time",
+    "contract": "current",
+    "spearman_mean": 0.5293,
+    "pick_lo_mean": 2.7374,
+    "role": "Split-K time model with an interior optimum; the best complement to the norm. Drop-one: 1.038 -> 1.050 (hungry 1.033 -> 1.051, big 1.034 -> 1.050). CMA weight 8-26 on the 10-per-log2-time scale, positive in 8/8 fits. Covers hungry and big split placement."
+   },
+   {
+    "name": "l2_locality_deficit",
+    "contract": "extended",
+    "spearman_mean": 0.0045,
+    "pick_lo_mean": 1.9348,
+    "role": "EXT CONTRACT ONLY. Swizzle/raster term that is 0 on the best realisable raster, so it adds no offset between tiles. Official dev ablation P1 -> P2: inner-CV 1.0476 -> 1.0395, better in 4/4 folds. Big 1.058 -> 1.015 (vendor 1.032), hungry 1.033 -> 1.018, but mid 1.078 -> 1.100 and small 1.044 -> 1.049. Fitted weight +4.2 to +12.6, positive in 4/4 folds."
+   },
+   {
+    "name": "tm_log_inst",
+    "contract": "current",
+    "spearman_mean": 0.0781,
+    "pick_lo_mean": 1.7339,
+    "role": "Raster tie-break only: 1e-3 x w x log2(inst_total), with separate weights for M>N and M<=N. Removing it costs 1.038 -> 1.077 in the surrogate (hungry 1.033 -> 1.095, big -> 1.074). The M<=N weight is negative (identity raster) in 8/8 fits; the M>N sign is mixed. It is a codegen-artifact proxy for the raster; retire it once raster is a common field."
+   },
+   {
+    "name": "tm_cta_warps",
+    "contract": "current",
+    "spearman_mean": -0.1316,
+    "pick_lo_mean": 1.4047,
+    "role": "Correction for CTA barrier width (log2 warps). Drop-one: 1.038 -> 1.057 (hungry 1.061, big 1.057). Weight positive in 8/8 fits. Its negative single-axis Spearman is expected, because big efficient tiles use more warps."
+   },
+   {
+    "name": "log_roofline_time_mraster",
+    "contract": "current",
+    "spearman_mean": 0.2364,
+    "pick_lo_mean": 2.2146,
+    "role": "Second time model: max(wave-quantised compute, DRAM with M-first A-refetch). On the plain norm it helps: 1.050 -> 1.044 (hungry 1.049 -> 1.039, mid 1.059 -> 1.053). It is redundant once splitk_roofline_log_time and operand traffic are in (1.038 -> 1.041). Best small-class pick_lo in the pool (1.095). Use it in rules that do not have splitk_roofline_log_time."
+   },
+   {
+    "name": "splitk_excess_log",
+    "contract": "current",
+    "spearman_mean": 0.4976,
+    "pick_lo_mean": 1.8943,
+    "role": "Split-K selector: 0 at the model's best split count, and tile efficiency cancels. It belongs with library tile terms: the R1/R2 dev rules (R2 1.0595) used it that way. On the norm it HURTS (1.038 -> 1.046, small 1.047), because the norm already places split_k. Covers hungry in library rules."
+   },
+   {
+    "name": "splitk_sm_latency_rounds_log",
+    "contract": "current",
+    "spearman_mean": 0.1883,
+    "pick_lo_mean": 8.1908,
+    "role": "Little's-law latency path of the busiest SM. Use it only inside a p.roofline_ratio<1 branch of library rules: R2 went 1.080 -> 1.060 in dev. Flat on the norm it hurts (1.038 -> 1.049, big 1.106). Gated to memory-bound shapes it hurts small (1.068). Small-class tile chooser (pick_lo small 1.127)."
+   },
+   {
+    "name": "l2_wave_traffic_ratio",
+    "contract": "extended",
+    "spearman_mean": 0.3249,
+    "pick_lo_mean": 7.152,
+    "role": "EXT. Lockstep-wave L2 traffic, an alternative cross-tile L2 term. On P1 it scores 1.0379 -> 1.0353, about the same as the deficit's 1.0352 (big 1.028). On top of norm + K + deficit it is neutral (1.031 -> 1.032). Not dev-tested."
+   },
+   {
+    "name": "raster_memory_time_ratio",
+    "contract": "extended",
+    "spearman_mean": 0.4919,
+    "pick_lo_mean": 4.6076,
+    "role": "EXT. Roofline ratio under the config's own raster; highest whole-shape Spearman of the ext set. In rules it adds nothing: P1 + log2 of it 1.038 -> 1.040, and on top of the deficit 1.031 -> 1.034. Diagnostic, and a candidate cross-tile term if the time model changes."
+   },
+   {
+    "name": "a_refetch_bw_demand",
+    "contract": "current",
+    "spearman_mean": -0.1341,
+    "pick_lo_mean": 1.9996,
+    "role": "Correction to log_roofline_time_mraster whose fitted weight is NEGATIVE in every fold, so it is not a standalone cost. Neutral on P1 (1.0379 -> 1.0379, big 1.031)."
+   },
+   {
+    "name": "splitk_partial_bytes_ratio",
+    "contract": "current",
+    "spearman_mean": 0.4166,
+    "pick_lo_mean": 1.7276,
+    "role": "L2-aware split-K partial traffic, monotone in split_k. Harmful as a flat term: on the norm 1.050 -> 1.072, on P1 1.038 -> 1.042 (hungry 1.042), because it suppresses split-K. Only for branched library rules (hungry). Its pick_lo is the shared value of axes that are constant at sk=1."
+   },
+   {
+    "name": "b_refetch_bw_demand",
+    "contract": "current",
+    "spearman_mean": -0.148,
+    "pick_lo_mean": 2.2004,
+    "role": "Diagnostic. It is the only current-contract predictor of the horizontal-1 swizzle trap (Spearman +0.78 with the hz1 slowdown). No rule gain: P1 1.038 -> 1.040, with big worse at 1.044."
+   }
+  ],
+  "combos": "WHICH COMBINATIONS ARE COMPLEMENTARY\n\nI screened with my own surrogate first: listwise softmax fit, reachable tie-break targets, the probe's inner 4-way partition, TRAIN shapes of each fold only. Then I used both official dev runs, with the holdout hidden. The surrogate is 0.004-0.010 more optimistic than the probe.\n\n(1) BEST CURRENT CONTRACT: P1, 7 weights, 2 paths (pool/rules/P1_current.json)\n- Structure:\n  - time norm t = sqrt(tm_crit^2 + (w0*tm_l2)^2 + tm_dram^2), scored as 10*log2(t); this covers big, hungry and mid\n  - + w*tm_regstaged + w*tm_cta_warps: efficiency, mainly mid and small\n  - + w*splitk_roofline_log_time: split-K placement, hungry and big\n  - + w*log2(operand_tile_traffic_ratio), a library axis: big\n  - + 1e-3 tie-break on tm_log_inst, one weight for M>N and one for M<=N: raster, big and hungry\n- w0 are physics priors, not fitted: kappa 0.5 and 10 per log2 time. Even unfitted, these give 1.063 on train shapes, already below the vendor's 1.0815.\n- DEV inner-CV 1.0476. By class: big 1.058 (vendor 1.032), hungry 1.033 (vendor 1.069), mid 1.078 (vendor 1.102), small 1.044 (vendor 1.130).\n- Folds 1.048 / 1.032 / 1.055 / 1.055 vs vendor 1.078 / 1.079 / 1.082 / 1.088: beats the vendor in 4/4 folds. split_k>=3 picked on 63/93 hungry train cases.\n- Reference points on the same protocol:\n  - tm_B 1.0537\n  - R2 1.0595\n  - ledger's best hand edit H28 1.0550\n  - M1 1.0744\n  - c2 baseline 1.1177\n- Drop-one in the surrogate, starting from P1 at 1.038:\n  - without the norm: 4.58\n  - without regstaged: 1.118\n  - without the tie-break: 1.077\n  - without cta_warps: 1.057\n  - without splitk_roofline_log_time: 1.050\n  - without operand traffic: 1.045\n\n(2) BEST EXTENDED CONTRACT: P2 = P1 + w*l2_locality_deficit, 8 weights (pool/rules/P2_ext.json)\n- DEV inner-CV 1.0395. By class: big 1.015 (beats vendor 1.032), hungry 1.018, mid 1.100 (tie with vendor 1.102), small 1.049.\n- Folds 1.047 / 1.027 / 1.041 / 1.043, better than P1 in 4/4 folds.\n- So the swizzle term is complementary to the time model. It fixes the big class, which the norm cannot see (big 1.058 -> 1.015), and frees split-K on hungry shapes (1.033 -> 1.018, sk>=3 on 67/93). It costs some mid (1.078 -> 1.100).\n\n(3) Library-tile family, the other working composition\n- Library tile terms + splitk_excess_log + splitk_roofline_log_time, with a p.roofline_ratio<1 branch holding splitk_sm_latency_rounds_log. This is the R2 rule: 1.0595.\n- splitk_excess_log and the latency term are complementary to LIBRARY tile axes, not to the tm norm. On P1 they hurt: +0.008 and +0.011.\n\n(4) log_roofline_time_mraster\n- Complementary to a bare norm (1.050 -> 1.044, mid and hungry). Redundant with splitk_roofline_log_time + operand traffic.\n- On the ext side, norm + regstaged + cta_warps + log_roofline_time_mraster + l2_locality_deficit (no tie-break) is a close alternative to P2: surrogate 1.029, mid 1.047. Not dev-tested.\n\nNOT COMPLEMENTARY (do not combine):\n- tm_log_est together with the norm (duplicate)\n- splitk_excess_log with the norm (both place split_k)\n- splitk_partial_bytes_ratio or log_dram_intensity_deficit as flat terms (they suppress split-K)\n- raster_memory_time_ratio or l2_raster_traffic_ratio on top of the deficit\n- tm_res_inv, tm_warps_inv or resident_block_scarcity next to the norm (1.050 -> 1.060-1.071, big 1.15)\n\nCLASS COVERAGE\n- big: tm_l2 (via kappa), operand traffic, the tie-break, and the deficit (ext). In the current contract big stays the one class lost to the vendor.\n- hungry: splitk_roofline_log_time + tm_crit, plus the tie-break, plus the deficit.\n- mid: tm_regstaged, the norm, and log_roofline_time_mraster.\n- small: tm_dram inside the norm, and tm_regstaged. All rules beat the vendor on small by a wide margin.\n- Weakest spots left: mid (P2 1.100), and big in the current contract (1.058).",
+  "notes": "RESULT\nThe merged pool gives the best dev rules so far, with the holdout never read:\n- P1 (current contract, 7 weights): inner-CV 1.0476.\n- P2 (extended contract, 8 weights): inner-CV 1.0395.\n- Vendor on the same shapes 1.0815; c2 baseline 1.1177. Both rules beat the vendor in 4/4 folds.\n\nPhysics signs held under CMA in 8/8 fold fits for splitk_roofline_log_time, tm_regstaged and tm_cta_warps, and in 4/4 for the deficit. log2(operand_tile_traffic_ratio) flipped sign in 1 of 4 P1 folds and 2 of 4 P2 folds. Treat it as the weakest term and the first to test for removal.\n\nFiles, all under /tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/a6k/v2/pool/:\n- pool_current.jsonl, pool_ext.jsonl, diag_current.json, diag_ext.json, dropped.json\n- rules/P1_current.json and rules/P1_current.dev.json\n- rules/P2_ext.json and rules/P2_ext.dev.json\n- work/ holds the scripts: surr.py (surrogate), dup.py (duplicate check), build_pool.py, screen1-5.py\n- work/vals.pkl (489 MB) was deleted; rebuild it with work/extract.py in about 90 s\n\nHOW TO IMPROVE THE OPTIMIZATION LOOP AND AGENTS (what building the pool taught)\n\n1. COMPOSE, DON'T ACCUMULATE.\n- The winning rules are a few physics terms combined into one time estimate (p=2 norm) plus 2-3 corrections and a tie-break, 7-8 weights in total. They beat 17-44-weight linear rules.\n- Give RuleWriter this skeleton and physical w0: 10 per log2 time, kappa 0.5, correction priors from measured percent costs. Unfitted, P1's priors already score 1.063 on train.\n- Give FeatureWriter shared helpers (busiest-SM path, L2 feed, DRAM roof, raster model), or allow features that reference other features. Three designers each rebuilt a different time model inside the 12-line limit. Their within-shape rank correlation is only 0.19-0.36, so they are not interchangeable and must be merged by a reviewer.\n\n2. SCREEN FEATURES IN CONTEXT, NOT ALONE.\n- Usefulness depends on the base rule. splitk_excess_log is strong with library tile axes (R2) and hurts the norm (+0.008). splitk_sm_latency_rounds_log helps only under a memory-bound branch.\n- Single-axis pick_lo would have ranked l2_locality_deficit last; it is the largest ext gain.\n- Add an automatic drop-one / add-one screen on a fixed base rule with a cheap surrogate (about 2 s per combination here). Store the verdict in the pool as 'works with / conflicts with' tags.\n\n3. WIDEN THE DUPLICATE CHECK.\n- Check against library axes, on all shapes including small grids (tm_res_inv differs only there).\n- Add a 'no-op in context' test: tm_reduce_ratio is rank-identical to a library axis and changes no pick inside the norm.\n\n4. VALIDATE DECLARED RANGES ON THE BUNDLE.\n- 7 of 26 designer features exceeded their declared expected_range.\n- splitk_excess_log has a negative minimum while declaring 0, and the exponent guard reads the declared minimum.\n\n5. MAKE RASTER/SWIZZLE A COMMON FIELD.\n- Do this the way D-161 promoted stages. P1 -> P2 is worth 0.008 pooled and 0.043 on big.\n- Until then, a current-contract rule needs the inst_total tie-break (worth 0.039 in the surrogate), which is a codegen artifact.\n- Add a visibility audit: find feature-identical groups whose times spread more than 5%.\n\n6. ACCEPTANCE AND DEV BUDGET.\n- Accept a rule only if it reports sign stability across folds; that is what flagged operand traffic here.\n- Spend dev budget on paired ablations (P1 vs P1+X), as done here with 2 runs.\n- Calibrate the surrogate: mine was 0.004-0.010 optimistic and sensitive to its temperature (sigma 0.015 -> 0.03 moved it from 1.038 to 1.053). Rank with it; never report it.\n\n7. FIX THE MID CLASS NEXT.\n- Mid is the remaining gap (P2 1.100 vs vendor 1.102).\n- The surrogate hints that log_roofline_time_mraster recovers mid alongside the deficit (1.047). That is the next paired dev test.\n\nCAVEATS\n- Design exposure. The four folds' train sets together cover all 65 shapes. Pool choices, the surrogate hyperparameters and the P1/P2 structure were picked from train-shape inner-CV on those shapes, so dev numbers are somewhat optimistic.\n- The dev w0 are physics priors (kappa 0.5 comes from the tm designer's CMA fits), not fitted per fold.\n- Fit-path noise is about ±0.01 (ledger). P1 vs tm_B (0.006) is inside that noise. P2 vs P1 (0.008) is at the edge, but 4/4 folds and the class pattern agree.\n- P2 and all ext numbers are EXTENDED CONTRACT. Do not mix them with current-contract numbers.\n- Budget used: exactly 2 dev probe runs, no GPU, no LLM calls. Nothing in the repo was modified."
+ }
+}
