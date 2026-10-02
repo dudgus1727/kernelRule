@@ -185,8 +185,11 @@ class Archive:
 
     def __init__(self, noise_tol: float = 0.0, *,
                  select_by: str = "regret") -> None:
-        #: The smallest improvement that counts as an update. Given by
-        #: `is_significant` (§7.4).
+        #: The smallest improvement that counts as an update of the
+        #: **best**. ⚠️ 2026-10-02 (D-190 §8): the loop passes the fitting
+        #: noise of the acceptance key (`loop.FIT_NOISE_TOL`), not
+        #: `is_significant` — that one is per-shape measurement noise, a
+        #: different quantity. The cells stay strict `<`.
         self.noise_tol = float(noise_tol)
         #: ★ What acceptance is judged on (D-101). The default is `regret`
         #: — every run so far is under that condition. `"rank"` runs **only
