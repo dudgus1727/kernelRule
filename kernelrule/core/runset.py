@@ -42,7 +42,8 @@ ROOT = Path("runs")
 KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
         "parameters", "product_hint", "power_hint", "hw", "split_kind",
         "feature_condition", "model", "fit_method", "fit_restarts",
-        "noise_tol", "failure_baseline")
+        "noise_tol", "failure_baseline", "fit_space", "warm_start",
+        "fit_budget")
 #: ⚠️ `fitter_source` is **deliberately not in KEYS** (D-163). It says how
 #: the record was written, not what ran: every run since D-144 chooses the
 #: fitter per rule, whether or not its `config.json` says so. Putting it in
@@ -56,7 +57,9 @@ KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
 #: have a value are compared as they are.
 _OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4,
                  # ★ D-190 §8 — every run before it
-                 "noise_tol": 0.0, "failure_baseline": "global_best"}
+                 "noise_tol": 0.0, "failure_baseline": "global_best",
+                 # ★ D-190 §6
+                 "fit_space": "w", "warm_start": False, "fit_budget": "flat"}
 
 
 class RunSetError(ValueError):
@@ -130,6 +133,10 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         "noise_tol": loop.get("noise_tol", _OLD_DEFAULTS["noise_tol"]),
         "failure_baseline": loop.get(
             "failure_baseline", _OLD_DEFAULTS["failure_baseline"]),
+        # ★ D-190 §6
+        "fit_space": loop.get("fit_space", _OLD_DEFAULTS["fit_space"]),
+        "warm_start": loop.get("warm_start", _OLD_DEFAULTS["warm_start"]),
+        "fit_budget": loop.get("fit_budget", _OLD_DEFAULTS["fit_budget"]),
         "seed_source": None, "seed_sha": None,
     }
     ch = r / _campaign(run) / "stage2-rule-writer" / "chosen.json"

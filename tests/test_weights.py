@@ -700,3 +700,70 @@ def test_history_experiments_pin_their_objective():
             if not any(k.arg == "objective" for k in n.keywords):
                 bad.append(f"{f.name}:{n.lineno}")
     assert not bad, f"calls that do not state the objective: {bad}"
+
+
+# ---------------------------------------------------------------------------
+# ★ D-190 §6 — standardized coordinates, new-term starts, the budget
+# ---------------------------------------------------------------------------
+def test_u_space_recovers_the_known_optimum(known):
+    """The change of coordinates must not lose what the w-space fit finds."""
+    t, m, score = known
+    fr = fit_weights(score, m, t, _all_train(t), np.array([1.0, 1.0, 1.0]),
+                     max_evals=400, space="u")
+    assert fr.space == "u" and fr.scale is not None
+    assert fr.fit_regret == pytest.approx(1.0, abs=1e-9), fr
+    cos = float(fr.w @ W_TRUE / (np.linalg.norm(fr.w) * np.linalg.norm(W_TRUE)))
+    assert cos > 0.99, fr.w
+
+
+def test_u_space_does_not_care_about_a_feature_s_scale(known):
+    """★ The point of §6: a term whose feature is 1000x larger gets a 1000x
+    smaller scale, so the fit lands on the same regret from the same
+    (spread-equivalent) start."""
+    t, m, score = known
+
+    def big(f, p, hw, w):
+        return (f.f0 * 1000.0) * w[0] + f.f1 * w[1] + f.f2 * w[2]
+
+    a = fit_weights(score, m, t, _all_train(t), np.array([1.0, 1.0, 1.0]),
+                    max_evals=200, space="u")
+    b = fit_weights(big, m, t, _all_train(t), np.array([1e-3, 1.0, 1.0]),
+                    max_evals=200, space="u")
+    assert b.fit_regret == pytest.approx(a.fit_regret, abs=1e-9)
+    assert b.scale[0] == pytest.approx(1000.0 * a.scale[0], rel=1e-6)
+
+
+def test_a_new_term_starts_at_a_tenth_of_the_inherited_spread(known):
+    """The LLM's magnitude for a new term is replaced; its sign is kept."""
+    from kernelrule.core.weights import _column_spreads, _Problem, _score_spread
+
+    t, m, score = known
+    w0 = np.array([2.0, 0.5, -1.0])
+    fr = fit_weights(score, m, t, _all_train(t), w0, max_evals=1,
+                     polish=False, space="u", new_terms=[False, False, True],
+                     warn_invariants=False)
+    prob = _Problem(m, t, t.shapes(), 1)
+    s_inh = _score_spread(prob, score, np.array([2.0, 0.5, 0.0]))
+    sd = _column_spreads(prob, score, w0, np.zeros(3, dtype=bool))
+    assert fr.n_new == 1
+    assert fr.w0[2] == pytest.approx(-0.1 * s_inh / sd[2])
+    assert fr.w0[:2].tolist() == [2.0, 0.5]
+
+
+def test_new_terms_need_u_space(known):
+    t, m, score = known
+    with pytest.raises(FitError):
+        fit_weights(score, m, t, _all_train(t), [1.0, 1.0, 1.0],
+                    new_terms=[False, False, True])
+
+
+def test_the_dimension_budget_keeps_the_per_weight_rate():
+    from kernelrule.rules.checks import fitter_for
+
+    assert fitter_for(30) == {"fit_method": "cma", "fit_restarts": 1,
+                              "max_evals": 300}
+    assert fitter_for(30, budget="dim")["max_evals"] == 1125
+    assert fitter_for(9, budget="dim")["max_evals"] == 338
+    assert fitter_for(8, budget="dim") == fitter_for(8)
+    with pytest.raises(ValueError):
+        fitter_for(30, budget="nope")

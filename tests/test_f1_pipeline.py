@@ -187,3 +187,26 @@ def test_config_records_seal_state(pipe):
     #   follows it.
     assert '"unsealed"' in inspect.getsource(RoundLoop._config_dict)
     assert '"unsealed": is_unsealed()' in inspect.getsource(pipe.main)
+
+
+def test_the_time_axis_quota_counts_declared_time_units():
+    """★ D-190 §2 — the stage-1 task says how many time axes exist, counted
+    by the unit the FeatureWriter declared."""
+    from types import SimpleNamespace
+
+    from experiments.f1_pipeline import MIN_TIME_AXES, _time_block
+
+    class Reg:
+        def __init__(self, items):
+            self._items = items
+
+        def __getitem__(self, n):
+            return self._items[n]
+
+    base = Reg({"a": SimpleNamespace(unit="ratio")})
+    none = Reg({**base._items, "b": SimpleNamespace(unit="bytes")})
+    one = Reg({**none._items, "c": SimpleNamespace(unit="log2 time ratio")})
+    assert MIN_TIME_AXES == 1
+    assert "**0** of the 1" in _time_block(none, base)
+    assert "quota is met" in _time_block(one, base)
+    assert "['c']" in _time_block(one, base)

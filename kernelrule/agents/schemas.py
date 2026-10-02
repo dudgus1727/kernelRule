@@ -497,7 +497,8 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
         code: str
         rationale: str
         unit: str = Field(description="e.g. ratio / bytes / count / "
-                                      "dimensionless. **Required**")
+                                      "dimensionless / time ratio. "
+                                      "**Required**")
         #: ⚠️ **`list[float]`, not `tuple[float, float]`.** A tuple renders
         #: as `prefixItems` with no `items`, and the API refuses that
         #: schema outright — 20/20 stage-1 calls came back

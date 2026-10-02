@@ -26,6 +26,7 @@ rule has already run. The AST catches it **before execution**.
 from __future__ import annotations
 
 import ast
+import math
 from dataclasses import dataclass, field
 
 __all__ = ["FITTER_SWITCH_DIM", "fitter_for", "CheckReport", "RuleCheckError", "check_rule", "LIMITS",
@@ -597,7 +598,17 @@ LIMITS = {
 }
 
 
-def fitter_for(n_weights: int | None) -> dict:
+#: ★ 2026-10-02 (D-190 §6): the CMA evaluation budget **per weight** when
+#: `budget="dim"`. 300 / 8 — the per-dimension budget the flat rule gives at
+#: the switch dimension, kept as the dimension grows. On a6000 the flat 300
+#: was the bottleneck: one 20-axis rule's holdout went 1.1425 / 1.1195 /
+#: 1.0888 at 1x300 / 2x2000 / 4x8000 evaluations (the other GPUs moved
+#: within ±0.01), and 99.8% of the c2 a6000 proposals have more than 8
+#: weights (median 25).
+EVALS_PER_DIM = 300 / FITTER_SWITCH_DIM
+
+
+def fitter_for(n_weights: int | None, *, budget: str = "flat") -> dict:
     """★ **`len(W0)`** decides the fitter (D-144). Decided in one place
     only.
 
@@ -621,13 +632,19 @@ def fitter_for(n_weights: int | None) -> dict:
     rule.
     """
     b = int(n_weights if n_weights is not None else FITTER_SWITCH_DIM)
+    if budget not in ("flat", "dim"):
+        raise ValueError(f"unknown fit budget: {budget!r} (flat | dim)")
     # ★ The key names are exactly `LoopConfig`'s fields — being splattable
     #   as `**fitter_for(n)` is what leaves no place for divergence
     #   (principle 2).
     if b <= FITTER_SWITCH_DIM:
         return {"fit_method": "nelder-mead", "fit_restarts": 4,
                 "max_evals": 200}
-    return {"fit_method": "cma", "fit_restarts": 1, "max_evals": 300}
+    # ★ D-190 §6: `"dim"` keeps the per-weight budget of the switch
+    #   dimension (300 at 8 -> 37.5 per weight). `"flat"` is every run
+    #   before it.
+    evals = 300 if budget == "flat" else int(math.ceil(EVALS_PER_DIM * b))
+    return {"fit_method": "cma", "fit_restarts": 1, "max_evals": evals}
 
 
 def limits_for(parameters: int | None = None) -> dict:

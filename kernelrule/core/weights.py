@@ -87,6 +87,13 @@ class FittedRule:
     #: not into `n_fit_evals` — the cap verdict is made on evaluations of
     #: the true objective alone. For budget comparisons use `n_evals`.
     n_init_evals: int = 0
+    #: ★ D-190 §6 — the coordinates the optimiser moved in (`"w"` = the
+    #: weights themselves, every run before it; `"u"` = scaled so one unit
+    #: of a term is one within-shape spread of the score), the scale vector
+    #: (`w = u / scale`), and how many weights started as **new** terms.
+    space: str = "w"
+    scale: np.ndarray | None = None
+    n_new: int = 0
 
     @property
     def moved(self) -> bool:
@@ -342,7 +349,11 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 rank_lambda: float = 0.0,
                 init_objective: str | None = None,
                 init_evals: int = 0,
-                bounds: list | None = None) -> FittedRule:
+                bounds: list | None = None,
+                space: str = "w",
+                new_terms: Sequence[bool] | None = None,
+                new_term_frac: float = 0.1,
+                polish_pairs_max_dim: int | None = None) -> FittedRule:
     """Fixes the structure and fits only the weights.
 
     `split` **must have `role="train"`.** There is no path by which the
@@ -351,6 +362,29 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     `val_split` is scored **for reporting only**, after the fit has
     finished. It takes no part in the objective — it exists so the gap
     (`FittedRule.gap`) can be recorded every round.
+
+    ## ★ `space="u"` — standardized coordinates (D-190 §6)
+
+    The optimiser moves `x`, and the rule is scored at `w = x / c` with
+    `c_i = sd_i / S`: `sd_i` is the within-shape spread of the score change
+    when `w_i` goes 0 -> 1, `S` the within-shape spread of the starting score
+    (train configs only — **no times**). One unit of `x_i` is then one spread
+    of the score, whatever the feature's scale, so the restarts' and
+    polish's `max(|x|, 1)` steps mean the same thing on every term. On a6000
+    the parents' `max|w|` had a median of 843 and reached 7.4e5, while a new
+    term arrived at 1~2 and needed 80~1,500 to move a single pick.
+
+    `new_terms` marks the weights the parent did not have; they start at
+    `±new_term_frac` spreads of the inherited score (the LLM's sign is
+    kept). Slots with finite `bounds` (exponents) and columns with no spread
+    keep `c_i = 1`. With the default `space="w"` nothing here runs — about
+    30 experiment scripts call this function and stay bit-identical.
+
+    `polish_pairs_max_dim`: the two-coordinate polish pass costs
+    `2n(n-1)` evaluations per step size; above ~18 weights the first pass at
+    the largest step used the whole budget of 600, multiplying single
+    weights by 11 or -9 and never reaching the fine steps. Given, the pair
+    pass runs only up to that many weights.
 
     ## ★ `objective` — the default is `"regret"` (reverted in D-128)
 
@@ -442,6 +476,41 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     n_eval = 0
     n_inf = 0
 
+    # ★ D-190 §6 — the change of coordinates. `c is None` is the old path.
+    if space not in ("w", "u"):
+        raise FitError(f"unknown fit space: {space!r} (w | u)")
+    if new_terms is not None:
+        if space != "u":
+            raise FitError("new_terms needs space='u' — the start of a new "
+                           "term is set from the score's spread")
+        if len(new_terms) != w0.size:
+            raise FitError(f"new_terms length {len(new_terms)} != weights "
+                           f"{w0.size}")
+    c = None
+    n_new = 0
+    if space == "u":
+        if init_objective is not None:
+            raise FitError("init_objective is not supported with space='u'")
+        fixed = np.zeros(w0.size, dtype=bool)
+        if bounds is not None:
+            fixed = np.isfinite(_blo) | np.isfinite(_bhi)
+        newm = (np.asarray(new_terms, dtype=bool) if new_terms is not None
+                else np.zeros(w0.size, dtype=bool)) & ~fixed
+        n_new = int(newm.sum())
+        if n_new:
+            # The spread of what was inherited — the new terms at 0.
+            w_inh = w0.copy()
+            w_inh[newm] = 0.0
+            s_inh = _score_spread(prob, score_fn, w_inh)
+            sd = _column_spreads(prob, score_fn, w0, fixed)
+            if np.isfinite(s_inh) and s_inh > 0:
+                for i in np.flatnonzero(newm):
+                    if sd[i] > 0:
+                        sg = -1.0 if w0[i] < 0 else 1.0
+                        w0[i] = sg * new_term_frac * s_inh / sd[i]
+                w0 = _proj(w0)
+        c = _scales(prob, score_fn, w0, fixed)
+
     # ★ It holds on to **the best it has seen** itself (D-55). Taking only
     #   the optimiser's `res.x` throws away better points visited during the
     #   search — the objective is a step function, so the simplex can step
@@ -449,7 +518,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     #   elsewhere. 5 of 24 were like that, discarding up to 0.0277. The
     #   evaluations are already paid for, so recovering them is free.
     seen_v = float("inf")
-    seen_w = w0.copy()
+    seen_w = w0.copy() if c is None else w0 * c
 
     if objective not in ("regret", "rank"):
         raise FitError(f"unknown objective: {objective!r}. It must be one "
@@ -491,6 +560,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         #   not know about bounds and neither does polish, so folding here is
         #   what enforces them in one place.
         wa = _proj(np.asarray(w, dtype=np.float64))
+        if c is not None:
+            wa = wa / c                         # ★ D-190 §6: x -> w
         if objective == "regret":
             return prob.regret(score_fn, wa)
         v = prob.rank_loss(score_fn, wa)
@@ -520,7 +591,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     #   value from here survives nowhere — from `best_v` below, everything
     #   is re-measured through the true objective.
     n_init = 0
-    start0 = w0.copy()
+    # ★ D-190 §6: the optimiser starts in its own coordinates.
+    start0 = w0.copy() if c is None else w0 * c
     if init_objective is not None:
         if init_objective != "rank_top1":
             raise FitError(
@@ -636,14 +708,18 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     n_fit = n_eval    # ★ before polish. The cap verdict uses this value.
     w = _proj(best_w)
     if polish:
+        pairs = (polish_pairs_max_dim is None
+                 or w.size <= polish_pairs_max_dim)
         w, best_v, n_pol = _polish(prob, score_fn, w, best_v, polish_budget,
-                                   value=value_at)
+                                   value=value_at, pairs=pairs)
         n_eval += n_pol
         # ★ Polish does not know about bounds. **It folds once more here**
         #   — regret and sensitivity below are re-measured on the folded
         #   values, so the reported and returned numbers come from the same
         #   weights.
         w = _proj(w)
+    if c is not None:
+        w = w / c                 # ★ D-190 §6: back to the rule's weights
     # ★ The scoring criterion is always regret — even under
     #   `objective="rank"`. "score by regret, train by the rank loss"
     #   (rank-evo-prereg.md §3)
@@ -676,7 +752,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                      n_infeasible=n_inf, sensitivity=sens,
                      seconds=time.perf_counter() - t0, val_regret=val,
                      method=m, contrib=contrib, n_fit_evals=n_fit,
-                     n_init_evals=n_init)
+                     n_init_evals=n_init, space=space, scale=c,
+                     n_new=n_new)
     if warn_invariants:
         msgs = out.invariants()
         if hit_cap:
@@ -874,6 +951,58 @@ def _minimize_once(obj, start, method: str, budget: int, r: int, *,
     return minimize(obj, start, method="Nelder-Mead",
                     options={"maxfev": budget, "xatol": 1e-4, "fatol": 1e-9,
                              "adaptive": True, "initial_simplex": simplex})
+
+
+def _score_spread(prob: _Problem, score_fn: ScoreFn, w: np.ndarray) -> float:
+    """★ D-190 §6 — the within-shape spread of the score, averaged over the
+    shapes. Only `score_fn` is called; the times are bound to `_` names."""
+    tot, n = 0.0, 0
+    for f, info, _cand, _times, _best in prob.items:
+        s = np.asarray(score_fn(f, info, prob.hw, w), dtype=np.float64)
+        if s.ndim != 1 or s.size < 2 or not np.isfinite(s).all():
+            continue
+        tot += float(np.std(s))
+        n += 1
+    return tot / n if n else float("nan")
+
+
+def _column_spreads(prob: _Problem, score_fn: ScoreFn, w: np.ndarray,
+                    fixed: np.ndarray) -> np.ndarray:
+    """★ D-190 §6 — per weight, the within-shape spread of the score change
+    when `w_i` goes 0 -> 1 (the others held at `w`). 0 for fixed slots and
+    for columns that cannot be scored."""
+    sd = np.zeros(len(w), dtype=np.float64)
+    cnt = np.zeros(len(w), dtype=np.float64)
+    for f, info, _cand, _times, _best in prob.items:
+        for i in range(len(w)):
+            if fixed[i]:
+                continue
+            a, b = np.asarray(w, dtype=np.float64).copy(), None
+            a[i] = 1.0
+            b = a.copy()
+            b[i] = 0.0
+            try:
+                d = (np.asarray(score_fn(f, info, prob.hw, a), np.float64)
+                     - np.asarray(score_fn(f, info, prob.hw, b), np.float64))
+            except Exception:                               # noqa: BLE001
+                continue
+            if d.ndim == 1 and d.size >= 2 and np.isfinite(d).all():
+                sd[i] += float(np.std(d))
+                cnt[i] += 1
+    return np.where(cnt > 0, sd / np.maximum(cnt, 1), 0.0)
+
+
+def _scales(prob: _Problem, score_fn: ScoreFn, w: np.ndarray,
+            fixed: np.ndarray) -> np.ndarray:
+    """★ D-190 §6 — `c_i = sd_i / S` (see `fit_weights(space="u")`).
+    `c_i = 1` for fixed slots and for columns with no spread."""
+    sd = _column_spreads(prob, score_fn, w, fixed)
+    S = _score_spread(prob, score_fn, w)
+    if not np.isfinite(S) or S <= 0:
+        S = float(np.max(sd)) if np.max(sd) > 0 else 1.0
+    floor = 1e-9 * float(np.max(sd)) if np.max(sd) > 0 else 0.0
+    c = np.where((sd > floor) & ~fixed, sd / S, 1.0)
+    return c.astype(np.float64)
 
 
 def _contributions(prob: _Problem, score_fn: ScoreFn,

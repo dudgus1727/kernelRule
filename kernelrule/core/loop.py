@@ -64,8 +64,11 @@ __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 #:
 #: ```
 #: where it comes from     refitting an evolved a6000 rule with its weight
-#:                         labels permuted moves train regret by ±0.01
-#:                         (D-188 H25)
+#:                         labels permuted (D-188 H25) moved inner-CV by
+#:                         ±0.01 and train regret by |Δ| 0.0024 on average,
+#:                         0.0070 at most — so 0.01 is above the train-side
+#:                         fit noise, and the measurement below is what
+#:                         sets it
 #: what it does to the     c2 a6000, 114 round-to-round changes of the best:
 #: archive best            train gain < 0.01  88 times -> holdout log change
 #:                         mean −0.0003, 40 better / 37 worse (= noise)
@@ -228,6 +231,24 @@ class LoopConfig:
     #: the failure record — `"parent"` (its own) or `"global_best"` (the
     #: archive best at the start of the round, every run before D-190).
     failure_baseline: str = "parent"
+    #: ★ 2026-10-02 (D-190 §6) — the fit. Every run before D-190 ran
+    #: `"w"` / `False` / `"flat"` (`runset._OLD_DEFAULTS`).
+    #:
+    #: ```
+    #: fit_space   "u"   fit in coordinates where one unit of a term is one
+    #:                   within-shape spread of the score (weights.fit_weights)
+    #: warm_start  True  the child's terms that are its parent's start from
+    #:                   the parent's FITTED weights (rules/inherit.py) — the
+    #:                   LLM carried them over for only 65% of the inherited
+    #:                   weights of the c2 a6000 exploit children — and the
+    #:                   new ones from the score's spread
+    #: fit_budget  "dim" CMA evaluations 37.5 per weight instead of a flat
+    #:                   300, and the two-coordinate polish only up to 8
+    #:                   weights (checks.fitter_for, EVALS_PER_DIM)
+    #: ```
+    fit_space: str = "u"
+    warm_start: bool = True
+    fit_budget: str = "dim"
 
 
 class LLMUnreachable(RuntimeError):
@@ -309,6 +330,26 @@ def failure_verdict(child: float, parents: list[float], before: float,
 _WORKER: dict = {}
 
 
+def _fit_rule(fn, code: str, w0, new, *, matrix, table, train, val,
+              objective: str, rank_top_k: int, rank_lambda: float,
+              fit_space: str, fit_budget: str):
+    """★ The one `fit_weights` call of the loop — the worker and the
+    sequential path both come here, so they cannot drift apart (D-95,
+    D-190 §6)."""
+    _ft = fitter_for(len(w0), budget=fit_budget)
+    return fit_weights(fn, matrix, table, train, w0,
+                       max_evals=_ft["max_evals"], val_split=val,
+                       objective=objective, rank_top_k=rank_top_k,
+                       rank_lambda=rank_lambda,
+                       method=_ft["fit_method"],
+                       n_restarts=_ft["fit_restarts"],
+                       bounds=weight_bounds(code, len(w0)),
+                       space=fit_space,
+                       new_terms=(new if fit_space == "u" else None),
+                       polish_pairs_max_dim=(_FITTER_DIM
+                                             if fit_budget == "dim" else None))
+
+
 def _fit_and_score(job: tuple) -> dict:
     """★ Fits and scores one candidate. **It runs in a worker** (D-95).
 
@@ -322,10 +363,10 @@ def _fit_and_score(job: tuple) -> dict:
     What comes back is **pure data** — the ids and order of the `Elite`s are
     decided by the parent (determinism).
     """
-    idx, code, w0 = job
+    idx, code, w0, new = job
     from kernelrule.core.sandbox import compile_rule
     from kernelrule.core.scoring import evaluate_scores
-    from kernelrule.core.weights import fit_weights, make_score_of
+    from kernelrule.core.weights import make_score_of
 
     c = _WORKER
     try:
@@ -333,15 +374,13 @@ def _fit_and_score(job: tuple) -> dict:
         # ★ The fitter is decided by **this rule's len(W0)** (D-144). With
         #   a per-path budget the dimension differs per rule — one campaign
         #   setting cannot decide it.
-        _ft = fitter_for(len(w0))
-        fr = fit_weights(fn, c["matrix"], c["table"], c["train"], w0,
-                         max_evals=_ft["max_evals"], val_split=c["val"],
-                         objective=c.get("objective", "regret"),
-                         rank_top_k=c.get("rank_top_k", 100),
-                         rank_lambda=c.get("rank_lambda", 0.0),
-                         method=_ft["fit_method"],
-                         n_restarts=_ft["fit_restarts"],
-                         bounds=weight_bounds(code, len(w0)))
+        fr = _fit_rule(fn, code, w0, new, matrix=c["matrix"],
+                       table=c["table"], train=c["train"], val=c["val"],
+                       objective=c.get("objective", "regret"),
+                       rank_top_k=c.get("rank_top_k", 100),
+                       rank_lambda=c.get("rank_lambda", 0.0),
+                       fit_space=c.get("fit_space", "w"),
+                       fit_budget=c.get("fit_budget", "flat"))
     except (FitError, SchemaViolation) as e:
         return {"i": idx, "err": ("fit", str(e)[:90])}
     except Exception as e:                                  # noqa: BLE001
@@ -356,6 +395,7 @@ def _fit_and_score(job: tuple) -> dict:
             "n_dead": len(fr.dead_terms),
             "n_dead_w": len(fr.dead_by_weight),
             "n_dead_s": len(fr.dead_by_sensitivity),
+            "n_new": int(fr.n_new),
             "rank_loss": _rank_loss_of(fn, c, fr.w),
             "val_regret": fr.val_regret,
             "mem": ev.at(1, mask=c["short_mask"]),
@@ -578,6 +618,15 @@ class RoundLoop:
                 f"was concluded to be the wrong objective (D-118 · D-121) — "
                 f"it is used as a metric only. To reproduce an old run, go "
                 f"back to that commit (D-128).")
+        # ★ D-190 §6 / §8 — unknown values fail here, before anything is
+        #   read (principle 1).
+        if cfg.fit_space not in ("w", "u"):
+            raise ValueError(f"unknown fit_space: {cfg.fit_space!r}")
+        if cfg.fit_budget not in ("flat", "dim"):
+            raise ValueError(f"unknown fit_budget: {cfg.fit_budget!r}")
+        if cfg.failure_baseline not in ("parent", "global_best"):
+            raise ValueError(
+                f"unknown failure_baseline: {cfg.failure_baseline!r}")
         self.cfg = cfg
         # ★ The trace (D-133). It accumulates in the same place as
         # `dump()`.
@@ -778,6 +827,13 @@ class RoundLoop:
                     registry=reg, task=_feature_task(text))
                 row["name"] = out.get("name")
                 row["code"] = out.get("code")
+                # ★ D-190 §2: what the FeatureWriter declared is kept, so a
+                #   loop axis can be promoted into a library later with its
+                #   unit and range rather than the loader's defaults.
+                for k in ("unit", "direction", "expected_range",
+                          "rationale"):
+                    if out.get(k) is not None:
+                        row[k] = out.get(k)
                 f = register_generated(out["code"], registry=reg, meta=out,
                                        table=self.table, matrix=self.matrix,
                                        hw_alt=alt_hw(self.table.hw),
@@ -903,6 +959,9 @@ class RoundLoop:
                 objective=self._objective,
                 rank_top_k=self.cfg.rank_top_k,
                 rank_lambda=self.cfg.rank_lambda,
+                # ★ D-190 §6 — the worker fits like the sequential path
+                fit_space=self.cfg.fit_space,
+                fit_budget=self.cfg.fit_budget,
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
                 max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
@@ -915,6 +974,14 @@ class RoundLoop:
             self._pool_exec.shutdown(wait=True)
             self._pool_exec = None
         self._pool_or_none()
+
+    def _start_of(self, prop) -> tuple[list[float], list[bool] | None]:
+        """★ Where the fit starts, and which weights are new (D-190 §6).
+        Set by `run_round` from the parent; a seed or a stage-2 candidate
+        has no parent and starts from the LLM's `w0`."""
+        meta = getattr(prop, "meta", None) or {}
+        return (list(meta.get("w_start", prop.w0)),
+                meta.get("new_terms"))
 
     def _evaluate_batch(self, props: list, res: RoundResult) -> list:
         """Several candidates at once. The result **must equal the
@@ -943,7 +1010,7 @@ class RoundLoop:
                     out.append(e)
             return out
 
-        jobs = [(i, prop.code, list(prop.w0))
+        jobs = [(i, prop.code, *self._start_of(prop))
                 for i, (prop, _r) in enumerate(admitted)]
         got = sorted(pool.map(_fit_and_score, jobs), key=lambda d: d["i"])
         elites = []
@@ -1024,6 +1091,7 @@ class RoundLoop:
             code_len=rep.n_nodes, code_terms=rep.n_terms,
             round=len(self.rounds),
             changes=prop.changes, hypothesis_id=prop.hypothesis_id,
+            parent_ids=list(getattr(prop, "parent_ids", []) or []),
             val_regret=out["val_regret"],
             rank_loss=float(out.get("rank_loss", float("nan"))))
 
@@ -1037,16 +1105,14 @@ class RoundLoop:
 
         try:
             # ★ The fitter is decided by **this rule's len(W0)** (D-144).
-            _ft = fitter_for(len(prop.w0))
-            fr = fit_weights(fn, self.matrix, self.table, self.splits.train,
-                             prop.w0, max_evals=_ft["max_evals"],
-                             val_split=self.splits.val,
-                             objective=self._objective,
-                             rank_top_k=self.cfg.rank_top_k,
-                             rank_lambda=self.cfg.rank_lambda,
-                             method=_ft["fit_method"],
-                             n_restarts=_ft["fit_restarts"],
-                             bounds=weight_bounds(prop.code, len(prop.w0)))
+            w_start, new = self._start_of(prop)
+            fr = _fit_rule(fn, prop.code, w_start, new, matrix=self.matrix,
+                           table=self.table, train=self.splits.train,
+                           val=self.splits.val, objective=self._objective,
+                           rank_top_k=self.cfg.rank_top_k,
+                           rank_lambda=self.cfg.rank_lambda,
+                           fit_space=self.cfg.fit_space,
+                           fit_budget=self.cfg.fit_budget)
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
             res.rejections.append(("fit", str(e)[:90]))
@@ -1072,6 +1138,7 @@ class RoundLoop:
             "n_dead": len(fr.dead_terms),
             "n_dead_w": len(fr.dead_by_weight),
             "n_dead_s": len(fr.dead_by_sensitivity),
+            "n_new": int(fr.n_new),
             "rank_loss": _rank_loss_of(fn, {
                 "objective": self._objective,
                 "rank_top_k": self.cfg.rank_top_k,
@@ -1420,12 +1487,30 @@ class RoundLoop:
                 continue
             if hyp:
                 prop.hypothesis_id = hyp.get("id", "")
+            # ★ D-190 §8: the parents travel with the child into its Elite —
+            #   `Elite.parent_ids` existed and was never filled.
+            prop.parent_ids = list(req.get("_parent_ids") or [])
+            # ★ D-190 §6: the terms the child kept from its parent start from
+            #   the parent's fitted weights, matched by statement — not by
+            #   the numbers the LLM retyped.
+            n_inh = n_new = None
+            if self.cfg.warm_start and req.get("parent") is not None:
+                from kernelrule.rules.inherit import inherit_weights
+                pars = [(x.code, x.w0) for x in (req["parent"],
+                                                 req.get("parent2")) if x]
+                w_start, new_m, _src = inherit_weights(prop.code, prop.w0,
+                                                       pars)
+                prop.meta["w_start"] = w_start
+                prop.meta["new_terms"] = new_m
+                n_new = sum(1 for x in new_m if x)
+                n_inh = len(new_m) - n_new
             if kind == "cross" and len(req.get("_codes") or ()) > 1:
                 self._record_cross(r, req["_codes"], prop.code)
             self.trace.ev("proposal", round=r, i=i, kind=kind,
                            parents=req.get("_parent_ids") or [],
                            hyp=(hyp or {}).get("id"),
                            changes=prop.changes, n_weights=len(prop.w0),
+                           n_inherited=n_inh, n_new=n_new,
                            code=prop.code, code_sha=_sha(prop.code))
             key = prop.code.strip()
             if key in self._seen_code:      # it is not rescored (§15.4)
@@ -1515,7 +1600,9 @@ class RoundLoop:
                     parent = ids[keys.index(min(keys))] if keys else None
                 self.failures.append({
                     "round": r, "idea": e.changes, "parent": parent,
-                    "regret_before": round(ref, 4),
+                    # `None`, not `inf` — `Infinity` is not JSON
+                    "regret_before": (round(ref, 4) if np.isfinite(ref)
+                                      else None),
                     "regret_after": round(after, 4),
                     "verdict": verdict})
         res.n_cells = self.archive.n_cells
@@ -1635,7 +1722,7 @@ class RoundLoop:
                          "matrix": self.matrix, "table": self.table,
                          "train": self.splits.train}, np.asarray(e.w))
         self.archive = Archive(
-            noise_tol=0.0,
+            noise_tol=self.cfg.noise_tol,
             select_by=("rank" if dst == "rank" else "regret"))
         for e in sorted(old, key=lambda x: (x.rank_loss if dst == "rank"
                                             else x.regret)):

@@ -224,6 +224,34 @@ def _branch_block(gen: FeatureRegistry, base: FeatureRegistry) -> str:
               "make this one branchable.")
 
 
+#: ★ 2026-10-02 (D-190 §2): time axes asked for per stage-1 session — an
+#: axis that estimates the kernel's time from two effects pulling in
+#: opposite directions as a config field grows (role/feature.md). Counted by
+#: the unit the FeatureWriter declares ("time ratio" / "log2 time ratio").
+#: ⛔ 1, and not raised: the point is that one exists, not how many; a
+#: larger quota pays for variants of the same estimate, which the
+#: duplication check then refuses one by one (the D-170 §4-3 reasoning).
+MIN_TIME_AXES = 1
+
+
+def _n_time_axes(gen: FeatureRegistry, base: FeatureRegistry) -> list[str]:
+    """The time axes built so far in this session (D-190 §2)."""
+    return sorted(n for n in set(gen._items) - set(base._items)
+                  if "time" in str(getattr(gen[n], "unit", "")).lower())
+
+
+def _time_block(gen: FeatureRegistry, base: FeatureRegistry) -> str:
+    """The live time-axis count for the prompt (D-190 §2)."""
+    names = _n_time_axes(gen, base)
+    if len(names) >= MIN_TIME_AXES:
+        return (f"\n\n★ Time axes so far: **{len(names)}** ({names}). The "
+                f"quota is met.")
+    return (f"\n\n★ Time axes so far: **0** of the {MIN_TIME_AXES} asked "
+            "for. If this area has two effects that move in opposite "
+            "directions as one config field grows, make this axis estimate "
+            "the time they add up to (unit \"time ratio\").")
+
+
 def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
           gen: FeatureRegistry, base: FeatureRegistry) -> str:
     """The instruction for this proposal. With an area, it builds within
@@ -233,7 +261,7 @@ def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
         tail = (f"\n\nBuilt so far: {made}. Find an axis different from "
                 "these." if made else "")
         return ("## What to build now\n\nPropose one feature." + tail
-                + _branch_block(gen, base))
+                + _branch_block(gen, base) + _time_block(gen, base))
     desc = next(c["description"] for c in cats if c["name"] == cat)
     mine = made_in.get(cat, [])
     other = sorted(set(gen._items) - set(base._items) - set(mine))
@@ -244,7 +272,7 @@ def _task(cat: str | None, cats: list[dict], made_in: dict[str, list[str]],
             "```\n\n"
             "★ Stay **within this area**. Wandering into another area leaves "
             "nothing to build\nwhen that area's turn comes."
-            + _branch_block(gen, base))
+            + _branch_block(gen, base) + _time_block(gen, base))
 
 
 #: ★ How many times the FeatureWriter is asked again when §8.3 refuses its

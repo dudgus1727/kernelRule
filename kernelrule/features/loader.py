@@ -256,7 +256,10 @@ def run_registry(run: str, *, table, seed: int = 0, root: str | Path = "runs",
             name, fn = gen.compile_feature(e["code"],
                                            known=frozenset(seen))
             seen.add(name)
-            rng = (e.get("range") or {}).get("declared") or (0.0, 1.0)
+            # ★ D-190 §2: a row written since D-190 carries the declared
+            #   range at the top level; older rows only inside `range`.
+            rng = (e.get("expected_range")
+                   or (e.get("range") or {}).get("declared") or (0.0, 1.0))
             pending.append(Feature(
                 name=name, fn=fn, unit=str(e.get("unit", "dimensionless")),
                 expected_range=(float(rng[0]), float(rng[1])),

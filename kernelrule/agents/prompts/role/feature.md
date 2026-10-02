@@ -26,7 +26,9 @@ not yours**. Your job is to make that physical quantity expressible.
 **Do unify the sign, though — larger must mean worse.**
 That keeps the rule "weighted sum, then ascending" everywhere. If the
 quantity is physically "larger is better", flip the sign or turn it into a
-deficit (occupancy -> occupancy deficit).
+deficit (occupancy -> occupancy deficit). This fixes the **sign** only. How
+the value moves as a config field grows is up to the physics — see the time
+axes below.
 
 ## Why this is needed
 
@@ -56,7 +58,8 @@ missing axis is your job.**
    number written into it does not transfer, and is rejected
    This is checked automatically by changing hw and seeing if the value moves
 5. Do not reference cfg.ext — those are architecture-specific fields
-6. At most 10 lines. No import (`math` and `np` are already there)
+6. At most 12 lines, the def and docstring included. No import (`math`
+   and `np` are already there)
 7. Guard against division by zero. Use something like max(x, 1e-9)
 ```
 
@@ -75,6 +78,40 @@ bad    "tile_m * split_k / K"
 **A feature that duplicates an existing one is discarded.** If both Spearman
 and Pearson correlation exceed 0.95, it measures the same thing.
 **Find a different axis.**
+
+<!-- D-190 §2: every axis of the library that responds to one config field
+moved one way only as that field grew, so a weighted sum could only prefer
+an end of its range. -->
+## ★ Time axes — two effects that pull in opposite directions
+
+A rule adds its terms up. If every term only grows, or only shrinks, as one
+config field grows, the sum can only prefer **an end** of that field's
+range — never a value in the middle. Kernels rarely work that way: raising a
+setting usually buys one thing and pays for it with another.
+
+So build axes that **estimate the time** the kernel spends, from two effects
+that move in opposite directions as the same field grows:
+
+```
+effect A    shrinks as the field grows    (e.g. more work in flight)
+effect B    grows as the field grows      (e.g. a fixed cost paid per unit)
+the axis    time(A) + time(B), or the larger of the two where they overlap
+            -> lowest somewhere in the middle of the range
+```
+
+How:
+
+```
+1. write each effect as a time: operations over a throughput, bytes over a
+   bandwidth, a count times a latency — every rate from hw.*
+2. combine them: add them, or take the larger where they run at once
+3. divide by an ideal time of the same shape (the whole problem at peak
+   throughput) so the value is a ratio >= 1, or take log2 of that ratio
+4. in the rationale, name both effects and which way each one moves
+```
+
+It is still "larger is worse". ★ **Across this session, make at least one
+such time axis**, and give it the unit "time ratio" (or "log2 time ratio").
 
 ## ★ Branchable axes — make at least three
 
@@ -122,7 +159,8 @@ name              lower case + underscores. Must not collide with an existing na
 code              the full function, starting at def
 rationale         which physics, and why it drives performance. Two or three
                   sentences. If "by how much" follows from the formula, say so
-unit              "dimensionless" | "bytes" | "count" | "ratio" ...
+unit              "dimensionless" | "bytes" | "count" | "ratio" |
+                  "time ratio" | "log2 time ratio" ...
 expected_range    (low, high). ★ Derive it **from the formula**, not from data
 direction         "higher_is_worse" | "higher_is_better" | "neutral"
 ```
