@@ -135,6 +135,10 @@ class Config:
     Keeping `ext` a dict is deliberate (§6.1). The fields differ per
     architecture, and a feature aiming at architecture transfer must not look
     at `ext` — making them dataclass fields would only encourage access.
+
+    ★ What does transfer is lifted out under a **backend-neutral** name and
+    `ext` keeps the raw copy: `stages` (D-161), `raster_order` /
+    `raster_width` (D-190).
     """
 
     # Common — physical features must compute from these alone for transfer
@@ -167,15 +171,46 @@ class Config:
     #:
     #: It stays out of `ext` under the §4.3 rule only if it does not
     #: transfer, and it does: the value set is {2,3,4,5,6,7,8} on the A6000,
-    #: the 5090, the 4090 and the H100 alike, with **0 missing rows**. The
-    #: `swizzle` fields stay in `ext` — `identity`/`horizontal` are SM80
-    #: words (D-75).
+    #: the 5090, the 4090 and the H100 alike, with **0 missing rows**.
+    #: ⚠️ It went on: "the `swizzle` fields stay in `ext` — `identity`/
+    #: `horizontal` are SM80 words (D-75)". D-190 lifts them under neutral
+    #: names (`raster_order` / `raster_width` below); the CUTLASS words stay
+    #: in `ext` and out of the prompt.
     #:
     #: ⚠️ `0` means **the bundle has no `ext_stages` column**. Every bundle
     #: measured so far has it, and so does the synthetic generator; a
     #: feature that sees 0 is looking at a table that cannot answer, not at
     #: a kernel with zero stages.
     stages: int = 0
+    #: ★ 2026-10-02 (D-190 §4): the **launch order of the output tiles**
+    #: (CTA rasterization), lifted out of `ext` under backend-neutral names.
+    #:
+    #: ```
+    #: raster_order  "along_m"  the band steps down M first — CTAs launched
+    #:                          together share columns of B
+    #:               "along_n"  the band steps across N first — they share
+    #:                          rows of A
+    #: raster_width  the band's width in tiles of the other dimension, as
+    #:               the kernel **requests** it
+    #:
+    #: CUTLASS 2.x  GemmIdentityThreadblockSwizzle<W>  along_m, W
+    #:              GemmHorizontalThreadblockSwizzle   along_n, 1
+    #: CUTLASS 3.x  RasterOrder AlongM / AlongN + max_swizzle_size
+    #: Triton       GROUP_M = G                        along_n, G
+    #: ```
+    #:
+    #: ⚠️ The **effective** width is not a field: CUTLASS narrows the band
+    #: when the grid has few N-tiles, so it depends on the shape, and a
+    #: `Config` is shape-independent. A feature computes it.
+    #:
+    #: Why it is lifted: on the c2 a6000 rules identity widths 1/2/4/8 were
+    #: tied in score 100% of the time and the tie-break decided 14% of the
+    #: train log-regret — a quantity the rules could not see. The value set
+    #: is the same on all four tables (identity 1/2/4/8, horizontal 1).
+    #:
+    #: ⚠️ `""` / `0` means **the bundle has no `ext_swizzle_*` column**.
+    raster_order: str = ""
+    raster_width: int = 0
     #: SASS instruction count. Known at build time, common across
     #: architectures. GBDT ranked it highly but the hand rule never used it
     #: (§30.6b).
@@ -340,9 +375,33 @@ def hardware_from_env(env: dict) -> Hardware:
     return hw
 
 
+#: ★ D-190 §4 — the CUTLASS 2.x swizzle kind -> the neutral launch order.
+_RASTER_ORDER = {"identity": "along_m", "horizontal": "along_n"}
+
+
+def raster_of(swizzle_type: Any, swizzle_n: Any) -> tuple[str, int]:
+    """`(raster_order, raster_width)` from the bundle's swizzle columns
+    (D-190 §4). `("", 0)` when the bundle has none; an unknown kind raises
+    — it is not guessed (§26.4).
+
+    ⚠️ Plain `str` / `int` out, so `config_from_row` and
+    `matrix._configs_of` build **equal** Configs.
+    """
+    if swizzle_type is None:
+        return "", 0
+    t = str(swizzle_type)
+    if t not in _RASTER_ORDER:
+        raise ValueError(f"unknown swizzle kind {t!r} — add it to "
+                         f"_RASTER_ORDER with its launch order (D-190)")
+    return _RASTER_ORDER[t], int(swizzle_n or 0)
+
+
 def config_from_row(row: dict[str, Any]) -> Config:
     """One adapter-normalised row -> Config. Called by `core/adapter.py`."""
     ext = {k[len("ext_"):]: v for k, v in row.items() if k.startswith("ext_")}
+    # ★ D-190 §4. `ext` keeps its copy, as with `stages`.
+    r_order, r_width = raster_of(row.get("ext_swizzle_type"),
+                                 row.get("ext_swizzle_n"))
     return Config(
         tile_m=int(row["tile_m"]), tile_n=int(row["tile_n"]),
         tile_k=int(row["tile_k"]),
@@ -359,6 +418,7 @@ def config_from_row(row: dict[str, Any]) -> Config:
         # ★ D-161. `ext` keeps its copy — `ext` is the raw record of the
         #   table and nothing that reads it should change.
         stages=int(row.get("ext_stages") or 0),
+        raster_order=r_order, raster_width=r_width,
         inst_total=int(row.get("inst_total") or 0),
         ext=ext,
     )

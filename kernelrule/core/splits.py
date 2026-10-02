@@ -330,7 +330,10 @@ def _make_dummy():
                   #   consistent. Nothing reads it here (the roofline needs
                   #   no stage count); a mismatched 0 would just be a lie
                   #   waiting to be read.
-                  stages=3)
+                  stages=3,
+                  # ★ D-190 §4: CUTLASS's default launch order, W = 1.
+                  #   Nothing reads it here either.
+                  raster_order="along_m", raster_width=1)
 
 
 _DUMMY_CFG = _make_dummy()

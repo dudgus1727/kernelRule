@@ -39,6 +39,7 @@ from kernelrule.core.types import (
     Hardware,
     Problem,
     config_from_row,
+    raster_of,
 )
 from kernelrule.features import FeatureRegistry
 
@@ -150,7 +151,9 @@ _CFG_INT = ("tile_m", "tile_n", "tile_k", "align_a", "align_b", "align_c",
             "spill_bytes", "max_blocks_per_sm")
 _CFG_STR = ("split_k_mode", "arch", "kernel_id", "pipeline_kind")
 #: Optional — absent in an older bundle, and then the default applies.
-_CFG_OPT = ("ext_stages", "inst_total")
+_CFG_OPT = ("ext_stages", "inst_total",
+            # ★ D-190 §4 — read into `raster_order` / `raster_width`
+            "ext_swizzle_type", "ext_swizzle_n")
 
 
 def _configs_of(df) -> list:
@@ -170,7 +173,7 @@ def _configs_of(df) -> list:
     ```
 
     **More than half was pandas -> dict, not `Config`.** `to_dict("records")`
-    materialises a **68-key dict per row** while `Config` reads 18 of them;
+    materialises a **68-key dict per row** while `Config` reads 20 of them;
     reading the columns as numpy arrays and indexing skips that entirely.
 
     ⚠️ The per-row object stays. A feature function is handed `cfg` and
@@ -193,6 +196,12 @@ def _configs_of(df) -> list:
     for i in range(n):
         st = opt["ext_stages"]
         it = opt["inst_total"]
+        # ★ D-190 §4 — the same helper as `config_from_row`
+        r_order, r_width = raster_of(
+            opt["ext_swizzle_type"][i]
+            if opt["ext_swizzle_type"] is not None else None,
+            opt["ext_swizzle_n"][i]
+            if opt["ext_swizzle_n"] is not None else None)
         out.append(Config(
             tile_m=int(ints["tile_m"][i]), tile_n=int(ints["tile_n"][i]),
             tile_k=int(ints["tile_k"][i]),
@@ -210,6 +219,7 @@ def _configs_of(df) -> list:
             max_blocks_per_sm=int(ints["max_blocks_per_sm"][i]),
             pipeline_kind=str(strs["pipeline_kind"][i]),
             stages=int(st[i] or 0) if st is not None else 0,
+            raster_order=r_order, raster_width=r_width,
             inst_total=int(it[i] or 0) if it is not None else 0,
             ext={k: v[i] for k, v in ext_cols.items()},
         ))

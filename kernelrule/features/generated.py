@@ -51,7 +51,9 @@ class FeatureRejected(ValueError):
 
 
 #: The raw fields exposed in the prompt. `Config.ext` is **deliberately
-#: left out** (§4.3).
+#: left out** (§4.3) — what of it transfers is exposed as a `Config` field
+#: under a neutral name (`stages` D-161, `raster_order`/`raster_width`
+#: D-190).
 RAW_FIELDS: dict[str, tuple[str, ...]] = {
     # ★ `bytes_per_element` / `acc_bytes_per_element` are derived from
     #   `dtype`, so they are **not new information.** They are exposed
@@ -66,7 +68,8 @@ RAW_FIELDS: dict[str, tuple[str, ...]] = {
     "cfg": ("tile_m", "tile_n", "tile_k", "align_a", "align_b", "align_c",
             "split_k", "split_k_mode", "regs_per_thread", "threads",
             "smem_bytes", "spill_bytes", "max_blocks_per_sm",
-            "pipeline_kind", "stages", "inst_total"),
+            "pipeline_kind", "stages", "raster_order", "raster_width",
+            "inst_total"),
 }
 
 _ALLOWED_NP = frozenset({
@@ -159,6 +162,16 @@ FIELD_MEANING: dict[str, str] = {
     "cfg.stages":
         "operand-buffer stages the mainloop keeps in flight. 2 means the "
         "pipelined family; 3 and above is multistage (int)",
+    "cfg.raster_order":
+        "the order output tiles are handed to CTAs. \"along_m\" walks a "
+        "band of tiles down M first, so CTAs launched together share "
+        "columns of B; \"along_n\" walks across N first, so they share rows "
+        "of A. It decides which operand tiles are still in L2 when the next "
+        "CTAs need them (string; \"\" = not recorded)",
+    "cfg.raster_width":
+        "the width of that band in tiles of the other dimension, as the "
+        "kernel requests it. The launch can use a narrower band when the "
+        "grid has fewer tiles across than this (int; 0 = not recorded)",
     "cfg.inst_total":
         "estimated SASS instruction count of the kernel (int)",
 }

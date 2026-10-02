@@ -10,7 +10,9 @@
 
 ```
 compute throughput   | how well the compute resources are used
-memory traffic       | how much data moves
+memory traffic       | how much data moves — into the SM, and from DRAM
+                       to L2; the launch order decides what CTAs running
+                       together can reuse from L2
 compute/traffic ratio| which of the two is the bottleneck. `hw.ridge_point`
                        is that boundary
 resource pressure    | how close you are to the per-SM resource limits

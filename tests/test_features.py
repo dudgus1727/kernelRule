@@ -628,7 +628,11 @@ def test_the_stage_count_is_a_config_field_and_it_varies(perf_table):
 
 def test_swizzle_stays_out_of_the_raw_fields():
     """⛔ D-75 — `identity`/`horizontal` are SM80 words and do not transfer.
-    Lifting `stages` out of `ext` is not a licence to lift the rest."""
+    Lifting `stages` out of `ext` is not a licence to lift the rest.
+
+    ★ D-190 §4: the launch order **is** lifted now, under neutral names
+    (`raster_order` / `raster_width`). The CUTLASS words still stay out of
+    the prompt — that is what this test keeps holding."""
     from kernelrule.features.generated import RAW_FIELDS, field_block
 
     flat = {f"{b}.{n}" for b, ns in RAW_FIELDS.items() for n in ns}
@@ -638,6 +642,47 @@ def test_swizzle_stays_out_of_the_raw_fields():
     text = field_block()
     for word in ("swizzle", "warp_m", "identity", "horizontal"):
         assert word not in text, f"{word} is in the prompt"
+
+
+def test_the_raster_fields_are_config_fields_and_match_ext(perf_table):
+    """★ D-190 §4 — `cfg.raster_order` / `cfg.raster_width` are exposed,
+    they are the swizzle columns under neutral names, and `ext` keeps the
+    raw copy."""
+    from kernelrule.core.types import config_from_row
+    from kernelrule.features.generated import FIELD_MEANING, RAW_FIELDS
+
+    for n in ("raster_order", "raster_width"):
+        assert n in RAW_FIELDS["cfg"]
+        assert f"cfg.{n}" in FIELD_MEANING
+    order = {"identity": "along_m", "horizontal": "along_n"}
+    seen = set()
+    for p in list(perf_table.shapes())[:4]:
+        for row in perf_table.frame_for(p).to_dict("records"):
+            c = config_from_row(row)
+            seen.add((c.raster_order, c.raster_width))
+            assert c.raster_order == order[c.ext["swizzle_type"]]
+            assert c.raster_width == int(c.ext["swizzle_n"])
+    assert seen <= {("along_m", 1), ("along_m", 2), ("along_m", 4),
+                    ("along_m", 8), ("along_n", 1)}, sorted(seen)
+    assert len(seen) > 2, f"the launch order is flat here: {sorted(seen)}"
+
+
+def test_a_feature_may_read_the_raster_fields_but_not_ext():
+    from kernelrule.features.generated import (
+        FeatureRejected,
+        check_feature_code,
+    )
+
+    ok = ("def band(p, hw, cfg):\n"
+          "    \"\"\"band.\"\"\"\n"
+          "    return float(cfg.raster_width) + "
+          "(1.0 if cfg.raster_order == \"along_n\" else 0.0)\n")
+    assert check_feature_code(ok, known=frozenset()) == "band"
+    bad = ("def band(p, hw, cfg):\n"
+           "    \"\"\"band.\"\"\"\n"
+           "    return float(cfg.ext[\"swizzle_n\"])\n")
+    with pytest.raises(FeatureRejected):
+        check_feature_code(bad, known=frozenset())
 
 
 # ---------------------------------------------------------------------------

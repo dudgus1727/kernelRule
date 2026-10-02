@@ -244,7 +244,8 @@ def test_configs_of_matches_the_to_dict_path_exactly(synth_table):
 
     Measured on the A6000 (66 shapes / 980,915 rows) the old line split as
     `to_dict` 9.85s + `config_from_row` 7.34s — more than half was pandas
-    -> dict, and `Config` reads 18 of the table's 68 columns. Reading the
+    -> dict, and `Config` reads 20 of the table's 68 columns (18 before
+    D-190 §4 added the two launch-order columns). Reading the
     columns directly skips it.
 
     ⛔ Equality, not tolerance. The same arithmetic in the same order must
@@ -259,6 +260,21 @@ def test_configs_of_matches_the_to_dict_path_exactly(synth_table):
         new = _configs_of(df)
         assert len(old) == len(new)
         assert old == new, p
+
+
+def test_configs_of_without_the_raster_columns(synth_table):
+    """★ D-190 §4 — a bundle without the swizzle columns gives `("", 0)`
+    on both paths, and the two paths still agree."""
+    from kernelrule.core.matrix import _configs_of
+    from kernelrule.core.types import config_from_row
+
+    p = synth_table.shapes()[0]
+    df = synth_table.frame_for(p).drop(
+        columns=["ext_swizzle_type", "ext_swizzle_n"], errors="ignore")
+    old = [config_from_row(r) for r in df.to_dict("records")]
+    new = _configs_of(df)
+    assert old == new
+    assert {(c.raster_order, c.raster_width) for c in new} == {("", 0)}
 
 
 def test_configs_of_keeps_the_ext_dict(synth_table):

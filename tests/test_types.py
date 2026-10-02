@@ -92,3 +92,17 @@ def test_hardware_from_env_applies_effective_values(real_bundle_path):
 def test_tiebreak_is_a_permutation():
     c = _cand(7)
     assert sorted(c.tiebreak.tolist()) == list(range(7))
+
+
+def test_raster_of_maps_the_swizzle_columns():
+    """★ D-190 §4 — the neutral launch order, and an unknown kind fails
+    loudly instead of being guessed."""
+    import pytest
+
+    from kernelrule.core.types import raster_of
+
+    assert raster_of(None, None) == ("", 0)
+    assert raster_of("identity", 4) == ("along_m", 4)
+    assert raster_of("horizontal", 1) == ("along_n", 1)
+    with pytest.raises(ValueError):
+        raster_of("diagonal", 1)
