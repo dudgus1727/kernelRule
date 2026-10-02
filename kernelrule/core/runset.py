@@ -41,7 +41,8 @@ ROOT = Path("runs")
 #: this grows, the tests grow with it.
 KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
         "parameters", "product_hint", "power_hint", "hw", "split_kind",
-        "feature_condition", "model", "fit_method", "fit_restarts")
+        "feature_condition", "model", "fit_method", "fit_restarts",
+        "noise_tol", "failure_baseline")
 #: ⚠️ `fitter_source` is **deliberately not in KEYS** (D-163). It says how
 #: the record was written, not what ran: every run since D-144 chooses the
 #: fitter per rule, whether or not its `config.json` says so. Putting it in
@@ -53,7 +54,9 @@ KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
 #: filling "missing" with this value is not leniency but **stating the
 #: fact**. Add an entry here only when a new key goes into KEYS. Runs that do
 #: have a value are compared as they are.
-_OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4}
+_OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4,
+                 # ★ D-190 §8 — every run before it
+                 "noise_tol": 0.0, "failure_baseline": "global_best"}
 
 
 class RunSetError(ValueError):
@@ -123,6 +126,10 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         #   of the config, not what ran. Old runs have no such key and are
         #   read exactly as before.
         "fitter_source": c.get("fitter_source"),
+        # ★ D-190 §8. Older runs have no key: 0.0 / the global best.
+        "noise_tol": loop.get("noise_tol", _OLD_DEFAULTS["noise_tol"]),
+        "failure_baseline": loop.get(
+            "failure_baseline", _OLD_DEFAULTS["failure_baseline"]),
         "seed_source": None, "seed_sha": None,
     }
     ch = r / _campaign(run) / "stage2-rule-writer" / "chosen.json"

@@ -35,9 +35,14 @@ is real.
 visible from a single case. Use it to check whether what you saw in one case
 holds across the whole table.
 
-**Block 5 (failure history)** lists what has already been tried and failed.
-**Do not repeat the same idea.** In particular, do not retry anything marked
-`made_worse`, however old it is.
+**Block 5 (failure history)** lists what has already been tried and did
+not get into the archive, each compared with **its own parent**.
+**Do not repeat the same idea unchanged.** Do not retry anything marked
+`made_worse` (worse than its parent by more than the fitting noise), however
+old it is. `tie` means the change landed within the fitting noise of its
+parent: it neither helped nor hurt measurably. That is not evidence against
+the idea, but repeating it as it was will tie again. `better_not_kept` beat
+its parent but not the rule that already holds that place.
 
 ## Good hypotheses and bad ones
 

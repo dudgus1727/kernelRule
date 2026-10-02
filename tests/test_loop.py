@@ -1252,3 +1252,38 @@ def test_switch_needs_enough_rounds():
     loop._objective, loop._switched = "rank", False
     loop.rounds = [RoundResult(round=i, best_rank_loss=1.0) for i in range(3)]
     assert loop._maybe_switch() is False
+
+
+# -- ★ D-190 §8 — the failure record compares a child with its own parent --
+def test_failure_verdict_is_against_the_own_parent_with_a_noise_band():
+    from kernelrule.core.loop import FIT_NOISE_TOL, failure_verdict
+
+    tol = FIT_NOISE_TOL
+    # A child 0.005 worse than its own parent is a tie, even though it is
+    # far worse than the global best (1.05) — the old record said made_worse.
+    assert failure_verdict(1.205, [1.20], 1.05, tol=tol,
+                           baseline="parent") == ("tie", 1.20)
+    assert failure_verdict(1.205, [], 1.05, tol=tol,
+                           baseline="global_best")[0] == "made_worse"
+    assert failure_verdict(1.25, [1.20], 1.05, tol=tol,
+                           baseline="parent") == ("made_worse", 1.20)
+    assert failure_verdict(1.15, [1.20], 1.05, tol=tol,
+                           baseline="parent") == ("better_not_kept", 1.20)
+    # A cross child is compared with the better of its two parents.
+    assert failure_verdict(1.185, [1.30, 1.18], 1.05, tol=tol,
+                           baseline="parent") == ("tie", 1.18)
+    # A fresh rule has no parent: the round-start best.
+    assert failure_verdict(1.07, [], 1.05, tol=tol,
+                           baseline="parent") == ("made_worse", 1.05)
+    with pytest.raises(ValueError):
+        failure_verdict(1.0, [], 1.0, tol=tol, baseline="nope")
+
+
+def test_the_loop_records_parents_and_ties(loop):
+    """Every failure carries the parent it was compared with, and the
+    verdicts are only the three D-190 ones."""
+    loop.run(2, verbose=False)
+    assert loop.archive.noise_tol == loop.cfg.noise_tol
+    for f in loop.failures:
+        assert f["verdict"] in ("made_worse", "tie", "better_not_kept")
+        assert "parent" in f

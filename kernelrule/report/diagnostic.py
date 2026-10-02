@@ -646,8 +646,11 @@ def _render(r: DiagnosticReport) -> str:
         add("**Do not repeat the same idea.**")
         add("```")
         for f in r.failures:
-            add(f"r{f.get('round','?'):<4} {f.get('verdict','?'):12s} "
+            # ★ D-190 §8: `regret_before` is the child's **own parent**
+            #   (named when known), not the global best.
+            vs = f" vs {f['parent']}" if f.get("parent") else ""
+            add(f"r{f.get('round','?'):<4} {f.get('verdict','?'):15s} "
                 f"{f.get('regret_before','?')} -> {f.get('regret_after','?')}"
-                f"   {f.get('idea','')}")
+                f"{vs}   {f.get('idea','')}")
         add("```")
     return "\n".join(L)

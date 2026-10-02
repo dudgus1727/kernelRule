@@ -59,6 +59,26 @@ from kernelrule.rules.checks import (
 __all__ = ["RoundLoop", "RoundResult", "LoopConfig", "LLMUnreachable"]
 
 
+#: ★ 2026-10-02 (D-190 §8): the **fitting noise** of an acceptance key — a
+#: difference smaller than this is not a difference.
+#:
+#: ```
+#: where it comes from     refitting an evolved a6000 rule with its weight
+#:                         labels permuted moves train regret by ±0.01
+#:                         (D-188 H25)
+#: what it does to the     c2 a6000, 114 round-to-round changes of the best:
+#: archive best            train gain < 0.01  88 times -> holdout log change
+#:                         mean −0.0003, 40 better / 37 worse (= noise)
+#:                         train gain >= 0.01 26 times -> mean −0.0156,
+#:                         18 better / 8 worse
+#: what it does to the     535 children that did not enter the archive,
+#: failure record          compared with their own parent: 43% within 0.01,
+#:                         55% worse, 2% better — all recorded `made_worse`
+#:                         against the global best, and banned from retry
+#: ```
+FIT_NOISE_TOL = 0.01
+
+
 @dataclass
 class LoopConfig:
     run_id: str
@@ -198,6 +218,16 @@ class LoopConfig:
     #: parent rule and the feature list alone.
     #: **The default is on** (as in every run so far).
     use_analyst: bool = True
+    #: ★ 2026-10-02 (D-190 §8): a difference in the acceptance key smaller
+    #: than this is fitting noise (`FIT_NOISE_TOL`). It is the archive's
+    #: `noise_tol` — the best is replaced only by a rule better by more
+    #: than this — and the width of a `tie` in the failure record.
+    #: Runs before D-190 ran with **0.0** (`runset._OLD_DEFAULTS`).
+    noise_tol: float = FIT_NOISE_TOL
+    #: ★ 2026-10-02 (D-190 §8): what a rejected child is compared with in
+    #: the failure record — `"parent"` (its own) or `"global_best"` (the
+    #: archive best at the start of the round, every run before D-190).
+    failure_baseline: str = "parent"
 
 
 class LLMUnreachable(RuntimeError):
@@ -237,6 +267,36 @@ STOP_ON_TOTAL_LLM_FAILURE = True
 #: It differs from overfitting — even a rule with only 3 terms exceeds this
 #: value (+4.99 measured).
 VAL_GAP_ALARM = 0.5
+
+
+def failure_verdict(child: float, parents: list[float], before: float,
+                    *, tol: float, baseline: str) -> tuple[str, float]:
+    """★ Why a child that did not enter the archive failed (D-190 §8).
+    Returns `(verdict, the value it was compared with)`.
+
+    ```
+    baseline="parent"       compared with its **own** parent (the better one
+                            for a cross child); `before` only when it had
+                            none (a fresh rule)
+      made_worse            worse than that by more than `tol`
+      tie                   within `tol` — the idea neither helped nor hurt
+                            measurably. ★ Not a reason to ban it
+      better_not_kept       better than its parent, but not enough to take a
+                            cell or the best
+    baseline="global_best"  the behaviour before D-190: compared with the
+                            archive best at the start of the round,
+                            `made_worse` / `no_effect`
+    ```
+    """
+    if baseline == "global_best":
+        return ("made_worse" if child > before else "no_effect"), before
+    if baseline != "parent":
+        raise ValueError(f"unknown failure baseline: {baseline!r}")
+    ref = min(parents) if parents else before
+    d = child - ref
+    if abs(d) < tol:
+        return "tie", ref
+    return ("made_worse" if d > 0 else "better_not_kept"), ref
 
 
 #: ★ What a worker sees (D-95). A child created by `fork` **inherits the
@@ -538,8 +598,10 @@ class RoundLoop:
         self.rng = np.random.default_rng(cfg.seed)
         # ★ The cells are always dynamic tertiles (D-144) — `cell_mode`
         # was removed.
+        # ★ 2026-10-02 (D-190 §8): `noise_tol` is the fitting noise. It was
+        #   0.0, so the best moved on gains the fitter makes by chance.
         self.archive = Archive(
-            noise_tol=0.0,
+            noise_tol=cfg.noise_tol,
             select_by=("rank" if cfg.objective == "rank" else "regret"))
         self.rounds: list[RoundResult] = []
         self.failures: list[dict] = []
@@ -1284,6 +1346,10 @@ class RoundLoop:
                          #   `_user_prompt` does not read — it does not enter
                          #   the prompt.
                          "_parent_ids": [x.rule_id for x in ps[:2]],
+                         # ★ Their acceptance keys, for the failure record
+                         #   (D-190 §8). Not read by `_user_prompt`.
+                         "_parent_keys": [self.archive.key(x)
+                                          for x in ps[:2]],
                          "parent_n_terms": n_terms,
                          "parent_path_params": path_params,
                          "hypothesis": hyp,
@@ -1305,6 +1371,9 @@ class RoundLoop:
         #: Candidates to send in parallel — the parent kind travels with
         #: them (for the D-94 counts).
         batch: list = []
+        #: code -> (parent ids, parent keys), for the failure record
+        #: (D-190 §8).
+        parent_of: dict[str, tuple[list, list]] = {}
 
         def bump(kind: str, key: str) -> None:
             res.by_parent_kind.setdefault(
@@ -1369,6 +1438,8 @@ class RoundLoop:
             #   here too, or the workers do the same job twice.
             self._seen_code[key] = float("nan")
             batch.append((prop, kind))
+            parent_of[key] = (list(req.get("_parent_ids") or []),
+                              list(req.get("_parent_keys") or []))
 
         # ★ Fitting and scoring happen in one batch (D-95). At
         #   `n_workers=0` it stays sequential.
@@ -1403,6 +1474,8 @@ class RoundLoop:
 
         # 6~7. Update the archive + record the failures
         before = self.archive.best.regret if self.archive.best else float("inf")
+        before_key = (self.archive.key(self.archive.best)
+                      if self.archive.best else float("inf"))
         for e in elites:
             won = self.archive.consider(e)
             # ★ The tertile cell is decided by the population — the
@@ -1422,12 +1495,29 @@ class RoundLoop:
             if won:
                 res.n_accepted += 1
             else:
+                # ★ 2026-10-02 (D-190 §8): compared with **its own parent**,
+                #   and a difference inside the fitting noise is a `tie`.
+                #   Before, every rejected child was compared with the global
+                #   best and 43% of the "made_worse" were within 0.01 of
+                #   their parent — and the Analyst is told never to retry
+                #   those.
+                if self.cfg.failure_baseline == "global_best":
+                    after = e.regret
+                    verdict, ref = failure_verdict(
+                        after, [], before, tol=0.0, baseline="global_best")
+                    parent = None
+                else:
+                    ids, keys = parent_of.get(e.code.strip(), ([], []))
+                    after = self.archive.key(e)
+                    verdict, ref = failure_verdict(
+                        after, keys, before_key, tol=self.cfg.noise_tol,
+                        baseline=self.cfg.failure_baseline)
+                    parent = ids[keys.index(min(keys))] if keys else None
                 self.failures.append({
-                    "round": r, "idea": e.changes,
-                    "regret_before": round(before, 4),
-                    "regret_after": round(e.regret, 4),
-                    "verdict": "made_worse" if e.regret > before
-                               else "no_effect"})
+                    "round": r, "idea": e.changes, "parent": parent,
+                    "regret_before": round(ref, 4),
+                    "regret_after": round(after, 4),
+                    "verdict": verdict})
         res.n_cells = self.archive.n_cells
         if self.archive.best:
             res.best_regret = self.archive.best.regret

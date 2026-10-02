@@ -227,6 +227,11 @@ class Archive:
         #: early-stop verdict (§14.3).
         self.last_new_cell_round = -1
 
+    def key(self, e: Elite) -> float:
+        """★ The acceptance key, for callers outside the archive (the
+        failure record compares a child with its parent on it, D-190 §8)."""
+        return self._key(e)
+
     def _key(self, e: Elite) -> float:
         """The value acceptance uses. **Lower is better.**"""
         if self.select_by == "regret":
