@@ -65,6 +65,7 @@ def _gm(v) -> float:
 
 _MATRIX: dict = {}
 _LIB: dict = {}
+_SPLITS: dict = {}
 
 
 def _matrix_for(arm: str, fold: int, seed: int, table):
@@ -102,7 +103,7 @@ def _feature_flags(code: str, reg) -> dict:
     return {"n_features": len(used), "raster": raster, "time": timed}
 
 
-def _picks(code, w, table, matrix, shapes, cls) -> dict:
+def _picks(code, w, table, matrix, shapes, cls, holdout=None) -> dict:
     from kernelrule.core.sandbox import compile_rule
     from kernelrule.core.weights import make_score_of
 
@@ -111,6 +112,7 @@ def _picks(code, w, table, matrix, shapes, cls) -> dict:
     hungry_hit = 0
     raster_big: Counter = Counter()
     ties = 0
+    detail = []
     for p in shapes:
         cand = table.candidates(p)
         df = table.frame_for(p).reset_index(drop=True)
@@ -119,6 +121,21 @@ def _picks(code, w, table, matrix, shapes, cls) -> dict:
         i = int(cand.top_k(s, 1)[0])
         ties += int(np.sum(s == s[i]) > 1)
         c = cls[f"{p.M}x{p.N}x{p.K}"]
+        j0 = int(np.argmin(t))
+
+        def _cf(k, df=df):
+            r_ = df.iloc[k]
+            return {"kernel_id": str(r_["kernel_id"]),
+                    "split_k": int(r_["split_k"]),
+                    "raster": f"{r_.get('ext_swizzle_type')}"
+                              f"{r_.get('ext_swizzle_n')}",
+                    "tile": f"{r_['tile_m']}x{r_['tile_n']}x{r_['tile_k']}"}
+        detail.append({"shape": [p.M, p.N, p.K], "class": c,
+                       "holdout": bool(holdout is not None
+                                       and p.key in holdout),
+                       "regret": round(float(t[i] / t[j0]), 5),
+                       "tie_size": int(np.sum(s == s[i])),
+                       "pick": _cf(i), "best": _cf(j0)})
         if c == "hungry":
             hungry += 1
             hungry_hit += int(int(df.iloc[i]["split_k"]) >= 3)
@@ -136,7 +153,8 @@ def _picks(code, w, table, matrix, shapes, cls) -> dict:
     return {"hungry": hungry, "hungry_sk_ge3": hungry_hit,
             "big": big, "big_raster_as_optimal": big_raster,
             "big_raster_picked": dict(raster_big),
-            "top1_tied_frac": round(ties / len(shapes), 4)}
+            "top1_tied_frac": round(ties / len(shapes), 4),
+            "detail": detail}
 
 
 def _run(arm: str, fold: int, seed: int, table, shapes, cls) -> dict:
@@ -151,6 +169,11 @@ def _run(arm: str, fold: int, seed: int, table, shapes, cls) -> dict:
     inh = [e for e in props if e.get("n_inherited") is not None]
     m = _MATRIX.setdefault((arm, fold, seed),
                            _matrix_for(arm, fold, seed, table))
+    ho = {p.key for p in _SPLITS[fold].val.shapes}
+    curve = [{"round": x["round"], "train": x.get("best_regret"),
+              "holdout": x.get("best_val_regret"),
+              "accepted": x.get("n_accepted"), "cells": x.get("n_cells")}
+             for x in rr]
     return {
         "arm": arm, "fold": fold, "seed": seed, "run": run.name,
         "n_rounds": len(rr),
@@ -163,7 +186,10 @@ def _run(arm: str, fold: int, seed: int, table, shapes, cls) -> dict:
                                  / max(1, sum(e["n_weights"] for e in inh)),
                                  4) if inh else None),
         "rule": _feature_flags(best["code"], _LIB[(arm, fold, seed)]),
-        "picks": _picks(best["code"], best["w"], table, m, shapes, cls)}
+        "curve": curve,
+        "best_code": best["code"], "best_w": best["w"],
+        "picks": _picks(best["code"], best["w"], table, m, shapes, cls,
+                        holdout=ho)}
 
 
 def _pooled(rows: list[dict], n_val: dict) -> float:
@@ -229,6 +255,7 @@ def main() -> None:
     warnings.simplefilter("ignore")
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", nargs="*", default=list(ARMS))
+    ap.add_argument("--seeds", nargs="*", type=int, default=list(SEEDS))
     ap.add_argument("--out", type=Path, default=OUT)
     a = ap.parse_args()
     from experiments import a6000_probe as P
@@ -237,15 +264,17 @@ def main() -> None:
     P._G["gpu"] = GPU
     table = P._table()
     sp = {f: _splits(table, fold=f, k=4, design="nkband") for f in FOLDS}
+    _SPLITS.update(sp)
     shapes = [p for f in FOLDS for p in sp[f].val.shapes]
     n_val = {f: len(sp[f].val.shapes) for f in FOLDS}
     rows = []
     cls = None
     for arm in a.arms:
         for f in FOLDS:
-            for s in SEEDS:
-                if not Path(f"runs/{arm}-{GPU}-f{f}-s{s}/rounds.jsonl"
-                            ).exists():
+            for s in a.seeds:
+                rp = Path(f"runs/{arm}-{GPU}-f{f}-s{s}/rounds.jsonl")
+                # ★ a run still going has fewer than 12 rounds — skipped
+                if not rp.exists() or len(_rows(rp)) < 12:
                     continue
                 if cls is None:
                     m0 = _matrix_for(arm, f, s, table)
