@@ -49,4 +49,9 @@ importance.**
 {parent_code}
 ```
 
-Parent weights (for reference; they will be refitted): {parent_w}{second_parent_block}
+Parent weights (fitted): {parent_w}{second_parent_block}
+
+A term you keep unchanged starts its fit from the parent's weight above,
+whatever you type for it. To reverse such a term's direction, write the
+parent's weight negated; a new or rewritten term starts from your value's
+sign.

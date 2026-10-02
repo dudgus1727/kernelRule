@@ -79,8 +79,18 @@ def weight_signatures(code: str) -> dict[int, set[tuple]]:
     return out
 
 
+#: ★ How close `|w0|` must be to `|parent w|` for an opposite sign to count
+#: as a deliberate **reversal** rather than a retyped number (D-190 §6
+#: review). On the archived RuleEditor calls the exact negations were 149
+#: terms in 60 of 1,152 calls (splitk) and their `changes` said so ("the
+#: term now has the opposite starting direction"); the other sign
+#: mismatches were mostly resets to round values such as 1.0.
+FLIP_TOL = 0.01
+
+
 def inherit_weights(child_code: str, child_w0: Sequence[float],
-                    parents: Sequence[tuple[str, Sequence[float]]]
+                    parents: Sequence[tuple[str, Sequence[float]]],
+                    *, flips: list[int] | None = None,
                     ) -> tuple[list[float], list[bool], list[int | None]]:
     """`(start, new, source)` for the child's weights.
 
@@ -88,6 +98,12 @@ def inherit_weights(child_code: str, child_w0: Sequence[float],
     the LLM's `w0[i]` otherwise; `new[i]` marks the latter; `source[i]` is
     the parent index (into the parent that matched — the first parent is
     tried first, then the second for what is still unmatched).
+
+    ★ One exception: when the LLM wrote the parent's value **negated**
+    (`|w0| within FLIP_TOL of |parent w|`, opposite sign), the reversal is
+    kept — the RuleEditor is told it may fix a term by changing its sign,
+    and an unchanged statement would otherwise silently undo it. Those
+    indices are appended to `flips` when it is given.
     """
     start = [float(x) for x in child_w0]
     new = [True] * len(start)
@@ -115,5 +131,11 @@ def inherit_weights(child_code: str, child_w0: Sequence[float],
             if cand and len(cand) == 1:
                 j = next(iter(cand))
                 if j < len(p_w):
-                    start[i], new[i], src[i] = float(p_w[j]), False, j
+                    pv, lv = float(p_w[j]), start[i]
+                    if (lv != 0.0 and pv != 0.0 and (lv > 0) != (pv > 0)
+                            and abs(abs(lv) - abs(pv)) <= FLIP_TOL * abs(pv)):
+                        pv = -pv                     # a deliberate reversal
+                        if flips is not None:
+                            flips.append(i)
+                    start[i], new[i], src[i] = pv, False, j
     return start, new, src

@@ -74,3 +74,15 @@ def test_comments_do_not_matter_and_bad_code_inherits_nothing():
     assert new == [False, False, False] and start == PW
     s2, n2, _ = inherit_weights("def (", [1.0], [(PARENT, PW)])
     assert n2 == [True] and s2 == [1.0]
+
+
+def test_an_exact_negation_is_kept_as_a_reversal():
+    """★ D-190 review: the LLM may reverse a term by negating its weight.
+    An unchanged statement would otherwise undo that; a reset to 1.0 is
+    not a reversal and is still replaced by the parent's value."""
+    flips: list[int] = []
+    start, new, _ = inherit_weights(PARENT, [-10.0, 1.0, 3.0],
+                                    [(PARENT, PW)], flips=flips)
+    assert start == [-10.0, 200.0, 3.0]
+    assert new == [False, False, False]
+    assert flips == [0, 2]

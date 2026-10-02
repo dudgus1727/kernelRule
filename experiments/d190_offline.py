@@ -30,13 +30,40 @@ val     fold 의 train 을 (N,K) 그룹 단위 nkband k=4 로 다시 나눈 것 
 ⚠️ 둘 다 **최종 Archive 안에서 고르는 효과만** 잰다. 루프 안에서는 선택
 기준이 다음 라운드의 부모까지 바꾸는데, 그건 오프라인으로 잴 수 없다.
 
+## fit — 표준화 좌표 · 부모 가중치 상속 · 차원 비례 예산 (개선 6번)
+
+c2 a6000 16실행의 exploit 자식(부모 = 그 라운드 시작의 최선, bests.jsonl)을
+실행마다 2개(라운드 3 · 8) 골라 같은 자식을 세 방식으로 적합한다:
+
+```
+old   space=w · LLM 의 w0 · 예산 300 고정 · 2좌표 polish 전부   (c2 와 같음)
+mid   space=u · 부모 적합값 상속 + 새 항 크기 · 예산 300 고정
+new   space=u · 상속 · 예산 가중치당 37.5 · 2좌표 polish 는 8개 이하만
+```
+
+보고: 자식 train regret 과 부모 train regret 의 차(부모보다 0.01 넘게 나쁨 /
+동률 / 나음), train gm, holdout gm.
+
 ## 미리 정한 판정 (측정 전에 적는다)
 
 ```
 prune   정리 후 holdout gm 이 정리 전보다 0.001 넘게 나빠지지 않으면 적용
 select  val 로 고른 holdout gm 이 train 으로 고른 것보다 낮고,
         나아진 실행 수 > 나빠진 실행 수 이면 적용
+fit     new 가 old 보다 "부모보다 0.01 넘게 나쁨" 비율이 낮고, train gm 이
+        나쁘지 않으면 유지 (아니면 LoopConfig 기본값을 old 로 되돌린다)
+        new 와 mid 의 train gm 차가 0.002 안이면 예산은 flat
 ```
+
+⚠️ 2026-10-02 정정 (fit 결과를 보기 **전에**): 처음 적은 fit 판정에는
+"holdout gm 이 0.005 넘게 나쁘지 않으면" 과 "holdout 차도 0.002 안" 이
+있었다. 변경 검토가 이것을 짚었다 — 여기서 쓰는 holdout 은 캠페인이 보고할
+**같은 a6000 nkband fold 의 holdout** 이라, 그것으로 조건을 고르면 그 숫자는
+더는 깨끗한 holdout 이 아니다 (§10.2). 그래서 fit 판정은 train 쪽만 본다.
+holdout 은 계산해 적되 판정에 쓰지 않는다.
+⚠️ prune · select 의 판정과 `FIT_NOISE_TOL` 의 근거(c2 최선 교체의 holdout
+변화)는 이미 같은 fold 의 holdout 을 읽었다 — D-190 기록과 캠페인 결과에
+그 사실을 적는다.
 """
 
 from __future__ import annotations
@@ -305,23 +332,129 @@ def _report_select(rows) -> dict:
     return out
 
 
+# -- fit -------------------------------------------------------------------
+FIT_ROUNDS = (3, 8)
+
+
+def _fit_children() -> list:
+    """(run, round, child code, LLM w0, parent code, parent w, parent
+    train regret) — the first exploit child of each chosen round."""
+    out = []
+    for run in sorted(_G["arc"]):
+        d = Path(f"{PREFIX}-f{run[0]}-s{run[1]}")
+        bests = [json.loads(x) for x in
+                 (d / "bests.jsonl").read_text().splitlines() if x]
+        ev = [json.loads(x) for x in
+              (d / "trace.jsonl").read_text().splitlines() if x]
+        for r in FIT_ROUNDS:
+            cand = [e for e in ev if e.get("ev") == "proposal"
+                    and e.get("kind") == "exploit" and e["round"] == r]
+            for e in cand:
+                w0 = _G["w0"].get(e["code"].strip())
+                if w0 is None or len(w0) != e["n_weights"]:
+                    continue
+                par = bests[r - 1]
+                out.append((run, r, e["code"], list(w0), par["code"],
+                            list(par["w"]), float(par["regret"])))
+                break
+    return out
+
+
+def _fit_task(t):
+    import warnings as _w
+
+    _w.simplefilter("ignore")
+    from kernelrule.core.sandbox import compile_rule
+    from kernelrule.core.weights import fit_weights
+    from kernelrule.rules.checks import (
+        FITTER_SWITCH_DIM,
+        fitter_for,
+        weight_bounds,
+    )
+    from kernelrule.rules.inherit import inherit_weights
+
+    (run, r, code, w0, pcode, pw, preg), arm = t
+    sp = _G["sp"][run[0]]
+    fn = compile_rule(code)
+    if arm == "old":
+        start, new, space, budget = w0, None, "w", "flat"
+    else:
+        start, new, _src = inherit_weights(code, w0, [(pcode, pw)])
+        space, budget = "u", ("dim" if arm == "new" else "flat")
+    ft = fitter_for(len(w0), budget=budget)
+    t0 = time.time()
+    try:
+        fr = fit_weights(
+            fn, _G["m"][run], _G["t"], sp.train, np.asarray(start, float),
+            objective="regret", warn_invariants=False,
+            method=ft["fit_method"], n_restarts=ft["fit_restarts"],
+            max_evals=ft["max_evals"], val_split=sp.val,
+            bounds=weight_bounds(code, len(w0)), space=space,
+            new_terms=new if space == "u" else None,
+            polish_pairs_max_dim=(FITTER_SWITCH_DIM if budget == "dim"
+                                  else None))
+    except Exception as ex:                                 # noqa: BLE001
+        return {"run": f"{run[0]}-{run[1]}", "round": r, "arm": arm,
+                "err": f"{type(ex).__name__}: {ex}"[:200]}
+    return {"run": f"{run[0]}-{run[1]}", "round": r, "arm": arm,
+            "n_w": len(w0), "n_new": int(sum(new)) if new else None,
+            "parent_train": preg, "train": fr.fit_regret,
+            "holdout": fr.val_regret, "evals": int(fr.n_evals),
+            "seconds": round(time.time() - t0, 1)}
+
+
+def _report_fit(rows) -> dict:
+    out = {}
+    for arm in ("old", "mid", "new"):
+        v = [r for r in rows if r["arm"] == arm and "err" not in r]
+        d = [r["train"] - r["parent_train"] for r in v]
+        out[arm] = {
+            "n": len(v), "n_err": sum(1 for r in rows
+                                      if r["arm"] == arm and "err" in r),
+            "worse_than_parent": sum(1 for x in d if x >= 0.01),
+            "tie": sum(1 for x in d if abs(x) < 0.01),
+            "better_than_parent": sum(1 for x in d if x <= -0.01),
+            "train_gm": _gm([r["train"] for r in v]) if v else None,
+            "holdout_gm": _gm([r["holdout"] for r in v]) if v else None,
+            "seconds_median": float(np.median([r["seconds"] for r in v]))
+            if v else None}
+    o, n, m = out["old"], out["new"], out["mid"]
+    # ★ train 쪽만 본다 — holdout 은 서술용 (위 docstring 의 정정)
+    if o["n"] and n["n"]:
+        out["verdict_keep_new"] = bool(
+            n["worse_than_parent"] / n["n"] < o["worse_than_parent"] / o["n"]
+            and n["train_gm"] <= o["train_gm"])
+    if n["n"] and m["n"]:
+        out["verdict_budget_flat"] = bool(
+            abs(n["train_gm"] - m["train_gm"]) < 0.002)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=("prune", "select"))
+    ap.add_argument("mode", choices=("prune", "select", "fit"))
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     warnings.simplefilter("ignore")
     t0 = time.time()
     _load()
-    if a.mode == "select":
+    if a.mode in ("select", "fit"):
         _G["w0"] = _w0_index()
+    if a.mode == "select":
         for f in FOLDS:
             for j in SEEDS:
                 fit_on, sel = select_split(_G["sp"][f].train.shapes, j)
                 print(f"  fold {f} 안쪽 {j}: 적합 {len(fit_on)} · val {len(sel)}")
     print(f"적재 {time.time() - t0:.0f}s", flush=True)
-    tasks = [(run, i) for run in _G["arc"] for i in range(len(_G["arc"][run]))]
-    fn = _prune_task if a.mode == "prune" else _select_task
+    if a.mode == "fit":
+        kids = _fit_children()
+        print(f"  exploit 자식 {len(kids)}개 x 3", flush=True)
+        tasks = [(k, arm) for k in kids for arm in ("old", "mid", "new")]
+    else:
+        tasks = [(run, i) for run in _G["arc"]
+                 for i in range(len(_G["arc"][run]))]
+    fn = {"prune": _prune_task, "select": _select_task,
+          "fit": _fit_task}[a.mode]
     rows = []
     with mp.get_context("fork").Pool(N_PROC) as pool:
         for k, r in enumerate(pool.imap_unordered(fn, tasks, chunksize=1), 1):
@@ -329,7 +462,8 @@ def main() -> None:
             if k % 8 == 0 or k == len(tasks):
                 print(f"  {k}/{len(tasks)}  {time.time() - t0:.0f}s",
                       flush=True)
-    rep = (_report_prune if a.mode == "prune" else _report_select)(rows)
+    rep = {"prune": _report_prune, "select": _report_select,
+           "fit": _report_fit}[a.mode](rows)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps({"mode": a.mode, "source": PREFIX,
                                  "report": rep, "rows": rows},

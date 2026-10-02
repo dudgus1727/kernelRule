@@ -1493,17 +1493,19 @@ class RoundLoop:
             # ★ D-190 §6: the terms the child kept from its parent start from
             #   the parent's fitted weights, matched by statement — not by
             #   the numbers the LLM retyped.
-            n_inh = n_new = None
+            n_inh = n_new = n_flip = None
             if self.cfg.warm_start and req.get("parent") is not None:
                 from kernelrule.rules.inherit import inherit_weights
                 pars = [(x.code, x.w0) for x in (req["parent"],
                                                  req.get("parent2")) if x]
+                flips: list[int] = []
                 w_start, new_m, _src = inherit_weights(prop.code, prop.w0,
-                                                       pars)
+                                                       pars, flips=flips)
                 prop.meta["w_start"] = w_start
                 prop.meta["new_terms"] = new_m
                 n_new = sum(1 for x in new_m if x)
                 n_inh = len(new_m) - n_new
+                n_flip = len(flips)
             if kind == "cross" and len(req.get("_codes") or ()) > 1:
                 self._record_cross(r, req["_codes"], prop.code)
             self.trace.ev("proposal", round=r, i=i, kind=kind,
@@ -1511,6 +1513,7 @@ class RoundLoop:
                            hyp=(hyp or {}).get("id"),
                            changes=prop.changes, n_weights=len(prop.w0),
                            n_inherited=n_inh, n_new=n_new,
+                           n_sign_kept=n_flip,
                            code=prop.code, code_sha=_sha(prop.code))
             key = prop.code.strip()
             if key in self._seen_code:      # it is not rescored (§15.4)
