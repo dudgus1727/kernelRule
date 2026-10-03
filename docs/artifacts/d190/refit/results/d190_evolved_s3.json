@@ -1,0 +1,1106 @@
+{
+ "protocol": {
+  "fit": {
+   "method": "cma",
+   "n_restarts": 2,
+   "max_evals": 2000
+  },
+  "n_inner": 4,
+  "design": "nkband",
+  "gpu": "a6000",
+  "library": "runs/d190-a6000-f* (fold 마다)",
+  "extra_features": [
+   "runs/d190-a6000-f0-s3/features.jsonl",
+   "runs/d190-a6000-f1-s3/features.jsonl",
+   "runs/d190-a6000-f3-s3/features.jsonl"
+  ],
+  "ext_contract_features": [],
+  "dev_holdout_hidden": false,
+  "n_perm": 0
+ },
+ "aggregate": {
+  "n_folds_ok": 4,
+  "inner_cv_gm": 1.07479,
+  "inner_by_fold": {
+   "0": 1.087508,
+   "1": 1.044636,
+   "2": 1.100652,
+   "3": 1.067461
+  },
+  "inner_by_class": {
+   "big": 1.038635,
+   "hungry": 1.055383,
+   "mid": 1.182426,
+   "small": 1.042338
+  },
+  "holdout_gm_65": 1.069337,
+  "vendor_gm_65": 1.081488,
+  "folds_beating_vendor": 3,
+  "holdout_by_fold": {
+   "0": 1.068489,
+   "1": 1.109901,
+   "2": 1.070188,
+   "3": 1.030301
+  },
+  "holdout_by_class": {
+   "big": 1.044531,
+   "hungry": 1.048013,
+   "mid": 1.146173,
+   "small": 1.063433
+  },
+  "vendor_by_class": {
+   "big": 1.032434,
+   "hungry": 1.069495,
+   "mid": 1.101826,
+   "small": 1.129502
+  },
+  "sk_ge3_picked_on_hard": "20/31",
+  "hard_gm": 1.048013,
+  "easy_gm": 1.089156
+ },
+ "per_fold": {
+  "0": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 16,
+    "depth": 2,
+    "n_weights": 47,
+    "features": [
+     "coalescing_stride_ratio",
+     "dispatch_overhead_per_flop",
+     "edge_waste",
+     "instruction_cache_footprint",
+     "instruction_density",
+     "instructions_per_thread",
+     "mainloop_iteration_count",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "pipeline_stage_time_ratio",
+     "raster_locality_deficit",
+     "register_file_pressure",
+     "serial_reduction_dependency",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "tail_waste",
+     "thread_work_granularity_deficit",
+     "tile_aspect_mismatch",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.061488,
+   "inner_cv_gm": 1.087508,
+   "w": [
+    49118680.90292158,
+    494317393.5824127,
+    -124132535.34691063,
+    298792559094155.4,
+    140745593.04909593,
+    45412338.33051705,
+    56432037.65753446,
+    10294980503.007307,
+    -18541.8756814613,
+    -3152051.9540441437,
+    186727626.15996897,
+    556636035.651048,
+    -6014001923.74022,
+    -77178529.24885546,
+    -2383064117.541621,
+    197277863.56638315,
+    114933495.50877628,
+    60006821.52989012,
+    69886997.11254865,
+    79596344.86188005,
+    1133111384.5305414,
+    -7548371.664623595,
+    -21854894974.327415,
+    1912679823.4412508,
+    316687802890.07166,
+    -1287652831.0112388,
+    135193007.34874257,
+    649150234.0761585,
+    225174745.39139572,
+    -373037248.47416484,
+    -43589026.4424921,
+    264663389.70768267,
+    -618952113.3389097,
+    26.889598482394664,
+    -1.0578136844229422,
+    0.5411739430966631,
+    42.502637470059874,
+    3200178665.3114624,
+    313033879.5669464,
+    -2053624259.1011472,
+    1185653294.7728522,
+    361589311.22716105,
+    15944805.805362498,
+    223266648.57021016,
+    56591952.011851594,
+    -311009.86683742877,
+    905291811.6118784
+   ],
+   "moved": true,
+   "picks": {
+    "1x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "8192x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x4096x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "256x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x4096": {
+     "sk_pick": 4,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x128x32"
+    },
+    "1024x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1500x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "3000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "384x4096x4096": {
+     "sk_pick": 4,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "768x4096x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "1536x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1000x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2304x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    }
+   },
+   "holdout_gm": 1.068489,
+   "vendor_gm": 1.092486,
+   "static_top1": 1.058933,
+   "c2_native_median": 1.155813,
+   "beats_vendor": true,
+   "n_hold": 17,
+   "hold_sk_ge3": {
+    "n": 11,
+    "picked_ge3": 3,
+    "gm": 1.079898,
+    "vendor_gm": 1.080156
+   },
+   "hold_sk_lt3_gm": 1.047886,
+   "sk_picked_hold": {
+    "1": 8,
+    "3": 2,
+    "2": 5,
+    "4": 2
+   },
+   "regret": {
+    "1x4096x4096": 1.034482706711362,
+    "8192x4096x4096": 1.018790802428743,
+    "512x4096x4096": 1.0828729179605612,
+    "32x4096x4096": 1.0338982538750485,
+    "256x4096x4096": 1.070707096689983,
+    "128x4096x4096": 1.1406250479616349,
+    "1024x4096x4096": 1.1023391053942415,
+    "2048x4096x4096": 1.077279803875263,
+    "4096x4096x4096": 1.0375399433804964,
+    "1500x4096x4096": 1.0433884604392045,
+    "3000x4096x4096": 1.0537975095471617,
+    "384x4096x4096": 1.1691176478455836,
+    "768x4096x4096": 1.1080000023283063,
+    "8x4096x4096": 1.0517240914289283,
+    "1536x4096x4096": 1.0412371276307388,
+    "1000x4096x4096": 1.0994151917393462,
+    "2304x4096x4096": 1.0128713182968303
+   }
+  },
+  "1": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 32,
+    "depth": 2,
+    "n_weights": 34,
+    "features": [
+     "edge_waste",
+     "has_spill",
+     "instruction_burden_per_thread",
+     "instruction_density",
+     "mainloop_iteration_count",
+     "multistage_family_indicator",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "pipeline_stage_time_ratio",
+     "raster_reuse_window_pressure",
+     "register_file_pressure",
+     "resident_block_scarcity",
+     "serial_reduction_dependency",
+     "shared_memory_pressure",
+     "swizzle_type_family_indicator",
+     "tail_waste",
+     "thread_work_granularity_deficit",
+     "tile_aspect_mismatch",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.027649,
+   "inner_cv_gm": 1.044636,
+   "w": [
+    11604708.458076637,
+    8409610.736650314,
+    12596393.054256558,
+    46958270.07627428,
+    4010120.190783829,
+    -7309.464405574989,
+    -137773.00212545312,
+    -53515841.74526763,
+    26484434642.274067,
+    1802069.828256367,
+    -165460.52078038268,
+    1171637770.3511767,
+    82603599.95482127,
+    15947788.133000214,
+    28923123.23026553,
+    -11712604.313649064,
+    -16089976.519495707,
+    124808.92779936096,
+    -3920755.694010095,
+    -20351566.283879183,
+    -188985.635864106,
+    99241505.53507882,
+    -1889357.4206898853,
+    -131207.1317584865,
+    -3875233.3073392822,
+    2246842.6048953095,
+    0.6070148317597726,
+    4.761482910411946,
+    6.216893379294098,
+    -0.259119118711187,
+    5803823.62350261,
+    -8155220.832718555,
+    0.20951422462059063,
+    90290694.95749214
+   ],
+   "moved": true,
+   "picks": {
+    "1x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "64x64x64"
+    },
+    "8192x4096x11008": {
+     "sk_pick": 3,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x4096x11008": {
+     "sk_pick": 6,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x512x512": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x64x64",
+     "tile_best": "64x64x32"
+    },
+    "32x4096x11008": {
+     "sk_pick": 6,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "256x4096x11008": {
+     "sk_pick": 12,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x11008": {
+     "sk_pick": 4,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "64x64x32"
+    },
+    "1024x4096x11008": {
+     "sk_pick": 3,
+     "sk_best": 8,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x4098": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x256x32"
+    },
+    "1024x4096x128": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x64x64",
+     "tile_best": "64x64x32"
+    },
+    "1024x4098x4096": {
+     "sk_pick": 3,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x11008": {
+     "sk_pick": 6,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x11008": {
+     "sk_pick": 4,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    }
+   },
+   "holdout_gm": 1.109901,
+   "vendor_gm": 1.089068,
+   "static_top1": 1.218962,
+   "c2_native_median": 1.153117,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 7,
+    "picked_ge3": 7,
+    "gm": 1.035227,
+    "vendor_gm": 1.088647
+   },
+   "hold_sk_lt3_gm": 1.171685,
+   "sk_picked_hold": {
+    "2": 3,
+    "3": 4,
+    "6": 3,
+    "12": 1,
+    "4": 2,
+    "1": 3
+   },
+   "regret": {
+    "1x4096x11008": 1.0141423377047147,
+    "8192x4096x11008": 1.0077279622553812,
+    "512x4096x11008": 1.0384615688518948,
+    "512x512x512": 1.5454545604875156,
+    "32x4096x11008": 1.0579710328316507,
+    "256x4096x11008": 1.0084033644273531,
+    "128x4096x11008": 1.0731913267761624,
+    "128x4096x256": 1.1818181592687267,
+    "1024x4096x11008": 1.0431738511356403,
+    "1024x4096x256": 1.3243242233431785,
+    "1024x4096x4098": 1.1565420242992506,
+    "1024x4096x128": 1.4615384131038318,
+    "1024x4098x4096": 1.0085714941441428,
+    "2048x4096x11008": 1.0,
+    "4096x4096x11008": 1.0,
+    "8x4096x11008": 1.014598545573201
+   }
+  },
+  "2": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 3,
+    "depth": 2,
+    "n_weights": 32,
+    "features": [
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "mainloop_iteration_count",
+     "occupancy_deficit",
+     "operand_contiguity_deficit",
+     "operand_tile_traffic_ratio",
+     "output_store_run_density",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "raster_reuse_eviction",
+     "register_file_pressure",
+     "resident_block_scarcity",
+     "serial_reduction_dependency",
+     "serial_reduction_traffic_fraction",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "stage_latency_time_ratio",
+     "tail_waste",
+     "thread_instruction_count"
+    ]
+   },
+   "train_gm": 1.062418,
+   "inner_cv_gm": 1.100652,
+   "w": [
+    -1.0137111924338857,
+    84886.40816232582,
+    7218.9286972750815,
+    592439.3486904067,
+    190005.62581703317,
+    -989.5485913322126,
+    1125868.0902795123,
+    29693.4738037234,
+    102508.36740191292,
+    7462783.622864483,
+    -36129.733006968105,
+    9638495.919777945,
+    -17265.232846549297,
+    -282283.7478534454,
+    457325.1022437753,
+    -175300.4494054325,
+    40641700702.24526,
+    -890462.328082476,
+    -806610.7053883811,
+    100982.49321868656,
+    -2948.5355982807855,
+    -301667.39523388125,
+    -9275.483360343234,
+    -251630.7637285608,
+    -62152036.52161896,
+    -2022988.4073242997,
+    -86126.5043707519,
+    1023530.4366905532,
+    -736074.8088882386,
+    19445.400000959544,
+    29492.193422353208,
+    -593840.8395828884
+   ],
+   "moved": true,
+   "picks": {
+    "1x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x32"
+    },
+    "8192x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x32"
+    },
+    "256x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 3,
+     "tile_pick": "64x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "64x128x32",
+     "tile_best": "128x64x32"
+    },
+    "1024x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x512": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x4100": {
+     "sk_pick": 3,
+     "sk_best": 2,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x1024x1024": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4100x4096": {
+     "sk_pick": 3,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x32"
+    }
+   },
+   "holdout_gm": 1.070188,
+   "vendor_gm": 1.080987,
+   "static_top1": 1.10387,
+   "c2_native_median": 1.100942,
+   "beats_vendor": true,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 5,
+    "picked_ge3": 2,
+    "gm": 1.037518,
+    "vendor_gm": 1.044115
+   },
+   "hold_sk_lt3_gm": 1.085377,
+   "sk_picked_hold": {
+    "2": 7,
+    "1": 6,
+    "3": 3
+   },
+   "regret": {
+    "1x11008x4096": 1.0869565492474762,
+    "8192x11008x4096": 1.329708530357698,
+    "512x11008x4096": 1.0358744523373542,
+    "32x11008x4096": 1.1079136562609302,
+    "256x11008x4096": 1.0282257870503209,
+    "128x11008x4096": 1.1130952339705456,
+    "128x4096x1024": 1.043478274623738,
+    "1024x11008x4096": 1.0082159564273314,
+    "1024x4096x1024": 1.0280373927102249,
+    "1024x4096x512": 1.0,
+    "1024x4096x4100": 1.0925450200352569,
+    "1024x1024x1024": 1.1212121613000416,
+    "1024x4100x4096": 1.0057637327516817,
+    "2048x11008x4096": 1.0132849844203122,
+    "4096x11008x4096": 1.055512831947013,
+    "8x11008x4096": 1.0942028756271032
+   }
+  },
+  "3": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 32,
+    "depth": 2,
+    "n_weights": 41,
+    "features": [
+     "edge_waste",
+     "grid_instruction_overhead_ratio",
+     "has_spill",
+     "instruction_density",
+     "memory_access_aspect_penalty",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "raster_band_count",
+     "raster_reuse_cache_pressure",
+     "resident_block_scarcity",
+     "serial_reduction_dependency",
+     "spill_traffic_ratio",
+     "split_k_critical_path_ratio",
+     "swizzle_coalescing_mismatch",
+     "tail_waste",
+     "thread_work_granularity_deficit",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.033361,
+   "inner_cv_gm": 1.067461,
+   "w": [
+    781706991323.409,
+    -11648610259694.637,
+    1660455023740.863,
+    1168523677018.6238,
+    -144673681843.0476,
+    160210961062659.88,
+    969047134233.8965,
+    -10773106087.025146,
+    182788780533898.7,
+    2921076214305324.5,
+    -3540572429436.3364,
+    -1276373236746.7651,
+    34913547127.595695,
+    4160100978953.627,
+    474246479028171.6,
+    14332199238615.576,
+    1874741717383.8596,
+    1348234858443191.8,
+    25769482222281.434,
+    97010421765486.5,
+    -2400430704778310.0,
+    180307138491725.16,
+    679063566331.5497,
+    9168896673362.686,
+    10725380413539.873,
+    3089141228403.5923,
+    -276678588192322.6,
+    57670747773.76383,
+    110129673245493.83,
+    3292097468108.415,
+    169502084580132.03,
+    -286696934716.14294,
+    16778410618657.457,
+    -3225499158162.6504,
+    1361560512459.2427,
+    -13179834069.692806,
+    -1858103192596589.0,
+    48708890160058.5,
+    -1925212941162.5898,
+    877323976592.2788,
+    704434465500.3798
+   ],
+   "moved": true,
+   "picks": {
+    "1x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x32"
+    },
+    "8192x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8192x8192x8192": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "256x12288x4096": {
+     "sk_pick": 4,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x16384": {
+     "sk_pick": 4,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x64"
+    },
+    "128x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x8192": {
+     "sk_pick": 3,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x16384": {
+     "sk_pick": 3,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x2048": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x2048x2048": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x32"
+    }
+   },
+   "holdout_gm": 1.030301,
+   "vendor_gm": 1.06297,
+   "static_top1": 1.040848,
+   "c2_native_median": 1.084957,
+   "beats_vendor": true,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 8,
+    "picked_ge3": 8,
+    "gm": 1.022979,
+    "vendor_gm": 1.05446
+   },
+   "hold_sk_lt3_gm": 1.037676,
+   "sk_picked_hold": {
+    "1": 4,
+    "2": 2,
+    "3": 8,
+    "4": 2
+   },
+   "regret": {
+    "1x12288x4096": 1.0261437995526,
+    "8192x12288x4096": 1.0,
+    "8192x8192x8192": 1.0131551516535582,
+    "512x12288x4096": 1.0041151977506453,
+    "32x12288x4096": 1.2156862987536712,
+    "256x12288x4096": 1.0784314016416616,
+    "128x4096x16384": 1.0229357540955966,
+    "128x12288x4096": 1.0,
+    "1024x4096x8192": 1.037248489506627,
+    "1024x4096x16384": 1.0548564111569316,
+    "1024x4096x2048": 1.0052910456213324,
+    "1024x12288x4096": 1.0015822905279435,
+    "2048x12288x4096": 1.0005402526256497,
+    "2048x2048x2048": 1.0053191118811586,
+    "4096x12288x4096": 1.0,
+    "8x12288x4096": 1.0392156993289
+   }
+  }
+ },
+ "rule_file": "docs/artifacts/d190/refit/rules/d190_evolved_s3.json",
+ "rule": {
+  "name": "d190 evolved s3 (a6000)",
+  "per_fold": {
+   "0": {
+    "code": "def score(f, p, hw, w):\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    s = s + f.tail_waste * w[1]\n    s = s + f.wave_count_deficit * w[2]\n    s = s + np.log2(1.0 + f.dispatch_overhead_per_flop) * w[3]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    if p.log_flops < 40:\n        s = s + np.log2(1.0 + f.instruction_cache_footprint) * w[5]\n        s = s + np.log2(1.0 + f.instructions_per_thread) * w[6]\n        s = s + f.thread_work_granularity_deficit * w[7]\n        s = s + np.log2(1.0 + f.tile_aspect_mismatch) * w[8]\n        s = s + np.log2(f.mainloop_iteration_count) * w[9]\n    else:\n        s = s + np.log2(1.0 + f.instruction_cache_footprint) * w[10]\n        s = s + np.log2(1.0 + f.instructions_per_thread) * w[11]\n        s = s + f.thread_work_granularity_deficit * w[12]\n        s = s + np.log2(1.0 + f.tile_aspect_mismatch) * w[13]\n        s = s + np.log2(f.mainloop_iteration_count) * w[14]\n    if p.roofline_ratio < 1:\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[15]\n        s = s + np.log2(1.0 + f.coalescing_stride_ratio) * w[16]\n        s = s + f.raster_locality_deficit * w[17]\n        s = s + f.tile_roofline_deficit * w[18]\n        s = s + f.parallel_reduction_traffic_fraction * w[19]\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[41]\n        s = s + np.log2(1.0 + f.coalescing_stride_ratio) * w[42]\n        s = s + f.raster_locality_deficit * w[43]\n    else:\n        s = s + f.occupancy_deficit * w[20]\n        s = s + f.register_file_pressure * w[21]\n        s = s + np.log2(1.0 + f.instruction_density) * w[22]\n        s = s + f.serial_reduction_dependency * w[23]\n        s = s + f.parallel_reduction_compute_fraction * w[24]\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[44]\n        s = s + np.log2(1.0 + f.coalescing_stride_ratio) * w[45]\n        s = s + f.raster_locality_deficit * w[46]\n    if p.alignment_deficit < 0.5:\n        if p.roofline_ratio < 1:\n            s = s + f.pipeline_fill_drain_fraction * w[25]\n            s = s + np.log2(f.pipeline_stage_time_ratio) * w[26]\n            s = s + f.register_file_pressure * w[27]\n            s = s + f.shared_memory_pressure * w[28]\n        else:\n            s = s + f.pipeline_fill_drain_fraction * w[29]\n            s = s + np.log2(f.pipeline_stage_time_ratio) * w[30]\n            s = s + f.register_file_pressure * w[31]\n            s = s + f.shared_memory_pressure * w[32]\n    else:\n        if p.roofline_ratio < 1:\n            s = s + f.pipeline_fill_drain_fraction * w[33]\n            s = s + np.log2(f.pipeline_stage_time_ratio) * w[34]\n            s = s + f.register_file_pressure * w[35]\n            s = s + f.shared_memory_pressure * w[36]\n        else:\n            s = s + f.pipeline_fill_drain_fraction * w[37]\n            s = s + np.log2(f.pipeline_stage_time_ratio) * w[38]\n            s = s + f.register_file_pressure * w[39]\n            s = s + f.shared_memory_pressure * w[40]\n    return s",
+    "w0": [
+     48817788.70853696,
+     197119577.46529207,
+     -80483387.8868253,
+     49526081116147.07,
+     82675747.82227987,
+     24038084.288069483,
+     8214121.697409637,
+     1288613148.3947864,
+     -1452761.9997757643,
+     -36234099.64552137,
+     -703724822.5342671,
+     1545875810.026531,
+     33148886413.222755,
+     1377757346.2405744,
+     -626318422.1535786,
+     127968214.60841036,
+     48305823.309879325,
+     58956397.56801174,
+     29465847.65709846,
+     53623647.67594305,
+     263272854.67272618,
+     -2667600.050951175,
+     -19466131147.96901,
+     416345323.78296465,
+     39382672345.63433,
+     -1396619447.3004456,
+     94614456.87253872,
+     202065511.00098,
+     151190771.46173257,
+     -328471983.89236444,
+     -18721132.576730274,
+     83979127.54268786,
+     -128324159.66121148,
+     5.579655879926194,
+     -1.2465877549934126,
+     -0.7088394039192925,
+     9.015439586335415,
+     8248245212.477673,
+     466113773.93578726,
+     -361181536.6043705,
+     251859520.14584184,
+     39470200.30864566,
+     -74937882.86545908,
+     -211168698.57887435,
+     59852371.08040699,
+     -748188.6253374416,
+     196782703.2558191
+    ],
+    "extra_features": [
+     "runs/d190-a6000-f0-s3/features.jsonl"
+    ]
+   },
+   "1": {
+    "code": "def score(f, p, hw, w):\n    # output-boundary overwork grows multiplicatively with the tile overhang\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # register spills cause an abrupt local-memory path\n    s = s + f.has_spill * w[1]\n    # the final CTA wave can leave SM capacity unused\n    s = s + f.tail_waste * w[2]\n    # serial split-K exposes a dependency between partial accumulations\n    s = s + f.serial_reduction_dependency * w[3]\n    # parallel split-K adds global partial write/read traffic\n    s = s + f.parallel_reduction_traffic_fraction * w[4]\n    # short problems are setup dominated, while larger problems expose\n    # steady-state pipeline service and iteration cost differently\n    if p.log_flops < 30:\n        s = s + f.pipeline_fill_drain_fraction * w[12]\n        s = s + np.log2(f.pipeline_stage_time_ratio) * w[13]\n        s = s + np.log2(f.mainloop_iteration_count) * w[14]\n    else:\n        s = s + f.pipeline_fill_drain_fraction * w[15]\n        s = s + np.log2(f.pipeline_stage_time_ratio) * w[16]\n        s = s + np.log2(f.mainloop_iteration_count) * w[17]\n    if p.roofline_ratio < 1:\n        # repeated operand loads are the principal bandwidth cost\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[5]\n        # low-intensity CTA tiles consume bandwidth for little arithmetic\n        s = s + f.tile_roofline_deficit * w[6]\n        # a long raster reuse window reduces cache reuse\n        s = s + f.raster_reuse_window_pressure * w[7]\n    else:\n        # wide-range front-end work competes with tensor arithmetic\n        s = s + np.log2(1.0 + f.instruction_density) * w[8]\n        # unfilled thread capacity reduces latency hiding\n        s = s + f.occupancy_deficit * w[9]\n        # register allocation pressure limits concurrent work\n        s = s + f.register_file_pressure * w[10]\n        # parallel split-K also adds accumulator arithmetic in this regime\n        s = s + f.parallel_reduction_compute_fraction * w[11]\n    # Underfilled shapes expose fixed per-thread work; saturated shapes can\n    # trade that burden against the multistage family's pipeline behavior.\n    if p.output_work_per_sm < 1024:\n        s = s + np.log2(1.0 + f.instruction_burden_per_thread) * w[18]\n        s = s + f.thread_work_granularity_deficit * w[19]\n        # Low output parallelism exposes geometry-induced residency and wave loss.\n        s = s + f.resident_block_scarcity * (1.0 + f.tile_aspect_mismatch) * w[23]\n        s = s + f.wave_count_deficit * (1.0 + f.tile_aspect_mismatch) * w[24]\n    else:\n        s = s + np.log2(1.0 + f.instruction_burden_per_thread) * w[20]\n        s = s + f.thread_work_granularity_deficit * w[21]\n        s = s + f.multistage_family_indicator * np.log2(1.0 + f.instruction_burden_per_thread) * w[22]\n        # In the saturated regime, residency interacts with its resource causes.\n        s = s + f.resident_block_scarcity * (f.register_file_pressure + f.shared_memory_pressure) * w[25]\n    # Swizzle family has different locality consequences when cache pressure\n    # and output geometry put different operand-reuse patterns on the critical path.\n    if p.l2_working_set_pressure < 0.5:\n        if p.output_aspect_imbalance < 0.5:\n            s = s + f.swizzle_type_family_indicator * w[26]\n            s = s + f.raster_reuse_window_pressure * w[27]\n        else:\n            s = s + f.swizzle_type_family_indicator * w[28]\n            s = s + f.raster_reuse_window_pressure * w[29]\n    else:\n        if p.output_aspect_imbalance < 0.5:\n            s = s + f.swizzle_type_family_indicator * w[30]\n            s = s + f.raster_reuse_window_pressure * w[31]\n        else:\n            s = s + f.swizzle_type_family_indicator * w[32]\n            s = s + f.raster_reuse_window_pressure * w[33]\n    return s",
+    "w0": [
+     3721780.51264472,
+     1686969.5233176758,
+     2257120.4461874766,
+     8714949.352879498,
+     845889.7766173935,
+     1388512.4432787474,
+     -181725.57178256128,
+     88987557.84845468,
+     15544372911.96187,
+     682112.7287816497,
+     -1512732.140914423,
+     637104226.4331445,
+     -211830496.2140641,
+     8683458.3580419,
+     -3659672.538170672,
+     -7455011.647882897,
+     6344409.38942966,
+     -79606.2405552908,
+     -1637360.62983219,
+     225849263.81705683,
+     -413268.1821032698,
+     71155027.00301187,
+     -458292.7989299003,
+     1466816.735037993,
+     -730529.8705022242,
+     2054074.386329343,
+     6.094067343398471,
+     1.996406288606463,
+     2.0117243598382784,
+     3.3205340316112113,
+     2497229.3987564477,
+     -40348071.05267656,
+     0.0,
+     54069181.66641476
+    ],
+    "extra_features": [
+     "runs/d190-a6000-f1-s3/features.jsonl"
+    ]
+   },
+   "2": {
+    "code": "def score(f, p, hw, w):\n    # Boundary predication: compress the wide output-tile overwork range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Last-wave idle time grows superlinearly as the surviving wave empties.\n    s = s + (-np.log(np.clip(1.0 - f.tail_waste, 1.0e-6, 1.0))) * w[1]\n    # Registers spilling to local memory are a discontinuous severe penalty.\n    s = s + f.has_spill * w[2]\n    # Spill severity captures the amount of local-memory traffic after that transition.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[3]\n    # Split-K partial traffic and serial accumulator round-trips add global-memory work.\n    s = s + f.parallel_reduction_traffic_fraction * w[4]\n    s = s + np.log2(1.0 + f.serial_reduction_traffic_fraction) * w[5]\n    # Serial split-K also removes independent accumulation work.\n    s = s + f.serial_reduction_dependency * w[6]\n    # Pipeline prologue/epilogue and stage-management cost is paid in every regime.\n    s = s + np.log2(f.stage_latency_time_ratio) * w[7]\n    if p.roofline_ratio < 1:\n        # Below the roofline, replicated operand loads and poor coalescing consume bandwidth.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[8]\n        s = s + f.raster_reuse_eviction * w[9]\n        s = s + f.operand_contiguity_deficit * w[10]\n        s = s + f.output_store_run_density * w[11]\n        # Memory-bound K granularity trades extra loop iterations against buffering pressure.\n        s = s + np.log2(f.mainloop_iteration_count) * w[12]\n        s = s + f.pipeline_fill_drain_fraction * w[13]\n        s = s + f.register_file_pressure * w[14]\n        s = s + f.shared_memory_pressure * w[15]\n    else:\n        if p.log_reduction_depth > 12:\n            # Long compute-bound reductions need an explicit issue/resource tradeoff.\n            s = s + np.log2(1.0 + f.instruction_density) * w[16]\n            s = s + f.occupancy_deficit * w[17]\n            s = s + f.register_file_pressure * w[18]\n            s = s + f.resident_block_scarcity * w[19]\n            s = s + np.log2(1.0 + f.thread_instruction_count) * w[20]\n            s = s + np.log2(f.mainloop_iteration_count) * w[21]\n            s = s + f.pipeline_fill_drain_fraction * w[22]\n            s = s + f.shared_memory_pressure * w[23]\n        else:\n            # Short compute-bound reductions retain the original occupancy/resource model.\n            s = s + np.log2(1.0 + f.instruction_density) * w[24]\n            s = s + f.occupancy_deficit * w[25]\n            s = s + f.register_file_pressure * w[26]\n            s = s + f.resident_block_scarcity * w[27]\n            s = s + np.log2(f.mainloop_iteration_count) * w[28]\n            s = s + f.pipeline_fill_drain_fraction * w[29]\n            s = s + f.register_file_pressure * w[30]\n            s = s + f.shared_memory_pressure * w[31]\n    return s",
+    "w0": [
+     0.0,
+     51809.76590278209,
+     31874.836014453373,
+     45543.091364463464,
+     43930.60906233741,
+     -245.7435814970497,
+     609304.9417995211,
+     8454.435548635693,
+     52870.41585701872,
+     644526.0114241649,
+     671193.6233973992,
+     13659075.14916002,
+     49214.664984540075,
+     -178039.5765675686,
+     161247.51306775972,
+     -49878.13651025931,
+     21781927961.83203,
+     -156745.03095255393,
+     -286688.3686173905,
+     196821.90735283052,
+     6903.643440841631,
+     -111746.02197007924,
+     -296629.6714451677,
+     -108806.88285128352,
+     -243100614.79964098,
+     -534659.75587054,
+     -132068.98314700436,
+     343665.36728567345,
+     -118854.281999599,
+     -163042.39043439116,
+     -28347.538001520978,
+     -153366.97425375084
+    ],
+    "extra_features": []
+   },
+   "3": {
+    "code": "def score(f, p, hw, w):\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    if p.output_work_per_sm < 4096:\n        s = s + f.wave_count_deficit * w[1]\n    else:\n        s = s + f.wave_count_deficit * np.log2(1.0 + f.tail_waste / np.maximum(1.0 - f.tail_waste, 1e-6)) * w[35]\n        s = s + f.wave_count_deficit * np.log2(1.0 + f.grid_instruction_overhead_ratio) * w[36]\n    s = s + np.log2(1.0 + f.tail_waste / np.maximum(1.0 - f.tail_waste, 1e-6)) * w[2]\n    s = s + f.has_spill * w[3]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    s = s + np.log2(1.0 + f.grid_instruction_overhead_ratio) * w[5]\n    s = s + np.log2(1.0 + f.split_k_critical_path_ratio) * w[12]\n    if p.roofline_ratio < 1:\n        if p.l2_working_set_pressure < 0.5:\n            s = s + np.where(p.output_work_per_sm < 4096, np.log2(1.0 + f.raster_band_count), -np.log2(1.0 + f.raster_band_count)) * w[25]\n            s = s + np.log2(1.0 + f.raster_band_count) * f.raster_reuse_cache_pressure * w[26]\n        else:\n            s = s + np.where(p.output_work_per_sm < 4096, np.log2(1.0 + f.raster_band_count), -np.log2(1.0 + f.raster_band_count)) * w[27]\n            s = s + np.log2(1.0 + f.raster_band_count) * f.raster_reuse_cache_pressure * w[28]\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[6]\n        s = s + f.tile_roofline_deficit * w[7]\n        s = s + f.raster_reuse_cache_pressure * w[8]\n        if p.output_work_per_sm < 4096:\n            s = s + f.parallel_reduction_traffic_fraction * w[13]\n            s = s + f.parallel_reduction_compute_fraction * w[14]\n            s = s + f.serial_reduction_dependency * w[15]\n            s = s + np.log2(1.0 + f.split_k_critical_path_ratio) * f.wave_count_deficit * w[33]\n        else:\n            s = s + f.parallel_reduction_traffic_fraction * w[16]\n            s = s + f.parallel_reduction_compute_fraction * w[17]\n            s = s + f.serial_reduction_dependency * w[18]\n    else:\n        if p.l2_working_set_pressure < 0.5:\n            s = s + np.where(p.output_work_per_sm < 4096, np.log2(1.0 + f.raster_band_count), -np.log2(1.0 + f.raster_band_count)) * w[29]\n            s = s + np.log2(1.0 + f.raster_band_count) * f.raster_reuse_cache_pressure * w[30]\n        else:\n            s = s + np.where(p.output_work_per_sm < 4096, np.log2(1.0 + f.raster_band_count), -np.log2(1.0 + f.raster_band_count)) * w[31]\n            s = s + np.log2(1.0 + f.raster_band_count) * f.raster_reuse_cache_pressure * w[32]\n        s = s + np.log2(1.0 + f.instruction_density) * w[9]\n        s = s + f.occupancy_deficit * w[10]\n        s = s + f.pipeline_fill_drain_fraction * w[11]\n        if p.output_work_per_sm < 4096:\n            s = s + f.parallel_reduction_traffic_fraction * w[19]\n            s = s + f.parallel_reduction_compute_fraction * w[20]\n            s = s + f.serial_reduction_dependency * w[21]\n            s = s + np.log2(1.0 + f.split_k_critical_path_ratio) * f.wave_count_deficit * w[34]\n        else:\n            s = s + f.parallel_reduction_traffic_fraction * w[22]\n            s = s + f.parallel_reduction_compute_fraction * w[23]\n            s = s + f.serial_reduction_dependency * w[24]\n    s = s + f.thread_work_granularity_deficit * w[37]\n    s = s + f.swizzle_coalescing_mismatch * w[38]\n    if p.output_work_per_sm < 4096:\n        s = s + np.log2(1.0 + f.memory_access_aspect_penalty) * f.resident_block_scarcity * w[39]\n    else:\n        s = s + np.log2(1.0 + f.memory_access_aspect_penalty) * f.resident_block_scarcity * w[40]\n    return s",
+    "w0": [
+     293413107042.8331,
+     -2755775218422.8623,
+     417674693350.88434,
+     353372738157.36865,
+     125379260349.49072,
+     88847606670796.14,
+     332822680366.767,
+     -300235077702.47424,
+     91415317866069.3,
+     2204006760024897.2,
+     -1048038967526.886,
+     -658875544817.1069,
+     115947047504.61487,
+     1855702386606.5706,
+     238112463773064.53,
+     9614136618154.66,
+     1736781045207.7366,
+     376422035503566.7,
+     14084149328464.893,
+     62151040224090.07,
+     -911191458262624.4,
+     73943366783510.0,
+     378230086796.1415,
+     6290505940701.071,
+     3953427798820.005,
+     2506046394336.315,
+     272963019829458.16,
+     58845761423.75884,
+     145366795776623.0,
+     1652178502894.02,
+     34621132351737.832,
+     -118320036019.48683,
+     9453369710052.77,
+     -1071478800286.1511,
+     316024367616.5795,
+     93571421563.71548,
+     1906016793178184.5,
+     20541978446546.88,
+     -402732770524.9029,
+     279128199273.3322,
+     273663337811.74496
+    ],
+    "extra_features": [
+     "runs/d190-a6000-f3-s3/features.jsonl"
+    ]
+   }
+  }
+ }
+}

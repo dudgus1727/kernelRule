@@ -1,0 +1,141 @@
+{
+ "name": "d190 evolved s2 (a6000)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    # Boundary overcompute grows with the logarithm of tile edge waste.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # A nearly empty final CTA wave loses useful machine throughput.\n    s = s + f.tail_waste * w[1]\n    # One-wave or otherwise poorly amortized grids expose scheduling startup.\n    s = s + f.wave_count_deficit * w[2]\n    # CTA dispatch cost is fixed per CTA, so compress its wide normalized range.\n    s = s + np.log2(1.0 + f.dispatch_overhead_per_flop) * w[3]\n    # Local-memory spill traffic is an especially expensive extra data path.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    if p.roofline_ratio < 1:\n        # Short pipeline fill/drain remains a cost on the bandwidth path.\n        s = s + f.pipeline_fill_drain_fraction * w[5]\n        # In the bandwidth regime, replicated operand traffic is the primary cost.\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[6]\n        # Poor tile coalescing directly increases global-memory transactions.\n        s = s + np.log2(1.0 + f.coalescing_stride_ratio) * w[7]\n        # Lost raster locality removes cache reuse and raises memory traffic.\n        s = s + f.raster_locality_deficit * w[8]\n        # Low tile arithmetic intensity makes each fetched byte less productive.\n        s = s + f.tile_roofline_deficit * w[9]\n        # Parallel split-K partial materialization adds bandwidth demand.\n        s = s + f.parallel_reduction_traffic_fraction * w[10]\n    else:\n        if p.log_flops < 40:\n            # On short reductions, fixed prologue/epilogue cost dominates staging.\n            s = s + np.log2(f.pipeline_stage_time_ratio) * w[11]\n            s = s + f.pipeline_fill_drain_fraction * w[12]\n            # Each scarce mainloop iteration exposes loop and barrier latency.\n            s = s + np.log2(f.mainloop_iteration_count) * w[13]\n        else:\n            # On long reductions, steady-state transfer hiding can amortize staging.\n            s = s + np.log2(f.pipeline_stage_time_ratio) * w[14]\n            s = s + f.pipeline_fill_drain_fraction * w[15]\n            # Iteration cost is less dominant once the pipeline reaches steady state.\n            s = s + np.log2(f.mainloop_iteration_count) * w[16]\n        # In the compute regime, unfilled thread slots reduce latency hiding.\n        s = s + f.occupancy_deficit * w[17]\n        # Register allocation pressure limits resident work and issue hiding.\n        s = s + f.register_file_pressure * w[18]\n        # Instruction work per useful arithmetic competes with tensor issue slots.\n        s = s + np.log2(1.0 + f.instruction_density) * w[19]\n        # Serial split-K dependencies reduce independent accumulator work.\n        s = s + f.serial_reduction_dependency * w[20]\n        # Extra parallel-reduction arithmetic is paid on a compute-bound path.\n        s = s + f.parallel_reduction_compute_fraction * w[21]\n    return s",
+   "w0": [
+    391.3929413167937,
+    10366.768534337507,
+    -2140.878151107547,
+    8439601437.670032,
+    6690.668008475291,
+    -35496.115016427866,
+    8334.95851739639,
+    -1833.0546796583176,
+    -12677.313049281916,
+    -25994.346677512665,
+    8184.620208678615,
+    10230.919464662906,
+    12986.141738268701,
+    -1916.4660177404432,
+    388980.55590189114,
+    6653752.731795096,
+    16.22849867695372,
+    -11685.444944914796,
+    -3169.558144233586,
+    -41616755.2382463,
+    31892.265835749702,
+    2137356.3140091593
+   ],
+   "extra_features": [
+    "runs/d190-a6000-f0-s2/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    # output-boundary overwork grows multiplicatively with the tile overhang\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # register spills cause an abrupt local-memory path\n    s = s + f.has_spill * w[1]\n    # the final CTA wave can leave SM capacity unused\n    s = s + f.tail_waste * w[2]\n    # serial split-K exposes a dependency between partial accumulations\n    s = s + f.serial_reduction_dependency * w[3]\n    # parallel split-K adds global partial write/read traffic\n    s = s + f.parallel_reduction_traffic_fraction * w[4]\n    # each reduction iteration carries loop-control and pipeline synchronization cost\n    s = s + np.log2(f.mainloop_iteration_count) * w[5]\n    if p.roofline_ratio < 1:\n        # pipeline fill/drain is exposed more directly when bandwidth and latency dominate\n        s = s + f.pipeline_fill_drain_fraction * w[6]\n        # stage count trades prologue/epilogue work against operand latency hiding\n        s = s + np.log2(f.pipeline_stage_time_ratio) * w[7]\n        # repeated operand loads are the principal bandwidth cost\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[8]\n        # low-intensity CTA tiles consume bandwidth for little arithmetic\n        s = s + f.tile_roofline_deficit * w[9]\n        # a long raster reuse window reduces cache reuse\n        s = s + f.raster_reuse_window_pressure * w[10]\n        # stages beyond the two-stage family amplify exposed fill/drain cost\n        stage_excess = np.log2(1.0 + np.maximum(f.pipeline_stage_family_count - 2.0, 0.0))\n        s = s + stage_excess * f.pipeline_fill_drain_fraction * w[21]\n        # extra multistage buffering consumes shared memory and reduces residency\n        s = s + stage_excess * f.shared_memory_pressure * w[22]\n        # extra multistage buffering also consumes registers and reduces residency\n        s = s + stage_excess * f.register_file_pressure * w[23]\n    else:\n        # compute-bound kernels still pay pipeline prologue and epilogue overhead\n        s = s + f.pipeline_fill_drain_fraction * w[11]\n        # stage-time tradeoff captures latency hiding versus excessive staging\n        s = s + np.log2(f.pipeline_stage_time_ratio) * w[12]\n        # wide-range front-end work competes with tensor arithmetic\n        s = s + np.log2(1.0 + f.instruction_density) * w[13]\n        # unfilled thread capacity reduces latency hiding\n        s = s + f.occupancy_deficit * w[14]\n        # register allocation pressure limits concurrent work\n        s = s + f.register_file_pressure * w[15]\n        # parallel split-K also adds accumulator arithmetic in this regime\n        s = s + f.parallel_reduction_compute_fraction * w[16]\n        # stages beyond the two-stage family amplify exposed fill/drain cost\n        stage_excess = np.log2(1.0 + np.maximum(f.pipeline_stage_family_count - 2.0, 0.0))\n        s = s + stage_excess * f.pipeline_fill_drain_fraction * w[24]\n        # extra multistage buffering couples stage choice to shared-memory occupancy\n        s = s + stage_excess * f.shared_memory_pressure * w[25]\n        # extra multistage buffering couples stage choice to register occupancy\n        s = s + stage_excess * f.register_file_pressure * w[26]\n    if p.output_work_per_sm < 256:\n        # with little output per SM, static issue work is partly a launch-amortization cost\n        s = s + np.log2(1.0 + f.instruction_burden_per_thread) * w[17]\n        # internal thread coordination still matters for small-output tiles\n        s = s + f.thread_work_granularity_deficit * w[18]\n    else:\n        # once SM output work is ample, per-thread instruction issue is repeatedly exposed\n        s = s + np.log2(1.0 + f.instruction_burden_per_thread) * w[19]\n        # adequate output work does not amortize poor internal thread granularity\n        s = s + f.thread_work_granularity_deficit * w[20]\n    return s",
+   "w0": [
+    1496.982077453291,
+    526007.1126601575,
+    781407.7751432613,
+    3004520.7800976024,
+    735507.6063374616,
+    -48918.61896465076,
+    -22907437.734078635,
+    4681536.343968471,
+    1407436.1789149113,
+    -4928660.958376796,
+    21578693.586041413,
+    6570735.533570762,
+    1464351.572619446,
+    8699898512.131306,
+    2128343.2509785756,
+    1161675.6436951158,
+    422907598.2267342,
+    -773691.8222484388,
+    0.0,
+    -339298.5740724226,
+    20048383.266498048,
+    526167421.3568629,
+    0.0,
+    -8395915.241207754,
+    163828.51872660816,
+    168103.89505458038,
+    -529881.9073156037
+   ],
+   "extra_features": [
+    "runs/d190-a6000-f1-s2/features.jsonl"
+   ]
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    # Boundary predication: compress the wide output-tile overwork range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Last-wave idle time grows superlinearly as the surviving wave empties.\n    s = s + (-np.log(np.clip(1.0 - f.tail_waste, 1.0e-6, 1.0))) * w[1]\n    # Register spills are a discontinuous transition to very slow local memory.\n    s = s + f.has_spill * w[2]\n    # Spill severity captures the amount of local-memory traffic after that transition.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[3]\n    # Split-K partial traffic and serial accumulator round-trips add global-memory work.\n    s = s + f.parallel_reduction_traffic_fraction * w[4]\n    s = s + np.log2(1.0 + f.serial_reduction_traffic_fraction) * w[5]\n    # Serial split-K also removes independent accumulation work.\n    s = s + f.serial_reduction_dependency * w[6]\n    # Retain the parent stage-latency model as a continuous baseline.\n    s = s + np.log2(f.stage_latency_time_ratio) * w[7]\n    if p.roofline_ratio < 1:\n        # Below the roofline, replicated operand loads and poor coalescing consume bandwidth.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[8]\n        s = s + f.raster_reuse_eviction * w[9]\n        s = s + f.operand_contiguity_deficit * w[10]\n        s = s + f.output_store_run_density * w[11]\n        # Wasted swizzle span is more costly when rectangularity limits useful reuse.\n        s = s + f.swizzle_extent_underfill * (1.0 + p.output_aspect_imbalance) * w[21]\n    else:\n        # Above the roofline, issue overhead and resource occupancy limit tensor throughput.\n        s = s + np.log2(1.0 + f.instruction_density) * w[12]\n        s = s + f.occupancy_deficit * w[13]\n        s = s + f.register_file_pressure * w[14]\n        s = s + f.resident_block_scarcity * w[15]\n        # Underfill remains a distinct, weaker grid-scheduling cost in compute-bound shapes.\n        s = s + f.swizzle_extent_underfill * (1.0 + p.output_aspect_imbalance) * w[22]\n    # The family label captures the discrete MmaPipelined versus multistage mechanism change.\n    s = s + f.stage_family_indicator * w[16]\n    # MmaPipelined exposes fill/drain latency, while multistage pays absolute loop granularity.\n    if p.log_reduction_depth < 4:\n        s = s + f.pipeline_fill_drain_fraction * (1.0 - f.stage_family_indicator) * w[17]\n        s = s + (np.log2(f.mainloop_iteration_count) / 60.0) * f.stage_family_indicator * w[18]\n    else:\n        s = s + f.pipeline_fill_drain_fraction * (1.0 - f.stage_family_indicator) * w[19]\n        s = s + (np.log2(f.mainloop_iteration_count) / 60.0) * f.stage_family_indicator * w[20]\n    return s",
+   "w0": [
+    568460.1727391921,
+    120937.71755441141,
+    404980.6651080914,
+    221528.444123463,
+    207542.58669814668,
+    -1708.4316696968751,
+    1138996.7054938811,
+    9795.000938704698,
+    1067720.5440250742,
+    22975869.35513136,
+    0.0,
+    -87544972.88775687,
+    -212950149.70742613,
+    -1682223.3207460537,
+    -525706.0757571991,
+    777790.7537982231,
+    -242830.47532767293,
+    1.1360956681448113,
+    1.5953666970401925,
+    -217825.49640385938,
+    0.0,
+    -736235.564803122,
+    336797.17062111606
+   ],
+   "extra_features": [
+    "runs/d190-a6000-f2-s2/features.jsonl"
+   ]
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    s = s + f.wave_count_deficit * w[1]\n    s = s + np.log2(1.0 + f.tail_waste / np.maximum(1.0 - f.tail_waste, 1e-6)) * w[2]\n    s = s + f.has_spill * w[3]\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    s = s + np.log2(1.0 + f.grid_instruction_overhead_ratio) * w[5]\n    if p.output_aspect_imbalance < 0.5:\n        if p.output_work_per_sm < 4096:\n            s = s + np.log2(f.raster_band_count) * w[6]\n        else:\n            s = s + np.log2(f.raster_band_count) * w[7]\n    else:\n        if p.output_work_per_sm < 4096:\n            s = s + np.log2(f.raster_band_count) * w[8]\n        else:\n            s = s + np.log2(f.raster_band_count) * w[9]\n    if p.roofline_ratio < 1:\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[10]\n        s = s + f.tile_roofline_deficit * w[11]\n        s = s + f.raster_reuse_cache_pressure * w[12]\n    else:\n        s = s + np.log2(1.0 + f.instruction_density) * w[13]\n        s = s + f.occupancy_deficit * w[14]\n        if p.alignment_deficit < 0.5:\n            s = s + np.log2(1.0 + f.pipeline_stage_time_ratio) * w[15]\n            s = s + f.shared_memory_pressure * w[20]\n            s = s + f.register_file_pressure * w[21]\n            s = s + f.resident_block_scarcity * w[22]\n        else:\n            s = s + f.pipeline_fill_drain_fraction * w[23]\n            s = s + np.log2(1.0 + f.pipeline_stage_time_ratio) * w[24]\n            s = s + f.shared_memory_pressure * w[25]\n            s = s + f.register_file_pressure * w[26]\n            s = s + f.resident_block_scarcity * w[27]\n    s = s + np.log2(1.0 + f.split_k_critical_path_ratio) * w[16]\n    s = s + f.parallel_reduction_traffic_fraction * w[17]\n    if p.output_work_per_sm < 4096:\n        s = s + f.serial_reduction_dependency * w[18]\n    else:\n        s = s + f.serial_reduction_dependency * w[19]\n    s = s + np.where(f.pipeline_stage_count < 3, f.pipeline_fill_drain_fraction, 0.0) * w[28]\n    s = s + np.where(f.pipeline_stage_count < 3, 0.0, np.log2(1.0 + f.pipeline_stage_time_ratio)) * w[29]\n    s = s + np.where(f.pipeline_stage_count < 3, f.shared_memory_pressure, 0.0) * w[30]\n    s = s + np.where(f.pipeline_stage_count < 3, 0.0, f.register_file_pressure) * w[31]\n    return s",
+   "w0": [
+    31208623.759761933,
+    -13954186.897885894,
+    31287298.484719384,
+    40120674.648683645,
+    5057214.752809533,
+    22935033956.631203,
+    -217795844.47339216,
+    7848591.163492456,
+    22115219.558780164,
+    -5266012.707963167,
+    87563770.044325,
+    -218484109.2781948,
+    0.0,
+    24676912825.611843,
+    -21447754.31177038,
+    37419987.13712677,
+    9777717.393100113,
+    21133170.61499584,
+    835767666.9119502,
+    183564735.38723615,
+    -73630476.36733094,
+    -5731121.27502405,
+    89152181.20787263,
+    1769058434.7968845,
+    13732262.277468039,
+    179158781.203931,
+    -394566564.16907686,
+    -288738580.97681576,
+    88481560.474885,
+    7923260.226745589,
+    593424991.737853,
+    34551571.98506818
+   ],
+   "extra_features": [
+    "runs/d190-a6000-f3-s2/features.jsonl"
+   ]
+  }
+ }
+}

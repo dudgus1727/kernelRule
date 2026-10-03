@@ -94,6 +94,26 @@ def _registry(table, extra: list[str]):
     return reg
 
 
+def _registry_fold(table, fold: int, extra: list[str]):
+    """★ D-190 — `--prefix` 캠페인의 **그 fold 의** 라이브러리 + 루프 축.
+
+    d190 은 fold 마다 stage 1 을 따로 돌려 라이브러리가 다르고, 같은 이름이
+    fold 마다 다른 코드인 축도 있다 (`pipeline_stage_time_ratio`). 그래서
+    한 행렬에 합치지 않고 fold 마다 따로 만든다.
+    """
+    from experiments.f1_pipeline import _load_stage1
+    from kernelrule.features import REGISTRY
+    from kernelrule.features.loader import base_registry, load_generated
+
+    reg = _load_stage1(Path(f"runs/{_G['prefix']}-{_gpu()}-f{fold}"),
+                       base_registry("F2", human=REGISTRY), "F2", table)
+    for fp in extra or []:
+        for f in load_generated(Path(fp), table=table):
+            if f.name not in reg._items:
+                reg.add(f)
+    return reg
+
+
 def _load_ext_contract(path: Path) -> list:
     """★ D-189 — **계약을 넓힌** 축: `cfg.ext` (swizzle 등) 를 읽어도 된다.
 
@@ -151,7 +171,8 @@ def _fit_task(task):
     from kernelrule.core.weights import fit_weights, make_score_of
 
     fold, part, perm = task if len(task) == 3 else (*task, 0)
-    t, m = _G["table"], _G["matrix"]
+    t = _G["table"]
+    m = (_G.get("matrix_by_fold") or {}).get(fold) or _G["matrix"]
     spec = _G["spec"][fold]
     sp = _G["splits"][fold]
     train = list(sp.train.shapes)
@@ -395,14 +416,23 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
                     for x in s.get("extra_features", [])})
     _G["ext_contract"] = sorted({x for s in spec_by_fold.values()
                                  for x in s.get("ext_contract_features", [])})
-    reg = _registry(t, extra)
-    m = FeatureMatrix(t, reg, cache_dir=CACHE_DIR)
+    if _G.get("prefix"):
+        # ★ D-190 — fold 마다 그 캠페인의 라이브러리
+        _G["matrix_by_fold"] = {
+            f: FeatureMatrix(t, _registry_fold(
+                t, f, spec_by_fold[f].get("extra_features", [])),
+                cache_dir=CACHE_DIR) for f in spec_by_fold}
+        m = _G["matrix_by_fold"][min(spec_by_fold)]
+    else:
+        reg = _registry(t, extra)
+        m = FeatureMatrix(t, reg, cache_dir=CACHE_DIR)
     _G["matrix"], _G["spec"] = m, spec_by_fold
 
     checks = {}
     for f, s in spec_by_fold.items():
-        rep = check_rule(s["code"], feature_names=m.feature_names(),
-                         shape_value_names=m.shape_value_names(),
+        mf = (_G.get("matrix_by_fold") or {}).get(f) or m
+        rep = check_rule(s["code"], feature_names=mf.feature_names(),
+                         shape_value_names=mf.shape_value_names(),
                          n_weights=len(s["w0"]), limits=limits_for())
         checks[f] = {"ok": rep.ok, "violations": list(rep.violations),
                      "n_paths": rep.n_paths, "depth": rep.branch_depth,
@@ -422,7 +452,10 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
     reps = [_one_rep([r for r in res if r["perm"] == k], checks, refs, cls,
                      dev) for k in range(n_perm + 1)]
     out = {"protocol": {"fit": FIT, "n_inner": N_INNER, "design": DESIGN,
-                        "gpu": _gpu(), "library": "k7-1 (27축)",
+                        "gpu": _gpu(),
+                        "library": (f"runs/{_G['prefix']}-{_gpu()}-f* "
+                                    "(fold 마다)" if _G.get("prefix")
+                                    else "k7-1 (27축)"),
                         "extra_features": extra,
                         "ext_contract_features": _G["ext_contract"],
                         "dev_holdout_hidden": dev, "n_perm": n_perm},
@@ -462,17 +495,18 @@ def make_baselines(out_dir: Path) -> None:
     다시 맞춘다. 손편집한 규칙과 같은 자로 견주려면 이것이 대조군이다.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
+    pre = _G.get("prefix") or "c2"
     for seed in (0, 1, 2, 3):
         pf = {}
         for f in FOLDS:
-            run = Path(f"runs/c2-{_gpu()}-f{f}-s{seed}")
+            run = Path(f"runs/{pre}-{_gpu()}-f{f}-s{seed}")
             e = [json.loads(x) for x in (run / "bests.jsonl").read_text()
                  .splitlines() if x.strip()][-1]
             fp = run / "features.jsonl"
             pf[str(f)] = {"code": e["code"], "w0": e["w"],
                           "extra_features": [str(fp)] if fp.exists() else []}
-        (out_dir / f"c2_evolved_s{seed}.json").write_text(json.dumps(
-            {"name": f"c2 evolved s{seed} ({_gpu()})", "per_fold": pf},
+        (out_dir / f"{pre}_evolved_s{seed}.json").write_text(json.dumps(
+            {"name": f"{pre} evolved s{seed} ({_gpu()})", "per_fold": pf},
             ensure_ascii=False, indent=1))
     print(f"  -> {out_dir}")
 
@@ -492,8 +526,11 @@ def main() -> None:
     ap.add_argument("--dev", action="store_true")
     # ★ D-189 — 적합 경로 잡음: 가중치 이름을 N 번 섞어 더 맞춘다
     ap.add_argument("--perm", type=int, default=0)
+    # ★ D-190 — 다른 캠페인의 규칙을 같은 절차로: fold 마다 그 캠페인의
+    #   라이브러리(runs/<prefix>-<gpu>-f<f>)를 쓴다. 없으면 c2 · k7-1 하나.
+    ap.add_argument("--prefix", default=None)
     a = ap.parse_args()
-    _G["gpu"], _G["dev"] = a.gpu, a.dev
+    _G["gpu"], _G["dev"], _G["prefix"] = a.gpu, a.dev, a.prefix
     if a.make_baselines:
         make_baselines(a.make_baselines)
         return
@@ -508,9 +545,13 @@ def main() -> None:
                         for x in s.get("extra_features", [])})
         _G["ext_contract"] = sorted({x for s in spec.values()
                                      for x in s.get("ext_contract_features", [])})
-        m = FeatureMatrix(t, _registry(t, extra), cache_dir=CACHE_DIR)
+        if not a.prefix:
+            m = FeatureMatrix(t, _registry(t, extra), cache_dir=CACHE_DIR)
         bad = 0
         for f, s in spec.items():
+            if a.prefix:          # ★ D-190 — fold 마다 그 캠페인의 라이브러리
+                m = FeatureMatrix(t, _registry_fold(
+                    t, f, s.get("extra_features", [])), cache_dir=CACHE_DIR)
             rep = check_rule(s["code"], feature_names=m.feature_names(),
                              shape_value_names=m.shape_value_names(),
                              n_weights=len(s["w0"]), limits=limits_for())
