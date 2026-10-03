@@ -44,6 +44,26 @@ new   space=u · 상속 · 예산 가중치당 37.5 · 2좌표 polish 는 8개 �
 보고: 자식 train regret 과 부모 train regret 의 차(부모보다 0.01 넘게 나쁨 /
 동률 / 나음), train gm, holdout gm.
 
+## prune_cv — 개선 버전(d190)의 규칙으로 7번을 다시 잰다 (2026-10-03)
+
+`prune` 은 c2 규칙으로 쟀다. 그런데 d190 은 피처(시간 축 · 래스터 축) · 적합 방식
+· 최선 교체 규칙이 다르고, 죽은 가중치의 비율부터 다르다 (seed 0: c2 65% · d190 42%).
+c2 에서 나빴다는 것이 d190 에서도 나쁘다는 보장은 없다. 그리고 `prune` 은 holdout
+으로 판정했다 — 캠페인이 보고하는 바로 그 holdout 이다.
+
+```
+대상    d190 16실행 각각이 보고한 최종 최선 규칙 (bests.jsonl 의 마지막)
+정리    prune 과 같다 — 죽은 가중치를 하나씩 지우고 train 이 안 나빠지면 둔다
+비교    원래 구조 vs 정리한 구조, 각각 train 4조각 inner-CV
+        (3조각으로 다시 적합 -> 1조각 채점, a6000_probe._inner_parts)
+        적합은 그 캠페인의 루프와 같은 방식 (config.json 의 fit_space · fit_budget)
+        시작점은 각 구조의 train 적합값 — 두 쪽에 똑같이
+holdout 적기만 한다 (재적합 없이, prune 과 같은 방식). 판정에 쓰지 않는다
+```
+
+    python3 -m experiments.d190_offline prune_cv --prefix runs/d190-a6000 \
+        --out docs/artifacts/d190/prune_cv.json
+
 ## 미리 정한 판정 (측정 전에 적는다)
 
 ```
@@ -53,6 +73,9 @@ select  val 로 고른 holdout gm 이 train 으로 고른 것보다 낮고,
 fit     new 가 old 보다 "부모보다 0.01 넘게 나쁨" 비율이 낮고, train gm 이
         나쁘지 않으면 유지 (아니면 LoopConfig 기본값을 old 로 되돌린다)
         new 와 mid 의 train gm 차가 0.002 안이면 예산은 flat
+prune_cv  16실행의 최종 최선 규칙에서, 정리한 구조의 inner-CV gm (모든 train
+          형상을 모은 기하평균) 이 원래 구조보다 0.001 넘게 나빠지지 않으면
+          "넣어도 된다". holdout 은 판정에 쓰지 않는다
 ```
 
 ⚠️ 2026-10-02 정정 (fit 결과를 보기 **전에**): 처음 적은 fit 판정에는
@@ -430,14 +453,194 @@ def _report_fit(rows) -> dict:
     return out
 
 
+# -- prune_cv ----------------------------------------------------------------
+def _fit_setting() -> tuple[str, str]:
+    """그 캠페인의 루프가 쓴 적합 (config.json). 없으면 옛 방식."""
+    c = json.loads(Path(f"{PREFIX}-f0-s0/config.json").read_text())
+    lp = c.get("loop", {})
+    return lp.get("fit_space", "w"), lp.get("fit_budget", "flat")
+
+
+def _best_of(run) -> dict:
+    p = Path(f"{PREFIX}-f{run[0]}-s{run[1]}/bests.jsonl")
+    return [json.loads(x) for x in p.read_text().splitlines() if x][-1]
+
+
+def _prune_best_task(run):
+    """1단계 — 최종 최선 규칙을 정리한다 (prune 과 같은 절차)."""
+    import warnings as _w
+
+    _w.simplefilter("ignore")
+    from kernelrule.core.sandbox import compile_rule
+    from kernelrule.core.weights import _contributions, _sensitivity
+    from kernelrule.rules.prune import prune_dead
+
+    best = _best_of(run)
+    sp = _G["sp"][run[0]]
+    tr, ho = _prob(run, sp.train.shapes), _prob(run, sp.val.shapes)
+    fn = compile_rule(best["code"])
+    w = np.asarray(best["w"], float)
+    base = tr.regret(fn, w)
+    sens = _sensitivity(tr, fn, w, base, 0.5)
+    dead = [k for k in range(len(w)) if abs(w[k]) < 1e-3 or sens[k] < 1e-6]
+    con = _contributions(tr, fn, w)
+    order = sorted(dead, key=lambda k: (float(con[k]) if con is not None
+                                        else 0.0, k))
+
+    def regret_of(code, ww):
+        try:
+            return tr.regret(compile_rule(code), np.asarray(ww, float))
+        except Exception:                                   # noqa: BLE001
+            return float("inf")
+
+    code2, w2, _log = prune_dead(best["code"], list(w), order, regret_of,
+                                 base)
+    fn2 = compile_rule(code2)
+    return {"run": f"{run[0]}-{run[1]}", "rule": best["rule_id"],
+            "code": best["code"], "w": [float(x) for x in w],
+            "code_pruned": code2, "w_pruned": [float(x) for x in w2],
+            "n_w": len(w), "n_dead": len(dead), "n_w_after": len(w2),
+            "train": base,
+            "train_after": tr.regret(fn2, np.asarray(w2, float)),
+            "holdout": ho.regret(fn, w),
+            "holdout_after": ho.regret(fn2, np.asarray(w2, float))}
+
+
+def _cv_task(t):
+    """2단계 — 한 구조를 train 3조각으로 다시 적합하고 남은 1조각을 채점."""
+    import warnings as _w
+
+    _w.simplefilter("ignore")
+    from experiments.a6000_probe import _inner_parts
+    from kernelrule.core.sandbox import compile_rule
+    from kernelrule.core.scoring import evaluate_scores
+    from kernelrule.core.splits import Split
+    from kernelrule.core.weights import fit_weights, make_score_of
+    from kernelrule.rules.checks import (
+        FITTER_SWITCH_DIM,
+        fitter_for,
+        weight_bounds,
+    )
+
+    run, arm, part, code, w = t
+    space, budget = _G["fit"]
+    parts = _inner_parts(list(_G["sp"][run[0]].train.shapes))
+    fit_on = [p for i, q in enumerate(parts) if i != part for p in q]
+    fn = compile_rule(code)
+    ft = fitter_for(len(w), budget=budget)
+    key = {"run": f"{run[0]}-{run[1]}", "arm": arm, "part": part}
+    try:
+        fr = fit_weights(
+            fn, _G["m"][run], _G["t"], Split("train", tuple(fit_on)),
+            np.asarray(w, float), objective="regret", warn_invariants=False,
+            method=ft["fit_method"], n_restarts=ft["fit_restarts"],
+            max_evals=ft["max_evals"], bounds=weight_bounds(code, len(w)),
+            space=space,
+            polish_pairs_max_dim=(FITTER_SWITCH_DIM if budget == "dim"
+                                  else None))
+    except Exception as ex:                                 # noqa: BLE001
+        return {**key, "err": f"{type(ex).__name__}: {ex}"[:200]}
+    ev = evaluate_scores(make_score_of(fn, _G["m"][run], fr.w), _G["t"],
+                         parts[part], ks=(1,))
+    return {**key, "regrets": [float(x) for x in ev.regret[:, 0]]}
+
+
+def _report_prune_cv(pr_rows: list, cv_rows: list) -> dict:
+    got: dict = {}
+    bad = set()
+    for r in cv_rows:
+        if "err" in r:
+            bad.add(r["run"])
+            continue
+        got.setdefault((r["run"], r["arm"]), {})[r["part"]] = r["regrets"]
+    per_run, a_all, b_all = {}, [], []
+    for pr in pr_rows:
+        k = pr["run"]
+        oa = got.get((k, "orig"), {})
+        ob = got.get((k, "pruned"), oa if pr["n_w_after"] == pr["n_w"]
+                     else {})
+        if k in bad or len(oa) != 4 or len(ob) != 4:
+            per_run[k] = {"skipped": True}
+            continue
+        a = [x for i in range(4) for x in oa[i]]
+        b = [x for i in range(4) for x in ob[i]]
+        a_all += a
+        b_all += b
+        per_run[k] = {"n_w": pr["n_w"], "n_w_after": pr["n_w_after"],
+                      "inner_orig": _gm(a), "inner_pruned": _gm(b),
+                      "holdout_orig": pr["holdout"],
+                      "holdout_pruned": pr["holdout_after"]}
+    ok = [v for v in per_run.values() if not v.get("skipped")]
+    d = [np.log(v["inner_pruned"]) - np.log(v["inner_orig"]) for v in ok]
+    out = {"fit": list(_G["fit"]), "n_runs": len(ok),
+           "n_skipped": len(per_run) - len(ok),
+           "weights_before": int(sum(v["n_w"] for v in ok)),
+           "weights_after": int(sum(v["n_w_after"] for v in ok)),
+           "inner_cv_gm_orig": _gm(a_all) if a_all else None,
+           "inner_cv_gm_pruned": _gm(b_all) if b_all else None,
+           "n_runs_inner_better": int(sum(1 for x in d if x < -1e-9)),
+           "n_runs_inner_worse": int(sum(1 for x in d if x > 1e-9)),
+           "holdout_gm_orig_not_used": _gm([v["holdout_orig"] for v in ok])
+           if ok else None,
+           "holdout_gm_pruned_not_used": _gm([v["holdout_pruned"]
+                                              for v in ok]) if ok else None,
+           "per_run": per_run}
+    if a_all:
+        out["verdict_apply"] = bool(out["inner_cv_gm_pruned"]
+                                    <= out["inner_cv_gm_orig"] + 0.001)
+    return out
+
+
+def _main_prune_cv(a, t0) -> None:
+    _G["fit"] = _fit_setting()
+    runs = sorted(_G["arc"])
+    with mp.get_context("fork").Pool(N_PROC) as pool:
+        pr_rows = pool.map(_prune_best_task, runs)
+    print(f"  정리 끝 {time.time() - t0:.0f}s — 가중치 "
+          f"{sum(r['n_w'] for r in pr_rows)} -> "
+          f"{sum(r['n_w_after'] for r in pr_rows)}  (적합 {_G['fit']})",
+          flush=True)
+    tasks = []
+    for run, pr in zip(runs, pr_rows, strict=True):
+        tasks += [(run, "orig", k, pr["code"], pr["w"]) for k in range(4)]
+        if pr["n_w_after"] < pr["n_w"]:   # 아무것도 안 지웠으면 같은 구조
+            tasks += [(run, "pruned", k, pr["code_pruned"], pr["w_pruned"])
+                      for k in range(4)]
+    cv_rows = []
+    with mp.get_context("fork").Pool(N_PROC) as pool:
+        for k, r in enumerate(pool.imap_unordered(_cv_task, tasks,
+                                                  chunksize=1), 1):
+            cv_rows.append(r)
+            if k % 8 == 0 or k == len(tasks):
+                print(f"  {k}/{len(tasks)}  {time.time() - t0:.0f}s",
+                      flush=True)
+    rep = _report_prune_cv(pr_rows, cv_rows)
+    a.out.parent.mkdir(parents=True, exist_ok=True)
+    a.out.write_text(json.dumps({"mode": a.mode, "source": PREFIX,
+                                 "report": rep, "rows": pr_rows,
+                                 "cv_rows": cv_rows},
+                                ensure_ascii=False, indent=1, default=float))
+    print(json.dumps({k: v for k, v in rep.items() if k != "per_run"},
+                     ensure_ascii=False, indent=1, default=float))
+    print(f"끝 {time.time() - t0:.0f}s -> {a.out}")
+
+
 def main() -> None:
+    global PREFIX  # noqa: PLW0603 — 측정 대상 캠페인을 바꾸는 한 곳
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=("prune", "select", "fit"))
+    ap.add_argument("mode", choices=("prune", "select", "fit", "prune_cv"))
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--prefix", default=PREFIX,
+                    help="runs/<campaign>-a6000 (기본 c2)")
     a = ap.parse_args()
+    PREFIX = a.prefix
     warnings.simplefilter("ignore")
     t0 = time.time()
     _load()
+    if a.mode == "prune_cv":
+        print(f"적재 {time.time() - t0:.0f}s", flush=True)
+        _main_prune_cv(a, t0)
+        return
     if a.mode in ("select", "fit"):
         _G["w0"] = _w0_index()
     if a.mode == "select":
