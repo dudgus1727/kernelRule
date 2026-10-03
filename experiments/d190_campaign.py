@@ -202,7 +202,9 @@ def summarize(rows: list[dict], n_val: dict) -> dict:
     out: dict = {"vendor_pooled": VENDOR_POOLED, "arms": {}}
     have = {(r["arm"], r["fold"], r["seed"]): r for r in rows
             if not r.get("missing")}
-    for arm in ARMS:
+    # ★ 실행에 있는 갈래 전부 (k1a 처럼 ARMS 밖의 갈래도)
+    arms = [*ARMS, *sorted({r["arm"] for r in rows} - set(ARMS))]
+    for arm in arms:
         mine = [r for r in rows if r["arm"] == arm and not r.get("missing")]
         if not mine:
             continue
@@ -237,7 +239,8 @@ def summarize(rows: list[dict], n_val: dict) -> dict:
             "minutes_median": st.median([r["minutes"] for r in mine]),
         }
     pairs = {}
-    for a, b in (("d190", "c2"), ("d190", "splitk")):
+    for a, b in (("d190", "c2"), ("d190", "splitk"), ("k1a", "d190"),
+                 ("k1a", "c2")):
         d = [np.log(have[(a, f, s)]["holdout"])
              - np.log(have[(b, f, s)]["holdout"])
              for f in FOLDS for s in SEEDS

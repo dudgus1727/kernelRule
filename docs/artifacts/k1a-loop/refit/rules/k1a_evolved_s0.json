@@ -1,0 +1,51 @@
+{
+ "name": "k1a evolved s0 (a6000)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster selected by the shorter grid side; use its consistent DRAM model.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    s = s + w[2] * f.splitk_roofline_log_time\n\n    # In cache-pressured, sufficiently large-output shapes, reuse distance\n    # modifies the traffic outcome rather than acting as a global penalty.\n    if p.l2_working_set_pressure > 0.5 and p.output_work_per_sm > 10000.0:\n        s = s + w[3] * np.log2(1.0 + d * (1.0 + np.clip(f.swizzle_panel_reuse_distance / hw.l2_bytes, 0.0, 1.0)))\n\n    # The instruction proxy is retained only where traversal traffic is\n    # effectively cache-equivalent.\n    tie_confidence = np.clip(1.0 - f.swizzle_panel_reuse_distance / hw.l2_bytes, 0.0, 1.0)\n    s = s + 0.001 * sgn * f.tm_log_inst * tie_confidence\n    return s",
+   "w0": [
+    17.18937027466316,
+    3.7057571511326675,
+    19.648912750966367,
+    -2.145470638137776
+   ],
+   "extra_features": [
+    "runs/k1a-a6000-f0-s0/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster (pool feature dram_w1_*): panels fetched once per one-CTA-per-SM\n    # K-lockstep window (whole grid if co-resident in one round), re-fetched across windows unless the reuse distance fits L2,\n    # plus C write, split-K partials, spills; DRAM time / ideal compute time. Replaces J1e's tm_dram_ratio + ref/rbs double count.\n    # SM roof as in J1e: the L2->SM feed (priced at DRAM bandwidth, kappa at its physical bound 1) overlaps the math of the\n    # same SM, so the SM runs at the slower of the two; DRAM keeps the imperfect-overlap p=2 combination.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Pure tie-break among raster variants that differ only in inst_total: sign fixed by physics (shorter-side raster),\n    # scale fixed at P1's prior 1e-3 per log2(inst) (<< one score unit = 0.1 log2 time), so it is not a fitted feature.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s\n",
+   "w0": [
+    7.192129797197672,
+    3.625504608840197,
+    20.385791519041476
+   ],
+   "extra_features": [
+    "runs/k1a-a6000-f1-s0/features.jsonl"
+   ]
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster (pool feature dram_w1_*): panels fetched once per one-CTA-per-SM\n    # K-lockstep window (whole grid if co-resident in one round), re-fetched across windows unless the reuse distance fits L2,\n    # plus C write, split-K partials, spills; DRAM time / ideal compute time. Replaces J1e's tm_dram_ratio + ref/rbs double count.\n    # SM roof as in J1e: the L2->SM feed (priced at DRAM bandwidth, kappa at its physical bound 1) overlaps the math of the\n    # same SM, so the SM runs at the slower of the two; DRAM keeps the imperfect-overlap p=2 combination.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Pure tie-break among raster variants that differ only in inst_total: sign fixed by physics (shorter-side raster),\n    # scale fixed at P1's prior 1e-3 per log2(inst) (<< one score unit = 0.1 log2 time), so it is not a fitted feature.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s\n",
+   "w0": [
+    12.559975368160769,
+    3.126199647274219,
+    16.010594704097944
+   ],
+   "extra_features": [
+    "runs/k1a-a6000-f2-s0/features.jsonl"
+   ]
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster, including panel reuse, C output, split-K partials, and spills.\n    # The SM roof uses the slower of the compute critical path and L2-to-SM feed; DRAM combines imperfectly with it.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Under high L2 pressure and enough output work, panel reuse is exposed; use the registered\n    # swizzle locality cost only in that regime so it breaks swizzle near-ties without replacing the raster DRAM model.\n    swizzle_gate = (p.l2_working_set_pressure > 0.5) & (p.output_work_per_sm > 1024.0)\n    s = s + w[3] * np.where(swizzle_gate, np.log2(f.swizzle_panel_locality_cost), 0.0)\n    # Pure tie-break among raster variants that differ only in inst_total: sign fixed by physics (shorter-side raster).\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s",
+   "w0": [
+    19.33638486678218,
+    5.529658560808539,
+    20.022727852398244,
+    -0.16092333437116535
+   ],
+   "extra_features": [
+    "runs/k1a-a6000-f3-s0/features.jsonl"
+   ]
+  }
+ }
+}
