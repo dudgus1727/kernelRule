@@ -1,0 +1,28 @@
+{
+ "what": "k7-1 (20 generated axes) + the validated time-model pool of the hand-built a6000 rules (current contract)",
+ "k7-1": "runs/k7-1/stage1-features/proposals.jsonl",
+ "k7-1_sha256": "9194a6b6b48f68356357af8f4bf1c1367e9ad9143f69a820d71c2ffd2b116273",
+ "pools": {
+  "docs/artifacts/a6000-rules/features/pool_current.jsonl": "697c6ca11e4982270878fb4ea2bc78095f5beda8db6581f0b4feaf7878ead756",
+  "docs/artifacts/a6000-rules/features/pool_K1.jsonl": "fc0ccccf34e5c9e3a606b702b50c19a1b0cd0c8a6892830b7bcc959390e16f0b"
+ },
+ "added": [
+  "tm_log_est",
+  "tm_crit_ratio",
+  "tm_l2_ratio",
+  "tm_dram_ratio",
+  "tm_cta_warps",
+  "tm_regstaged",
+  "tm_log_inst",
+  "log_roofline_time_mraster",
+  "a_refetch_bw_demand",
+  "b_refetch_bw_demand",
+  "splitk_partial_bytes_ratio",
+  "splitk_roofline_log_time",
+  "splitk_excess_log",
+  "splitk_sm_latency_rounds_log",
+  "dram_w1_id_ratio",
+  "dram_w1_hz_ratio"
+ ],
+ "⚠️": "the pool was designed while all 65 a6000 shapes were visible — a6000 holdout numbers on top of it are optimistic"
+}
