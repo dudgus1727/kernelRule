@@ -1,0 +1,131 @@
+{
+ "fold": 0,
+ "campaign": "tgate",
+ "n_train": 49,
+ "axes": [
+  {
+   "group": "tgate f0 stage 1",
+   "name": "split_k_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.34435314168779624,
+    "pick_gm": 1.7718952147401792,
+    "slices": {
+     "split_k": {
+      "n": 47,
+      "interior": 32,
+      "end_miss": 1,
+      "hit": 15
+     },
+     "stages": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict": null
+  },
+  {
+   "group": "tgate f1 stage 1",
+   "name": "tile_shape_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 49,
+    "rank": 0.3581736104266295,
+    "pick_gm": 1.4852254031709948,
+    "slices": {
+     "split_k": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "stages": {
+      "n": 48,
+      "interior": 4,
+      "end_miss": 4,
+      "hit": 44
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict": null
+  },
+  {
+   "group": "tgate f2 stage 1",
+   "name": "split_k_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 49,
+    "rank": 0.3194441197215696,
+    "pick_gm": 1.765879092237249,
+    "slices": {
+     "split_k": {
+      "n": 48,
+      "interior": 33,
+      "end_miss": 0,
+      "hit": 16
+     },
+     "stages": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict": null
+  },
+  {
+   "group": "tgate f3 stage 1",
+   "name": "split_k_parallel_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 49,
+    "rank": 0.41280581477280337,
+    "pick_gm": 5.999128652775488,
+    "slices": {
+     "split_k": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "stages": {
+      "n": 34,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 34
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict": null
+  }
+ ]
+}

@@ -37,6 +37,9 @@ D190 = [(f"runs/d190-a6000-f{f}/stage1-features/proposals.jsonl", None)
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fold", type=int, default=0)
+    # ★ 한 캠페인의 stage-1 시간 축을, fold 마다 그 fold 의 train 으로
+    ap.add_argument("--campaign", default=None,
+                    help="e.g. tgate — runs/<c>-a6000-f{f}/stage1-features")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     warnings.simplefilter("ignore")
@@ -50,12 +53,21 @@ def main() -> None:
 
     P._G["gpu"] = "a6000"
     t = P._table()
-    train = list(_splits(t, fold=a.fold, k=4, design="nkband").train.shapes)
+    trains = {f: list(_splits(t, fold=f, k=4, design="nkband").train.shapes)
+              for f in range(4)}
+    train = trains[a.fold]
     out = []
-    groups = [("hand-built (D-189)", Path(HAND[0]), set(HAND[1]))]
-    groups += [(f"d190 f{i} stage 1", Path(p), None)
-               for i, (p, _x) in enumerate(D190)]
-    for label, path, only in groups:
+    if a.campaign:
+        groups = [(f"{a.campaign} f{f} stage 1",
+                   Path(f"runs/{a.campaign}-a6000-f{f}/stage1-features/"
+                        "proposals.jsonl"), None, f) for f in range(4)]
+    else:
+        groups = [("hand-built (D-189)", Path(HAND[0]), set(HAND[1]),
+                   a.fold)]
+        groups += [(f"d190 f{i} stage 1", Path(p), None, a.fold)
+                   for i, (p, _x) in enumerate(D190)]
+    for label, path, only, fold in groups:
+        train = trains[fold]
         for f in load_generated(path, table=t):
             if f.shape_level:
                 continue
@@ -76,7 +88,8 @@ def main() -> None:
                   f"{d['pick_gm']:.3f}  end-miss/interior/n {sl}  "
                   f"{'PASS' if v is None else 'CAUGHT'}", flush=True)
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    a.out.write_text(json.dumps({"fold": a.fold, "n_train": len(train),
+    a.out.write_text(json.dumps({"fold": a.fold, "campaign": a.campaign,
+                                 "n_train": len(train),
                                  "axes": out}, ensure_ascii=False, indent=1))
     print(f"  -> {a.out}")
 
