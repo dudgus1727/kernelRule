@@ -333,8 +333,8 @@ def _population_criterion() -> str:
             f"(kernelrule.core.splits.experiment_shapes, D-170 §1)")
 
 
-def _wire_feature_retry(llm, *, table, matrix, hw_alt, gen, train_shapes
-                        ) -> bool:
+def _wire_feature_retry(llm, *, table, matrix, hw_alt, gen, train_shapes,
+                        time_gate: bool = False) -> bool:
     """★ Put the §8.3 refusal **inside the retry path** (D-170 §3).
 
     `f1_pipeline.py:535` caught `FeatureRejected` and moved to the next
@@ -354,7 +354,7 @@ def _wire_feature_retry(llm, *, table, matrix, hw_alt, gen, train_shapes
     def check(name: str, code: str, meta: dict) -> None:
         check_generated(code, registry=gen, meta=meta, table=table,
                         matrix=matrix, hw_alt=hw_alt,
-                        train_shapes=train_shapes)
+                        train_shapes=train_shapes, time_gate=time_gate)
 
     llm.set_feature_check(check)
     return True
@@ -620,7 +620,9 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry,
     #   emptying the slot.
     retry_wired = _wire_feature_retry(llm, table=table, matrix=matrix,
                                       hw_alt=hw_alt, gen=gen,
-                                      train_shapes=train_shapes)
+                                      train_shapes=train_shapes,
+                                      time_gate=getattr(a, "time_gate",
+                                                        False))
     print(f"  ★ §8.3 refusals go back to the model: {retry_wired} "
           f"(up to {FEATURE_RETRIES} retries per slot, D-170 §3)")
     rejects: dict[str, int] = {}
@@ -755,7 +757,10 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry,
                                        table=table, matrix=matrix,
                                        hw_alt=hw_alt,
                                        # ★ D-166 — see the loop's call site
-                                       train_shapes=train_shapes)
+                                       train_shapes=train_shapes,
+                                       # ★ D-192
+                                       time_gate=getattr(a, "time_gate",
+                                                         False))
                 row["accepted"] = True
                 row["shape_level"] = f.shape_level
                 if f.shape_level:
@@ -1088,6 +1093,7 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        use_analyst=not getattr(a, "no_analyst", False),
                        n_workers=getattr(a, "workers",
                                          LoopConfig.n_workers),
+                       time_gate=getattr(a, "time_gate", False),
                        objective="regret",
                        parameters=getattr(a, "parameters", None),
                        # ★ The fitter is **decided by the parameter count**
@@ -1179,6 +1185,7 @@ def stage3(a, d: Path, table, base: FeatureRegistry, splits,
                            feature_condition=a.condition,
                            use_analyst=not a.no_analyst,
                            n_workers=a.workers,
+                           time_gate=getattr(a, "time_gate", False),
                            objective="regret",
                            parameters=a.parameters,
                            # ★ The fitter is **decided by the parameter
@@ -1335,6 +1342,11 @@ def main() -> None:
                          "automatically")
     # ★ Parallel scoring and fitting (D-95). 0 = sequential (the default).
     #   The results must be identical.
+    ap.add_argument("--time-gate", action="store_true",
+                    help="★ D-192: a FeatureWriter axis that declares a time "
+                         "unit must behave like a time on the training "
+                         "shapes (stage 1 retries with the numbers; in the "
+                         "loop it is refused). Off = every run before it")
     ap.add_argument("--workers", type=int,
                     default=LoopConfig.n_workers, metavar="N",
                     help="score and fit in N processes (0=sequential). ★ The "
@@ -1566,6 +1578,8 @@ def main() -> None:
     _dump_json(d / "config.json", {
         "condition": a.condition, "model": a.model, "dry_run": a.dry_run,
         "seed_source": a.seed_source,
+        # ★ D-192 — the time-axis check on the FeatureWriter path
+        "time_gate": bool(getattr(a, "time_gate", False)),
         # ★ D-176 §2 — which RuleWriter prompt this run used. Without it a
         #   variant run and a campaign run look identical in the record.
         "size_guidance": getattr(a, "size_guidance", "role/_size_loop.md"),

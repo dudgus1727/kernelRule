@@ -533,7 +533,8 @@ def check_generated(code: str, *, registry: FeatureRegistry, meta: dict,
                     table, matrix, hw_alt,
                     others: dict | None = None,
                     train_shapes=None,
-                    sample_from_train: bool = False) -> None:
+                    sample_from_train: bool = False,
+                    time_gate: bool = False) -> None:
     """★ Would this candidate be accepted? **It registers nothing** (D-170
     §3).
 
@@ -553,14 +554,16 @@ def check_generated(code: str, *, registry: FeatureRegistry, meta: dict,
     _build_and_validate(code, registry=registry, meta=meta, table=table,
                         matrix=matrix, hw_alt=hw_alt, others=others,
                         train_shapes=train_shapes,
-                        sample_from_train=sample_from_train)
+                        sample_from_train=sample_from_train,
+                        time_gate=time_gate)
 
 
 def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
                         table, matrix, hw_alt,
                         others: dict | None = None,
                         train_shapes=None,
-                        sample_from_train: bool = False):
+                        sample_from_train: bool = False,
+                        time_gate: bool = False):
     """compile -> §8.3 validation -> the shape-level verdict. **Nothing is
     registered.** Returns `(feature, probe matrix, shape-level reason)`.
 
@@ -610,6 +613,19 @@ def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
     is_shape, why = detect_shape_level(f, table, matrix=probe)
     if is_shape:
         f = replace(f, shape_level=True)
+    # ★ D-192: an axis that declares a time unit has to behave like a time
+    #   on the **training** shapes (features/time_gate.py). Off unless the
+    #   caller asks — it reads training times, which this path otherwise
+    #   never does (D-75). Without `train_shapes` it cannot run, and it does
+    #   not fall back to the whole table.
+    if (time_gate and not f.shape_level and train_shapes is not None
+            and "time" in str(f.unit).lower()):
+        from kernelrule.features.time_gate import diagnose, verdict
+
+        msg = verdict(diagnose(name, f.direction, table, probe,
+                               list(train_shapes)))
+        if msg:
+            raise FeatureRejected(f"{name}: {msg}")
     return f, probe, (why if is_shape else None)
 
 
@@ -617,7 +633,8 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
                        table, matrix, hw_alt,
                        others: dict | None = None,
                        train_shapes=None,
-                       sample_from_train: bool = False) -> Feature:
+                       sample_from_train: bool = False,
+                       time_gate: bool = False) -> Feature:
     """Check -> sandbox -> §8.3 validation -> registration. One failure
     raises.
 
@@ -629,7 +646,7 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
     f, probe, why = _build_and_validate(
         code, registry=registry, meta=meta, table=table, matrix=matrix,
         hw_alt=hw_alt, others=others, train_shapes=train_shapes,
-        sample_from_train=sample_from_train)
+        sample_from_train=sample_from_train, time_gate=time_gate)
     name = f.name
     if f.shape_level:
         # ★ The reason is recorded. In particular one that "references cfg

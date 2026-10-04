@@ -249,6 +249,10 @@ class LoopConfig:
     fit_space: str = "u"
     warm_start: bool = True
     fit_budget: str = "dim"
+    #: ★ D-192: an axis built in the loop that declares a time unit must
+    #: behave like a time on the training shapes (features/time_gate.py).
+    #: Off by default — it reads training times on the FeatureWriter path.
+    time_gate: bool = False
 
 
 class LLMUnreachable(RuntimeError):
@@ -841,7 +845,8 @@ class RoundLoop:
                                        #   that reads the answer. The loop
                                        #   knows its split, so it says which
                                        #   shapes are its own.
-                                       train_shapes=self.splits.train.shapes)
+                                       train_shapes=self.splits.train.shapes,
+                                       time_gate=self.cfg.time_gate)
                 # ★ The column is built now. Without it, a rule using the
                 #   name gets a KeyError.
                 # ★ 2026-09-11 (D-161): `register_generated` already handed

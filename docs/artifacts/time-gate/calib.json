@@ -1,0 +1,327 @@
+{
+ "fold": 0,
+ "n_train": 48,
+ "axes": [
+  {
+   "group": "hand-built (D-189)",
+   "name": "tm_log_est",
+   "unit": "log2 ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.8086158850066335,
+    "pick_gm": 1.1459550407289516,
+    "slices": {
+     "split_k": {
+      "n": 47,
+      "interior": 32,
+      "end_miss": 5,
+      "hit": 19
+     },
+     "stages": {
+      "n": 44,
+      "interior": 5,
+      "end_miss": 5,
+      "hit": 39
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.stages it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 5 of 44 training shapes, and your axis is lowest at an end on 5 of those. (Picking the lowest value alone gives a regret of 1.146 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": null
+  },
+  {
+   "group": "hand-built (D-189)",
+   "name": "tm_crit_ratio",
+   "unit": "ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.42517769179900955,
+    "pick_gm": 2.1041719280060196,
+    "slices": {
+     "split_k": {
+      "n": 47,
+      "interior": 32,
+      "end_miss": 0,
+      "hit": 26
+     },
+     "stages": {
+      "n": 44,
+      "interior": 5,
+      "end_miss": 5,
+      "hit": 39
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.stages it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 5 of 44 training shapes, and your axis is lowest at an end on 5 of those. (Picking the lowest value alone gives a regret of 2.104 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": null
+  },
+  {
+   "group": "hand-built (D-189)",
+   "name": "log_roofline_time_mraster",
+   "unit": "log2 ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.2833910372308929,
+    "pick_gm": 2.0736480058573608,
+    "slices": {
+     "split_k": {
+      "n": 37,
+      "interior": 27,
+      "end_miss": 5,
+      "hit": 3
+     },
+     "stages": {
+      "n": 30,
+      "interior": 3,
+      "end_miss": 0,
+      "hit": 7
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": null,
+   "verdict": "time-axis check — it does not rise with the time: the mean within-shape rank correlation with log(time) is +0.28 over 48 training shapes. (Picking the lowest value alone gives a regret of 2.074 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates."
+  },
+  {
+   "group": "hand-built (D-189)",
+   "name": "splitk_roofline_log_time",
+   "unit": "log2 ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.5225949418950657,
+    "pick_gm": 2.0444495266122065,
+    "slices": {
+     "split_k": {
+      "n": 47,
+      "interior": 32,
+      "end_miss": 5,
+      "hit": 33
+     },
+     "stages": {
+      "n": 36,
+      "interior": 3,
+      "end_miss": 3,
+      "hit": 33
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.stages it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 3 of 36 training shapes, and your axis is lowest at an end on 3 of those. (Picking the lowest value alone gives a regret of 2.044 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": null
+  },
+  {
+   "group": "hand-built (D-189)",
+   "name": "splitk_excess_log",
+   "unit": "log2 ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.47732209194258274,
+    "pick_gm": 2.095328290774427,
+    "slices": {
+     "split_k": {
+      "n": 47,
+      "interior": 32,
+      "end_miss": 5,
+      "hit": 33
+     },
+     "stages": {
+      "n": 23,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 21
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": null,
+   "verdict": null
+  },
+  {
+   "group": "d190 f0 stage 1",
+   "name": "pipeline_stage_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.3056893304754638,
+    "pick_gm": 4.889325350950085,
+    "slices": {
+     "split_k": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "stages": {
+      "n": 44,
+      "interior": 5,
+      "end_miss": 5,
+      "hit": 22
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.stages it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 5 of 44 training shapes, and your axis is lowest at an end on 5 of those. (Picking the lowest value alone gives a regret of 4.889 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": null
+  },
+  {
+   "group": "d190 f1 stage 1",
+   "name": "pipeline_stage_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.05091433938895248,
+    "pick_gm": 2.171473989735641,
+    "slices": {
+     "split_k": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "stages": {
+      "n": 44,
+      "interior": 5,
+      "end_miss": 4,
+      "hit": 0
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.stages it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 5 of 44 training shapes, and your axis is lowest at an end on 4 of those. (Picking the lowest value alone gives a regret of 2.171 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": "time-axis check — it does not rise with the time: the mean within-shape rank correlation with log(time) is +0.05 over 48 training shapes. (Picking the lowest value alone gives a regret of 2.171 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates."
+  },
+  {
+   "group": "d190 f2 stage 1",
+   "name": "stage_latency_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.12099008832272644,
+    "pick_gm": 9.344199874836745,
+    "slices": {
+     "split_k": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "stages": {
+      "n": 44,
+      "interior": 5,
+      "end_miss": 5,
+      "hit": 39
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.stages it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 5 of 44 training shapes, and your axis is lowest at an end on 5 of those. (Picking the lowest value alone gives a regret of 9.344 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": "time-axis check — it does not rise with the time: the mean within-shape rank correlation with log(time) is +0.12 over 48 training shapes. (Picking the lowest value alone gives a regret of 9.344 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates."
+  },
+  {
+   "group": "d190 f3 stage 1",
+   "name": "pipeline_stage_time_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.15425968561642345,
+    "pick_gm": 9.344199874836745,
+    "slices": {
+     "split_k": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "stages": {
+      "n": 44,
+      "interior": 5,
+      "end_miss": 5,
+      "hit": 39
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.stages it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 5 of 44 training shapes, and your axis is lowest at an end on 5 of those. (Picking the lowest value alone gives a regret of 9.344 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": "time-axis check — it does not rise with the time: the mean within-shape rank correlation with log(time) is +0.15 over 48 training shapes. (Picking the lowest value alone gives a regret of 9.344 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates."
+  },
+  {
+   "group": "d190 f3 stage 1",
+   "name": "split_k_critical_path_ratio",
+   "unit": "time ratio",
+   "diag": {
+    "n_shapes": 48,
+    "rank": 0.0827060055861124,
+    "pick_gm": 2.3034160980353238,
+    "slices": {
+     "split_k": {
+      "n": 47,
+      "interior": 32,
+      "end_miss": 32,
+      "hit": 0
+     },
+     "stages": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     },
+     "raster_width": {
+      "n": 0,
+      "interior": 0,
+      "end_miss": 0,
+      "hit": 0
+     }
+    }
+   },
+   "verdict_first_rule": "time-axis check — along cfg.split_k it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 32 of 47 training shapes, and your axis is lowest at an end on 32 of those. (Picking the lowest value alone gives a regret of 2.303 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates.",
+   "verdict": "time-axis check — it does not rise with the time: the mean within-shape rank correlation with log(time) is +0.08 over 48 training shapes; along cfg.split_k it moves one way only: holding every other field of the fastest config, the time is lowest in the middle of the range on 32 of 47 training shapes, and your axis is lowest at an end on 32 of those. (Picking the lowest value alone gives a regret of 2.303 on these shapes.) A time axis has to be lowest where the time is: write it as the sum, or the larger, of an effect that falls and one that rises as that field grows, each a time from hw.* rates."
+  }
+ ],
+ "note": "verdict_first_rule = rank>0 and a field judged from 3 interior shapes; verdict = RANK_MIN 0.3 and INTERIOR_SHARE 0.25 (set after seeing these ten axes)"
+}
