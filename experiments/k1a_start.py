@@ -28,6 +28,8 @@ FOLDS = (0, 1, 2, 3)
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--prefix", default="k1a")
+    ap.add_argument("--gpu", default="a6000",
+                    choices=("a6000", "5090", "4090", "h100"))
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     warnings.simplefilter("ignore")
@@ -40,11 +42,11 @@ def main() -> None:
     from kernelrule.features import REGISTRY
     from kernelrule.features.loader import base_registry
 
-    P._G["gpu"] = "a6000"
+    P._G["gpu"] = a.gpu
     t = P._table()
     out = {}
     for f in FOLDS:
-        d = Path(f"runs/{a.prefix}-a6000-f{f}")
+        d = Path(f"runs/{a.prefix}-{a.gpu}-f{f}")
         seed = json.loads((d / "stage2-rule-writer" / "chosen.json")
                           .read_text())
         sp = _splits(t, fold=f, k=4, design="nkband")
@@ -54,7 +56,7 @@ def main() -> None:
                        None, matrix=m, table=t, train=sp.train, val=sp.val,
                        objective="regret", rank_top_k=100, rank_lambda=0.0,
                        fit_space="u", fit_budget="dim")
-        ev = [json.loads(x) for x in Path(f"runs/{a.prefix}-a6000-f{f}-s0/"
+        ev = [json.loads(x) for x in Path(f"runs/{a.prefix}-{a.gpu}-f{f}-s0/"
                                           "trace.jsonl").read_text()
               .splitlines() if x]
         rs = next((e for e in ev if e.get("ev") == "round_start"), {})
