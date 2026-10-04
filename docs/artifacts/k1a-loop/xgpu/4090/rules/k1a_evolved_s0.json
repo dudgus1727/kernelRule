@@ -1,0 +1,102 @@
+{
+ "name": "k1a evolved s0 (4090)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster tie-break: use the shorter output dimension as the fast raster side.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n\n    # Common compute/L2 roof and the explicit split-K and family corrections retained from the parent.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    s = s + w[2] * f.splitk_roofline_log_time\n    s = s + 0.001 * sgn * f.tm_log_inst\n\n    # tm_regstaged=1 identifies the register-staged two-stage family; its complement\n    # identifies multistage kernels.  Resource costs are fitted separately for the\n    # two families because the same allocation has a different latency-hiding trade.\n    two_stage = f.tm_regstaged\n    multistage = 1.0 - f.tm_regstaged\n    if p.roofline_ratio < 1:\n        # Memory-bound kernels additionally pay for the latency-critical SM path.\n        s = s + w[3] * two_stage * f.register_file_pressure\n        s = s + w[4] * two_stage * f.shared_memory_pressure\n        s = s + w[5] * two_stage * f.resident_block_scarcity\n        s = s + w[6] * multistage * f.pipeline_fill_drain_fraction\n        s = s + w[7] * multistage * f.register_file_pressure\n        s = s + w[8] * multistage * f.shared_memory_pressure\n        s = s + w[9] * multistage * f.resident_block_scarcity\n        s = s + w[10] * f.splitk_sm_latency_rounds_log\n    else:\n        # Compute-bound kernels expose stage prologue/epilogue and occupancy/resource\n        # costs, but do not use the memory-only latency-round correction.\n        s = s + w[11] * two_stage * f.register_file_pressure\n        s = s + w[12] * two_stage * f.shared_memory_pressure\n        s = s + w[13] * two_stage * f.resident_block_scarcity\n        s = s + w[14] * multistage * f.pipeline_fill_drain_fraction\n        s = s + w[15] * multistage * f.register_file_pressure\n        s = s + w[16] * multistage * f.shared_memory_pressure\n        s = s + w[17] * multistage * f.resident_block_scarcity\n    return s",
+   "w0": [
+    463.6399287227256,
+    136.4607264526208,
+    387.25307562743257,
+    650.0988966822413,
+    -57.186198942328325,
+    1108.7616376165167,
+    -3878.8899780525844,
+    -300.223028512664,
+    -438.45793428098915,
+    -3.8669940590018324,
+    -66.80220705354219,
+    -416.91608273447343,
+    272.99990138302365,
+    24.61631032610049,
+    1145.082042444647,
+    -404.6543167056639,
+    -18.58991921497706,
+    83.76200596866384
+   ],
+   "extra_features": [
+    "runs/k1a-4090-f0-s0/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster (pool feature dram_w1_*): panels fetched once per one-CTA-per-SM\n    # K-lockstep window (whole grid if co-resident in one round), re-fetched across windows unless the reuse distance fits L2,\n    # plus C write, split-K partials, spills; DRAM time / ideal compute time. Replaces J1e's tm_dram_ratio + ref/rbs double count.\n    # SM roof as in J1e: the L2->SM feed (priced at DRAM bandwidth, kappa at its physical bound 1) overlaps the math of the\n    # same SM, so the SM runs at the slower of the two; DRAM keeps the imperfect-overlap p=2 combination.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Pure tie-break among raster variants that differ only in inst_total: sign fixed by physics (shorter-side raster),\n    # scale fixed at P1's prior 1e-3 per log2(inst) (<< one score unit = 0.1 log2 time), so it is not a fitted feature.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s\n",
+   "w0": [
+    13.41963916197213,
+    4.022535821052763,
+    39.30719443384894
+   ],
+   "extra_features": [
+    "runs/k1a-4090-f1-s0/features.jsonl"
+   ]
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: one consistent byte count for the selected raster.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Existing efficiency corrections.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # When output work per SM is scarce, split-K can repair a deficient dispatch wave.\n    # Once there is ample output work, use the tile-relative excess and charge the\n    # reduction/refetch costs instead of applying one global split-K direction.\n    if p.output_work_per_sm < 4096:\n        s = s + w[2] * f.splitk_roofline_log_time\n        s = s + w[3] * f.splitk_excess_log\n        s = s + w[4] * f.wave_count_deficit\n    else:\n        s = s + w[5] * f.splitk_excess_log\n        s = s + w[6] * f.serial_reduction_dependency\n        s = s + w[7] * f.splitk_partial_bytes_ratio\n    # Memory-sensitive shapes must trade pipeline fill/drain against latency hiding,\n    # residency resources, and the useful work assigned to each thread.\n    if p.roofline_ratio < 1:\n        s = s + w[8] * f.pipeline_fill_drain_fraction\n        s = s + w[9] * f.register_file_pressure\n        s = s + w[10] * f.shared_memory_pressure\n        s = s + w[11] * f.occupancy_deficit\n        s = s + w[12] * f.resident_block_scarcity\n        s = s + w[13] * f.thread_work_granularity_deficit\n        s = s + w[14] * f.splitk_sm_latency_rounds_log\n    else:\n        # In the compute roof, retain a direct cost for deeper pipelines rather than\n        # rewarding multistaging through the latency-bound model.\n        s = s + w[15] * f.pipeline_fill_drain_fraction\n    # Pure tie-break among raster variants; the sign follows the shorter-side raster.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s",
+   "w0": [
+    438.5831777378118,
+    247.8547802426567,
+    866.7924705460782,
+    67621.25180649446,
+    -2489.3926811462547,
+    297.76485959641434,
+    -479.6632572400937,
+    10.440644633372147,
+    -76878.06772552434,
+    1841.8901671366118,
+    -5316.094369705773,
+    286.58444187309095,
+    1094.3201977424424,
+    -96351.96545851915,
+    7.922458767259228,
+    3089.4862659391483
+   ],
+   "extra_features": [
+    "runs/k1a-4090-f2-s0/features.jsonl"
+   ]
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    s = s + w[0] * f.tm_cta_warps\n    s = s + w[1] * f.splitk_roofline_log_time\n    if p.roofline_ratio < 1:\n        s = s + w[2] * f.tm_regstaged\n        s = s + w[3] * f.pipeline_fill_drain_fraction\n        s = s + w[4] * f.splitk_sm_latency_rounds_log\n        s = s + w[5] * f.resident_block_scarcity\n        if p.output_work_per_sm < 4096:\n            s = s + w[19] * f.splitk_excess_log\n            s = s + w[20] * f.wave_count_deficit\n    else:\n        s = s + w[6] * f.tm_regstaged\n        s = s + w[7] * f.pipeline_fill_drain_fraction\n        s = s + w[8] * f.register_file_pressure\n        s = s + w[9] * f.shared_memory_pressure\n        s = s + w[10] * f.resident_block_scarcity\n        if p.output_work_per_sm < 4096:\n            s = s + w[21] * f.splitk_excess_log\n            s = s + w[22] * f.wave_count_deficit\n        else:\n            s = s + w[23] * f.splitk_excess_log\n            s = s + w[24] * f.serial_reduction_dependency\n            s = s + w[25] * np.log2(1.0 + f.splitk_partial_bytes_ratio)\n    if p.output_aspect_imbalance > 0.5:\n        if p.output_work_per_sm < 4096:\n            s = s + w[11] * np.log2(1.0 + f.edge_waste)\n            s = s + w[12] * np.log2(1.0 + f.tail_waste / np.maximum(1e-6, 1.0 - f.tail_waste))\n            s = s + w[13] * f.thread_work_granularity_deficit\n            s = s + w[14] * np.log2(1.0 + f.tile_aspect_mismatch)\n            s = s + w[15] * np.log2(f.operand_tile_traffic_ratio)\n            s = s + w[16] * (f.shared_memory_pressure + f.resident_block_scarcity + f.register_file_pressure) * (1.0 + f.thread_work_granularity_deficit + np.log2(1.0 + f.tile_aspect_mismatch))\n    if p.output_work_per_sm >= 4096:\n        s = s + w[17] * np.log2(1.0 + d) * (1.0 + f.resident_block_scarcity)\n        s = s + w[18] * np.log2(f.operand_tile_traffic_ratio) * (1.0 + f.resident_block_scarcity)\n        if p.l2_working_set_pressure > 0.5:\n            if p.M > p.N:\n                s = s + w[26] * np.log2(1.0 + f.b_refetch_bw_demand)\n            else:\n                s = s + w[27] * np.log2(1.0 + f.a_refetch_bw_demand)\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s",
+   "w0": [
+    342340.72966420226,
+    450747.0397905078,
+    1130534.012098678,
+    -31958973.512985434,
+    -197960.05904644862,
+    -1237607.1223738373,
+    2144191.466178353,
+    10908197.377786897,
+    -2539878.598803804,
+    -1286556.3900930015,
+    2905294.062931664,
+    -3471638.6349868,
+    4938238.088140415,
+    -200440563.94364315,
+    7534024.653066501,
+    407348.5489746007,
+    1306166.3064202743,
+    86350.33734019594,
+    219252.47014089444,
+    0.0,
+    44360156.54295318,
+    2.9931570905101363,
+    5.185041359335067,
+    1327246.1627769459,
+    -5680139.956156751,
+    450868.72371682205,
+    536367892.75461906,
+    26927378.91975447
+   ],
+   "extra_features": [
+    "runs/k1a-4090-f3-s0/features.jsonl"
+   ]
+  }
+ }
+}

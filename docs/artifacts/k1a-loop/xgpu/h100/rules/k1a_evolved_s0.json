@@ -1,0 +1,82 @@
+{
+ "name": "k1a evolved s0 (h100)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster tie-break: use the shorter output-grid direction for the\n    # visible raster model, while retaining the fixed-sign instruction tie-break.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n\n    if p.log_min_dim < 5 or p.output_work_per_sm < 128:\n        s = s + w[2] * np.log2(1.0 + f.edge_waste)\n        s = s + w[3] * f.register_file_pressure\n        s = s + w[4] * f.shared_memory_pressure\n        s = s + w[5] * f.resident_block_scarcity\n        s = s + w[6] * f.wave_count_deficit\n        s = s + w[7] * f.thread_work_granularity_deficit\n        s = s + w[8] * f.splitk_sm_latency_rounds_log\n    else:\n        s = s + w[9] * f.splitk_roofline_log_time\n        # Long reductions expose steady-state K-loop work; retain separate\n        # resource terms in the compute-bound path for tiles whose iteration\n        # advantage is lost to register or shared-memory pressure.\n        if p.log_min_dim >= 7:\n            if p.roofline_ratio < 1:\n                s = s + w[10] * np.log2(f.mainloop_iteration_count)\n                s = s + w[11] * f.pipeline_fill_drain_fraction\n                s = s + w[12] * f.k_tail_waste\n            else:\n                s = s + w[13] * np.log2(f.mainloop_iteration_count)\n                s = s + w[14] * f.pipeline_fill_drain_fraction\n                s = s + w[15] * np.log2(f.tm_crit_ratio)\n                s = s + w[16] * np.log2(f.tm_l2_ratio)\n                s = s + w[17] * f.k_tail_waste\n\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s",
+   "w0": [
+    43781.37516118113,
+    7881.746880995118,
+    230890.8758944829,
+    221731.27407349704,
+    1113399.1227267662,
+    -3622482.707274347,
+    -1437549.9400104475,
+    -220745.62286800725,
+    419389.28217725677,
+    42953.59580866233,
+    2.4208196998111693,
+    35.643239278294374,
+    -20.12745878434805,
+    -11948.77764585531,
+    81864.0560954763,
+    24696.23864459242,
+    40887.92329957163,
+    -22237544.009682234
+   ],
+   "extra_features": [
+    "runs/k1a-h100-f0-s0/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster, including split-K partials and spills.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # A long reduction exposes the accumulated loop-control and synchronization cost.\n    # Log compression keeps the absolute iteration count commensurate with the time-model score.\n    if p.log_min_dim < 8:\n        # Short-dimension shapes have little steady-state pipeline to amortize fill/drain latency.\n        s = s + w[3] * np.log2(f.mainloop_iteration_count)\n        s = s + w[4] * f.pipeline_fill_drain_fraction\n    else:\n        # On long reductions, repeated per-iteration overhead dominates the fixed prologue/epilogue fraction.\n        s = s + w[5] * np.log2(f.mainloop_iteration_count)\n        s = s + w[6] * f.pipeline_fill_drain_fraction\n    # Pure tie-break among raster variants that differ only in inst_total; sign fixed by physics (shorter-side raster).\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s",
+   "w0": [
+    46.38491128986347,
+    3.0014830791569813,
+    27.487150867840377,
+    50.87860312655802,
+    -79.46120200599691,
+    35.26181893222484,
+    172.2724537004566
+   ],
+   "extra_features": [
+    "runs/k1a-h100-f1-s0/features.jsonl"
+   ]
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster (pool feature dram_w1_*): panels fetched once per one-CTA-per-SM\n    # K-lockstep window (whole grid if co-resident in one round), re-fetched across windows unless the reuse distance fits L2,\n    # plus C write, split-K partials, spills; DRAM time / ideal compute time.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop, CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Pure tie-break among raster variants that differ only in inst_total: shorter-side raster.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    # In populated, non-skinny grids, a short tile_k exposes loop iterations; price that\n    # against the tile's bandwidth deficit and the residency cost of the larger tile.\n    if p.log_min_dim > 6 and p.output_work_per_sm > 1024:\n        s = s + w[3] * (np.log2(f.mainloop_iteration_count) * (1.0 + f.tile_roofline_deficit))\n        s = s + w[4] * f.shared_memory_pressure\n        s = s + w[5] * f.resident_block_scarcity\n        s = s + w[6] * f.wave_count_deficit\n    return s",
+   "w0": [
+    16.4281443450068,
+    3.2876794629046735,
+    32.351282105974015,
+    10.462339979453533,
+    44.74421361805537,
+    1.004879199917935,
+    -55.7992589656208
+   ],
+   "extra_features": [
+    "runs/k1a-h100-f2-s0/features.jsonl"
+   ]
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster tie-break: use the shorter-grid-side raster and its consistent DRAM model.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # The SM feed and compute paths overlap; DRAM remains an imperfect-overlap leg.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency corrections retained from the parent.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Keep the established shorter-side raster tie-break.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    # A small output surface has too little useful work per CTA to be described by\n    # the aggregate time norm alone.  GEMV-like shapes are especially boundary- and\n    # thread-overhead-sensitive, whereas less-rectangular low-work shapes are more\n    # limited by resident resources and dispatch waves.\n    if p.output_work_per_sm < 1024.0:\n        if p.output_aspect_imbalance > 0.8:\n            s = s + w[3] * f.thread_work_granularity_deficit\n            s = s + w[4] * np.log2(1.0 + f.edge_waste)\n            s = s + w[5] * f.register_file_pressure\n            s = s + w[6] * f.resident_block_scarcity\n            s = s + w[7] * f.wave_count_deficit\n        else:\n            s = s + w[8] * f.thread_work_granularity_deficit\n            s = s + w[9] * np.log2(1.0 + f.edge_waste)\n            s = s + w[10] * f.register_file_pressure\n            s = s + w[11] * f.resident_block_scarcity\n            s = s + w[12] * f.wave_count_deficit\n    return s",
+   "w0": [
+    65.86006580384866,
+    0.8502255733014096,
+    6.336624237912121,
+    6708.744902043156,
+    94.68730111856993,
+    589.8659996367663,
+    -1041.3083103622655,
+    -741.0461699198997,
+    1.5099809784181015,
+    1.7730832320305965,
+    1.9711113606011785,
+    1.4155832159734028,
+    3.4133921004469565
+   ],
+   "extra_features": [
+    "runs/k1a-h100-f3-s0/features.jsonl"
+   ]
+  }
+ }
+}

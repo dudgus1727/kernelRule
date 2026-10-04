@@ -1,0 +1,129 @@
+{
+ "name": "k1a evolved s0 (5090)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg: ONE consistent byte count for that raster, plus C writes, split-K partials, and spills.\n    # The SM roof uses the slower of the compute and L2-feed legs, while DRAM combines imperfectly with it.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency the norm cannot see: register-staged 2-stage mainloop and CTA-wide barrier over more warps.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Split-K time model with an interior optimum, in log2 time.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Pure tie-break among raster variants; shorter-side raster is preferred by the fixed sign.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    # Multistage fill/drain is most exposed for short K loops; resource pressure makes\n    # deeper pipelines especially costly when they cannot be hidden by residency.\n    if p.roofline_ratio < 1:\n        if p.K < 1024:\n            s = s + w[15] * f.pipeline_fill_drain_fraction\n            s = s + w[16] * np.log2(f.mainloop_iteration_count)\n            s = s + w[17] * f.register_file_pressure\n            s = s + w[18] * f.shared_memory_pressure\n        else:\n            s = s + w[19] * f.pipeline_fill_drain_fraction\n            s = s + w[20] * np.log2(f.mainloop_iteration_count)\n            s = s + w[21] * f.register_file_pressure\n            s = s + w[22] * f.shared_memory_pressure\n    else:\n        if p.K < 1024:\n            s = s + w[23] * f.pipeline_fill_drain_fraction\n            s = s + w[24] * np.log2(f.mainloop_iteration_count)\n            s = s + w[25] * f.register_file_pressure\n            s = s + w[26] * f.shared_memory_pressure\n        else:\n            s = s + w[27] * f.pipeline_fill_drain_fraction\n            s = s + w[28] * np.log2(f.mainloop_iteration_count)\n            s = s + w[29] * f.register_file_pressure\n            s = s + w[30] * f.shared_memory_pressure\n    # A narrower branch isolates rectangular grids with enough work to amortize launch noise,\n    # but not enough output surface to make the ordinary populated-grid geometry adequate.\n    if (p.output_aspect_imbalance > 0.5 and\n            p.output_work_per_sm < 1000000.0 and\n            p.log_min_dim > 5):\n        s = s + w[3] * (f.tile_aspect_mismatch / 20.0)\n        s = s + w[4] * f.thread_work_granularity_deficit\n        s = s + w[5] * np.log2(f.operand_tile_traffic_ratio)\n        s = s + w[6] * f.tile_roofline_deficit\n        # Boundary and dispatch inefficiency are jointly exposed in this partially amortized regime.\n        s = s + w[31] * (np.log2(1.0 + f.edge_waste) / np.log2(301.0))\n        s = s + w[32] * (np.log2(1.0 / (1.0 - np.clip(f.tail_waste, 0.0, 0.99))) / np.log2(100.0))\n        s = s + w[33] * f.wave_count_deficit\n        s = s + w[34] * f.thread_work_granularity_deficit\n        s = s + w[35] * (f.tile_aspect_mismatch / 20.0)\n    elif p.output_aspect_imbalance > 0.5:\n        s = s + w[3] * (f.tile_aspect_mismatch / 20.0)\n        s = s + w[4] * f.thread_work_granularity_deficit\n        s = s + w[5] * np.log2(f.operand_tile_traffic_ratio)\n        s = s + w[6] * f.tile_roofline_deficit\n        s = s + w[7] * f.register_file_pressure\n        s = s + w[8] * f.shared_memory_pressure\n    else:\n        s = s + w[9] * (f.tile_aspect_mismatch / 20.0)\n        s = s + w[10] * f.thread_work_granularity_deficit\n        s = s + w[11] * np.log2(f.operand_tile_traffic_ratio)\n        s = s + w[12] * f.tile_roofline_deficit\n        s = s + w[13] * f.register_file_pressure\n        s = s + w[14] * f.shared_memory_pressure\n    return s",
+   "w0": [
+    205722.00241493148,
+    150758.35225977274,
+    412432.8665983106,
+    1283640.471003641,
+    5103047.011697186,
+    406263.21373892605,
+    -910152.3062497112,
+    -155766.433726084,
+    -545032.4133079253,
+    1410909.88715505,
+    10137624.160176523,
+    263237.8153368556,
+    -1057872.3522263113,
+    -380186.1740775125,
+    295684.52056962776,
+    -349.4109574523028,
+    -4.650110484464404,
+    305.7956406861892,
+    16.325249031160066,
+    -2956182.471609251,
+    -573793.5240060857,
+    -163820.8348482809,
+    -238207.91107092146,
+    65054.90690523787,
+    -1302687.2075848782,
+    2159909.598196373,
+    1169858.5272728046,
+    3628477.8323348584,
+    -129730.77590442145,
+    549139.7422995925,
+    190015.4674532897,
+    24901375.722180836,
+    3121703.2283590795,
+    57175.84707466691,
+    5093591.731801021,
+    -839506.4623686317
+   ],
+   "extra_features": [
+    "runs/k1a-5090-f0-s0/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster tie-break: use the shorter grid side's raster model.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Register staging and CTA-wide barrier effects are retained from the parent.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    s = s + 0.001 * sgn * f.tm_log_inst\n\n    # When each SM has abundant output work and the problem is large, tile\n    # family choice is already covered by the absolute model above.  Use the\n    # tile-local split excess and wave/tail state to choose split counts.\n    if p.output_work_per_sm > 4096 and p.log_flops > 32:\n        s = s + w[3] * f.splitk_excess_log\n        s = s + w[4] * f.wave_count_deficit\n        s = s + w[5] * f.tail_waste\n    else:\n        # With insufficient output work, retain the absolute split-K model so\n        # that under-splitting and idle SMs remain explicitly priced.\n        s = s + w[2] * f.splitk_roofline_log_time\n\n    # Memory/feed-limited shapes trade tile geometry against operand reuse and\n    # per-CTA amortisation.  Rectangular outputs have a different useful\n    # row/column geometry from square-like outputs.\n    if p.roofline_ratio < 1:\n        if p.output_aspect_imbalance > 0.5:\n            s = s + w[6] * f.tile_aspect_mismatch\n            s = s + w[7] * f.thread_work_granularity_deficit\n            s = s + w[8] * np.log2(f.operand_tile_traffic_ratio)\n            s = s + w[9] * f.tile_roofline_deficit\n        else:\n            s = s + w[10] * f.tile_aspect_mismatch\n            s = s + w[11] * f.thread_work_granularity_deficit\n            s = s + w[12] * np.log2(f.operand_tile_traffic_ratio)\n            s = s + w[13] * f.tile_roofline_deficit\n    else:\n        # Compute-bound shapes still benefit from amortised tile work, but\n        # resource pressure is the stronger constraint on large tiles.\n        s = s + w[14] * f.tile_aspect_mismatch\n        s = s + w[15] * f.thread_work_granularity_deficit\n        s = s + w[16] * np.log2(f.operand_tile_traffic_ratio)\n        s = s + w[17] * f.tile_roofline_deficit\n        s = s + w[18] * f.register_file_pressure\n        s = s + w[19] * f.shared_memory_pressure\n        s = s + w[20] * f.occupancy_deficit\n    return s",
+   "w0": [
+    7257.650290027513,
+    -755.8689914302153,
+    34853.96911656164,
+    5958.929417328965,
+    7831.11069245492,
+    15921.38110038902,
+    4009.961321331494,
+    109615.16022225203,
+    11036.517220748578,
+    -19321.628307124654,
+    -1.2603658479919972,
+    38.02556939543658,
+    -9.590688915228794,
+    11.832130805384036,
+    946.2822693740706,
+    207862.40065370037,
+    1374.0784963460414,
+    -9961.182837266946,
+    -311.36482072942226,
+    -70.4412431755176,
+    32862.91508892849
+   ],
+   "extra_features": []
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster the tie-break below realises (current contract cannot see swizzle): along the shorter grid side.\n    # M<=N: identity (M-fastest), A panels are the fast-dim panels; M>N: horizontal (N-fastest), B panels are.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    # DRAM leg and the slower of the SM compute and L2-feed paths.\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Efficiency corrections retained from the parent.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    # Existing split-K roofline model retained as the base split-count predictor.\n    s = s + w[2] * f.splitk_roofline_log_time\n    # Reduction mode has different costs in the memory and compute regimes.  In the\n    # memory regime, global partial traffic is the dominant parallel-reduction cost.\n    if p.roofline_ratio < 1:\n        s = s + w[3] * f.serial_reduction_dependency\n        s = s + w[4] * f.parallel_reduction_traffic_fraction\n        s = s + w[5] * np.abs(f.splitk_excess_log)\n    else:\n        # For saturated compute grids, tile-family efficiency and replicated operand\n        # work become visible before the active norm's small-resource preference.\n        if p.output_work_per_sm > 1024:\n            s = s + w[6] * f.serial_reduction_dependency\n            s = s + w[7] * f.parallel_reduction_compute_fraction\n            s = s + w[8] * f.parallel_reduction_traffic_fraction\n            s = s + w[9] * np.abs(f.splitk_excess_log)\n            s = s + w[10] * np.log2(f.operand_tile_traffic_ratio)\n            s = s + w[11] * f.tile_roofline_deficit\n            s = s + w[12] * f.thread_work_granularity_deficit\n            s = s + w[13] * f.resident_block_scarcity\n            s = s + w[14] * f.wave_count_deficit\n            s = s + w[15] * f.register_file_pressure\n            s = s + w[16] * f.log_roofline_time_mraster\n        else:\n            # For compute-bound but sparsely populated grids, retain the parent's\n            # reduction and active-resource ordering without saturated-grid terms.\n            s = s + w[6] * f.serial_reduction_dependency\n            s = s + w[7] * f.parallel_reduction_compute_fraction\n            s = s + w[8] * f.parallel_reduction_traffic_fraction\n            s = s + w[9] * np.abs(f.splitk_excess_log)\n    # Small swizzle/raster interaction: code-size raster evidence matters more when\n    # the selected width-1 raster is under greater panel/cache traffic pressure.\n    s = s + w[17] * np.log2(1.0 + d) * (sgn * (f.tm_log_inst - 8.0) / 8.0)\n    # Pure raster tie-break among variants differing only in instruction count.\n    s = s + 0.001 * sgn * f.tm_log_inst\n    return s",
+   "w0": [
+    94345.30659941869,
+    58671.10614774447,
+    34369.996026923276,
+    1369214.5188106068,
+    39595.591146833955,
+    66220.46592734996,
+    278784.91998924187,
+    29145375.155029967,
+    13123.906999789386,
+    -48381.43341525787,
+    -2565.0910038851944,
+    0.0,
+    5708360.789010959,
+    56411.800200506776,
+    44407.169915328086,
+    212774.32616229114,
+    108692.8217755819,
+    2641.2146867867714
+   ],
+   "extra_features": [
+    "runs/k1a-5090-f2-s0/features.jsonl"
+   ]
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    # Width-1 raster tie-break: along the shorter output-grid side.\n    if p.M > p.N:\n        d = f.dram_w1_hz_ratio\n        sgn = 1.0\n    else:\n        d = f.dram_w1_id_ratio\n        sgn = -1.0\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(d))\n    s = 10.0 * np.log2(t)\n    # Existing efficiency corrections and interior split-K time model.\n    s = s + w[0] * f.tm_regstaged + w[1] * f.tm_cta_warps\n    s = s + w[2] * f.splitk_roofline_log_time\n    s = s + 0.001 * sgn * f.tm_log_inst\n    # Tile geometry and thread-level amortization are distinct from boundary waste.\n    s = s + w[3] * np.log2(1.0 + f.tile_aspect_mismatch)\n    s = s + w[4] * f.thread_work_granularity_deficit\n    # Bandwidth-bound shapes emphasize replicated operand traffic and tile intensity;\n    # compute-bound shapes emphasize residency and resource limits instead.\n    if p.roofline_ratio < 1.0:\n        s = s + w[5] * np.log2(f.operand_tile_traffic_ratio)\n        s = s + w[6] * f.tile_roofline_deficit\n        s = s + w[7] * f.resident_block_scarcity\n        s = s + w[8] * f.shared_memory_pressure\n        s = s + w[9] * f.register_file_pressure\n        # Explicitly strengthen selected width-1 traffic; the other terms proxy\n        # swizzle-dependent panel reuse and wave balance.\n        s = s + w[14] * np.log2(1.0 + np.where(p.M > p.N, f.dram_w1_hz_ratio, f.dram_w1_id_ratio))\n        s = s + w[15] * np.log2(f.operand_tile_traffic_ratio)\n        s = s + w[16] * (-np.log2(np.maximum(1e-6, 1.0 - f.tail_waste)))\n    else:\n        s = s + w[10] * f.tile_roofline_deficit\n        s = s + w[11] * f.resident_block_scarcity\n        s = s + w[12] * f.shared_memory_pressure\n        s = s + w[13] * f.register_file_pressure\n        # Raster traffic remains useful outside the bandwidth regime, while\n        # tail imbalance remains a distinct wave-level cost.\n        s = s + w[17] * np.log2(1.0 + np.where(p.M > p.N, f.dram_w1_hz_ratio, f.dram_w1_id_ratio))\n        s = s + w[18] * (-np.log2(np.maximum(1e-6, 1.0 - f.tail_waste)))\n    return s",
+   "w0": [
+    2801.628221116368,
+    -497.17639097173054,
+    1260.2590135266378,
+    285.84087951066147,
+    141591.06617127746,
+    2503.9532910757202,
+    -28005.458668564002,
+    2693.5572773755084,
+    -1122.8813056208894,
+    9495.564504748012,
+    -3913.1601221277233,
+    3188.272136186126,
+    -2387.367140301404,
+    3569.055900862247,
+    222889.53090411064,
+    1890.3132684164664,
+    4372.048143241381,
+    297.71775591564756,
+    2607.3521536688136
+   ],
+   "extra_features": [
+    "runs/k1a-5090-f3-s0/features.jsonl"
+   ]
+  }
+ }
+}
