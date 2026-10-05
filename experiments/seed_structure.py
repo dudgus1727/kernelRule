@@ -95,16 +95,43 @@ def analyse(code: str) -> dict:
             "features_used": sorted(_feats(fn))}
 
 
+def _final(run: Path) -> dict:
+    """The loop's last best rule and what changed on the way (stage 3)."""
+    bests = [json.loads(x) for x in (run / "bests.jsonl").read_text()
+             .splitlines() if x.strip()]
+    last = bests[-1]
+    r = analyse(last["code"])
+    ids = [b["rule_id"] for b in bests]
+    change = next((b["round"] for b in bests if b["rule_id"] == ids[-1]),
+                  None)
+    return {"final": r, "rule_id": last["rule_id"],
+            "last_best_round": change,
+            "splitk_terms": sorted(x for x in r["features_used"]
+                                   if x.startswith("splitk_")),
+            "n_best_changes": len(dict.fromkeys(ids)) - 1}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--prefix", required=True)
     ap.add_argument("--gpu", default="a6000")
     ap.add_argument("--folds", default="0,1,2,3")
     ap.add_argument("--out", type=Path, default=None)
+    # ★ `final` reads the loop's last best (stage 3, loop seed 0) instead
+    ap.add_argument("--source", choices=("chosen", "final"), default="chosen")
     a = ap.parse_args()
     out = {}
     for f in (int(x) for x in a.folds.split(",")):
         d = Path(f"runs/{a.prefix}-{a.gpu}-f{f}/stage2-rule-writer")
+        if a.source == "final":
+            out[f] = _final(Path(f"runs/{a.prefix}-{a.gpu}-f{f}-s0"))
+            c = out[f]["final"]
+            print(f"  f{f}  main term {'YES' if c['time_main_term'] else 'no ':3s}"
+                  f"  w {c['n_weights']}  tm_cta_warps "
+                  f"{'tm_cta_warps' in c['features_used']}  split-K "
+                  f"{out[f]['splitk_terms']}  last best round "
+                  f"{out[f]['last_best_round']}")
+            continue
         ch = json.loads((d / "chosen.json").read_text())
         res = {"chosen": analyse(ch["code"]), "source": ch.get("source"),
                "train": ch.get("fit_regret")}
@@ -119,7 +146,8 @@ def main() -> None:
               f"  paths {c['main_term_paths']}  w {c['n_weights']}  "
               f"branches {c['branches']}  candidates with it "
               f"{res['candidates_with_main_term']}/{len(cands)}")
-    n = sum(v["chosen"]["time_main_term"] for v in out.values())
+    key = "final" if a.source == "final" else "chosen"
+    n = sum(v[key]["time_main_term"] for v in out.values())
     print(f"  structure: {n}/{len(out)} folds")
     if a.out:
         a.out.write_text(json.dumps({"prefix": a.prefix, "gpu": a.gpu,
