@@ -50,7 +50,9 @@ def main() -> None:
         seed = json.loads((d / "stage2-rule-writer" / "chosen.json")
                           .read_text())
         sp = _splits(t, fold=f, k=4, design="nkband")
-        reg = _load_stage1(d, base_registry("F2", human=REGISTRY), "F2", t)
+        # ★ D-193 — the campaign's own condition (F2 before it)
+        cond = P._condition_of(d)
+        reg = _load_stage1(d, base_registry(cond, human=REGISTRY), cond, t)
         m = FeatureMatrix(t, reg, cache_dir=CACHE_DIR)
         fr = _fit_rule(compile_rule(seed["code"]), seed["code"], seed["w0"],
                        None, matrix=m, table=t, train=sp.train, val=sp.val,

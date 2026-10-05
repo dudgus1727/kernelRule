@@ -94,6 +94,15 @@ def _registry(table, extra: list[str]):
     return reg
 
 
+def _condition_of(run: Path) -> str:
+    """The feature condition a campaign ran under (`config.json`). F2 when
+    the file does not say — every campaign before D-193."""
+    cfg = run / "config.json"
+    if cfg.exists():
+        return json.loads(cfg.read_text()).get("condition") or "F2"
+    return "F2"
+
+
 def _registry_fold(table, fold: int, extra: list[str]):
     """★ D-190 — `--prefix` 캠페인의 **그 fold 의** 라이브러리 + 루프 축.
 
@@ -105,8 +114,11 @@ def _registry_fold(table, fold: int, extra: list[str]):
     from kernelrule.features import REGISTRY
     from kernelrule.features.loader import base_registry, load_generated
 
-    reg = _load_stage1(Path(f"runs/{_G['prefix']}-{_gpu()}-f{fold}"),
-                       base_registry("F2", human=REGISTRY), "F2", table)
+    run = Path(f"runs/{_G['prefix']}-{_gpu()}-f{fold}")
+    # ★ D-193 — the campaign's own condition (F4 has another base library);
+    #   campaigns before it are all F2
+    cond = _condition_of(run)
+    reg = _load_stage1(run, base_registry(cond, human=REGISTRY), cond, table)
     for fp in extra or []:
         for f in load_generated(Path(fp), table=table):
             if f.name not in reg._items:

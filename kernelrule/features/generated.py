@@ -534,7 +534,8 @@ def check_generated(code: str, *, registry: FeatureRegistry, meta: dict,
                     others: dict | None = None,
                     train_shapes=None,
                     sample_from_train: bool = False,
-                    time_gate: bool = False) -> None:
+                    time_gate: bool = False,
+                    observed_ranges: bool = False) -> None:
     """★ Would this candidate be accepted? **It registers nothing** (D-170
     §3).
 
@@ -555,7 +556,25 @@ def check_generated(code: str, *, registry: FeatureRegistry, meta: dict,
                         matrix=matrix, hw_alt=hw_alt, others=others,
                         train_shapes=train_shapes,
                         sample_from_train=sample_from_train,
-                        time_gate=time_gate)
+                        time_gate=time_gate,
+                        observed_ranges=observed_ranges)
+
+
+def _observed_of(f: Feature, probe, shapes, *, per_shape: bool
+                 ) -> tuple[float, ...]:
+    """★ D-193 — `(min, p01, p50, p99, max)` of the candidate's column on
+    `shapes` (one value per shape when it is shape level). Values only —
+    no times."""
+    cols = [np.asarray(getattr(probe.for_shape(p)[0], f.name), np.float64)
+            for p in shapes]
+    v = (np.asarray([c[0] for c in cols if c.size]) if per_shape
+         else np.concatenate(cols))
+    v = v[np.isfinite(v)]
+    if not v.size:
+        raise FeatureRejected(f"{f.name}: no finite value on the training "
+                              f"configs")
+    return tuple(float(x) for x in
+                 np.percentile(v, (0.0, 1.0, 50.0, 99.0, 100.0)))
 
 
 def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
@@ -563,7 +582,8 @@ def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
                         others: dict | None = None,
                         train_shapes=None,
                         sample_from_train: bool = False,
-                        time_gate: bool = False):
+                        time_gate: bool = False,
+                        observed_ranges: bool = False):
     """compile -> §8.3 validation -> the shape-level verdict. **Nothing is
     registered.** Returns `(feature, probe matrix, shape-level reason)`.
 
@@ -575,6 +595,8 @@ def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
     from kernelrule.features.validate import validate_feature
 
     name, fn = compile_feature(code, known=frozenset(registry._items))
+    # ★ Without a declared range (D-193, `observed_ranges`) this is a
+    #   placeholder that is replaced right after the probe measures it.
     rng = tuple(meta.get("expected_range", (0.0, 1.0)))
     f = Feature(name=name, fn=fn, unit=str(meta.get("unit", "dimensionless")),
                 expected_range=(float(rng[0]), float(rng[1])),
@@ -590,6 +612,17 @@ def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
     tmp = FeatureRegistry(f"probe-{name}")
     tmp.add(f)
     probe = FeatureMatrix(table, tmp)
+    # ★ D-193 — under `observed_ranges` the FeatureWriter writes no range:
+    #   the range is what the formula gives on the **training** configs
+    #   (the whole table only when no split is given — a check-only call).
+    #   It is measured before §8.3 so the range check reads it.
+    obs_shapes = (list(train_shapes) if train_shapes is not None
+                  else probe.shapes())
+    if observed_ranges:
+        rng = _observed_of(f, probe, obs_shapes, per_shape=False)
+        f = replace(f, observed_range=rng)
+        if "expected_range" not in meta:
+            f = replace(f, expected_range=(rng[0], rng[-1]))
     if others is None:
         others = _reference_columns(table, matrix, registry)
     # ★ D-163: the registry goes in so a duplication refusal can name what
@@ -613,6 +646,9 @@ def _build_and_validate(code: str, *, registry: FeatureRegistry, meta: dict,
     is_shape, why = detect_shape_level(f, table, matrix=probe)
     if is_shape:
         f = replace(f, shape_level=True)
+        if observed_ranges:
+            f = replace(f, observed_range=_observed_of(
+                f, probe, obs_shapes, per_shape=True))
     # ★ D-192: an axis that declares a time unit has to behave like a time
     #   on the **training** shapes (features/time_gate.py). Off unless the
     #   caller asks — it reads training times, which this path otherwise
@@ -634,7 +670,8 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
                        others: dict | None = None,
                        train_shapes=None,
                        sample_from_train: bool = False,
-                       time_gate: bool = False) -> Feature:
+                       time_gate: bool = False,
+                       observed_ranges: bool = False) -> Feature:
     """Check -> sandbox -> §8.3 validation -> registration. One failure
     raises.
 
@@ -646,7 +683,8 @@ def register_generated(code: str, *, registry: FeatureRegistry, meta: dict,
     f, probe, why = _build_and_validate(
         code, registry=registry, meta=meta, table=table, matrix=matrix,
         hw_alt=hw_alt, others=others, train_shapes=train_shapes,
-        sample_from_train=sample_from_train, time_gate=time_gate)
+        sample_from_train=sample_from_train, time_gate=time_gate,
+        observed_ranges=observed_ranges)
     name = f.name
     if f.shape_level:
         # ★ The reason is recorded. In particular one that "references cfg

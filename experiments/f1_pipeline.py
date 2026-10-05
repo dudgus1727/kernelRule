@@ -334,7 +334,8 @@ def _population_criterion() -> str:
 
 
 def _wire_feature_retry(llm, *, table, matrix, hw_alt, gen, train_shapes,
-                        time_gate: bool = False) -> bool:
+                        time_gate: bool = False,
+                        observed_ranges: bool = False) -> bool:
     """★ Put the §8.3 refusal **inside the retry path** (D-170 §3).
 
     `f1_pipeline.py:535` caught `FeatureRejected` and moved to the next
@@ -354,7 +355,8 @@ def _wire_feature_retry(llm, *, table, matrix, hw_alt, gen, train_shapes,
     def check(name: str, code: str, meta: dict) -> None:
         check_generated(code, registry=gen, meta=meta, table=table,
                         matrix=matrix, hw_alt=hw_alt,
-                        train_shapes=train_shapes, time_gate=time_gate)
+                        train_shapes=train_shapes, time_gate=time_gate,
+                        observed_ranges=observed_ranges)
 
     llm.set_feature_check(check)
     return True
@@ -552,6 +554,9 @@ def _make_llm(a, *, registry: FeatureRegistry, budget: Budget,
                                    a, "product_hint", False),
                                power_hint=getattr(
                                    a, "power_hint", False),
+                               # ★ D-193
+                               observed_ranges=getattr(
+                                   a, "observed_ranges", False),
                                hw_text=hw_text),
                      feature_names=names, shape_values=svals,
                      registry=registry, budget=budget, cache=False)
@@ -622,7 +627,9 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry,
                                       hw_alt=hw_alt, gen=gen,
                                       train_shapes=train_shapes,
                                       time_gate=getattr(a, "time_gate",
-                                                        False))
+                                                        False),
+                                      observed_ranges=getattr(
+                                          a, "observed_ranges", False))
     print(f"  ★ §8.3 refusals go back to the model: {retry_wired} "
           f"(up to {FEATURE_RETRIES} retries per slot, D-170 §3)")
     rejects: dict[str, int] = {}
@@ -760,7 +767,18 @@ def stage1(a, d: Path, table, matrix, base: FeatureRegistry,
                                        train_shapes=train_shapes,
                                        # ★ D-192
                                        time_gate=getattr(a, "time_gate",
-                                                         False))
+                                                         False),
+                                       # ★ D-193
+                                       observed_ranges=getattr(
+                                           a, "observed_ranges", False))
+                if getattr(a, "observed_ranges", False):
+                    # ★ D-193 — the range is the measured one; the record
+                    #   keeps both what `load_generated` reads and the
+                    #   quantiles the prompt showed
+                    row["expected_range"] = [float(x) for x in
+                                             f.expected_range]
+                    row["observed_range"] = [float(x) for x in
+                                             f.observed_range]
                 row["accepted"] = True
                 row["shape_level"] = f.shape_level
                 if f.shape_level:
@@ -1094,6 +1112,7 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                        n_workers=getattr(a, "workers",
                                          LoopConfig.n_workers),
                        time_gate=getattr(a, "time_gate", False),
+                       observed_ranges=getattr(a, "observed_ranges", False),
                        objective="regret",
                        parameters=getattr(a, "parameters", None),
                        # ★ The fitter is **decided by the parameter count**
@@ -1175,6 +1194,8 @@ def stage3(a, d: Path, table, base: FeatureRegistry, splits,
         #   is `base` plus what stage 1 accepted, and nothing the loop added.
         reg = _load_stage1(d, base, a.condition, table)
         matrix = FeatureMatrix(table, reg)
+        if getattr(a, "observed_ranges", False):
+            matrix.attach_observed_ranges(splits.train.shapes)   # ★ D-193
         llm = _make_llm(a, registry=reg, budget=budget, table=table)
         loop = RoundLoop(
             cfg=LoopConfig(run_id=run_id, max_rounds=a.rounds,
@@ -1186,6 +1207,8 @@ def stage3(a, d: Path, table, base: FeatureRegistry, splits,
                            use_analyst=not a.no_analyst,
                            n_workers=a.workers,
                            time_gate=getattr(a, "time_gate", False),
+                           observed_ranges=getattr(a, "observed_ranges",
+                                                   False),
                            objective="regret",
                            parameters=a.parameters,
                            # ★ The fitter is **decided by the parameter
@@ -1248,7 +1271,7 @@ def _install_signal_handlers() -> None:
 def main() -> None:
     _install_signal_handlers()
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("condition", choices=("F1", "F2", "F3"))
+    ap.add_argument("condition", choices=("F1", "F2", "F3", "F4"))
     ap.add_argument("--n-features", type=int, default=20,
                     help="used only for free generation (--no-categorize). "
                          "With areas, the count is derived from the number "
@@ -1342,6 +1365,11 @@ def main() -> None:
                          "automatically")
     # ★ Parallel scoring and fitting (D-95). 0 = sequential (the default).
     #   The results must be identical.
+    ap.add_argument("--observed-ranges", action="store_true",
+                    help="★ D-193 — the FeatureWriter writes no range; "
+                         "every feature list shows what the axis takes on "
+                         "the training configs (p1 / median / p99), and the "
+                         "exponent guard reads that minimum")
     ap.add_argument("--time-gate", action="store_true",
                     help="★ D-192: a FeatureWriter axis that declares a time "
                          "unit must behave like a time on the training "
@@ -1553,6 +1581,12 @@ def main() -> None:
         #   Under F1 it is an empty matrix, so no human feature value appears
         #   anywhere.
         m0 = FeatureMatrix(table, base)
+        if getattr(a, "observed_ranges", False):
+            # ★ D-193 — the existing features the FeatureWriter sees carry
+            #   their training-config ranges too
+            n_obs = m0.attach_observed_ranges(splits.train.shapes)
+            print(f"  ★ observed ranges on the base: {n_obs} axes "
+                  f"(training configs, no times)")
         print("--- stage 1 FeatureWriter ---")
         reg = stage1(a, d, table, m0, base,
                      train_shapes=splits.train.shapes)
@@ -1567,6 +1601,10 @@ def main() -> None:
               f"{len(reg._items) - n_sh}) ---")
 
     matrix = FeatureMatrix(table, reg)
+    if getattr(a, "observed_ranges", False):
+        # ★ D-193 — what the RuleWriter sees, and what the exponent guard
+        #   reads (`FeatureMatrix.feature_mins`)
+        matrix.attach_observed_ranges(splits.train.shapes)
     # ★ What the axes **actually** take on the training configs (D-160).
     #   The declaration is what the model said; this is what the table says.
     #   ⛔ It is written to the artefact and nowhere near a prompt — a range
@@ -1580,6 +1618,8 @@ def main() -> None:
         "seed_source": a.seed_source,
         # ★ D-192 — the time-axis check on the FeatureWriter path
         "time_gate": bool(getattr(a, "time_gate", False)),
+        # ★ D-193 — measured ranges instead of declared ones
+        "observed_ranges": bool(getattr(a, "observed_ranges", False)),
         # ★ D-176 §2 — which RuleWriter prompt this run used. Without it a
         #   variant run and a campaign run look identical in the record.
         "size_guidance": getattr(a, "size_guidance", "role/_size_loop.md"),

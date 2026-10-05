@@ -306,9 +306,56 @@ class FeatureMatrix:
         ★ It is the declared range, not the observed one. Judging by
         observation lets an axis that happened to be positive in this table
         turn negative in another.
+
+        ★ D-193 — under the condition `observed_ranges` a feature carries the
+        minimum it **actually takes** on the training configs, and that is
+        used instead: a FeatureWriter declaration was off by orders of
+        magnitude on the d190/tgate libraries, so the guard checked a number
+        nobody had measured. Each table measures its own, so the concern
+        above does not carry over; and a base that does go negative still
+        cannot pass silently — the fit treats a non-finite score as
+        unrunnable weights and scoring refuses the rule.
         """
-        return {n: float(self.registry[n].expected_range[0])
-                for n in self.registry.names(shape_level=False)}
+        out = {}
+        for n in self.registry.names(shape_level=False):
+            f = self.registry[n]
+            out[n] = float(f.observed_range[0] if f.observed_range is not None
+                           else f.expected_range[0])
+        return out
+
+    def observed_quantiles(self, shapes) -> dict[str, tuple[float, ...]]:
+        """★ D-193 — `(min, p01, p50, p99, max)` of each axis on those
+        shapes' configs (shape-level: over the shapes). The caller passes
+        the **training** shapes. Computed from the feature values only — no
+        times."""
+        shapes = list(shapes)
+        out: dict[str, tuple[float, ...]] = {}
+        qs = (0.0, 1.0, 50.0, 99.0, 100.0)
+        for n in self.registry.names(shape_level=False):
+            if n not in self._cols[shapes[0].key]:
+                continue
+            v = np.concatenate([np.asarray(self._cols[p.key][n], np.float64)
+                                for p in shapes])
+            v = v[np.isfinite(v)]
+            if v.size:
+                out[n] = tuple(float(x) for x in np.percentile(v, qs))
+        for n in self.registry.names(shape_level=True):
+            if n not in self._info[shapes[0].key]:
+                continue
+            v = np.asarray([float(self._info[p.key][n]) for p in shapes])
+            v = v[np.isfinite(v)]
+            if v.size:
+                out[n] = tuple(float(x) for x in np.percentile(v, qs))
+        return out
+
+    def attach_observed_ranges(self, shapes) -> int:
+        """★ D-193 — write `observed_quantiles(shapes)` onto this matrix's
+        registry (`Feature.observed_range`). Returns how many axes got one.
+        The code hashes do not change, so neither does the cache key."""
+        got = self.observed_quantiles(shapes)
+        for n, rng in got.items():
+            self.registry.set_observed_range(n, rng)
+        return len(got)
 
     def observed_ranges(self, shapes=None) -> dict[str, tuple[float, float]]:
         """★ The **actual** min/max each axis takes on those shapes' configs

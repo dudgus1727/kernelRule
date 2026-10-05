@@ -103,19 +103,25 @@ def classify_violation(msg: str) -> str:
 #: public facts** (§30.17). The old names `F0` (no features) and the old
 #: `F2` (5 raw values) had 0 runs and were deleted, and the old
 #: `F1-K` is today's `F2` (D-128). **There are no aliases.**
-_CONDITIONS = frozenset({"F1", "F2", "F3"})
+_CONDITIONS = frozenset({"F1", "F2", "F3", "F4"})
 
 #: Condition -> the **feature** example file. A condition that must not be
 #: handed the answer gets an unrelated domain.
 #: ★ The condition selects the prompt **example** — moving it wrongly gives
 #: the model a different example, and that is a change of condition (the
 #: spot most carefully watched during the D-128 rename).
-_EXAMPLES = {"F1": "other_domain", "F2": "known7", "F3": "known7"}
+_EXAMPLES = {"F1": "other_domain", "F2": "known7", "F3": "known7",
+             # ★ D-193 — F4 has no tail_waste / edge_waste / has_spill, the
+             #   three known7.md shows as "already in the library"
+             "F4": "time_features"}
 
 #: The features `examples/rule_known.md` **calls by name**.
 #: All four must be in the registry for that example to be usable (§30.20).
 _RULE_EXAMPLE_NEEDS = ("tail_waste", "has_spill", "occupancy_deficit",
                        "roofline_ratio")
+#: ★ D-193 — the features `examples/rule_time.md` builds its main term from.
+#: When they are all in the registry, that example is used.
+_RULE_TIME_EXAMPLE_NEEDS = ("tm_crit_ratio", "tm_l2_ratio", "tm_dram_ratio")
 
 
 def _rule_example_for(registry, *, parameters: int | None = None) -> str:
@@ -138,6 +144,12 @@ def _rule_example_for(registry, *, parameters: int | None = None) -> str:
     registry cannot be missed.**
     """
     names = set(getattr(registry, "_items", {}) or {})
+    # ★ D-193 — a registry with the time features gets the time-estimate
+    #   example. Checked first: F4 has the time features and lacks
+    #   `tail_waste` / `has_spill`, so it would otherwise fall to the
+    #   unrelated domain.
+    if names.issuperset(_RULE_TIME_EXAMPLE_NEEDS):
+        return load_prompt("examples/rule_time.md", parameters=parameters)
     ok = names.issuperset(_RULE_EXAMPLE_NEEDS)
     return load_prompt(
         f"examples/{'rule_known' if ok else 'rule_other_domain'}.md",
@@ -295,6 +307,31 @@ _EDITOR_KEEPS = ("claim", "measurable_with", "proposed_direction")
 
 def _for_editor(hyp: dict) -> dict:
     return {k: hyp[k] for k in _EDITOR_KEEPS if k in hyp}
+
+
+#: ★ D-193 — `role/feature.md`'s two range slots. Off reproduces the file
+#: as it was before the slots existed, byte for byte.
+_RANGE_LINE_DECLARED = ("expected_range    (low, high). ★ Derive it **from "
+                        "the formula**, not from data\n")
+_RANGE_NOTE_DECLARED = (
+    "★ The last three are **required** — there is no default to fall back "
+    "on.\nWrite what this formula gives, not a placeholder.\n\n"
+    "Do not be careless with `expected_range` — the rule uses it to set the "
+    "weight\nratios. Adding a `[0,1]` term and a `[0,300]` term with the "
+    "same weight lets\nthe latter decide the whole ordering.")
+_RANGE_NOTE_MEASURED = (
+    "★ The last two are **required** — there is no default to fall back "
+    "on.\nWrite what this formula gives, not a placeholder.\n\n"
+    "You do **not** write a range. The values your formula takes on the "
+    "training\nconfigs are measured for you, and that is what the rule "
+    "writer sees.")
+
+
+def range_slots(measured: bool) -> dict[str, str]:
+    """The `{range_output_line}` / `{range_required_note}` texts."""
+    return {"range_output_line": "" if measured else _RANGE_LINE_DECLARED,
+            "range_required_note": (_RANGE_NOTE_MEASURED if measured
+                                    else _RANGE_NOTE_DECLARED)}
 
 
 def product_block(on: bool) -> str:
@@ -531,6 +568,11 @@ class LLMConfig:
     #: forth makes it impossible to tell which run was under which
     #: condition.
     feature_detail: str = "full"
+    #: ★ D-193 — the condition `observed_ranges`. The FeatureWriter writes
+    #: no `expected_range` (its output type has none) and every feature list
+    #: shows what the axis takes on the training configs
+    #: (`Feature.observed_range`). Off = byte-identical to before.
+    observed_ranges: bool = False
 
     def to_dict(self) -> dict:
         """The form recorded into `config.json`.
@@ -723,6 +765,7 @@ class OpenAILLM:
             AnalysisOutput,
             CategoryOutput,
             FeatureOutput,
+            FeatureOutputMeasured,
             rule_output_for,
         )
 
@@ -740,11 +783,16 @@ class OpenAILLM:
                                         product_hint=self._product,
                                         power_hint=self._power)
             out = {"analyze": AnalysisOutput, "rule_editor": _rule_out,
-                   "rule_writer": _rule_out, "feature": FeatureOutput,
+                   "rule_writer": _rule_out,
+                   # ★ D-193 — no range field when it is measured
+                   "feature": (FeatureOutputMeasured
+                               if self.cfg.observed_ranges else FeatureOutput),
                    "categorize": CategoryOutput}[role]
             body = load_prompt(f"role/{role}.md", parameters=self._parameters) \
                 .replace("{product_note}", product_note(self._product)) \
                 .replace("{power_note}", power_note(self._power))
+            for k, v in range_slots(self.cfg.observed_ranges).items():
+                body = body.replace("{" + k + "}", v)
         # ★ It splits along **two axes** (§30.10). Split along one axis
         #   only (hardware-independent / dependent), things no role needed
         #   piled up in the common part — FeatureWriter was receiving the
@@ -1105,6 +1153,9 @@ class OpenAILLM:
         #   file, so the two cannot drift apart (principle 2).
         size_block = load_prompt(self.cfg.size_guidance,
                                  parameters=self._parameters)
+        # ★ D-193 — the paragraphs the size variants share live in one file
+        size_block = size_block.replace(
+            "{size_bar}", load_prompt("role/_size_bar.md").rstrip("\n"))
         return load_prompt("role/rule_writer.md",
                            parameters=self._parameters).format(
             size_guidance_block=size_block,
@@ -1176,6 +1227,7 @@ class OpenAILLM:
         return load_prompt("role/feature.md", parameters=self._parameters).format(
             field_block=field_block(), feature_block=block,
             example_block=example,
+            **range_slots(self.cfg.observed_ranges),
             area_block=load_prompt("areas.md", parameters=self._parameters),
             task_block=task or ("## What to build now\n\nPropose one "
                                 "feature."))

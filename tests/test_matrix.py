@@ -291,3 +291,24 @@ def test_configs_of_keeps_the_ext_dict(synth_table):
     assert new.ext == old.ext
     assert {k: type(v).__name__ for k, v in new.ext.items()} == \
            {k: type(v).__name__ for k, v in old.ext.items()}
+
+
+def test_feature_mins_prefers_the_observed_minimum():
+    """★ D-193 — the exponent guard reads what the axis takes on the
+    training configs once it is measured; the declaration otherwise."""
+    from dataclasses import replace
+
+    import kernelrule.features.known7 as K
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import FeatureRegistry
+
+    class _M(FeatureMatrix):
+        def __init__(self, reg):           # no table — only the registry
+            self.registry = reg
+
+    r = FeatureRegistry("t")
+    r.add(replace(K.KNOWN7["tail_waste"], expected_range=(-1.0, 1.0)))
+    m = _M(r)
+    assert m.feature_mins()["tail_waste"] == -1.0
+    r.set_observed_range("tail_waste", (0.0, 0.0, 0.1, 0.9, 1.0))
+    assert m.feature_mins()["tail_waste"] == 0.0

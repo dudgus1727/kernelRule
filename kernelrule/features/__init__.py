@@ -103,6 +103,12 @@ class Feature:
     #: every hardware-independent feature — in the first F1 run a perfectly
     #: good feature was thrown away exactly that way (D-37).
     source: str = ""
+    #: ★ D-193 — the values this feature **actually takes** on the training
+    #: configs (shape-level: on the training shapes): `(min, p01, p50, p99,
+    #: max)`. Computed from `p`/`hw`/`cfg` only — no times. `None` = not
+    #: measured, and the prompt shows the declared `expected_range` as it
+    #: always did. Set only under the condition `observed_ranges`.
+    observed_range: tuple[float, ...] | None = None
 
     @property
     def active(self) -> bool:
@@ -130,9 +136,17 @@ class Feature:
         #   added, and the numerical optimiser cannot escape that point
         #   either. The first RuleWriter A attempt really did produce regret
         #   8.4.
-        lo, hi = self.expected_range
-        rng = f"[{lo:g}, {hi:g}]"
-        head = f"{ref:28s} {rng:>14s}  {self.physics}"
+        if self.observed_range is not None:
+            # ★ D-193 — what the training configs give, not a declaration.
+            #   The tails are shown apart from the middle: a spill axis is
+            #   0 on most configs and large on a few.
+            _mn, p01, p50, p99, _mx = self.observed_range
+            rng = f"[train p1 {p01:.3g} · median {p50:.3g} · p99 {p99:.3g}]"
+            head = f"{ref:28s} {rng}  {self.physics}"
+        else:
+            lo, hi = self.expected_range
+            rng = f"[{lo:g}, {hi:g}]"
+            head = f"{ref:28s} {rng:>14s}  {self.physics}"
         if include_observed:
             for o in (*self.observed, *extra):
                 head += f"\n{'':28s}   [observed] {o}"
@@ -176,6 +190,18 @@ class FeatureRegistry:
         if expected_range is not None:
             d["expected_range"] = tuple(expected_range)
         self._items[name] = Feature(**d)
+
+    def set_observed_range(self, name: str, rng: tuple[float, ...]) -> None:
+        """★ D-193 — attach `(min, p01, p50, p99, max)` measured on the
+        training configs. Like `annotate`, it replaces the record, not the
+        function: the code hash (and so the matrix cache) is unchanged."""
+        if len(rng) != 5:
+            raise ValueError(f"observed range is (min, p01, p50, p99, max); "
+                             f"got {len(rng)} numbers")
+        f = self[name]
+        self._items[name] = Feature(**{**f.__dict__,
+                                       "observed_range": tuple(
+                                           float(x) for x in rng)})
 
     def deprecate(self, name: str, *, at_round: int, reason: str) -> None:
         f = self[name]

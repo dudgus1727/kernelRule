@@ -253,6 +253,10 @@ class LoopConfig:
     #: behave like a time on the training shapes (features/time_gate.py).
     #: Off by default — it reads training times on the FeatureWriter path.
     time_gate: bool = False
+    #: ★ D-193: an axis built in the loop gets the range it takes on the
+    #: training configs (`Feature.observed_range`) instead of a declared
+    #: one, the same as stage 1 under the condition `observed_ranges`.
+    observed_ranges: bool = False
 
 
 class LLMUnreachable(RuntimeError):
@@ -846,7 +850,16 @@ class RoundLoop:
                                        #   knows its split, so it says which
                                        #   shapes are its own.
                                        train_shapes=self.splits.train.shapes,
-                                       time_gate=self.cfg.time_gate)
+                                       time_gate=self.cfg.time_gate,
+                                       # ★ D-193
+                                       observed_ranges=self.cfg.observed_ranges)
+                if self.cfg.observed_ranges:
+                    # ★ D-193 — no declaration; the measured range is what
+                    #   a later promotion should carry
+                    row["expected_range"] = [float(x) for x in
+                                             f.expected_range]
+                    row["observed_range"] = [float(x) for x in
+                                             f.observed_range]
                 # ★ The column is built now. Without it, a rule using the
                 #   name gets a KeyError.
                 # ★ 2026-09-11 (D-161): `register_generated` already handed

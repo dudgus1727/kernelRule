@@ -1004,3 +1004,64 @@ def test_every_generated_code_hash_goes_through_the_helper():
     assert not bad, (
         "`code_hash` built from the salted built-in `hash()` (D-171 §S):\n"
         + "\n".join(bad))
+
+
+# ---------------------------------------------------------------------------
+# ★ D-193 — condition F4 and the measured ranges
+# ---------------------------------------------------------------------------
+def test_f4_base_is_known7_minus_three_plus_the_time_features():
+    from kernelrule.features.loader import (
+        F4_DROPPED,
+        F4_TIME_EXCLUDED,
+        base_registry,
+    )
+    r = base_registry("F4")
+    names = set(r._items)
+    assert not names & set(F4_DROPPED)
+    assert not names & set(F4_TIME_EXCLUDED)
+    assert {"occupancy_deficit", "roofline_ratio", "log_min_dim",
+            "log_flops"} <= names
+    assert {"tm_crit_ratio", "tm_l2_ratio", "tm_dram_ratio",
+            "splitk_roofline_log_time", "tm_regstaged",
+            "tm_cta_warps"} <= names
+    assert len(names) == 19
+
+
+def test_time_feature_descriptions_carry_no_measurement_notes():
+    """The notes the hand-built pool carried went into 1,440 k1a prompts
+    (D-191 correction 2). The package copy is physics only."""
+    import json
+    import re
+
+    from kernelrule.features.loader import TIME_FEATURES
+    bad = re.compile(r"a6000|pool note|surrogate|spearman|J1e|\bK1\b|"
+                     r"tie-break|train check|fold", re.I)
+    for line in TIME_FEATURES.read_text().splitlines():
+        r = json.loads(line)
+        assert not bad.search(r["rationale"]), r["name"]
+        assert "imported_from" not in r
+
+
+def test_describe_shows_the_observed_range_when_measured():
+    from dataclasses import replace
+
+    import kernelrule.features.known7 as K
+    f = K.KNOWN7["tail_waste"]
+    assert "[0, 1]" in f.describe(include_observed=False)
+    g = replace(f, observed_range=(0.0, 0.001, 0.04, 0.9, 0.95))
+    line = g.describe(include_observed=False)
+    assert "train p1 0.001 · median 0.04 · p99 0.9" in line
+    assert "[0, 1]" not in line
+
+
+def test_set_observed_range_keeps_the_code_hash():
+    import kernelrule.features.known7 as K
+    from kernelrule.features import FeatureRegistry
+    r = FeatureRegistry("t")
+    r.add(K.KNOWN7["tail_waste"])
+    h = r.lock_hash()
+    r.set_observed_range("tail_waste", (0.0, 0.0, 0.1, 0.9, 1.0))
+    assert r["tail_waste"].observed_range == (0.0, 0.0, 0.1, 0.9, 1.0)
+    assert r.lock_hash() == h
+    with pytest.raises(ValueError):
+        r.set_observed_range("tail_waste", (0.0, 1.0))

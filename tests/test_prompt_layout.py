@@ -585,3 +585,67 @@ def test_no_korean_on_the_llm_path():
 
     assert not bad, ("there is Korean on the LLM path:\n  "
                      + "\n  ".join(bad))
+
+
+# ---------------------------------------------------------------------------
+# ★ D-193 — the range slots of role/feature.md and the F4 examples
+# ---------------------------------------------------------------------------
+def _feature_prompt_measured(condition: str, measured: bool):
+    import os
+
+    import kernelrule.features.known7 as K
+    from kernelrule.agents.openai_client import LLMConfig, OpenAILLM
+    from kernelrule.features import FeatureRegistry
+
+    os.environ.setdefault("OPENAI_API_KEY", "t")
+    reg = FeatureRegistry(condition)
+    for n in sorted(K.KNOWN7._items):
+        reg.add(K.KNOWN7[n])
+    llm = OpenAILLM(LLMConfig(observed_ranges=measured), feature_names=[],
+                    shape_values=[], registry=reg)
+    return llm._user_prompt("feature", "", condition=condition, registry=reg)
+
+
+def test_declared_range_slots_reproduce_the_old_output_section():
+    body = _feature_prompt_measured("F2", measured=False)
+    assert ("expected_range    (low, high). ★ Derive it **from the "
+            "formula**, not from data\ndirection") in body
+    assert "★ The last three are **required**" in body
+    assert "Do not be careless with `expected_range`" in body
+    assert "{range_" not in body
+
+
+def test_measured_ranges_ask_for_no_range():
+    body = _feature_prompt_measured("F2", measured=True)
+    assert "expected_range" not in body
+    assert "★ The last two are **required**" in body
+    assert "You do **not** write a range." in body
+
+
+def test_system_prompt_fills_the_range_slots():
+    from kernelrule.agents.openai_client import load_prompt, range_slots
+    for measured in (False, True):
+        body = load_prompt("role/feature.md")
+        for k, v in range_slots(measured).items():
+            body = body.replace("{" + k + "}", v)
+        assert "{range_" not in body
+
+
+def test_f4_feature_example_shows_only_axes_in_the_f4_library():
+    import re
+
+    from kernelrule.agents.openai_client import _EXAMPLES, load_prompt
+    from kernelrule.features.loader import base_registry
+    assert _EXAMPLES["F4"] == "time_features"
+    ex = load_prompt("examples/time_features.md")
+    shown = set(re.findall(r"^def (\w+)\(", ex, re.M))
+    assert shown and shown <= set(base_registry("F4")._items)
+
+
+def test_rule_example_follows_the_time_features():
+    from kernelrule.agents.openai_client import _rule_example_for
+    from kernelrule.features.loader import base_registry
+    assert "one estimate of the kernel's time" in _rule_example_for(
+        base_registry("F4"))
+    assert "one estimate of the kernel's time" not in _rule_example_for(
+        base_registry("F2"))

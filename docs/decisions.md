@@ -132,6 +132,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-190](#d-190-루프-개선을-측정으로-거르고-넣는다-실패-판정-래스터-필드-적합-좌표-시간-축-그리고-a6000-재실행-2026-10-02)  루프 개선을 측정으로 거르고 넣는다 — 실패 판정 · 래스터 필드 · 적합 좌표 · 시간 축, 그리고 a6000 재실행 (2026-10-02)
 - [D-191](#d-191-좋은-피처를-주면-루프는-그것을-살린다-시간-모델-피처-k1a-씨앗으로-a6000-2026-10-03)  좋은 피처를 주면 루프는 그것을 살린다 — 시간 모델 피처 + K1a 씨앗으로 a6000 (2026-10-03)
 - [D-192](#d-192-시간-축-채점-장치-featurewriter-의-시간-축을-train-만으로-재고-돌려준다-2026-10-04)  시간 축 채점 장치 — FeatureWriter 의 시간 축을 train 만으로 재고 돌려준다 (2026-10-04)
+- [D-193](#d-193-시드룰에-시간-틀을-준다-조건-f4-실제-범위-2026-10-05)  시드룰에 시간 틀을 준다 — 조건 F4 · 실제 범위 (2026-10-05)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -11699,3 +11700,59 @@ stage 1     fold 마다 시간 축 하나 통과 · split_k 가운데 최소 놓
 ⚠️ seed 하나. 규칙은 여전히 24~42 가중치이고, mid(작은 격자) 1.150 은 그대로다 — 남은
 두 문제는 D-191 정정의 "고정 허용선이 큰 복잡도 증가를 받아들인다" 와 CTA 수 / SM 수 축의
 부재다.
+
+
+## D-193  시드룰에 시간 틀을 준다 — 조건 F4 · 실제 범위 (2026-10-05)
+
+사용자 질문: "시드룰(RuleWriter 가 stage 2 에서 만드는 seed 규칙)이 K1a 처럼 나오려면".
+오늘 잰 기준선(`docs/artifacts/seedrule-baseline`): 시드룰 24개 모두 벌점 항 8~21개의
+가중합 + `if p.roofline_ratio < 1` 하나. 같은 절차 재적합 a6000 holdout 1.169 (d190) ·
+1.171 (tgate), inner-CV 1.226 · 1.180 — K1a 1.048 · 1.044. 시간 축 요구는 FeatureWriter 에만
+있었고 RuleWriter 프롬프트에는 시간 틀이 없었다 (예시가 벌점 목록 + roofline 분기).
+
+바꾼 것 (사용자 결정, 2026-10-05):
+
+```
+조건 F4        기본 라이브러리 = known7 에서 tail_waste · edge_waste · has_spill 을 뺀 넷
+               + 시간 피처 15 (kernelrule/features/time_features.jsonl, 설명은 물리만,
+               미리 합친 tm_log_est 제외). 뺀 셋은 시간 피처 안에 이미 있다 (웨이브 ·
+               패딩은 tm_crit_ratio, 스필은 L2 · DRAM 시간). FeatureWriter 가 스스로 만들 수 있다
+FeatureWriter  예시 = 시간 피처 셋 (시간 비 / 가운데 최소인 시간 / 이진 보정, examples/
+               time_features.md). known7.md 는 F4 에 없는 셋을 "이미 있다" 로 보여 준다
+RuleWriter     예시 = 시간 본항 (max(계산, L2 공급) 과 DRAM 을 sqrt 로 합친 log2 시간, 가중치
+               없음) + 보정 자리 (examples/rule_time.md, 라이브러리에 tm_crit/l2/dram 이
+               있으면 선택). 규모 안내 role/_size_time.md: 메모리/계산 분기는 본항 안에
+               있으니 분기는 보정의 물리가 형상마다 다를 때만. 공통 두 문단은
+               role/_size_bar.md 한 곳 (_size_loop.md 는 바이트 그대로)
+observed_ranges FeatureWriter 는 범위를 적지 않는다 (출력 타입 FeatureOutputMeasured).
+               모든 피처 목록은 train config 에서 잰 p1 · 중앙 · p99 를 보인다
+               (Feature.observed_range, 시간은 읽지 않는다). 지수 검사는 train 최솟값
+               (FeatureMatrix.feature_mins). 루프의 새 축도 같다 (LoopConfig.observed_ranges,
+               runset KEYS, 예전 실행 False). ⚠️ D-160 의 "관측 범위는 프롬프트에 넣지
+               않는다" 를 이 조건에서 바꾼다 — 시간 없이 config 로 계산한 값이다
+도구           a6000_probe · k1a_start 가 캠페인의 config.json 조건을 읽는다 (F2 고정이었다)
+```
+
+꺼진 상태(F2 · 기본값)의 FeatureWriter 프롬프트(사용자 · 시스템)와 `_size_loop.md` 는
+HEAD 와 바이트 단위로 같다 (확인함). 시험: features · matrix · prompt_layout · loop ·
+f1_pipeline · time_gate · runset.
+
+### 실행 전 판정 기준 (결과를 보기 전에 적는다)
+
+실행: a6000 nkband k=4 fold 0~3, stage 1 · 2 만 (`docs/artifacts/f4-seed/campaign.sh`):
+`F4 --observed-ranges --time-gate --size-guidance role/_size_time.md --n-features 20
+--n-rule-writer 10`, 새 FeatureWriter (k7-1 을 잇지 않는다 — "스스로 만들게"), gpt-5.6-luna.
+
+```
+구조   fold 의 시드룰에 "시간 본항" 이 있다 = 경로 시간 피처 (tm_crit_ratio · tm_l2_ratio ·
+       tm_dram_ratio · dram_w1_id_ratio · dram_w1_hz_ratio) 중 둘 이상을 한 식 안에서
+       합친다 (max / sqrt / 합). 따로따로 가중치를 단 항이면 아니다
+성능   같은 절차 재적합 (a6000_probe --prefix f4) 의 inner-CV
+판정   K1a 와 비슷하다   구조 4 fold 중 3 이상  그리고  inner-CV <= 1.065 (K1a 1.0437 + 0.02)
+       형태만 비슷       구조 3 이상, inner-CV > 1.065
+       아니다            구조 2 이하
+```
+
+holdout 은 같이 적고 판정에 쓰지 않는다. ⚠️ 시간 피처는 a6000 holdout 을 본 작업(D-189)에서
+식의 모양을 골랐다 — 이 피처를 쓰는 규칙의 a6000 수치는 조금 낙관적일 수 있다. 다른 GPU
+확인은 다음 단계.

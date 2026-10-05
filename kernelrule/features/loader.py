@@ -23,7 +23,19 @@ from kernelrule.features import Feature, FeatureRegistry, code_hash_of
 
 __all__ = ["load_generated", "extended_registry", "base_registry",
            "run_registry", "registry_spec", "registry_from_spec",
-           "RegistryUnavailable"]
+           "RegistryUnavailable", "TIME_FEATURES", "F4_DROPPED",
+           "F4_TIME_EXCLUDED"]
+
+#: ★ D-193 — the hand-built time features with physics-only descriptions
+#: (the measurement notes they carried went into 1,440 k1a prompts — D-191
+#: correction 2).
+TIME_FEATURES = Path(__file__).with_name("time_features.jsonl")
+#: Condition F4 leaves these out of known7: the time features already hold
+#: the wave tail and tile padding (`tm_crit_ratio`) and the spill traffic
+#: (L2 / DRAM times). The FeatureWriter may build its own versions.
+F4_DROPPED = ("edge_waste", "has_spill", "tail_waste")
+#: ... and this one out of the time features: the pre-combined estimate.
+F4_TIME_EXCLUDED = ("tm_log_est",)
 
 
 def load_generated(path: str | Path, *, table, only: set[str] | None = None,
@@ -156,6 +168,26 @@ def base_registry(condition: str, *,
         for n in sorted(KNOWN7._items):
             r.add(KNOWN7[n])
         return r
+    if condition == "F4":
+        # ★ D-193 — known7 without the three the time features already
+        #   contain (wave tail and tile padding sit in `tm_crit_ratio`, spill
+        #   traffic in the L2 and DRAM times), plus the time features with
+        #   their descriptions cut to physics (`time_features.jsonl`). The
+        #   pre-combined estimate `tm_log_est` is left out so that a rule
+        #   combines the paths itself. ⚠️ These are **hand-built** axes (the
+        #   a6000 work, D-189): a condition that gives the model human
+        #   physics, not the F1/F2 question.
+        from kernelrule.features.known7 import KNOWN7
+        r = FeatureRegistry("F4-known4+time15")
+        for n in sorted(KNOWN7._items):
+            if n not in F4_DROPPED:
+                r.add(KNOWN7[n])
+        # ★ `table=None` on purpose: every one of them reads `cfg`, so the
+        #   recorded `shape_level=False` holds on any table.
+        for f in load_generated(TIME_FEATURES, table=None,
+                                exclude=set(F4_TIME_EXCLUDED)):
+            r.add(f)
+        return r
     if condition == "F3":
         if human is None:
             raise ValueError(
@@ -166,7 +198,7 @@ def base_registry(condition: str, *,
         for n in sorted(human._items):
             r.add(human[n])
         return r
-    raise ValueError(f"unknown condition: {condition!r}. F1/F2/F3")
+    raise ValueError(f"unknown condition: {condition!r}. F1/F2/F3/F4")
 
 
 def run_registry(run: str, *, table, seed: int = 0, root: str | Path = "runs",

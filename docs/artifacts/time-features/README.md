@@ -1,6 +1,7 @@
 # 시간 피처 16개 — 물리 설명만 남긴 판 (2026-10-05)
 
-`time_features.jsonl` 은 k1a 실행이 쓴 라이브러리(`runs/k7-1+k1a/stage1-features/proposals.jsonl`,
+`kernelrule/features/time_features.jsonl` (조건 F4 의 기본 라이브러리, D-193 에서 이 폴더에서
+옮김) 은 k1a 실행이 쓴 라이브러리(`runs/k7-1+k1a/stage1-features/proposals.jsonl`,
 원래 출처 `docs/artifacts/a6000-rules/features/pool_current.jsonl` · `pool_K1.jsonl`)의 시간 피처
 16개다. **바꾼 것은 설명(`rationale`)뿐이다.** 앞으로 이 피처를 프롬프트에 넣을 때는 이 판을 쓴다.
 

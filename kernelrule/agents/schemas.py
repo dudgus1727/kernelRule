@@ -528,6 +528,24 @@ if HAVE_PYDANTIC:                                   # pragma: no branch
                     f"expected_range is [low, high] and {v[0]} > {v[1]}")
             return v
 
+    class FeatureOutputMeasured(BaseModel):
+        """★ D-193 — `FeatureOutput` **without `expected_range`**, for the
+        condition `observed_ranges`. The FeatureWriter's declarations were
+        off by orders of magnitude on the d190/tgate libraries
+        (`instruction_density` declared [0, 1e9], 0.0012 at most on the
+        training configs), and the rule writer set its magnitudes from them.
+        Under this condition the range is measured on the training configs
+        instead (`generated._observed_of`)."""
+
+        name: str
+        code: str
+        rationale: str
+        unit: str = Field(description="e.g. ratio / bytes / count / "
+                                      "dimensionless / time ratio. "
+                                      "**Required**")
+        direction: str = Field(
+            description="higher_is_worse or higher_is_better. **Required**")
+
     class Category(BaseModel):
         name: str = Field(description="lower case + underscores")
         description: str = Field(description="One sentence. What is wasted "
@@ -558,6 +576,7 @@ else:                                               # pragma: no cover
     AnalysisOutput = _NoPydantic("AnalysisOutput")
     RuleOutput = _NoPydantic("RuleOutput")
     FeatureOutput = _NoPydantic("FeatureOutput")
+    FeatureOutputMeasured = _NoPydantic("FeatureOutputMeasured")
     CritiqueOutput = _NoPydantic("CritiqueOutput")
     Category = _NoPydantic("Category")
     CategoryOutput = _NoPydantic("CategoryOutput")
