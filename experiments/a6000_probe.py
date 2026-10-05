@@ -292,13 +292,15 @@ def _classes(t, m, shapes) -> dict:
     for p in shapes:
         df = t.frame_for(p).reset_index(drop=True)
         j = int(np.argmin(np.asarray(t.times_of(p))))
-        info = m.for_shape(p)[1]
         k = f"{p.M}x{p.N}x{p.K}"
         if int(df.iloc[j]["split_k"]) >= 3:
             out[k] = "hungry"
         elif p.M <= 32:
             out[k] = "small"
-        elif float(info.output_work_per_sm) > 2e5:
+        # ★ D-193 — computed from the shape, the same formula as k7-1's
+        #   `output_work_per_sm` (M*N / max(1, SMs)); an F4 library does not
+        #   carry that axis, and the classes must not depend on the library
+        elif p.M * p.N / max(1.0, float(t.hw.sm_count)) > 2e5:
             out[k] = "big"
         else:
             out[k] = "mid"

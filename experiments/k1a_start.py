@@ -58,10 +58,13 @@ def main() -> None:
                        None, matrix=m, table=t, train=sp.train, val=sp.val,
                        objective="regret", rank_top_k=100, rank_lambda=0.0,
                        fit_space="u", fit_budget="dim")
-        ev = [json.loads(x) for x in Path(f"runs/{a.prefix}-{a.gpu}-f{f}-s0/"
-                                          "trace.jsonl").read_text()
-              .splitlines() if x]
-        rs = next((e for e in ev if e.get("ev") == "round_start"), {})
+        # ★ D-193 — a campaign that stopped after stage 2 has no loop trace;
+        #   the stage-2 score of the same fit (`chosen.json`) is the check
+        tr = Path(f"runs/{a.prefix}-{a.gpu}-f{f}-s0/trace.jsonl")
+        ev = ([json.loads(x) for x in tr.read_text().splitlines() if x]
+              if tr.exists() else [])
+        rs = next((e for e in ev if e.get("ev") == "round_start"),
+                  {"archive_best": seed.get("fit_regret")})
         out[f] = {"n_val": len(sp.val.shapes), "train": fr.fit_regret,
                   "holdout": fr.val_regret, "w": [float(x) for x in fr.w],
                   "trace_seed_train": rs.get("archive_best")}

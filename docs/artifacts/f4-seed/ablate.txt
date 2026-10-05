@@ -1,0 +1,21 @@
+  f0  A 시드룰 그대로                                  train 1.1018  holdout 1.0835
+  f0  B split-K 항 -> splitk_roofline_log_time    train 1.0890  holdout 1.0518
+  f0  C + tm_cta_warps · tm_regstaged            train 1.1047  holdout 1.1318
+  f0  D = B + C                                  train 1.0896  holdout 1.0475
+  f1  A 시드룰 그대로                                  train 1.1021  holdout 1.1616
+  f1  B split-K 항 -> splitk_roofline_log_time    train 1.1026  holdout 1.1585
+  f1  C + tm_cta_warps · tm_regstaged            train 1.0822  holdout 1.1210
+  f1  D = B + C                                  train 1.0858  holdout 1.1022
+  f2  A 시드룰 그대로                                  train 1.0993  holdout 1.1212
+  f2  B split-K 항 -> splitk_roofline_log_time    train 1.0830  holdout 1.1062
+  f2  C + tm_cta_warps · tm_regstaged            train 1.1020  holdout 1.1043
+  f2  D = B + C                                  train 1.0486  holdout 1.0494
+  f3  A 시드룰 그대로                                  train 1.1019  holdout 1.1101
+  f3  B split-K 항 -> splitk_roofline_log_time    train 1.0908  holdout 1.0858
+  f3  C + tm_cta_warps · tm_regstaged            train 1.1046  holdout 1.1072
+  f3  D = B + C                                  train 1.0407  holdout 1.0365
+
+  A 시드룰 그대로                                  train(4 fold gm) 1.1013  holdout pooled 1.1182
+  B split-K 항 -> splitk_roofline_log_time    train(4 fold gm) 1.0913  holdout pooled 1.0991
+  C + tm_cta_warps · tm_regstaged            train(4 fold gm) 1.0984  holdout pooled 1.1163
+  D = B + C                                  train(4 fold gm) 1.0659  holdout pooled 1.0584

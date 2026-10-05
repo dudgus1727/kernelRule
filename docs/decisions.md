@@ -11756,3 +11756,40 @@ f1_pipeline · time_gate · runset.
 holdout 은 같이 적고 판정에 쓰지 않는다. ⚠️ 시간 피처는 a6000 holdout 을 본 작업(D-189)에서
 식의 모양을 골랐다 — 이 피처를 쓰는 규칙의 a6000 수치는 조금 낙관적일 수 있다. 다른 GPU
 확인은 다음 단계.
+
+### 결과 (2026-10-05, stage 1 · 2 = 22분) — 판정: 형태만 비슷
+
+```
+구조     4/4 fold 시드룰에 시간 본항 (예시 그대로: max(tm_crit, tm_l2) 과 tm_dram 을 sqrt,
+         10·log2). RuleWriter 후보 40개 전부. 가중치 5~10 (기준 시드룰 11~21)
+성능     같은 절차 inner-CV 1.1134 > 1.065 (K1a 1.0437; 기준 시드룰 tgate 1.1800 · d190 1.2260)
+```
+
+| 같은 절차 재적합 (a6000) | inner-CV | holdout 65 | 벤더 넘은 fold | split_k≥3 적중 | big · hungry · mid · small |
+|---|--:|--:|--:|--:|---|
+| **F4 시드룰** | 1.1134 | 1.1167 | 0/4 | 18/31 | 1.084 · 1.124 · 1.200 · 1.038 |
+| tgate 시드룰 (기준선) | 1.1800 | 1.1709 | 0/4 | 5/31 | 1.111 · 1.173 · 1.338 · 1.048 |
+| K1a | 1.0437 | 1.0479 | 3/4 | 22/31 | 1.046 · 1.034 · 1.114 · 1.017 |
+
+loop 적합 holdout pooled: F4 시드룰 1.1182 (기준 1.145 · 1.184, K1a 1.0392).
+
+**왜 K1a 만큼 안 나오나 — 보정 항이 다르다.** RuleWriter 는 본항을 그대로 받아 쓰고, 보정은
+스스로 골랐다: split-K 는 4/4 가 `splitk_excess_log` (K1a 는 `splitk_roofline_log_time`),
+`tm_cta_warps` 는 0/4, `tm_regstaged` 는 1/4 (조건부). 나머지 자리는 FeatureWriter 벌점 축
+(instruction_density, coalescing, edge waste ...)과 roofline 분기. 많이 지는 형상은 최적이
+128x128 인데 128x256 을 고른다 — warp 수 보정이 없다. 진단 (`f4-seed/ablate.py`, loop 적합,
+판정에 쓰지 않음):
+
+```
+                                          train(4 fold)  holdout pooled
+A  시드룰 그대로                              1.1013        1.1182
+B  split-K 항 -> splitk_roofline_log_time    1.0913        1.0991
+C  + tm_cta_warps · tm_regstaged             1.0984        1.1163
+D  B + C                                     1.0659        1.0584
+   (K1a)                                     ~1.032        1.0392
+```
+
+둘은 따로는 작고 같이 크다 (D). 남은 차이(1.058 vs 1.039)는 DRAM 다리 (dram_w1 + M>N 전환)와
+동점 깨기(tm_log_inst) 쪽. ⚠️ K1a 의 보정 셋은 D-189 에서 a6000 데이터를 보고 고른 것이다 —
+데이터 없이 쓰는 RuleWriter 가 그것을 고르지 못하는 것은 예상할 수 있는 일이고, 그것을 데이터로
+찾는 것이 루프(stage 3)의 몫이다. fold 마다 한 번씩, seed 하나.

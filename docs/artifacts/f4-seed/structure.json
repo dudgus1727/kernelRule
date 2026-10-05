@@ -1,0 +1,273 @@
+{
+ "prefix": "f4",
+ "gpu": "a6000",
+ "n_with_main_term": 4,
+ "folds": {
+  "0": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 6,
+    "branches": [
+     "p.roofline_ratio >= 1.0",
+     "p.unaligned_access_fraction > 0.01"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "instruction_density",
+     "mainloop_sync_count",
+     "occupancy_deficit",
+     "spill_operand_traffic_ratio",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "source": "rule_writer-try01",
+   "train": 1.1017859451555203,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "1": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 7,
+    "branches": [
+     "p.log_min_dim < 7"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "operand_coalescing_aspect",
+     "output_store_coalescing_aspect",
+     "output_tile_edge_waste_ratio",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "wave_tail_occupancy_deficit"
+    ]
+   },
+   "source": "rule_writer-try03",
+   "train": 1.1021380863938466,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "2": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 5,
+    "branches": [
+     "p.roofline_ratio < 1"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "instruction_density",
+     "occupancy_deficit",
+     "splitk_excess_log",
+     "tile_alignment_traffic_deficit",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "warp_output_work"
+    ]
+   },
+   "source": "rule_writer-try05",
+   "train": 1.0993370305986725,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "3": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 10,
+    "branches": [
+     "p.roofline_ratio < 1.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "a_refetch_bw_demand",
+     "b_refetch_bw_demand",
+     "barrier_work_density",
+     "cta_wave_tail_fraction",
+     "edge_compute_padding_ratio",
+     "instruction_work_density",
+     "occupancy_deficit",
+     "operand_stride_transaction_ratio",
+     "pipeline_stage_time_ratio",
+     "raster_band_l2_footprint_ratio",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "source": "rule_writer-try05",
+   "train": 1.1018689965888127,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  }
+ }
+}
