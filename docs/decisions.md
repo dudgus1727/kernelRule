@@ -11793,3 +11793,20 @@ D  B + C                                     1.0659        1.0584
 동점 깨기(tm_log_inst) 쪽. ⚠️ K1a 의 보정 셋은 D-189 에서 a6000 데이터를 보고 고른 것이다 —
 데이터 없이 쓰는 RuleWriter 가 그것을 고르지 못하는 것은 예상할 수 있는 일이고, 그것을 데이터로
 찾는 것이 루프(stage 3)의 몫이다. fold 마다 한 번씩, seed 하나.
+
+### stage 3 — 실행 전 기준 (2026-10-05, 결과를 보기 전에 적는다)
+
+사용자 결정: 이 시드룰에서 loop 를 돌려 개선한다. 실행: `SEEDS=0 docs/artifacts/f4-seed/campaign.sh 3`
+— 같은 조건(F4 · observed_ranges · time_gate), 12 라운드, a6000 fold 0~3 x loop seed 0
+(tgate · k1a 와 같은 규모). mock 1라운드로 연결을 먼저 확인했다 (loop 설정 F4 · observed_ranges,
+루프 새 축에 train 범위).
+
+```
+자       최종 최선 규칙 (bests.jsonl 마지막) 을 같은 절차 재적합 (a6000_probe --prefix f4)
+판정     inner-CV 로 (holdout 은 같이 적는다)
+           loop 가 시드룰을 고쳤다   < 1.1034   (F4 시드룰 1.1134 - 0.01)
+           tgate loop 를 넘는다      < 1.0674   (D-192, 같은 a6000 · seed 0)
+           K1a 수준                 <= 1.065
+관찰     (판정 아님) 최종 규칙에 tm_cta_warps 가 들어갔나, split-K 항이 splitk_roofline_log_time
+         으로 바뀌었나, 가중치 수, 최선이 바뀐 라운드
+```
