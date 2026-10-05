@@ -1,0 +1,94 @@
+{
+ "name": "tgate a6000 시드룰 (RuleWriter stage 2 chosen, per fold)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    # Output-boundary predication grows rapidly when tiles overhang M or N.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Last-wave idle SMs expose a nonlinear loss of available throughput.\n    s = s + (-np.log2(np.maximum(1.0e-6, 1.0 - f.tail_waste))) * w[1]\n    # A shallow launch cannot amortize grid-dispatch startup and wave quantisation.\n    s = s + f.wave_count_deficit * w[2]\n    # Register spilling introduces especially expensive local-memory accesses.\n    s = s + f.has_spill * w[3]\n    # Spill severity is additional cache/DRAM traffic over the compulsory traffic.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    # CTA/output geometry mismatch reduces partition balance and operand reuse.\n    s = s + f.tile_aspect_mismatch * w[5]\n    # Split-K exposes reduction work, traffic, and serial dependency overhead.\n    s = s + np.log2(f.split_k_time_ratio) * w[6]\n    # K-boundary predication wastes tensor work in the final reduction slice.\n    s = s + f.k_tail_waste * w[7]\n    if p.roofline_ratio < 1:\n        # In a memory-bound GEMM, replicated operand traffic directly consumes bandwidth.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[8]\n        # Poor global-load coalescing increases the number of memory transactions.\n        s = s + f.coalesced_run_deficit * w[9]\n        # Poor C-store coalescing adds output memory transactions.\n        s = s + f.output_store_coalescing_deficit * w[10]\n        # Residual raster traffic represents operand reuse that the launch fails to expose.\n        s = s + f.raster_reuse_residual * w[11]\n        # A low-intensity CTA tile makes each fetched operand support little arithmetic.\n        s = s + f.tile_roofline_deficit * w[12]\n    else:\n        # In a compute-bound GEMM, unfilled thread capacity reduces latency hiding.\n        s = s + f.occupancy_deficit * w[13]\n        # Register allocation pressure limits concurrent warps and latency hiding.\n        s = s + f.register_file_pressure * w[14]\n        # Shared-memory allocation pressure limits resident CTAs and buffering.\n        s = s + f.shared_memory_pressure * w[15]\n        # Low CTA residency reduces the scheduler's independent work pool.\n        s = s + f.resident_block_scarcity * w[16]\n        # Static instruction overhead competes with tensor issue slots.\n        s = s + np.log2(1.0 + f.instruction_density) * w[17]\n        # Pipeline fill and drain are exposed when the steady-state loop is short.\n        s = s + f.pipeline_fill_drain_fraction * w[18]\n        # Absolute front-end work is poorly amortized by small compute launches.\n        s = s + np.log2(1.0 + f.total_frontend_instruction_work) * w[19]\n        # Each reduction iteration carries loop-control and synchronization latency.\n        s = s + np.log2(f.mainloop_iteration_count) * w[20]\n    return s",
+   "w0": [
+    0.5,
+    1.0,
+    1.0,
+    5.0,
+    0.3,
+    0.1,
+    0.3,
+    1.0,
+    0.5,
+    1.0,
+    0.8,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.2,
+    1.0,
+    0.2,
+    0.1
+   ],
+   "extra_features": []
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    # Output-boundary overhang grows multiplicatively with the wasted tile work.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Final-wave loss is expressed as the corresponding inverse useful-wave factor.\n    s = s + np.log2(1.0 + f.tail_waste / np.clip(1.0 - f.tail_waste, 0.01, 1.0)) * w[1]\n    # Any register spill sends the inner-loop values through local memory.\n    s = s + f.has_spill * w[2]\n    # Fewer resident CTAs leave fewer independent blocks to hide latency.\n    s = s + f.resident_block_scarcity * w[3]\n    if p.roofline_ratio < 1:\n        # Memory-bound shapes are penalized by replicated operand loads.\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[4]\n        # A large raster-band footprint reduces L2 reuse of those loads.\n        s = s + np.log2(1.0 + f.raster_band_cache_pressure) * w[5]\n        # Parallel split-K adds global partial write/read traffic.\n        s = s + f.parallel_reduction_traffic_fraction * w[6]\n        # Serial split-K adds partial accumulator traffic to the output path.\n        s = s + np.log2(1.0 + f.serial_partial_traffic_ratio) * w[7]\n        # Low-intensity CTA tiles directly increase bandwidth pressure.\n        s = s + f.tile_roofline_deficit * w[8]\n    else:\n        # Compute-bound shapes are penalized by front-end work per useful GEMM.\n        s = s + np.log2(1.0 + f.instruction_density) * w[9]\n        # Pipeline prologue and epilogue are exposed when compute dominates.\n        s = s + f.pipeline_fill_drain_fraction * w[10]\n        # Unfilled thread slots reduce latency hiding in the compute regime.\n        s = s + f.occupancy_deficit * w[11]\n        # Serial split-K boundaries reduce independent accumulation progress.\n        s = s + f.serial_reduction_dependency * w[12]\n        # Parallel split-K also adds accumulator arithmetic in this regime.\n        s = s + f.parallel_reduction_compute_fraction * w[13]\n    return s",
+   "w0": [
+    0.5,
+    1.0,
+    4.0,
+    1.0,
+    0.25,
+    0.2,
+    1.0,
+    0.15,
+    1.0,
+    0.25,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "extra_features": []
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    # CTA dispatch work grows with the absolute grid size.\n    s = np.log2(f.cta_launch_count) * w[0]\n    # Output-tile overhang directly wastes tensor work.\n    s = s + np.log2(f.edge_waste + 1.0) * w[1]\n    # A partially filled final wave leaves SM capacity idle.\n    s = s + f.tail_waste * w[2]\n    # Register spills are an exceptionally expensive local-memory path.\n    s = s + f.has_spill * w[3]\n    s = s + np.log2(f.spill_traffic_ratio + 1.0) * w[4]\n    if p.roofline_ratio < 1:\n        # In a memory-bound GEMM, replicated operand loads consume bandwidth.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[5]\n        # Low CTA tile arithmetic intensity exposes the bandwidth bottleneck.\n        s = s + f.tile_roofline_deficit * w[6]\n        # Raster-band overflow reduces cache reuse and increases DRAM traffic.\n        s = s + f.raster_band_cache_pressure * w[7]\n    else:\n        # In a compute-bound GEMM, front-end and control instructions compete with MMA issue.\n        s = s + np.log2(f.instruction_density + 1.0) * w[8]\n        # Unfilled thread slots reduce latency hiding during tensor execution.\n        s = s + f.occupancy_deficit * w[9]\n        # Register-file pressure limits concurrent CTAs and latency hiding.\n        s = s + f.register_file_pressure * w[10]\n    return s",
+   "w0": [
+    0.03,
+    0.25,
+    1.0,
+    4.0,
+    0.15,
+    0.08,
+    1.0,
+    0.8,
+    0.08,
+    1.0,
+    0.8
+   ],
+   "extra_features": []
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    # Output-tile overhang: logarithm compresses the wide wasted-work range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Final-wave idle time grows superlinearly as the idle fraction approaches one.\n    s = s + np.log2(1.0 / np.maximum(1.0e-6, 1.0 - f.tail_waste)) * w[1]\n    # Register spilling sends the accumulator through local memory.\n    s = s + f.has_spill * w[2]\n    # Spill severity accounts for the amount of local-memory traffic.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[3]\n    # One-wave or lightly populated grids expose launch and scheduling overhead.\n    s = s + f.wave_count_deficit * w[4]\n    # Shared-memory allocation can reduce resident CTA concurrency in either regime.\n    s = s + f.shared_memory_pressure * w[5]\n    if p.roofline_ratio < 1:\n        # Below the roofline, replicated operand traffic is the primary cost.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[6]\n        # Low-intensity CTA tiles consume bandwidth without enough tensor work per load.\n        s = s + f.tile_roofline_deficit * w[7]\n        # Strided operand loads and stores increase memory transactions.\n        s = s + f.operand_layout_stride_penalty * w[8]\n        s = s + f.output_store_coalescing_deficit * w[9]\n        # Raster-band cache eviction adds DRAM traffic when the working panel is too large.\n        s = s + np.log2(1.0 + f.raster_band_cache_excess) * w[10]\n        # Split-K partial materialization is an additional bandwidth burden.\n        s = s + np.log2(f.split_k_parallel_time_ratio) * w[11]\n    else:\n        # Above the roofline, issue efficiency and latency hiding dominate.\n        s = s + f.occupancy_deficit * w[12]\n        s = s + f.register_file_pressure * w[13]\n        # Compress the wide instruction-density range before combining it with fractions.\n        s = s + np.log2(1.0 + f.instruction_density) * w[14]\n        # Pipeline prologue/epilogue is exposed when the reduction loop is short.\n        s = s + f.pipeline_fill_drain_fraction * w[15]\n        # Serial split-K reduces independent work; parallel split-K adds reduction work.\n        s = s + f.serial_reduction_dependency * w[16]\n        s = s + f.parallel_reduction_compute_fraction * w[17]\n        s = s + np.log2(f.split_k_parallel_time_ratio) * w[18]\n    return s",
+   "w0": [
+    1.0,
+    1.0,
+    5.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "extra_features": []
+  }
+ }
+}

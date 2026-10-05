@@ -1,0 +1,890 @@
+{
+ "protocol": {
+  "fit": {
+   "method": "cma",
+   "n_restarts": 2,
+   "max_evals": 2000
+  },
+  "n_inner": 4,
+  "design": "nkband",
+  "gpu": "a6000",
+  "library": "runs/tgate-a6000-f* (fold 마다)",
+  "extra_features": [],
+  "ext_contract_features": [],
+  "dev_holdout_hidden": false,
+  "n_perm": 0
+ },
+ "aggregate": {
+  "n_folds_ok": 4,
+  "inner_cv_gm": 1.18001,
+  "inner_by_fold": {
+   "0": 1.146438,
+   "1": 1.324366,
+   "2": 1.142405,
+   "3": 1.11714
+  },
+  "inner_by_class": {
+   "big": 1.186047,
+   "hungry": 1.200363,
+   "mid": 1.251819,
+   "small": 1.054977
+  },
+  "holdout_gm_65": 1.17088,
+  "vendor_gm_65": 1.081488,
+  "folds_beating_vendor": 0,
+  "holdout_by_fold": {
+   "0": 1.119577,
+   "1": 1.423402,
+   "2": 1.086563,
+   "3": 1.088502
+  },
+  "holdout_by_class": {
+   "big": 1.110674,
+   "hungry": 1.173409,
+   "mid": 1.338221,
+   "small": 1.04818
+  },
+  "vendor_by_class": {
+   "big": 1.032434,
+   "hungry": 1.069495,
+   "mid": 1.101826,
+   "small": 1.129502
+  },
+  "sk_ge3_picked_on_hard": "5/31",
+  "hard_gm": 1.173409,
+  "easy_gm": 1.168579
+ },
+ "per_fold": {
+  "0": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 2,
+    "depth": 1,
+    "n_weights": 21,
+    "features": [
+     "coalesced_run_deficit",
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "k_tail_waste",
+     "mainloop_iteration_count",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "output_store_coalescing_deficit",
+     "pipeline_fill_drain_fraction",
+     "raster_reuse_residual",
+     "register_file_pressure",
+     "resident_block_scarcity",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "split_k_time_ratio",
+     "tail_waste",
+     "tile_aspect_mismatch",
+     "tile_roofline_deficit",
+     "total_frontend_instruction_work",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.137139,
+   "inner_cv_gm": 1.146438,
+   "w": [
+    4.559321036705955,
+    8.70178001547661,
+    0.3780196127957634,
+    40.37473236129165,
+    1.776262998854801,
+    -0.6531944384463059,
+    10.280909046155898,
+    3.0066277471241385,
+    11.118250393697815,
+    3.1170994835998767,
+    0.28484654699986217,
+    1.0948519505969048,
+    3.053499641063943,
+    -305.15564212374005,
+    -50.86773006657548,
+    -89.88941332920304,
+    1.4691569307382477,
+    -1.649069478695392,
+    -83.75226454960756,
+    4.521204681791999,
+    -15.926594002725352
+   ],
+   "moved": true,
+   "picks": {
+    "1x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "64x64x64"
+    },
+    "8192x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "512x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "64x64x64"
+    },
+    "256x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x4096": {
+     "sk_pick": 4,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x128x32"
+    },
+    "1024x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1500x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "3000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "384x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "768x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "64x64x64"
+    },
+    "1536x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2304x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    }
+   },
+   "holdout_gm": 1.119577,
+   "vendor_gm": 1.092486,
+   "static_top1": 1.058933,
+   "c2_native_median": 1.155813,
+   "beats_vendor": false,
+   "n_hold": 17,
+   "hold_sk_ge3": {
+    "n": 11,
+    "picked_ge3": 0,
+    "gm": 1.143639,
+    "vendor_gm": 1.080156
+   },
+   "hold_sk_lt3_gm": 1.076769,
+   "sk_picked_hold": {
+    "2": 5,
+    "1": 11,
+    "4": 1
+   },
+   "regret": {
+    "1x4096x4096": 1.0689654761464948,
+    "8192x4096x4096": 1.0649509990412855,
+    "512x4096x4096": 1.1270718289788133,
+    "32x4096x4096": 1.067796569410753,
+    "256x4096x4096": 1.0909091243156925,
+    "128x4096x4096": 1.1562500532907054,
+    "1024x4096x4096": 1.184210474808551,
+    "2048x4096x4096": 1.1112828851928072,
+    "4096x4096x4096": 1.1214057466397163,
+    "1500x4096x4096": 1.0702479291631992,
+    "3000x4096x4096": 1.0622362695618879,
+    "384x4096x4096": 1.3529411827646691,
+    "768x4096x4096": 1.2399999534338735,
+    "8x4096x4096": 1.0689654761464948,
+    "1536x4096x4096": 1.0680412155847954,
+    "1000x4096x4096": 1.184210474808551,
+    "2304x4096x4096": 1.0373827403560802
+   }
+  },
+  "1": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 2,
+    "depth": 1,
+    "n_weights": 14,
+    "features": [
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "parallel_reduction_compute_fraction",
+     "parallel_reduction_traffic_fraction",
+     "pipeline_fill_drain_fraction",
+     "raster_band_cache_pressure",
+     "resident_block_scarcity",
+     "serial_partial_traffic_ratio",
+     "serial_reduction_dependency",
+     "tail_waste",
+     "tile_roofline_deficit"
+    ]
+   },
+   "train_gm": 1.24994,
+   "inner_cv_gm": 1.324366,
+   "w": [
+    12.470392922968145,
+    -2.2889360065467774,
+    12.36781510402668,
+    -10.667520601356012,
+    10.01286620662029,
+    9.113827730008953,
+    88.6109983192904,
+    -142.69203253659393,
+    17.95259990700567,
+    0.16861287572419698,
+    10.05725656939853,
+    -0.003618258985846723,
+    2.520302329540873,
+    0.9609003439473072
+   ],
+   "moved": true,
+   "picks": {
+    "1x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x64x64"
+    },
+    "8192x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "512x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 12,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "512x512x512": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x64x32"
+    },
+    "32x4096x11008": {
+     "sk_pick": 16,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "256x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x11008": {
+     "sk_pick": 16,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x256": {
+     "sk_pick": 4,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x64x32"
+    },
+    "1024x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 8,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x4098": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x256x32"
+    },
+    "1024x4096x128": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x64x32"
+    },
+    "1024x4098x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "256x64x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 6,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "8x4096x11008": {
+     "sk_pick": 16,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    }
+   },
+   "holdout_gm": 1.423402,
+   "vendor_gm": 1.089068,
+   "static_top1": 1.218962,
+   "c2_native_median": 1.153117,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 7,
+    "picked_ge3": 0,
+    "gm": 1.358219,
+    "vendor_gm": 1.088647
+   },
+   "hold_sk_lt3_gm": 1.476256,
+   "sk_picked_hold": {
+    "1": 11,
+    "16": 3,
+    "4": 1,
+    "2": 1
+   },
+   "regret": {
+    "1x4096x11008": 1.051094962615385,
+    "8192x4096x11008": 1.0672334299610506,
+    "512x4096x11008": 1.2149321880734343,
+    "512x512x512": 3.0,
+    "32x4096x11008": 1.0797101174191905,
+    "256x4096x11008": 2.2520352657727023,
+    "128x4096x11008": 1.2891794892949962,
+    "128x4096x256": 2.6363636814625466,
+    "1024x4096x11008": 1.24620767243527,
+    "1024x4096x256": 1.2162161816700348,
+    "1024x4096x4098": 1.1028037732708245,
+    "1024x4096x128": 2.109374994534287,
+    "1024x4098x4096": 1.5657142895156024,
+    "2048x4096x11008": 1.2746178098271979,
+    "4096x4096x11008": 1.1362663924012273,
+    "8x4096x11008": 1.051094962615385
+   }
+  },
+  "2": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 2,
+    "depth": 1,
+    "n_weights": 11,
+    "features": [
+     "cta_launch_count",
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "occupancy_deficit",
+     "operand_tile_traffic_ratio",
+     "raster_band_cache_pressure",
+     "register_file_pressure",
+     "spill_traffic_ratio",
+     "tail_waste",
+     "tile_roofline_deficit"
+    ]
+   },
+   "train_gm": 1.11586,
+   "inner_cv_gm": 1.142405,
+   "w": [
+    9.276502672610034,
+    8.862484938058365,
+    45.93323449220265,
+    35.00022921128489,
+    -3.1213468228563936,
+    -2.744277552468351,
+    -3.699071833866107,
+    1.6881408971514171,
+    -4.8356459140299535,
+    -21.155564921831555,
+    13.21603936976133
+   ],
+   "moved": true,
+   "picks": {
+    "1x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "8192x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "512x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "256x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x64x32",
+     "tile_best": "128x64x32"
+    },
+    "1024x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x512": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x4100": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x1024x1024": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4100x4096": {
+     "sk_pick": 1,
+     "sk_best": 4,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "8x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    }
+   },
+   "holdout_gm": 1.086563,
+   "vendor_gm": 1.080987,
+   "static_top1": 1.10387,
+   "c2_native_median": 1.100942,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 5,
+    "picked_ge3": 0,
+    "gm": 1.182014,
+    "vendor_gm": 1.044115
+   },
+   "hold_sk_lt3_gm": 1.045763,
+   "sk_picked_hold": {
+    "1": 16
+   },
+   "regret": {
+    "1x11008x4096": 1.007246326379627,
+    "8192x11008x4096": 1.017430227660468,
+    "512x11008x4096": 1.1547085920186464,
+    "32x11008x4096": 1.0287769889615868,
+    "256x11008x4096": 1.2580644896297066,
+    "128x11008x4096": 1.25,
+    "128x4096x1024": 1.0,
+    "1024x11008x4096": 1.0833332820941968,
+    "1024x4096x1024": 1.0841121781306746,
+    "1024x4096x512": 1.1290323034919316,
+    "1024x4096x4100": 1.1105398663378507,
+    "1024x1024x1024": 1.0303030403250104,
+    "1024x4100x4096": 1.1729107244597738,
+    "2048x11008x4096": 1.0513284703223889,
+    "4096x11008x4096": 1.0462863226804933,
+    "8x11008x4096": 1.007246326379627
+   }
+  },
+  "3": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 2,
+    "depth": 1,
+    "n_weights": 19,
+    "features": [
+     "edge_waste",
+     "has_spill",
+     "instruction_density",
+     "occupancy_deficit",
+     "operand_layout_stride_penalty",
+     "operand_tile_traffic_ratio",
+     "output_store_coalescing_deficit",
+     "parallel_reduction_compute_fraction",
+     "pipeline_fill_drain_fraction",
+     "raster_band_cache_excess",
+     "register_file_pressure",
+     "serial_reduction_dependency",
+     "shared_memory_pressure",
+     "spill_traffic_ratio",
+     "split_k_parallel_time_ratio",
+     "tail_waste",
+     "tile_roofline_deficit",
+     "wave_count_deficit"
+    ]
+   },
+   "train_gm": 1.081206,
+   "inner_cv_gm": 1.11714,
+   "w": [
+    3.3331712484962615,
+    1.9142287949949361,
+    250.2200910350121,
+    -0.9159556445562475,
+    -0.9743288097644566,
+    -2.832072931274653,
+    -1.2379015031257672,
+    -45.16126657156309,
+    -40.94974675745003,
+    -8.042411649325471,
+    -4.2057146651482435,
+    50.76425410019747,
+    -4.693677171542617,
+    5.377036430499155,
+    -1.6550931125457249,
+    -3.2193716201690954,
+    9.520109323030287,
+    6.481191971457598,
+    4.156679865566855
+   ],
+   "moved": true,
+   "picks": {
+    "1x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "8192x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8192x8192x8192": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "512x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "32x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "256x12288x4096": {
+     "sk_pick": 4,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "128x4096x16384": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "64x256x32",
+     "tile_best": "128x128x64"
+    },
+    "128x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "64x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x8192": {
+     "sk_pick": 3,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x16384": {
+     "sk_pick": 3,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x2048": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x2048x2048": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "8x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 2,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    }
+   },
+   "holdout_gm": 1.088502,
+   "vendor_gm": 1.06297,
+   "static_top1": 1.040848,
+   "c2_native_median": 1.084957,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 8,
+    "picked_ge3": 5,
+    "gm": 1.064711,
+    "vendor_gm": 1.05446
+   },
+   "hold_sk_lt3_gm": 1.112825,
+   "sk_picked_hold": {
+    "3": 7,
+    "1": 6,
+    "4": 1,
+    "2": 2
+   },
+   "regret": {
+    "1x12288x4096": 1.0392156993289,
+    "8192x12288x4096": 1.3344357256208481,
+    "8192x8192x8192": 1.4356451408181858,
+    "512x12288x4096": 1.0041151977506453,
+    "32x12288x4096": 1.0653594988814998,
+    "256x12288x4096": 1.0705883185438314,
+    "128x4096x16384": 1.0045871241183575,
+    "128x12288x4096": 1.114285757050528,
+    "1024x4096x8192": 1.0371517170134423,
+    "1024x4096x16384": 1.0544435981264682,
+    "1024x4096x2048": 1.0952381282356356,
+    "1024x12288x4096": 1.045358626731463,
+    "2048x12288x4096": 1.0,
+    "2048x2048x2048": 1.1010638223762317,
+    "4096x12288x4096": 1.055485433337928,
+    "8x12288x4096": 1.0457516016617716
+   }
+  }
+ },
+ "rule_file": "/tmp/claude-1000/-home-piai-workspace-kernelRule/d27f8d45-6378-4355-b573-0ac65dcd41f9/scratchpad/seedcmp/seedrule_tgate_a6000.json",
+ "rule": {
+  "name": "tgate a6000 시드룰 (RuleWriter stage 2 chosen, per fold)",
+  "per_fold": {
+   "0": {
+    "code": "def score(f, p, hw, w):\n    # Output-boundary predication grows rapidly when tiles overhang M or N.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Last-wave idle SMs expose a nonlinear loss of available throughput.\n    s = s + (-np.log2(np.maximum(1.0e-6, 1.0 - f.tail_waste))) * w[1]\n    # A shallow launch cannot amortize grid-dispatch startup and wave quantisation.\n    s = s + f.wave_count_deficit * w[2]\n    # Register spilling introduces especially expensive local-memory accesses.\n    s = s + f.has_spill * w[3]\n    # Spill severity is additional cache/DRAM traffic over the compulsory traffic.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    # CTA/output geometry mismatch reduces partition balance and operand reuse.\n    s = s + f.tile_aspect_mismatch * w[5]\n    # Split-K exposes reduction work, traffic, and serial dependency overhead.\n    s = s + np.log2(f.split_k_time_ratio) * w[6]\n    # K-boundary predication wastes tensor work in the final reduction slice.\n    s = s + f.k_tail_waste * w[7]\n    if p.roofline_ratio < 1:\n        # In a memory-bound GEMM, replicated operand traffic directly consumes bandwidth.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[8]\n        # Poor global-load coalescing increases the number of memory transactions.\n        s = s + f.coalesced_run_deficit * w[9]\n        # Poor C-store coalescing adds output memory transactions.\n        s = s + f.output_store_coalescing_deficit * w[10]\n        # Residual raster traffic represents operand reuse that the launch fails to expose.\n        s = s + f.raster_reuse_residual * w[11]\n        # A low-intensity CTA tile makes each fetched operand support little arithmetic.\n        s = s + f.tile_roofline_deficit * w[12]\n    else:\n        # In a compute-bound GEMM, unfilled thread capacity reduces latency hiding.\n        s = s + f.occupancy_deficit * w[13]\n        # Register allocation pressure limits concurrent warps and latency hiding.\n        s = s + f.register_file_pressure * w[14]\n        # Shared-memory allocation pressure limits resident CTAs and buffering.\n        s = s + f.shared_memory_pressure * w[15]\n        # Low CTA residency reduces the scheduler's independent work pool.\n        s = s + f.resident_block_scarcity * w[16]\n        # Static instruction overhead competes with tensor issue slots.\n        s = s + np.log2(1.0 + f.instruction_density) * w[17]\n        # Pipeline fill and drain are exposed when the steady-state loop is short.\n        s = s + f.pipeline_fill_drain_fraction * w[18]\n        # Absolute front-end work is poorly amortized by small compute launches.\n        s = s + np.log2(1.0 + f.total_frontend_instruction_work) * w[19]\n        # Each reduction iteration carries loop-control and synchronization latency.\n        s = s + np.log2(f.mainloop_iteration_count) * w[20]\n    return s",
+    "w0": [
+     0.5,
+     1.0,
+     1.0,
+     5.0,
+     0.3,
+     0.1,
+     0.3,
+     1.0,
+     0.5,
+     1.0,
+     0.8,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     0.2,
+     1.0,
+     0.2,
+     0.1
+    ],
+    "extra_features": []
+   },
+   "1": {
+    "code": "def score(f, p, hw, w):\n    # Output-boundary overhang grows multiplicatively with the wasted tile work.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Final-wave loss is expressed as the corresponding inverse useful-wave factor.\n    s = s + np.log2(1.0 + f.tail_waste / np.clip(1.0 - f.tail_waste, 0.01, 1.0)) * w[1]\n    # Any register spill sends the inner-loop values through local memory.\n    s = s + f.has_spill * w[2]\n    # Fewer resident CTAs leave fewer independent blocks to hide latency.\n    s = s + f.resident_block_scarcity * w[3]\n    if p.roofline_ratio < 1:\n        # Memory-bound shapes are penalized by replicated operand loads.\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[4]\n        # A large raster-band footprint reduces L2 reuse of those loads.\n        s = s + np.log2(1.0 + f.raster_band_cache_pressure) * w[5]\n        # Parallel split-K adds global partial write/read traffic.\n        s = s + f.parallel_reduction_traffic_fraction * w[6]\n        # Serial split-K adds partial accumulator traffic to the output path.\n        s = s + np.log2(1.0 + f.serial_partial_traffic_ratio) * w[7]\n        # Low-intensity CTA tiles directly increase bandwidth pressure.\n        s = s + f.tile_roofline_deficit * w[8]\n    else:\n        # Compute-bound shapes are penalized by front-end work per useful GEMM.\n        s = s + np.log2(1.0 + f.instruction_density) * w[9]\n        # Pipeline prologue and epilogue are exposed when compute dominates.\n        s = s + f.pipeline_fill_drain_fraction * w[10]\n        # Unfilled thread slots reduce latency hiding in the compute regime.\n        s = s + f.occupancy_deficit * w[11]\n        # Serial split-K boundaries reduce independent accumulation progress.\n        s = s + f.serial_reduction_dependency * w[12]\n        # Parallel split-K also adds accumulator arithmetic in this regime.\n        s = s + f.parallel_reduction_compute_fraction * w[13]\n    return s",
+    "w0": [
+     0.5,
+     1.0,
+     4.0,
+     1.0,
+     0.25,
+     0.2,
+     1.0,
+     0.15,
+     1.0,
+     0.25,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "extra_features": []
+   },
+   "2": {
+    "code": "def score(f, p, hw, w):\n    # CTA dispatch work grows with the absolute grid size.\n    s = np.log2(f.cta_launch_count) * w[0]\n    # Output-tile overhang directly wastes tensor work.\n    s = s + np.log2(f.edge_waste + 1.0) * w[1]\n    # A partially filled final wave leaves SM capacity idle.\n    s = s + f.tail_waste * w[2]\n    # Register spills are an exceptionally expensive local-memory path.\n    s = s + f.has_spill * w[3]\n    s = s + np.log2(f.spill_traffic_ratio + 1.0) * w[4]\n    if p.roofline_ratio < 1:\n        # In a memory-bound GEMM, replicated operand loads consume bandwidth.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[5]\n        # Low CTA tile arithmetic intensity exposes the bandwidth bottleneck.\n        s = s + f.tile_roofline_deficit * w[6]\n        # Raster-band overflow reduces cache reuse and increases DRAM traffic.\n        s = s + f.raster_band_cache_pressure * w[7]\n    else:\n        # In a compute-bound GEMM, front-end and control instructions compete with MMA issue.\n        s = s + np.log2(f.instruction_density + 1.0) * w[8]\n        # Unfilled thread slots reduce latency hiding during tensor execution.\n        s = s + f.occupancy_deficit * w[9]\n        # Register-file pressure limits concurrent CTAs and latency hiding.\n        s = s + f.register_file_pressure * w[10]\n    return s",
+    "w0": [
+     0.03,
+     0.25,
+     1.0,
+     4.0,
+     0.15,
+     0.08,
+     1.0,
+     0.8,
+     0.08,
+     1.0,
+     0.8
+    ],
+    "extra_features": []
+   },
+   "3": {
+    "code": "def score(f, p, hw, w):\n    # Output-tile overhang: logarithm compresses the wide wasted-work range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Final-wave idle time grows superlinearly as the idle fraction approaches one.\n    s = s + np.log2(1.0 / np.maximum(1.0e-6, 1.0 - f.tail_waste)) * w[1]\n    # Register spilling sends the accumulator through local memory.\n    s = s + f.has_spill * w[2]\n    # Spill severity accounts for the amount of local-memory traffic.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[3]\n    # One-wave or lightly populated grids expose launch and scheduling overhead.\n    s = s + f.wave_count_deficit * w[4]\n    # Shared-memory allocation can reduce resident CTA concurrency in either regime.\n    s = s + f.shared_memory_pressure * w[5]\n    if p.roofline_ratio < 1:\n        # Below the roofline, replicated operand traffic is the primary cost.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[6]\n        # Low-intensity CTA tiles consume bandwidth without enough tensor work per load.\n        s = s + f.tile_roofline_deficit * w[7]\n        # Strided operand loads and stores increase memory transactions.\n        s = s + f.operand_layout_stride_penalty * w[8]\n        s = s + f.output_store_coalescing_deficit * w[9]\n        # Raster-band cache eviction adds DRAM traffic when the working panel is too large.\n        s = s + np.log2(1.0 + f.raster_band_cache_excess) * w[10]\n        # Split-K partial materialization is an additional bandwidth burden.\n        s = s + np.log2(f.split_k_parallel_time_ratio) * w[11]\n    else:\n        # Above the roofline, issue efficiency and latency hiding dominate.\n        s = s + f.occupancy_deficit * w[12]\n        s = s + f.register_file_pressure * w[13]\n        # Compress the wide instruction-density range before combining it with fractions.\n        s = s + np.log2(1.0 + f.instruction_density) * w[14]\n        # Pipeline prologue/epilogue is exposed when the reduction loop is short.\n        s = s + f.pipeline_fill_drain_fraction * w[15]\n        # Serial split-K reduces independent work; parallel split-K adds reduction work.\n        s = s + f.serial_reduction_dependency * w[16]\n        s = s + f.parallel_reduction_compute_fraction * w[17]\n        s = s + np.log2(f.split_k_parallel_time_ratio) * w[18]\n    return s",
+    "w0": [
+     1.0,
+     1.0,
+     5.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "extra_features": []
+   }
+  }
+ }
+}

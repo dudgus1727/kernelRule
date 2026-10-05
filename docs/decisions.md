@@ -11657,6 +11657,19 @@ a6000 fold 4개 x seed 0. 라이브러리 = k7-1 + D-189 의 시간 모델 피�
 큰 복잡도 증가를 작은 train 이득으로 받아들인다.** a6000 의 "살린다" 는 이미 본 holdout
 위의 결과였다 (`docs/artifacts/k1a-loop/xgpu/summary.json`).
 
+### ⚠️ 정정 2 — 시간 피처의 설명에 측정 메모가 섞여 프롬프트에 들어갔다 (2026-10-05)
+
+k1a 라이브러리의 시간 피처 16개는 `rationale` 에 D-189 개발 메모를 그대로 달고 있었고,
+`rationale` 은 피처 설명으로 프롬프트에 들어간다 (`loader.py` `physical_meaning`). k1a 16실행
+(4 GPU)의 LLM 호출 **1,440번** (RuleEditor 1,148 · Analyst 205 · FeatureWriter 87) 에 들어갔다.
+내용: a6000 관찰 ("2단 128x128 이 3단보다 약 4.5% 느리다"), 서로게이트 수치 ("1.050 -> 1.045"),
+쓰는 법 권고 ("Weight ~2x the log-time weight, stable in all folds", "Put it under a
+p.roofline_ratio < 1 branch", "Use it alone in a linear rule"). 표에서 읽은 것을 프롬프트에
+넣지 않는다는 원칙(§12.3, known7 이 설명을 정리한 이유)에 어긋난다. 그래서 D-191 의 두 결과
+(a6000 "살린다", 다른 GPU 기준 미달) 는 **이 메모를 읽은 루프의 결과**로 읽어야 한다.
+메모를 지운 판: `docs/artifacts/time-features/time_features.jsonl` (코드 · 값 그대로, README).
+원본과 k1a 기록은 그대로 둔다.
+
 
 ## D-192  시간 축 채점 장치 — FeatureWriter 의 시간 축을 train 만으로 재고 돌려준다 (2026-10-04)
 

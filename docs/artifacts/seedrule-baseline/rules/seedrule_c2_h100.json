@@ -1,0 +1,81 @@
+{
+ "name": "c2 h100 시드룰 (RuleWriter stage 2 chosen, per fold)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    # Boundary overhang: compress the wide edge-waste range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Local-memory spill severity: compress potentially enormous traffic.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[1]\n    # Any spilling introduces a qualitatively expensive local-memory path.\n    s = s + f.has_spill * w[2]\n    # Last-wave underfill leaves SM capacity idle.\n    s = s + f.tail_waste * w[3]\n    # One-wave or very short grids expose dispatch and launch overhead.\n    s = s + f.wave_count_deficit * w[4]\n    if p.roofline_ratio < 1:\n        # In the bandwidth regime, replicated operand loads directly raise traffic.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[5]\n        # Low CTA tile intensity makes each fetched operand less productive.\n        s = s + f.tile_roofline_deficit * w[6]\n    else:\n        # In the compute regime, front-end work competes with tensor instructions.\n        s = s + np.log2(1.0 + f.instruction_density) * w[7]\n        # Resource pressure limits resident CTAs and latency hiding.\n        s = s + f.occupancy_deficit * w[8]\n    return s",
+   "w0": [
+    1.0,
+    3.0,
+    4.0,
+    1.0,
+    0.5,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+   ],
+   "extra_features": []
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    # Output-boundary predication wastes complete tile work; compress its wide range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Last-wave idle SMs have a reciprocal-like cost; preserve that curvature safely.\n    s = s + np.log2(1.0 + f.tail_waste / np.clip(1.0 - f.tail_waste, 1.0e-3, 1.0)) * w[1]\n    # A spill switches register accesses to much slower local-memory accesses.\n    s = s + f.has_spill * w[2]\n    # Spill traffic distinguishes a minor spill from severe repeated local-memory traffic.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[3]\n    # A short grid cannot amortize launch and CTA-dispatch startup over many waves.\n    s = s + f.wave_count_deficit * w[4]\n    if p.roofline_ratio < 1.0:\n        # In the memory-bound regime, replicated operand loads directly increase bandwidth demand.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[5]\n        # Low CTA tile arithmetic intensity makes each operand transaction less productive.\n        s = s + f.tile_roofline_deficit * w[6]\n        # Parallel split-K adds partial write/read traffic on the bandwidth-critical path.\n        s = s + f.parallel_reduction_traffic_fraction * w[7]\n        # Resource-limited residency reduces the ability to hide memory latency.\n        s = s + f.occupancy_deficit * w[8]\n    else:\n        # In the compute-bound regime, front-end instructions compete with tensor issue capacity.\n        s = s + np.log2(1.0 + f.instruction_density) * w[9]\n        # Thread-slot, register, and CTA residency limits reduce compute latency hiding.\n        s = s + f.occupancy_deficit * w[10]\n        s = s + f.register_file_pressure * w[11]\n        s = s + f.resident_block_scarcity * w[12]\n        # Pipeline prologue/epilogue is exposed when the steady-state mainloop is short.\n        s = s + f.pipeline_fill_drain_fraction * w[13]\n        # Serial split-K introduces dependencies that prevent independent compute scheduling.\n        s = s + f.serial_reduction_dependency * w[14]\n        # Parallel split-K also adds accumulator arithmetic in the compute-bound regime.\n        s = s + f.parallel_reduction_compute_fraction * w[15]\n    return s",
+   "w0": [
+    0.5,
+    0.5,
+    8.0,
+    0.5,
+    0.5,
+    0.6,
+    0.8,
+    1.0,
+    0.6,
+    0.25,
+    0.8,
+    0.6,
+    0.7,
+    0.5,
+    0.7,
+    0.5
+   ],
+   "extra_features": []
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    # Output-boundary overwork, compressed because edge_waste spans hundreds.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Last-wave idling has a nonlinear throughput cost as the active fraction vanishes.\n    s = s + np.log2(1.0 / np.clip(1.0 - f.tail_waste, 1e-3, 1.0)) * w[1]\n    # A nearly single-wave grid cannot amortize dispatch and scheduling startup.\n    s = s + f.wave_count_deficit * w[2]\n    # Any register spill introduces an exceptionally expensive local-memory path.\n    s = s + f.has_spill * w[3]\n    # Spill severity captures the additional local-memory traffic beyond the binary event.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[4]\n    if p.roofline_ratio < 1:\n        # In the bandwidth-bound regime, replicated operand loads directly consume bandwidth.\n        s = s + np.log2(1.0 + f.operand_tile_traffic_ratio) * w[5]\n        # Low CTA tile intensity creates bandwidth pressure even for a favorable whole-shape intensity.\n        s = s + f.tile_roofline_deficit * w[6]\n        # Parallel split-K partials add global write/read traffic in this regime.\n        s = s + f.parallel_reduction_traffic_fraction * w[7]\n        # Pipeline prologue and drain are exposed when memory work is short or poorly amortized.\n        s = s + f.pipeline_fill_drain_fraction * w[8]\n    else:\n        # Compute-bound kernels are limited by issue/control overhead relative to tensor work.\n        s = s + np.log2(1.0 + f.instruction_density) * w[9]\n        # Thread-slot and CTA residency deficits reduce latency hiding during compute.\n        s = s + f.occupancy_deficit * w[10]\n        s = s + f.resident_block_scarcity * w[11]\n        # Register-file pressure independently limits concurrent compute CTAs.\n        s = s + f.register_file_pressure * w[12]\n        # Serial split-K dependencies and parallel reduction arithmetic add compute-side work.\n        s = s + f.serial_reduction_dependency * w[13]\n        s = s + f.parallel_reduction_compute_fraction * w[14]\n    return s",
+   "w0": [
+    1.0,
+    1.0,
+    1.0,
+    8.0,
+    0.1,
+    0.1,
+    1.0,
+    1.0,
+    0.5,
+    0.03,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.5
+   ],
+   "extra_features": []
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    # Output-boundary overhang: compress the wide tile-waste range.\n    s = np.log2(1.0 + f.edge_waste) * w[0]\n    # Last-wave idle SMs: convert the nonlinear loss of useful capacity to a log penalty.\n    s = s + (-np.log2(np.maximum(1.0e-6, 1.0 - f.tail_waste))) * w[1]\n    # Any register spill introduces a severe local-memory path.\n    s = s + f.has_spill * w[2]\n    # Spill severity: account for the amount of spilled traffic, not only its presence.\n    s = s + np.log2(1.0 + f.spill_traffic_ratio) * w[3]\n    # Few resident CTAs reduce the scheduler's pool for latency hiding.\n    s = s + f.resident_block_scarcity * w[4]\n    # A small grid leaves launch and dispatch overhead poorly amortized.\n    s = s + f.wave_count_deficit * w[5]\n    # Pipeline prologue/epilogue cost is exposed when the K loop is short.\n    s = s + f.pipeline_fill_drain_fraction * w[6]\n    if p.roofline_ratio < 1:\n        # Below the hardware ridge, replicated operand loads directly consume bandwidth.\n        s = s + np.log2(f.operand_tile_traffic_ratio) * w[7]\n        # Low CTA arithmetic intensity adds tile-local bandwidth pressure.\n        s = s + f.tile_roofline_deficit * w[8]\n    else:\n        # Above the ridge, front-end issue overhead competes with tensor arithmetic.\n        s = s + np.log2(1.0 + f.instruction_density) * w[9]\n        # Thread-slot and register capacity determine compute-side latency hiding.\n        s = s + f.occupancy_deficit * w[10]\n        s = s + f.register_file_pressure * w[11]\n    return s",
+   "w0": [
+    0.5,
+    0.25,
+    10.0,
+    0.1,
+    1.0,
+    1.0,
+    0.5,
+    0.5,
+    1.0,
+    0.25,
+    1.0,
+    1.0
+   ],
+   "extra_features": []
+  }
+ }
+}
