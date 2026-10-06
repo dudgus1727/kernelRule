@@ -114,7 +114,9 @@ def _registry_fold(table, fold: int, extra: list[str]):
     from kernelrule.features import REGISTRY
     from kernelrule.features.loader import base_registry, load_generated
 
-    run = Path(f"runs/{_G['prefix']}-{_gpu()}-f{fold}")
+    # ★ D-196 — the library's **code** may come from another GPU's runs
+    #   (transfer); its values are computed on this table
+    run = Path(f"runs/{_G['prefix']}-{_G.get('lib_gpu') or _gpu()}-f{fold}")
     # ★ D-193 — the campaign's own condition (F4 has another base library);
     #   campaigns before it are all F2
     cond = _condition_of(run)
@@ -200,22 +202,27 @@ def _fit_task(task):
     fn = compile_rule(code)
     # ★ D-195 — term caps, measured on the shapes this fit sees (train, or
     #   the inner-CV training parts) — never the part it is scored on
-    caps = None
-    if _G.get("cap"):
-        from kernelrule.rules.caps import term_caps
-        caps = term_caps(fn, code, w0, m, fit_on, lam=float(_G["cap"]))
-    fr = fit_weights(fn, m, t, Split("train", tuple(fit_on)),
-                     np.asarray(w0, float), objective="regret",
-                     warn_invariants=False, caps=caps, **FIT)
-    so = make_score_of(fn, m, fr.w)
+    if _G.get("no_fit"):
+        # ★ D-196 — (a) full transplant: the spec's weights as they are
+        w_use, moved = np.asarray(w0, float), False
+    else:
+        caps = None
+        if _G.get("cap"):
+            from kernelrule.rules.caps import term_caps
+            caps = term_caps(fn, code, w0, m, fit_on, lam=float(_G["cap"]))
+        fr = fit_weights(fn, m, t, Split("train", tuple(fit_on)),
+                         np.asarray(w0, float), objective="regret",
+                         warn_invariants=False, caps=caps, **FIT)
+        w_use, moved = fr.w, fr.moved
+    so = make_score_of(fn, m, w_use)
     reg = {}
     if read_on:
         ev = evaluate_scores(so, t, read_on, ks=(1,))
         reg = {f"{p.M}x{p.N}x{p.K}": float(r)
                for p, r in zip(ev.shapes, ev.regret[:, 0], strict=True)}
-    w_back = [float(fr.w[inv[i]]) for i in range(len(inv))]
+    w_back = [float(w_use[inv[i]]) for i in range(len(inv))]
     out = {"fold": fold, "part": part, "perm": perm, "regret": reg,
-           "w": w_back, "moved": bool(fr.moved)}
+           "w": w_back, "moved": bool(moved)}
     if part is None:
         tr = evaluate_scores(so, t, train, ks=(1,))
         out["train_gm"] = _gm(tr.regret[:, 0])
@@ -473,14 +480,18 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
                      dev) for k in range(n_perm + 1)]
     out = {"protocol": {"fit": FIT, "n_inner": N_INNER, "design": DESIGN,
                         "gpu": _gpu(),
-                        "library": (f"runs/{_G['prefix']}-{_gpu()}-f* "
+                        "library": (f"runs/{_G['prefix']}-"
+                                    f"{_G.get('lib_gpu') or _gpu()}-f* "
                                     "(fold 마다)" if _G.get("prefix")
                                     else "k7-1 (27축)"),
                         "extra_features": extra,
                         "ext_contract_features": _G["ext_contract"],
                         "dev_holdout_hidden": dev, "n_perm": n_perm,
                         # ★ D-195 — term cap (None = uncapped, as before)
-                        "cap": _G.get("cap")},
+                        "cap": _G.get("cap"),
+                        # ★ D-196 — transfer
+                        "lib_gpu": _G.get("lib_gpu"),
+                        "no_fit": bool(_G.get("no_fit"))},
            **reps[0]}
     if n_perm:
         ic = [r["aggregate"]["inner_cv_gm"] for r in reps]
@@ -553,9 +564,18 @@ def main() -> None:
     ap.add_argument("--prefix", default=None)
     # ★ D-195 — cap each correction at lam x the time estimate's range
     ap.add_argument("--cap", type=float, default=None, metavar="LAMBDA")
+    # ★ D-196 — transfer: library code from another GPU's runs; and the
+    #   (a) arm, the spec's weights scored as they are
+    ap.add_argument("--lib-gpu", default=None,
+                    choices=("a6000", "5090", "4090", "h100"))
+    ap.add_argument("--no-fit", action="store_true")
     a = ap.parse_args()
     _G["gpu"], _G["dev"], _G["prefix"] = a.gpu, a.dev, a.prefix
     _G["cap"] = a.cap
+    _G["lib_gpu"], _G["no_fit"] = a.lib_gpu, a.no_fit
+    if a.no_fit and a.cap:
+        raise SystemExit("--no-fit scores the weights as they are; a cap has "
+                         "nothing to bound")
     if a.make_baselines:
         make_baselines(a.make_baselines)
         return
