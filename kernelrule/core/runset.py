@@ -43,7 +43,7 @@ KEYS = ("seed_source", "seed_sha", "objective", "rank_top_k", "rank_lambda",
         "parameters", "product_hint", "power_hint", "hw", "split_kind",
         "feature_condition", "model", "fit_method", "fit_restarts",
         "noise_tol", "failure_baseline", "fit_space", "warm_start",
-        "fit_budget", "time_gate", "observed_ranges")
+        "fit_budget", "time_gate", "observed_ranges", "term_cap")
 #: ⚠️ `fitter_source` is **deliberately not in KEYS** (D-163). It says how
 #: the record was written, not what ran: every run since D-144 chooses the
 #: fitter per rule, whether or not its `config.json` says so. Putting it in
@@ -63,7 +63,9 @@ _OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4,
                  # ★ D-192
                  "time_gate": False,
                  # ★ D-193
-                 "observed_ranges": False}
+                 "observed_ranges": False,
+                 # ★ D-195
+                 "term_cap": None}
 
 
 class RunSetError(ValueError):
@@ -147,6 +149,8 @@ def run_condition(run: str, root: Path | None = None) -> dict:
         # ★ D-193 — what the feature lists show as a range
         "observed_ranges": loop.get("observed_ranges",
                                     _OLD_DEFAULTS["observed_ranges"]),
+        # ★ D-195
+        "term_cap": loop.get("term_cap", _OLD_DEFAULTS["term_cap"]),
         "seed_source": None, "seed_sha": None,
     }
     ch = r / _campaign(run) / "stage2-rule-writer" / "chosen.json"

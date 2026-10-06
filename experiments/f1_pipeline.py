@@ -1113,6 +1113,7 @@ def _loop(a, table, matrix, splits, llm, *, run_id: str) -> RoundLoop:
                                          LoopConfig.n_workers),
                        time_gate=getattr(a, "time_gate", False),
                        observed_ranges=getattr(a, "observed_ranges", False),
+                       term_cap=getattr(a, "term_cap", None),
                        objective="regret",
                        parameters=getattr(a, "parameters", None),
                        # ★ The fitter is **decided by the parameter count**
@@ -1209,6 +1210,7 @@ def stage3(a, d: Path, table, base: FeatureRegistry, splits,
                            time_gate=getattr(a, "time_gate", False),
                            observed_ranges=getattr(a, "observed_ranges",
                                                    False),
+                           term_cap=getattr(a, "term_cap", None),
                            objective="regret",
                            parameters=a.parameters,
                            # ★ The fitter is **decided by the parameter
@@ -1365,6 +1367,10 @@ def main() -> None:
                          "automatically")
     # ★ Parallel scoring and fitting (D-95). 0 = sequential (the default).
     #   The results must be identical.
+    ap.add_argument("--term-cap", type=float, default=None,
+                    metavar="LAMBDA",
+                    help="★ D-195 — cap each correction term at LAMBDA x the "
+                         "time estimate's within-shape range (needs F4)")
     ap.add_argument("--observed-ranges", action="store_true",
                     help="★ D-193 — the FeatureWriter writes no range; "
                          "every feature list shows what the axis takes on "
@@ -1620,6 +1626,8 @@ def main() -> None:
         "time_gate": bool(getattr(a, "time_gate", False)),
         # ★ D-193 — measured ranges instead of declared ones
         "observed_ranges": bool(getattr(a, "observed_ranges", False)),
+        # ★ D-195 — the correction-term cap (None = uncapped)
+        "term_cap": getattr(a, "term_cap", None),
         # ★ D-176 §2 — which RuleWriter prompt this run used. Without it a
         #   variant run and a campaign run look identical in the record.
         "size_guidance": getattr(a, "size_guidance", "role/_size_loop.md"),

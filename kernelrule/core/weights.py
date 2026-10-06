@@ -545,8 +545,14 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         def _proj(x):                           # noqa: F811
             return np.clip(x, _blo, _bhi)
 
-        bounds = [(float(a), float(b)) for a, b in zip(_blo, _bhi,
-                                                      strict=True)]
+        # ★ A pinned slot (lo == hi — a term that moves no training shape)
+        #   is enforced exactly by the folding above; the optimisers get a
+        #   negligibly wider interval, since CMA refuses lo == hi.
+        _pinned = _blo == _bhi
+        _eps = 1e-9 * np.maximum(1.0, np.abs(_blo))
+        bounds = [(float(a), float(b)) for a, b in zip(
+            np.where(_pinned, _blo - _eps, _blo),
+            np.where(_pinned, _bhi + _eps, _bhi), strict=True)]
 
     # ★ It holds on to **the best it has seen** itself (D-55). Taking only
     #   the optimiser's `res.x` throws away better points visited during the
@@ -760,10 +766,10 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     n_at_cap = 0
     if caps is not None:
         x_end = np.asarray(w, dtype=np.float64)
-        n_at_cap = int(np.sum(
+        n_at_cap = int(np.sum(~_pinned & (
             (np.isfinite(_blo) & np.isclose(x_end, _blo, rtol=1e-9, atol=0))
             | (np.isfinite(_bhi) & np.isclose(x_end, _bhi, rtol=1e-9,
-                                              atol=0))))
+                                              atol=0)))))
     if c is not None:
         w = w / c                 # ★ D-190 §6: back to the rule's weights
     # ★ The scoring criterion is always regret — even under

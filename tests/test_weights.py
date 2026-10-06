@@ -802,3 +802,17 @@ def test_caps_length_is_checked(known):
     with pytest.raises(FitError):
         fit_weights(score, m, t, _all_train(t), W_TRUE.copy(), max_evals=10,
                     caps=[(-1.0, 1.0)], warn_invariants=False)
+
+
+def test_a_pinned_cap_holds_the_weight_with_cma(known):
+    """★ D-195 — a term that moves no training shape is pinned (lo == hi);
+    CMA refuses equal bounds, so the optimiser gets a sliver around it and
+    the folding keeps the weight exactly there."""
+    pytest.importorskip("cma")
+    t, m, score = known
+    caps = [(-np.inf, np.inf), (0.0, 0.0), (-np.inf, np.inf)]
+    fr = fit_weights(score, m, t, _all_train(t), W_TRUE.copy(), max_evals=60,
+                     method="cma", n_restarts=1, objective="regret",
+                     caps=caps, warn_invariants=False)
+    assert fr.w[1] == 0.0
+    assert fr.n_at_cap == 0           # a pin is not a binding cap

@@ -257,6 +257,11 @@ class LoopConfig:
     #: training configs (`Feature.observed_range`) instead of a declared
     #: one, the same as stage 1 under the condition `observed_ranges`.
     observed_ranges: bool = False
+    #: ★ D-195: cap each correction term at `term_cap` x the time
+    #: estimate's within-shape range (`rules/caps.term_caps`), measured on
+    #: the training shapes. `None` = uncapped, every run before it. Needs a
+    #: library with the time features (condition F4).
+    term_cap: float | None = None
 
 
 class LLMUnreachable(RuntimeError):
@@ -340,11 +345,16 @@ _WORKER: dict = {}
 
 def _fit_rule(fn, code: str, w0, new, *, matrix, table, train, val,
               objective: str, rank_top_k: int, rank_lambda: float,
-              fit_space: str, fit_budget: str):
+              fit_space: str, fit_budget: str,
+              term_cap: float | None = None):
     """★ The one `fit_weights` call of the loop — the worker and the
     sequential path both come here, so they cannot drift apart (D-95,
-    D-190 §6)."""
+    D-190 §6, D-195)."""
     _ft = fitter_for(len(w0), budget=fit_budget)
+    caps = None
+    if term_cap is not None:
+        from kernelrule.rules.caps import term_caps
+        caps = term_caps(fn, code, w0, matrix, train.shapes, lam=term_cap)
     return fit_weights(fn, matrix, table, train, w0,
                        max_evals=_ft["max_evals"], val_split=val,
                        objective=objective, rank_top_k=rank_top_k,
@@ -355,7 +365,8 @@ def _fit_rule(fn, code: str, w0, new, *, matrix, table, train, val,
                        space=fit_space,
                        new_terms=(new if fit_space == "u" else None),
                        polish_pairs_max_dim=(_FITTER_DIM
-                                             if fit_budget == "dim" else None))
+                                             if fit_budget == "dim" else None),
+                       caps=caps)
 
 
 def _fit_and_score(job: tuple) -> dict:
@@ -388,7 +399,8 @@ def _fit_and_score(job: tuple) -> dict:
                        rank_top_k=c.get("rank_top_k", 100),
                        rank_lambda=c.get("rank_lambda", 0.0),
                        fit_space=c.get("fit_space", "w"),
-                       fit_budget=c.get("fit_budget", "flat"))
+                       fit_budget=c.get("fit_budget", "flat"),
+                       term_cap=c.get("term_cap"))
     except (FitError, SchemaViolation) as e:
         return {"i": idx, "err": ("fit", str(e)[:90])}
     except Exception as e:                                  # noqa: BLE001
@@ -404,6 +416,7 @@ def _fit_and_score(job: tuple) -> dict:
             "n_dead_w": len(fr.dead_by_weight),
             "n_dead_s": len(fr.dead_by_sensitivity),
             "n_new": int(fr.n_new),
+            "n_at_cap": int(fr.n_at_cap),
             "rank_loss": _rank_loss_of(fn, c, fr.w),
             "val_regret": fr.val_regret,
             "mem": ev.at(1, mask=c["short_mask"]),
@@ -510,6 +523,8 @@ class RoundResult:
     #: countable while the run happens. Observed on one F2 run: 6 of the 49
     #: registered axes, 1~3 per run.
     n_dead_terms: int = 0
+    #: ★ D-195 — weights that ended at a term cap, over the scored rules
+    n_at_cap: int = 0
     #: ★ 2026-09-12 (D-169): the same terms, **split by why they are dead.**
     #: The two do not overlap and they say opposite things.
     #:
@@ -635,6 +650,16 @@ class RoundLoop:
         if cfg.failure_baseline not in ("parent", "global_best"):
             raise ValueError(
                 f"unknown failure_baseline: {cfg.failure_baseline!r}")
+        if cfg.term_cap is not None:
+            # ★ D-195 — the cap measures against the time estimate; a
+            #   library without it fails here, not on every candidate
+            if not cfg.term_cap > 0:
+                raise ValueError(f"term_cap must be positive: {cfg.term_cap}")
+            need = {"tm_crit_ratio", "tm_l2_ratio", "tm_dram_ratio"}
+            if not need <= set(matrix.feature_names()):
+                raise ValueError(
+                    f"term_cap needs the time features {sorted(need)} in the "
+                    f"library (condition F4)")
         self.cfg = cfg
         # ★ The trace (D-133). It accumulates in the same place as
         # `dump()`.
@@ -980,6 +1005,7 @@ class RoundLoop:
                 # ★ D-190 §6 — the worker fits like the sequential path
                 fit_space=self.cfg.fit_space,
                 fit_budget=self.cfg.fit_budget,
+                term_cap=self.cfg.term_cap,             # ★ D-195
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
                 max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
@@ -1045,6 +1071,7 @@ class RoundLoop:
             res.n_dead_terms += int(d["n_dead"])
             res.n_dead_by_weight += int(d.get("n_dead_w", 0))
             res.n_dead_by_sens += int(d.get("n_dead_s", 0))
+            res.n_at_cap += int(d.get("n_at_cap", 0))
             res.n_scored += 1
             elites.append(self._elite_from(prop, rep, d))
         return elites
@@ -1130,7 +1157,8 @@ class RoundLoop:
                            rank_top_k=self.cfg.rank_top_k,
                            rank_lambda=self.cfg.rank_lambda,
                            fit_space=self.cfg.fit_space,
-                           fit_budget=self.cfg.fit_budget)
+                           fit_budget=self.cfg.fit_budget,
+                           term_cap=self.cfg.term_cap)
         except (FitError, SchemaViolation) as e:
             res.n_rejected_fit += 1
             res.rejections.append(("fit", str(e)[:90]))
@@ -1147,6 +1175,7 @@ class RoundLoop:
         if fr.moved:
             res.n_fit_moved += 1
         res.n_dead_terms += len(fr.dead_terms)
+        res.n_at_cap += int(fr.n_at_cap)
         res.n_dead_by_weight += len(fr.dead_by_weight)
         res.n_dead_by_sens += len(fr.dead_by_sensitivity)
         ev = self._score(fn, fr.w, self.splits.train.shapes)
