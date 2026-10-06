@@ -816,3 +816,15 @@ def test_a_pinned_cap_holds_the_weight_with_cma(known):
                      caps=caps, warn_invariants=False)
     assert fr.w[1] == 0.0
     assert fr.n_at_cap == 0           # a pin is not a binding cap
+
+
+def test_cma_restarts_inside_tight_caps(known):
+    """★ D-195 — with several restarts the noisy restart points fall outside
+    tight caps; CMA must still run and the result stay inside."""
+    pytest.importorskip("cma")
+    t, m, score = known
+    caps = [(-0.1, 0.1), (-0.1, 0.1), (-0.1, 0.1)]
+    fr = fit_weights(score, m, t, _all_train(t), W_TRUE.copy(), max_evals=80,
+                     method="cma", n_restarts=3, objective="regret",
+                     caps=caps, warn_invariants=False)
+    assert np.all(np.abs(fr.w) <= 0.1 + 1e-9)

@@ -961,6 +961,11 @@ def _cma_once(obj, start: np.ndarray, budget: int, r: int, *,
     if bounds is not None:
         opts["bounds"] = [[float(b[0]) for b in bounds],
                           [float(b[1]) for b in bounds]]
+        # ★ D-195 — a restart starts from the best point plus noise, which
+        #   can sit outside the bounds; CMA refuses such a start ("argument
+        #   of inverse must be within the given bounds")
+        start = np.clip(np.asarray(start, dtype=np.float64),
+                        opts["bounds"][0], opts["bounds"][1])
     es = _cma.CMAEvolutionStrategy([float(x) for x in start], 1.0, opts)
     es.optimize(obj)
     xb = es.result.xbest
