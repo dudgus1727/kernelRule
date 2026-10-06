@@ -1009,7 +1009,7 @@ def test_every_generated_code_hash_goes_through_the_helper():
 # ---------------------------------------------------------------------------
 # ★ D-193 — condition F4 and the measured ranges
 # ---------------------------------------------------------------------------
-def test_f4_base_is_known7_minus_three_plus_the_time_features():
+def test_f4_base_is_known7_minus_two_plus_the_time_features():
     from kernelrule.features.loader import (
         F4_DROPPED,
         F4_TIME_EXCLUDED,
@@ -1020,11 +1020,11 @@ def test_f4_base_is_known7_minus_three_plus_the_time_features():
     assert not names & set(F4_DROPPED)
     assert not names & set(F4_TIME_EXCLUDED)
     assert {"occupancy_deficit", "roofline_ratio", "log_min_dim",
-            "log_flops"} <= names
+            "log_flops", "has_spill"} <= names     # has_spill: D-194
     assert {"tm_crit_ratio", "tm_l2_ratio", "tm_dram_ratio",
             "splitk_roofline_log_time", "tm_regstaged",
             "tm_cta_warps"} <= names
-    assert len(names) == 19
+    assert len(names) == 20
 
 
 def test_time_feature_descriptions_carry_no_measurement_notes():

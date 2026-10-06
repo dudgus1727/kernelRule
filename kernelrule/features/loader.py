@@ -31,9 +31,14 @@ __all__ = ["load_generated", "extended_registry", "base_registry",
 #: correction 2).
 TIME_FEATURES = Path(__file__).with_name("time_features.jsonl")
 #: Condition F4 leaves these out of known7: the time features already hold
-#: the wave tail and tile padding (`tm_crit_ratio`) and the spill traffic
-#: (L2 / DRAM times). The FeatureWriter may build its own versions.
-F4_DROPPED = ("edge_waste", "has_spill", "tail_waste")
+#: the wave tail and tile padding (`tm_crit_ratio`). The FeatureWriter may
+#: build its own versions.
+#: ★ D-194 — `has_spill` is back. The time features count a spill's
+#: **traffic** only; its **latency** (a register is one cycle, local memory
+#: hundreds, on every mainloop iteration) has no axis without it, and no
+#: hardware field carries a latency to build a time from. Without it the
+#: D-193 loop picked a spilling 256x256 kernel 16x slower than the best.
+F4_DROPPED = ("edge_waste", "tail_waste")
 #: ... and this one out of the time features: the pre-combined estimate.
 F4_TIME_EXCLUDED = ("tm_log_est",)
 
@@ -169,16 +174,16 @@ def base_registry(condition: str, *,
             r.add(KNOWN7[n])
         return r
     if condition == "F4":
-        # ★ D-193 — known7 without the three the time features already
-        #   contain (wave tail and tile padding sit in `tm_crit_ratio`, spill
-        #   traffic in the L2 and DRAM times), plus the time features with
+        # ★ D-193 — known7 without the axes the time features already
+        #   contain (wave tail and tile padding sit in `tm_crit_ratio`;
+        #   `has_spill` is back since D-194), plus the time features with
         #   their descriptions cut to physics (`time_features.jsonl`). The
         #   pre-combined estimate `tm_log_est` is left out so that a rule
         #   combines the paths itself. ⚠️ These are **hand-built** axes (the
         #   a6000 work, D-189): a condition that gives the model human
         #   physics, not the F1/F2 question.
         from kernelrule.features.known7 import KNOWN7
-        r = FeatureRegistry("F4-known4+time15")
+        r = FeatureRegistry("F4-known5+time15")
         for n in sorted(KNOWN7._items):
             if n not in F4_DROPPED:
                 r.add(KNOWN7[n])

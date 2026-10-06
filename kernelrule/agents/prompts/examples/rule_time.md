@@ -1,7 +1,9 @@
 <!-- D-193 — the RuleWriter example when the registry holds the time
      features (condition F4). The main term is the J1e/K1a form with the
      generic DRAM time; the corrections are left as placeholders on purpose:
-     which effects to add, and in what form, is what the run measures. -->
+     which effects to add, and in what form, is what the run measures.
+     D-194 — one correction is named: has_spill (public, known7), the spill
+     latency the time estimate does not price. rule_known.md names it too. -->
 ## Rule example — ★ built **from the feature list above**
 
 This is a shape example. **Do not submit it as is** — look at why each part
@@ -20,7 +22,7 @@ def score(f, p, hw, w):
     t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))
     s = 10.0 * np.log2(t)          # fixed scale, not a weight
     # corrections — effects the estimate does not contain, one term each
-    s = s + f.<correction axis> * w[0]
+    s = s + f.has_spill * w[0]     # spill latency — the estimate prices its traffic only
     s = s + f.<correction axis> * w[1]
     return s
 ```
@@ -39,6 +41,10 @@ why no weight on it   it is the yardstick — each correction weight is measured
                       against it (1 score unit = 0.1 log2 of time)
 the corrections       the estimate is only the skeleton. Which effects it
                       misses, and in what form, decides how good the rule is
+spill                 the estimate prices a spill's traffic, not its latency
+                      (local memory is hundreds of cycles, every iteration).
+                      A binary term carries that — switching it on changes the
+                      magnitude, so start its weight large
 ```
 
 ★ **The main term needs no memory/compute branch** — max and sqrt already

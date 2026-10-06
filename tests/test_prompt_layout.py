@@ -315,7 +315,12 @@ def _feature_prompt(condition: str):
 #: `test_rule_example_never_names_a_feature_outside_the_registry` and
 #: `test_known_by_design_files_never_reach_f0_or_f1` — **the exception is
 #: made and whether it leaks is checked alongside.**
-_KNOWN_BY_DESIGN = {"examples/known7.md", "examples/rule_known.md"}
+#:   examples/rule_time.md   ★ D-194 — names `has_spill` (public, known7).
+#:                           Chosen only when the registry holds the time
+#:                           features (`_rule_example_for`), which F1 never
+#:                           does — checked below
+_KNOWN_BY_DESIGN = {"examples/known7.md", "examples/rule_known.md",
+                    "examples/rule_time.md"}
 
 
 #: Statements knowable only from the table. One of them in the prompt is a
@@ -649,3 +654,11 @@ def test_rule_example_follows_the_time_features():
         base_registry("F4"))
     assert "one estimate of the kernel's time" not in _rule_example_for(
         base_registry("F2"))
+
+
+def test_rule_time_example_never_reaches_an_empty_registry():
+    """★ D-194 — rule_time.md names a real feature; it must only be chosen
+    for a registry that holds the time features (F4), never for F1's."""
+    from kernelrule.agents.openai_client import _rule_example_for
+    from kernelrule.features import FeatureRegistry
+    assert "has_spill" not in _rule_example_for(FeatureRegistry("F1-empty"))
