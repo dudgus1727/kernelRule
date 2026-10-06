@@ -1,0 +1,268 @@
+{
+ "prefix": "f4c",
+ "gpu": "a6000",
+ "n_with_main_term": 4,
+ "folds": {
+  "0": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 8,
+    "branches": [
+     "p.roofline_ratio < 1.0",
+     "p.log_flops < 30.0",
+     "p.unaligned_access_fraction > 0.01"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "instruction_density",
+     "mainloop_sync_count",
+     "occupancy_deficit",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "source": "rule_writer-try09",
+   "train": 1.0809458464402284,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "1": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 6,
+    "branches": [
+     "p.roofline_ratio < 1"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "cta_barrier_density",
+     "dynamic_instruction_per_flop",
+     "occupancy_deficit",
+     "operand_coalescing_aspect",
+     "output_store_coalescing_aspect",
+     "tile_vector_tail_overfetch_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "source": "rule_writer-try00",
+   "train": 1.1374341428966337,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "2": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 6,
+    "branches": [
+     "p.roofline_ratio < 1"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "has_spill",
+     "launch_tail_deficit",
+     "occupancy_deficit",
+     "splitk_excess_log",
+     "tile_alignment_traffic_deficit",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "warp_output_work"
+    ]
+   },
+   "source": "rule_writer-try06",
+   "train": 1.1031250342327528,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "3": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 6,
+    "branches": [
+     "p.roofline_ratio < 1.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "barrier_work_density",
+     "instruction_work_density",
+     "occupancy_deficit",
+     "operand_stride_transaction_ratio",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "source": "rule_writer-try04",
+   "train": 1.1422277539279002,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  }
+ }
+}
