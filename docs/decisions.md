@@ -11966,3 +11966,6 @@ lam 배"). 설명 없이 B 에서 lam 으로 이름을 바꿔 썼다. 사용자 
 관찰   holdout, regret > 1.2 인 holdout 형상 수 (D-193 루프 같은 절차 1.1005 · 7 개, 최악 15.99),
        가중치 수, n_at_cap, has_spill · tm_cta_warps 를 썼나, 새 시드룰의 구조
 ```
+
+⚠️ 정정 (같은 날): 위 '관찰' 의 "D-193 루프 ... 7 개" 는 **5 개**다 (`f4-seed/stage3-refit.json`, regret >
+1.2 인 holdout 형상, 최악 15.99). 숫자를 계산 결과를 보기 전에 적었다.
