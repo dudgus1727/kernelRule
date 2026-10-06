@@ -1,0 +1,325 @@
+{
+ "prefix": "f4c",
+ "gpu": "h100",
+ "n_with_main_term": 4,
+ "folds": {
+  "0": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 50,
+    "branches": [
+     "p.log_flops < 30",
+     "p.roofline_ratio < 1",
+     "p.log_flops < 32",
+     "p.output_parallelism_deficit < 0.001",
+     "p.output_parallelism_deficit < 0.001"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "a_refetch_bw_demand",
+     "accumulator_operand_storage_ratio",
+     "b_refetch_bw_demand",
+     "cp_async_alignment_deficit",
+     "cta_instruction_amortization",
+     "cta_wave_tail_idle",
+     "has_spill",
+     "log_roofline_time_mraster",
+     "mainloop_barrier_density",
+     "memory_transaction_alignment_ratio",
+     "occupancy_deficit",
+     "output_store_padding_ratio",
+     "pipeline_fill_drain_ratio",
+     "raster_band_l2_pressure",
+     "register_file_pressure",
+     "smem_capacity_pressure",
+     "splitk_excess_log",
+     "splitk_k_padding_ratio",
+     "splitk_partial_bytes_ratio",
+     "splitk_sm_latency_rounds_log",
+     "static_instruction_density",
+     "tile_edge_wave_time_ratio",
+     "tile_k_mainloop_iterations",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "rule_id": "r0059",
+   "last_best_round": 10,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_k_padding_ratio",
+    "splitk_partial_bytes_ratio",
+    "splitk_sm_latency_rounds_log"
+   ],
+   "n_best_changes": 3
+  },
+  "1": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 47,
+    "branches": [
+     "p.roofline_ratio < 1",
+     "p.reduction_depth_per_output < 1",
+     "p.log_flops <= 35",
+     "p.reduction_depth_per_output >= 1",
+     "p.log_flops <= 35",
+     "p.log_flops <= 38"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "cp_async_stage_depth",
+     "has_spill",
+     "k_step_granularity_time_ratio",
+     "launch_wave_tail_fraction",
+     "log_roofline_time_mraster",
+     "occupancy_deficit",
+     "padded_gemm_work_ratio",
+     "raster_l2_reuse_distance",
+     "register_file_pressure_ratio",
+     "shared_memory_pressure_ratio",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "splitk_roofline_log_time",
+     "splitk_sm_latency_rounds_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_log_inst",
+     "tm_regstaged"
+    ]
+   },
+   "rule_id": "r0062",
+   "last_best_round": 10,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_partial_bytes_ratio",
+    "splitk_roofline_log_time",
+    "splitk_sm_latency_rounds_log"
+   ],
+   "n_best_changes": 1
+  },
+  "2": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 12,
+    "branches": [
+     "p.roofline_ratio < 1",
+     "p.cp_async_alignment_deficit > 0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "instruction_density",
+     "k_iteration_padding_ratio",
+     "occupancy_deficit",
+     "register_file_pressure",
+     "smem_capacity_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "rule_id": "r0015",
+   "last_best_round": 2,
+   "splitk_terms": [
+    "splitk_excess_log"
+   ],
+   "n_best_changes": 1
+  },
+  "3": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 9,
+    "branches": [],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "cp_async_alignment_deficit",
+     "cta_epilogue_store_time_ratio",
+     "cta_wave_underfill_ratio",
+     "occupancy_deficit",
+     "output_tile_padding_ratio",
+     "partial_accumulator_precision_ratio",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "rule_id": "r0009",
+   "last_best_round": 1,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_partial_bytes_ratio"
+   ],
+   "n_best_changes": 1
+  }
+ }
+}

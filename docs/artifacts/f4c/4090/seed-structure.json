@@ -1,0 +1,277 @@
+{
+ "prefix": "f4c",
+ "gpu": "4090",
+ "n_with_main_term": 4,
+ "folds": {
+  "0": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 6,
+    "branches": [
+     "p.roofline_ratio < 1",
+     "p.log_min_dim < 7"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "cfg_alignment_transaction_deficit",
+     "output_tile_edge_waste",
+     "pipeline_stage_service_time_ratio",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "source": "rule_writer-try03",
+   "train": 1.0727430217959169,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "1": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 13,
+    "branches": [
+     "p.roofline_ratio < 1.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "a_refetch_bw_demand",
+     "b_refetch_bw_demand",
+     "cta_thread_work_ratio",
+     "edge_padded_work_ratio",
+     "input_load_coalescing_pressure",
+     "launch_wave_tail_fraction",
+     "occupancy_deficit",
+     "output_store_coalescing_pressure",
+     "pipeline_depth_time_ratio",
+     "raster_band_l2_pressure",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "source": "rule_writer-try05",
+   "train": 1.036288127513125,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "2": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 9,
+    "branches": [
+     "p.roofline_ratio < 1.0",
+     "p.alignment_traffic_deficit > 0.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "instruction_amortization_density",
+     "mainloop_barrier_count",
+     "occupancy_deficit",
+     "output_store_stride_exposure",
+     "splitk_excess_log",
+     "tiled_boundary_traffic_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "source": "rule_writer-try02",
+   "train": 1.0636710325168794,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  },
+  "3": {
+   "chosen": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 7,
+    "branches": [
+     "p.roofline_ratio < 1.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "barrier_arrival_density",
+     "cta_wave_tail_deficit",
+     "has_spill",
+     "operand_panel_transaction_amplification",
+     "operand_tile_padding_ratio",
+     "register_file_pressure",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "source": "rule_writer-try08",
+   "train": 1.0963449237573284,
+   "candidates_with_main_term": 10,
+   "n_candidates": 10
+  }
+ }
+}

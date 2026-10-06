@@ -1,0 +1,364 @@
+{
+ "prefix": "f4c",
+ "gpu": "4090",
+ "n_with_main_term": 4,
+ "folds": {
+  "0": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 34,
+    "branches": [
+     "p.roofline_ratio < 1",
+     "p.log_min_dim < 7",
+     "p.reduction_parallelism_pressure > 1",
+     "p.log_flops < 30",
+     "p.operand_l2_pressure > 1",
+     "p.output_l2_pressure > 1"
+    ],
+    "path_features_used": [
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "a_refetch_bw_demand",
+     "b_refetch_bw_demand",
+     "cfg_alignment_transaction_deficit",
+     "cta_compute_granularity_ratio",
+     "cta_register_file_pressure",
+     "cta_smem_capacity_pressure",
+     "cta_wave_tail_ratio",
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "grid_residency_deficit",
+     "log_roofline_time_mraster",
+     "occupancy_deficit",
+     "output_tile_edge_waste",
+     "pipeline_stage_service_time_ratio",
+     "raster_band_l2_pressure",
+     "splitk_partial_bytes_ratio",
+     "splitk_roofline_log_time",
+     "splitk_sm_latency_rounds_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "rule_id": "r0017",
+   "last_best_round": 2,
+   "splitk_terms": [
+    "splitk_partial_bytes_ratio",
+    "splitk_roofline_log_time",
+    "splitk_sm_latency_rounds_log"
+   ],
+   "n_best_changes": 1
+  },
+  "1": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 18,
+    "branches": [
+     "p.mn_aspect_imbalance > 4.0",
+     "p.roofline_ratio < 1.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "a_refetch_bw_demand",
+     "b_refetch_bw_demand",
+     "cta_thread_work_ratio",
+     "edge_padded_work_ratio",
+     "input_load_coalescing_pressure",
+     "launch_wave_tail_fraction",
+     "log_roofline_time_mraster",
+     "occupancy_deficit",
+     "output_store_coalescing_pressure",
+     "pipeline_depth_time_ratio",
+     "raster_band_l2_pressure",
+     "raster_warp_orientation_mismatch",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "tile_grid_aspect_mismatch",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "rule_id": "r0022",
+   "last_best_round": 3,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_partial_bytes_ratio"
+   ],
+   "n_best_changes": 1
+  },
+  "2": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "dram_w1_hz_ratio",
+       "dram_w1_id_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(1.0 + np.where(f.a_refetch_bw_demand >= f.b_refetch_bw_demand, f.dram_w1_hz_ratio, f.dram_w1_id_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 40,
+    "branches": [
+     "p.log_min_dim < 8.0 or p.output_parallelism_deficit > 0.0001",
+     "p.roofline_ratio < 1.0",
+     "p.alignment_traffic_deficit > 0.0",
+     "p.output_parallelism_deficit > 0.0001",
+     "p.reduction_depth_ratio > 1.0",
+     "p.gemm_working_set_l2_pressure < 1.0",
+     "p.pipeline_latency_occupancy_time_ratio > 1.0",
+     "p.pipeline_latency_occupancy_time_ratio > 1.0"
+    ],
+    "path_features_used": [
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "a_refetch_bw_demand",
+     "b_refetch_bw_demand",
+     "cta_register_file_pressure",
+     "cta_roofline_traffic_ratio",
+     "cta_shared_memory_pressure",
+     "cta_wave_padding_ratio",
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "instruction_amortization_density",
+     "log_roofline_time_mraster",
+     "mainloop_barrier_count",
+     "occupancy_deficit",
+     "operand_reuse_imbalance",
+     "output_store_stride_exposure",
+     "pipeline_stage_overhead_fraction",
+     "raster_band_l2_pressure",
+     "raster_panel_turnover_rate",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "splitk_roofline_log_time",
+     "splitk_sm_latency_rounds_log",
+     "tiled_boundary_traffic_ratio",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "rule_id": "r0060",
+   "last_best_round": 9,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_partial_bytes_ratio",
+    "splitk_roofline_log_time",
+    "splitk_sm_latency_rounds_log"
+   ],
+   "n_best_changes": 2
+  },
+  "3": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 18,
+    "branches": [
+     "p.roofline_ratio < 1.0",
+     "p.relative_reduction_depth > 2.0 and p.log_min_dim < 9.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "barrier_arrival_density",
+     "cta_wave_tail_deficit",
+     "has_spill",
+     "occupancy_deficit",
+     "operand_panel_transaction_amplification",
+     "operand_tile_padding_ratio",
+     "pipeline_depth_time_ratio",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "splitk_roofline_log_time",
+     "splitk_sm_latency_rounds_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "rule_id": "r0012",
+   "last_best_round": 1,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_partial_bytes_ratio",
+    "splitk_roofline_log_time",
+    "splitk_sm_latency_rounds_log"
+   ],
+   "n_best_changes": 1
+  }
+ }
+}
