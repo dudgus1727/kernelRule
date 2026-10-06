@@ -198,9 +198,15 @@ def _fit_task(task):
         fit_on = [p for i, q in enumerate(parts) if i != part for p in q]
     code, w0, inv = _permute(spec["code"], spec["w0"], perm)
     fn = compile_rule(code)
+    # ★ D-195 — term caps, measured on the shapes this fit sees (train, or
+    #   the inner-CV training parts) — never the part it is scored on
+    caps = None
+    if _G.get("cap"):
+        from kernelrule.rules.caps import term_caps
+        caps = term_caps(fn, code, w0, m, fit_on, lam=float(_G["cap"]))
     fr = fit_weights(fn, m, t, Split("train", tuple(fit_on)),
                      np.asarray(w0, float), objective="regret",
-                     warn_invariants=False, **FIT)
+                     warn_invariants=False, caps=caps, **FIT)
     so = make_score_of(fn, m, fr.w)
     reg = {}
     if read_on:
@@ -472,7 +478,9 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
                                     else "k7-1 (27축)"),
                         "extra_features": extra,
                         "ext_contract_features": _G["ext_contract"],
-                        "dev_holdout_hidden": dev, "n_perm": n_perm},
+                        "dev_holdout_hidden": dev, "n_perm": n_perm,
+                        # ★ D-195 — term cap (None = uncapped, as before)
+                        "cap": _G.get("cap")},
            **reps[0]}
     if n_perm:
         ic = [r["aggregate"]["inner_cv_gm"] for r in reps]
@@ -543,8 +551,11 @@ def main() -> None:
     # ★ D-190 — 다른 캠페인의 규칙을 같은 절차로: fold 마다 그 캠페인의
     #   라이브러리(runs/<prefix>-<gpu>-f<f>)를 쓴다. 없으면 c2 · k7-1 하나.
     ap.add_argument("--prefix", default=None)
+    # ★ D-195 — cap each correction at lam x the time estimate's range
+    ap.add_argument("--cap", type=float, default=None, metavar="LAMBDA")
     a = ap.parse_args()
     _G["gpu"], _G["dev"], _G["prefix"] = a.gpu, a.dev, a.prefix
+    _G["cap"] = a.cap
     if a.make_baselines:
         make_baselines(a.make_baselines)
         return

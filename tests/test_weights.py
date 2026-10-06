@@ -767,3 +767,38 @@ def test_the_dimension_budget_keeps_the_per_weight_rate():
     assert fitter_for(8, budget="dim") == fitter_for(8)
     with pytest.raises(ValueError):
         fitter_for(30, budget="nope")
+
+
+# ---------------------------------------------------------------------------
+# ★ D-195 — term caps
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("space", ["w", "u"])
+def test_caps_bound_the_fitted_weights(known, space):
+    """Every fitted weight ends inside its cap, in either coordinate system,
+    and a binding cap is counted."""
+    t, m, score = known
+    caps = [(-0.5, 0.5), (-np.inf, np.inf), (0.0, 0.2)]
+    fr = fit_weights(score, m, t, _all_train(t), W_TRUE.copy(), max_evals=60,
+                     objective="regret", space=space, caps=caps,
+                     warn_invariants=False)
+    for wi, (lo, hi) in zip(fr.w, caps, strict=True):
+        assert lo - 1e-9 <= wi <= hi + 1e-9
+    assert fr.n_at_cap >= 1           # W_TRUE (2.0, 1.5) sits outside two
+
+
+def test_no_caps_is_the_old_path(known):
+    t, m, score = known
+    a = fit_weights(score, m, t, _all_train(t), W_TRUE.copy(), max_evals=40,
+                    objective="regret", space="u", warn_invariants=False)
+    b = fit_weights(score, m, t, _all_train(t), W_TRUE.copy(), max_evals=40,
+                    objective="regret", space="u", caps=None,
+                    warn_invariants=False)
+    assert np.array_equal(a.w, b.w) and a.fit_regret == b.fit_regret
+    assert a.n_at_cap == 0
+
+
+def test_caps_length_is_checked(known):
+    t, m, score = known
+    with pytest.raises(FitError):
+        fit_weights(score, m, t, _all_train(t), W_TRUE.copy(), max_evals=10,
+                    caps=[(-1.0, 1.0)], warn_invariants=False)

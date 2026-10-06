@@ -94,6 +94,10 @@ class FittedRule:
     space: str = "w"
     scale: np.ndarray | None = None
     n_new: int = 0
+    #: ★ D-195 — how many weights ended **at** a term cap (`caps=`). A cap
+    #: that binds says the fit wanted that correction larger than the time
+    #: estimate allows.
+    n_at_cap: int = 0
 
     @property
     def moved(self) -> bool:
@@ -353,7 +357,9 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 space: str = "w",
                 new_terms: Sequence[bool] | None = None,
                 new_term_frac: float = 0.1,
-                polish_pairs_max_dim: int | None = None) -> FittedRule:
+                polish_pairs_max_dim: int | None = None,
+                caps: Sequence[tuple[float, float]] | None = None
+                ) -> FittedRule:
     """Fixes the structure and fits only the weights.
 
     `split` **must have `role="train"`.** There is no path by which the
@@ -379,6 +385,15 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     kept). Slots with finite `bounds` (exponents) and columns with no spread
     keep `c_i = 1`. With the default `space="w"` nothing here runs — about
     30 experiment scripts call this function and stay bit-identical.
+
+    ## ★ `caps` — bounds on the rule's weights (D-195)
+
+    `(lo, hi)` per weight, ±inf for none (`rules/caps.term_caps`). They are
+    converted to the optimiser's coordinates (`x = w * c` under
+    `space="u"`), merged with `bounds`, and enforced by the same folding.
+    They do **not** mark a slot as fixed for the scaling — only `bounds`
+    (exponents) does — so the u-coordinates are unchanged. `None` = the
+    path before them, bit for bit.
 
     `polish_pairs_max_dim`: the two-coordinate polish pass costs
     `2n(n-1)` evaluations per step size; above ~18 weights the first pass at
@@ -511,6 +526,28 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                 w0 = _proj(w0)
         c = _scales(prob, score_fn, w0, fixed)
 
+    # ★ D-195 — term caps, in the optimiser's coordinates.
+    if caps is not None:
+        if len(caps) != w0.size:
+            raise FitError(f"caps length {len(caps)} != weights {w0.size}")
+        clo = np.array([b[0] for b in caps], dtype=np.float64)
+        chi = np.array([b[1] for b in caps], dtype=np.float64)
+        if np.any(clo > chi):
+            raise FitError("a cap has lo > hi")
+        if c is not None:                       # w -> x = w * c, c > 0
+            clo, chi = clo * c, chi * c
+        if bounds is not None:
+            clo, chi = np.maximum(_blo, clo), np.minimum(_bhi, chi)
+            if np.any(clo > chi):
+                raise FitError("a cap and an exponent bound do not overlap")
+        _blo, _bhi = clo, chi
+
+        def _proj(x):                           # noqa: F811
+            return np.clip(x, _blo, _bhi)
+
+        bounds = [(float(a), float(b)) for a, b in zip(_blo, _bhi,
+                                                      strict=True)]
+
     # ★ It holds on to **the best it has seen** itself (D-55). Taking only
     #   the optimiser's `res.x` throws away better points visited during the
     #   search — the objective is a step function, so the simplex can step
@@ -593,6 +630,8 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
     n_init = 0
     # ★ D-190 §6: the optimiser starts in its own coordinates.
     start0 = w0.copy() if c is None else w0 * c
+    if caps is not None:
+        start0 = _proj(start0)                  # ★ D-195: inside the caps
     if init_objective is not None:
         if init_objective != "rank_top1":
             raise FitError(
@@ -718,6 +757,13 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
         #   values, so the reported and returned numbers come from the same
         #   weights.
         w = _proj(w)
+    n_at_cap = 0
+    if caps is not None:
+        x_end = np.asarray(w, dtype=np.float64)
+        n_at_cap = int(np.sum(
+            (np.isfinite(_blo) & np.isclose(x_end, _blo, rtol=1e-9, atol=0))
+            | (np.isfinite(_bhi) & np.isclose(x_end, _bhi, rtol=1e-9,
+                                              atol=0))))
     if c is not None:
         w = w / c                 # ★ D-190 §6: back to the rule's weights
     # ★ The scoring criterion is always regret — even under
@@ -753,7 +799,7 @@ def fit_weights(score_fn: ScoreFn, matrix: FeatureMatrix, table: PerfTable,
                      seconds=time.perf_counter() - t0, val_regret=val,
                      method=m, contrib=contrib, n_fit_evals=n_fit,
                      n_init_evals=n_init, space=space, scale=c,
-                     n_new=n_new)
+                     n_new=n_new, n_at_cap=n_at_cap)
     if warn_invariants:
         msgs = out.invariants()
         if hit_cap:

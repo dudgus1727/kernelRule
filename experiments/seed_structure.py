@@ -21,78 +21,12 @@ expression over three paths. Pure AST — it reads no table and no time.
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 from pathlib import Path
 
-#: The path-time features of condition F4 — each a time over the ideal time.
-PATH = ("tm_crit_ratio", "tm_l2_ratio", "tm_dram_ratio", "dram_w1_id_ratio",
-        "dram_w1_hz_ratio")
-#: The calls that combine paths into one time (and their log).
-COMBINE = ("maximum", "fmax", "sqrt", "hypot", "log2", "log", "minimum",
-           "fmin", "power")
-
-
-def _feats(node: ast.AST) -> set[str]:
-    return {n.attr for n in ast.walk(node)
-            if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)
-            and n.value.id == "f"}
-
-
-def _names(node: ast.AST) -> set[str]:
-    return {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
-
-
-def _has_w(node: ast.AST) -> bool:
-    return any(isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
-               and n.value.id == "w" for n in ast.walk(node))
-
-
-def analyse(code: str) -> dict:
-    fn = next(n for n in ast.parse(code).body
-              if isinstance(n, ast.FunctionDef))
-    # variable -> (path features it carries, does a weight sit in it)
-    var: dict[str, tuple[set[str], bool]] = {}
-
-    def closure(node: ast.AST) -> tuple[set[str], bool]:
-        fs, w = set(_feats(node)) & set(PATH), _has_w(node)
-        for nm in _names(node):
-            if nm in var and nm != "s":
-                fs |= var[nm][0]
-                w = w or var[nm][1]
-        return fs, w
-
-    found: list[dict] = []
-    for st in ast.walk(fn):
-        if isinstance(st, ast.Assign) and len(st.targets) == 1 \
-                and isinstance(st.targets[0], ast.Name):
-            t = st.targets[0].id
-            if t != "s":
-                fs, w = closure(st.value)
-                old = var.get(t, (set(), False))
-                var[t] = (old[0] | fs, old[1] or w)
-        if isinstance(st, ast.Call) and isinstance(st.func, ast.Attribute) \
-                and st.func.attr in COMBINE:
-            fs, w = set(), False
-            for a in st.args:
-                f2, w2 = closure(a)
-                fs |= f2
-                w = w or w2
-            if len(fs) >= 2:
-                found.append({"call": st.func.attr, "paths": sorted(fs),
-                              "weighted_inside": bool(w),
-                              "expr": ast.unparse(st)[:160]})
-    n_w = len({n.slice.value for n in ast.walk(fn)
-               if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
-               and n.value.id == "w" and isinstance(n.slice, ast.Constant)})
-    branches = [ast.unparse(n.test) for n in ast.walk(fn)
-                if isinstance(n, ast.If)]
-    paths_used = sorted(_feats(fn) & set(PATH))
-    return {"time_main_term": bool(found),
-            "main_term_paths": sorted({p for x in found for p in x["paths"]}),
-            "combinations": found[:4], "n_weights": n_w,
-            "branches": branches, "path_features_used": paths_used,
-            "features_used": sorted(_feats(fn))}
+# ★ D-195 — the analysis lives in the library (rules/time_term.py), where
+#   the term cap reads it too. One copy (principle 2).
+from kernelrule.rules.time_term import COMBINE, PATH, analyse  # noqa: E402,F401
 
 
 def _final(run: Path) -> dict:
