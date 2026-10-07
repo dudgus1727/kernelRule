@@ -16,16 +16,18 @@
 어휘      k7-1 라이브러리 27축 (네 fold · 네 GPU 가 ★ 한 벌로 같다)
           + 규칙 파일이 부르는 loop 축(`extra_features`) — 코드라 어느 표에서나 계산된다
 적합      학습 분할에서만 · objective=regret · CMA · 재시작 2 · 평가 2000 (고정)
-★ 고르는 값  inner-CV — 학습 48형상을 4조각으로 나눠 3조각에 맞추고 1조각을 잰다
-           (홀드아웃을 ⛔ 안 본다. 반복마다 무엇을 남길지는 이 값으로 정한다)
-★ 보고 값    fold 홀드아웃 — 네 fold 의 홀드아웃이 65형상을 ★ 정확히 한 번씩 덮는다
+★ 보고 · 판정 값  fold 홀드아웃 — 네 fold 의 홀드아웃이 65형상을 ★ 정확히 한 번씩 덮는다
            -> 65형상 합동 기하평균 + fold 별
+⛔ inner-CV  D-199 (2026-10-07) 에 뺐다 — 사용자: "inner-CV 과정은 제거해". 학습 48형상을
+           크기 순 4조각으로 나눠 다시 맞추던 것 (D-188 ~ D-198). 그 값으로 새로 안 것도
+           개선도 없었고, 네 번 연속 holdout 과 반대를 가리켰다 (D-193 · D-195 · D-196 · D-197).
+           그 기록은 그 결정들에 그대로 있다
 참고       벤더 · static top-1 · c2 원주민(루프가 끝낸 w 그대로) 을 같은 형상에서
 ```
 
 ⚠️ **홀드아웃을 반복마다 읽는다** — 사람이 그 숫자를 보고 다음 가설을 고르므로
-뒤로 갈수록 낙관적이 된다. 그래서 반복 기록에 inner-CV 를 같이 싣고, 최종
-판정은 두 값이 같은 쪽을 가리킬 때만 한다.
+뒤로 갈수록 낙관적이 된다. 최종 숫자는 판정에 쓰지 않은 데이터 (다른 GPU 등) 로
+다시 확인한다.
 
 ⛔ `kernelrule/` 은 건드리지 않는다. 이것은 측정 도구다.
 """
@@ -51,7 +53,6 @@ GPU = "a6000"
 FOLDS = (0, 1, 2, 3)
 DESIGN = "nkband"
 FIT = {"method": "cma", "n_restarts": 2, "max_evals": 2000}
-N_INNER = 4
 
 _G: dict = {}          # fork 로 자식에게 넘기는 것 (표 · 행렬 · 분할)
 
@@ -169,14 +170,8 @@ def _load_ext_contract(path: Path) -> list:
     return out
 
 
-def _inner_parts(shapes) -> list[list]:
-    """학습 형상을 N_INNER 조각으로 — 크기 순으로 줄 세워 돌려 담는다(결정적)."""
-    s = sorted(shapes, key=lambda p: (p.M * p.N * p.K, p.M, p.N, p.K))
-    return [s[i::N_INNER] for i in range(N_INNER)]
-
-
 def _fit_task(task):
-    """(fold, part) — part=None 이면 학습 전부에 맞추고 홀드아웃까지 읽는다."""
+    """(fold, perm) — 학습 전부에 맞추고 홀드아웃을 읽는다 (dev 면 안 읽는다)."""
     import warnings as _w
     _w.simplefilter("ignore")
     from kernelrule.core.sandbox import compile_rule
@@ -184,24 +179,19 @@ def _fit_task(task):
     from kernelrule.core.splits import Split
     from kernelrule.core.weights import fit_weights, make_score_of
 
-    fold, part, perm = task if len(task) == 3 else (*task, 0)
+    fold, perm = task
     t = _G["table"]
     m = (_G.get("matrix_by_fold") or {}).get(fold) or _G["matrix"]
     spec = _G["spec"][fold]
     sp = _G["splits"][fold]
     train = list(sp.train.shapes)
     dev = _G.get("dev", False)
-    if part is None:
-        # ★ D-189 dev — 홀드아웃을 ⛔ 읽지 않는다. 고른 것은 학습 형상에서 본다
-        fit_on, read_on = train, ([] if dev else list(sp.val.shapes))
-    else:
-        parts = _inner_parts(train)
-        read_on = parts[part]
-        fit_on = [p for i, q in enumerate(parts) if i != part for p in q]
+    # ★ D-189 dev — 홀드아웃을 ⛔ 읽지 않는다. 고른 것은 학습 형상에서 본다
+    fit_on, read_on = train, ([] if dev else list(sp.val.shapes))
     code, w0, inv = _permute(spec["code"], spec["w0"], perm)
     fn = compile_rule(code)
-    # ★ D-195 — term caps, measured on the shapes this fit sees (train, or
-    #   the inner-CV training parts) — never the part it is scored on
+    # ★ D-195 — term caps, measured on the shapes this fit sees (train) —
+    #   never the holdout
     if _G.get("no_fit"):
         # ★ D-196 — (a) full transplant: the spec's weights as they are
         w_use, moved = np.asarray(w0, float), False
@@ -221,28 +211,27 @@ def _fit_task(task):
         reg = {f"{p.M}x{p.N}x{p.K}": float(r)
                for p, r in zip(ev.shapes, ev.regret[:, 0], strict=True)}
     w_back = [float(w_use[inv[i]]) for i in range(len(inv))]
-    out = {"fold": fold, "part": part, "perm": perm, "regret": reg,
+    out = {"fold": fold, "perm": perm, "regret": reg,
            "w": w_back, "moved": bool(moved)}
-    if part is None:
-        tr = evaluate_scores(so, t, train, ks=(1,))
-        out["train_gm"] = _gm(tr.regret[:, 0])
-        out["train_regret"] = {f"{p.M}x{p.N}x{p.K}": float(r) for p, r in
-                               zip(tr.shapes, tr.regret[:, 0], strict=True)}
-        # ★ 무엇을 골랐나 — split_k (dev 면 학습 형상에서)
-        picks = {}
-        for p in (train if dev else read_on):
-            df = t.frame_for(p).reset_index(drop=True)
-            tt = np.asarray(t.times_of(p))
-            i = int(t.candidates(p).top_k(so(p, t.candidates(p)), 1)[0])
-            j = int(np.argmin(tt))
-            picks[f"{p.M}x{p.N}x{p.K}"] = {
-                "sk_pick": int(df.iloc[i]["split_k"]),
-                "sk_best": int(df.iloc[j]["split_k"]),
-                "tile_pick": f"{df.iloc[i]['tile_m']}x{df.iloc[i]['tile_n']}"
-                             f"x{df.iloc[i]['tile_k']}",
-                "tile_best": f"{df.iloc[j]['tile_m']}x{df.iloc[j]['tile_n']}"
-                             f"x{df.iloc[j]['tile_k']}"}
-        out["picks"] = picks
+    tr = evaluate_scores(so, t, train, ks=(1,))
+    out["train_gm"] = _gm(tr.regret[:, 0])
+    out["train_regret"] = {f"{p.M}x{p.N}x{p.K}": float(r) for p, r in
+                           zip(tr.shapes, tr.regret[:, 0], strict=True)}
+    # ★ 무엇을 골랐나 — split_k (dev 면 학습 형상에서)
+    picks = {}
+    for p in (train if dev else read_on):
+        df = t.frame_for(p).reset_index(drop=True)
+        tt = np.asarray(t.times_of(p))
+        i = int(t.candidates(p).top_k(so(p, t.candidates(p)), 1)[0])
+        j = int(np.argmin(tt))
+        picks[f"{p.M}x{p.N}x{p.K}"] = {
+            "sk_pick": int(df.iloc[i]["split_k"]),
+            "sk_best": int(df.iloc[j]["split_k"]),
+            "tile_pick": f"{df.iloc[i]['tile_m']}x{df.iloc[i]['tile_n']}"
+                         f"x{df.iloc[i]['tile_k']}",
+            "tile_best": f"{df.iloc[j]['tile_m']}x{df.iloc[j]['tile_n']}"
+                         f"x{df.iloc[j]['tile_k']}"}
+    out["picks"] = picks
     return out
 
 
@@ -323,32 +312,30 @@ def _classes(t, m, shapes) -> dict:
 def _one_rep(res, checks, refs, cls, dev) -> dict:
     """fit 경로 하나(perm 하나)의 결과를 모은다."""
     per_fold = {}
-    pooled_main, pooled_inner, pooled_vend, pooled_vin = [], [], [], []
+    pooled_main, pooled_train, pooled_vend, pooled_vin = [], [], [], []
     by_cls_main: dict = {}
-    by_cls_inner: dict = {}
     by_cls_vend: dict = {}
     for f in FOLDS:
         if not checks[f]["ok"]:
             per_fold[f] = {"check": checks[f]}
             continue
-        full = next(r for r in res if r["fold"] == f and r["part"] is None)
-        inner = [r for r in res if r["fold"] == f and r["part"] is not None]
-        ireg = {k: v for r in inner for k, v in r["regret"].items()}
-        ir = list(ireg.values())
-        # ★ 벤더는 dev 면 학습 형상, 아니면 홀드아웃 형상에서 잰 것
-        vin = [refs[f]["vendor"][k] for k in ireg if k in refs[f]["vendor"]]
-        for k, v in ireg.items():
-            by_cls_inner.setdefault(cls[k], []).append(v)
+        full = next(r for r in res if r["fold"] == f)
         pf = {"check": checks[f],
               "train_gm": round(full["train_gm"], 6),
-              "inner_cv_gm": round(_gm(ir), 6),
               "w": full["w"], "moved": full["moved"],
               "picks": full["picks"]}
+        pooled_train += list(full["train_regret"].values())
         if dev:
+            # ★ 벤더는 dev 면 학습 형상에서 잰 것 (`_refs`)
+            treg = full["train_regret"]
+            vin = [refs[f]["vendor"][k] for k in treg if k in refs[f]["vendor"]]
             pf["vendor_train_gm"] = round(_gm(vin), 6)
             pooled_vin += vin
-            for k in ireg:
-                by_cls_vend.setdefault(cls[k], []).append(refs[f]["vendor"][k])
+            for k, v in treg.items():
+                by_cls_main.setdefault(cls[k], []).append(v)
+                if k in refs[f]["vendor"]:
+                    by_cls_vend.setdefault(cls[k], []).append(
+                        refs[f]["vendor"][k])
         else:
             hv = list(full["regret"].values())
             vv = [refs[f]["vendor"][k] for k in full["regret"]]
@@ -380,17 +367,15 @@ def _one_rep(res, checks, refs, cls, dev) -> dict:
                 "regret": full["regret"]})
             pooled_main += hv
             pooled_vend += vv
-        pooled_inner += ir
         per_fold[f] = pf
     ok = [f for f in FOLDS if checks[f]["ok"]]
     agg = {"n_folds_ok": len(ok),
-           "inner_cv_gm": round(_gm(pooled_inner), 6) if ok else None,
-           "inner_by_fold": {f: per_fold[f]["inner_cv_gm"] for f in ok},
-           "inner_by_class": {c: round(_gm(v), 6)
-                              for c, v in sorted(by_cls_inner.items())}}
+           "train_gm": round(_gm(pooled_train), 6) if ok else None}
     if dev:
         agg.update({
             "holdout": "hidden (dev)",
+            "train_by_class": {c: round(_gm(v), 6)
+                               for c, v in sorted(by_cls_main.items())},
             "vendor_train_gm": round(_gm(pooled_vin), 6) if ok else None,
             "vendor_by_class_train": {c: round(_gm(v), 6)
                                       for c, v in sorted(by_cls_vend.items())},
@@ -425,7 +410,7 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
     """★ 규칙 하나(fold 마다 같거나 다른 코드)를 이 파일의 절차로 채점.
 
     ★ D-189: `n_perm` > 0 이면 가중치 이름을 섞은 적합을 n_perm 번 더 해
-    **적합 경로 잡음**을 같이 낸다. 고를 때는 `noise.inner_cv_mean` 을 쓴다.
+    **적합 경로 잡음**을 같이 낸다 (홀드아웃 · 학습의 평균과 폭).
     perm 0 (원본) 의 값이 `aggregate` 다 — D-188 과 같은 숫자가 나온다.
     """
     from experiments.f1_pipeline import _splits
@@ -466,8 +451,7 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
                      "n_weights": len(s["w0"]),
                      "features": sorted(rep.features_used)}
     good = [f for f in FOLDS if checks[f]["ok"]]
-    tasks = [(f, part, perm) for perm in range(n_perm + 1) for f in good
-             for part in (None, *range(N_INNER))]
+    tasks = [(f, perm) for perm in range(n_perm + 1) for f in good]
     ctx = mp.get_context("fork")
     with ctx.Pool(min(workers, len(tasks) or 1)) as pool:
         res = pool.map(_fit_task, tasks)
@@ -478,7 +462,9 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
 
     reps = [_one_rep([r for r in res if r["perm"] == k], checks, refs, cls,
                      dev) for k in range(n_perm + 1)]
-    out = {"protocol": {"fit": FIT, "n_inner": N_INNER, "design": DESIGN,
+    out = {"protocol": {"fit": FIT, "design": DESIGN,
+                        # ★ D-199 — inner-CV removed; holdout decides
+                        "inner_cv": None,
                         "gpu": _gpu(),
                         "library": (f"runs/{_G['prefix']}-"
                                     f"{_G.get('lib_gpu') or _gpu()}-f* "
@@ -494,10 +480,10 @@ def evaluate_rule(spec_by_fold: dict, workers: int = 20, *,
                         "no_fit": bool(_G.get("no_fit"))},
            **reps[0]}
     if n_perm:
-        ic = [r["aggregate"]["inner_cv_gm"] for r in reps]
-        noise = {"inner_cv_mean": round(float(np.mean(ic)), 6),
-                 "inner_cv_min": min(ic), "inner_cv_max": max(ic),
-                 "inner_cv_reps": ic}
+        tg = [r["aggregate"]["train_gm"] for r in reps]
+        noise = {"train_mean": round(float(np.mean(tg)), 6),
+                 "train_min": min(tg), "train_max": max(tg),
+                 "train_reps": tg}
         if not dev:
             ho = [r["aggregate"]["holdout_gm_65"] for r in reps]
             noise.update({"holdout_mean": round(float(np.mean(ho)), 6),
@@ -612,21 +598,21 @@ def main() -> None:
     nz = r.get("noise", {})
     tag = f"[{a.gpu}{' · dev' if a.dev else ''}]"
     if a.dev:
-        print(f"★ {a.rule.name} {tag}  inner-CV {g['inner_cv_gm']}"
-              + (f" (perm 평균 {nz['inner_cv_mean']} · {nz['inner_cv_min']}~"
-                 f"{nz['inner_cv_max']})" if nz else "")
+        print(f"★ {a.rule.name} {tag}  학습 {g['train_gm']}"
+              + (f" (perm 평균 {nz['train_mean']} · {nz['train_min']}~"
+                 f"{nz['train_max']})" if nz else "")
               + f"  벤더(학습) {g['vendor_train_gm']}  홀드아웃 ⛔ 가림"
               f"  sk>=3(학습) {g['sk_ge3_picked_on_hard_train']}")
-        print(f"   분류별 inner  {g['inner_by_class']}")
+        print(f"   분류별 학습   {g['train_by_class']}")
         print(f"   분류별 벤더   {g['vendor_by_class_train']}")
     else:
-        print(f"★ {a.rule.name} {tag}  inner-CV {g['inner_cv_gm']}  ★ 홀드아웃(65) "
+        print(f"★ {a.rule.name} {tag}  학습 {g['train_gm']}  ★ 홀드아웃(65) "
               f"{g['holdout_gm_65']}  벤더(65) {g['vendor_gm_65']}  벤더 넘은 fold "
               f"{g['folds_beating_vendor']}/{g['n_folds_ok']}  sk>=3 {g['sk_ge3_picked_on_hard']}"
               f"  어려운 {g['hard_gm']} 쉬운 {g['easy_gm']}")
         if nz:
-            print(f"   perm {a.perm}회  inner 평균 {nz['inner_cv_mean']} "
-                  f"({nz['inner_cv_min']}~{nz['inner_cv_max']})  홀드아웃 평균 "
+            print(f"   perm {a.perm}회  학습 평균 {nz['train_mean']} "
+                  f"({nz['train_min']}~{nz['train_max']})  홀드아웃 평균 "
                   f"{nz['holdout_mean']} ({nz['holdout_min']}~{nz['holdout_max']})"
                   f"  벤더 넘은 fold {nz['folds_beating_vendor_reps']}")
         print(f"   분류별 홀드아웃 {g['holdout_by_class']}")
@@ -635,7 +621,7 @@ def main() -> None:
         if "train_gm" not in v:
             print(f"   f{f} ⛔ {v['check']['violations'][:1]}")
             continue
-        line = (f"   f{f}  학습 {v['train_gm']:.4f}  inner {v['inner_cv_gm']:.4f}  ")
+        line = f"   f{f}  학습 {v['train_gm']:.4f}  "
         if a.dev:
             line += f"벤더(학습) {v['vendor_train_gm']:.4f}  "
         else:

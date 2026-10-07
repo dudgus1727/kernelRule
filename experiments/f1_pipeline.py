@@ -995,6 +995,29 @@ def _features_module(gen: FeatureRegistry, base: FeatureRegistry) -> str:
 # ---------------------------------------------------------------------------
 # Stage 2 — RuleWriter
 # ---------------------------------------------------------------------------
+def _imported_rule_writer(a, splits) -> tuple[Path, list[dict]] | None:
+    """★ D-199 — `--import-rule-writer RUN_DIR`: that run's successful
+    RuleWriter candidates (code + the LLM's `w0`). It must be the same
+    condition, table and fold — the candidates name that run's stage-1
+    axes, and this run imports the same stage 1."""
+    run = getattr(a, "import_rule_writer", None)
+    if not run:
+        return None
+    run = Path(run)
+    src = run / "stage2-rule-writer" / "summary.json"
+    cfg = json.loads((run / "config.json").read_text())
+    want = {"condition": a.condition, "bundle": a.bundle,
+            "split_kind": splits.kind}
+    bad = {k: (cfg.get(k), v) for k, v in want.items() if cfg.get(k) != v}
+    if bad:
+        raise SystemExit(f"--import-rule-writer {run}: not the same run "
+                         f"setting — {bad} (theirs, ours)")
+    tries = [r for r in json.loads(src.read_text())["tries"] if r.get("ok")]
+    if not tries:
+        raise SystemExit(f"{src} has no successful candidate")
+    return src, tries
+
+
 def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
     """Builds the seed rule. It picks the best training score — **it does
     not look at the holdout**."""
@@ -1018,7 +1041,11 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
                                           "source": "human_guided"})
         return chosen
 
-    llm = _make_llm(a, registry=reg, budget=Budget(max_calls=a.n_rule_writer * 3),
+    # ★ D-199 — another run's RuleWriter candidates, re-scored here
+    imported = _imported_rule_writer(a, splits)
+    llm = _make_llm(a, registry=reg,
+                    budget=Budget(max_calls=0 if imported
+                                  else a.n_rule_writer * 3),
                     table=table)
     facts = TableFacts.compute(table, splits.train)
     loop = _loop(a, table, matrix, splits, llm, run_id=f"arch-{a.condition}")
@@ -1029,12 +1056,32 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
         _dump_json(out / "summary.json", {
             "condition": a.condition, "model": a.model, "dry_run": a.dry_run,
             "n_tries": a.n_rule_writer, "n_ok": sum(r["ok"] for r in rows),
-            "seconds": round(time.perf_counter() - t0, 1), "tries": rows})
+            "seconds": round(time.perf_counter() - t0, 1), "tries": rows,
+            "imported_from": str(imported[0]) if imported else None})
         if hasattr(llm, "dump"):
             llm.dump(out / "llm_calls")
 
     try:
-        for i in range(a.n_rule_writer):
+        for r0 in (imported[1] if imported else []):
+            # ★ The seed is picked by the fit, and the fit is what changed
+            #   (term cap · pruning) — so the same candidates are scored
+            #   again under this run's condition. 0 LLM calls.
+            row = {"i": r0["i"], "ok": False,
+                   "imported_fit_regret": r0.get("fit_regret")}
+            try:
+                e = loop.score_only(r0["code"], r0["w0"])
+                row.update(ok=True, code=r0["code"], w0=list(r0["w0"]),
+                           fit_regret=e)
+                (out / "candidates" / f"try{r0['i']:02d}.py").write_text(
+                    r0["code"])
+                print(f"  arch #{r0['i']:02d}  ✓ train {e:.4f}  (imported; "
+                      f"{r0['fit_regret']:.4f} under its own run)")
+            except Exception as ex:                         # noqa: BLE001
+                row.update(error=f"{type(ex).__name__}: {ex}"[:200])
+                print(f"  arch #{r0['i']:02d}  ✗ {type(ex).__name__}: "
+                      f"{str(ex)[:70]}")
+            rows.append(row)
+        for i in range(0 if imported else a.n_rule_writer):
             row = {"i": i, "ok": False}
             for attempt in range(ARCH_RETRIES):
                 try:
@@ -1083,6 +1130,8 @@ def stage2(a, d: Path, table, matrix, reg: FeatureRegistry, splits) -> dict:
               #   record**. Procedurally it is held, but evidence is needed
               #   later.
               "selected_on": "train_split_regret_only",
+              # ★ D-199 — the candidates came from another run's stage 2
+              "imported_from": str(imported[0]) if imported else None,
               "holdout_seen_at_selection": False,
               "unsealed": is_unsealed(),
               "_note": ("the seed was picked purely on the training-split "
@@ -1479,6 +1528,10 @@ def main() -> None:
                          "against those too and the artefact is the union. "
                          "★ The extension is a separate condition, so do not "
                          "mix it into the comparison table")
+    ap.add_argument("--import-rule-writer", metavar="RUN_DIR",
+                    help="★ D-199 — stage 2 from that run's RuleWriter "
+                         "candidates, re-scored under this run's condition "
+                         "(0 LLM calls). Same condition · table · fold only")
     ap.add_argument("--import-featwriter", metavar="RUN_DIR",
                     help="import an `experiments/feature_writer.py` "
                          "artefact as stage 1. The format is the same, so a "
@@ -1640,6 +1693,8 @@ def main() -> None:
         "term_cap": getattr(a, "term_cap", None),
         # ★ D-198 — dead terms removed before the archive
         "prune_dead": bool(getattr(a, "prune_dead", LoopConfig.prune_dead)),
+        # ★ D-199 — stage 2's candidates re-scored from another run
+        "import_rule_writer": getattr(a, "import_rule_writer", None),
         # ★ D-176 §2 — which RuleWriter prompt this run used. Without it a
         #   variant run and a campaign run look identical in the record.
         "size_guidance": getattr(a, "size_guidance", "role/_size_loop.md"),
