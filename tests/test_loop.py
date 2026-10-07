@@ -365,10 +365,12 @@ def _proposal(code, w0):
     return RuleProposal(code=code, w0=list(w0), changes="dead-term")
 
 
-def test_pruning_is_a_recorded_condition_that_defaults_off():
+def test_pruning_is_on_by_default_and_recorded():
+    """★ D-198 — on by default (user decision); runs before it did not
+    prune, and the run set says so for a config without the key."""
     from kernelrule.core.runset import _OLD_DEFAULTS, KEYS
 
-    assert LoopConfig(run_id="x").prune_dead is False
+    assert LoopConfig(run_id="x").prune_dead is True
     assert "prune_dead" in KEYS and _OLD_DEFAULTS["prune_dead"] is False
 
 

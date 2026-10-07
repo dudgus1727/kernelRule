@@ -12160,3 +12160,12 @@ H100 f1     4096x4096x11008 2.155 · 512x4096x11008 1.643: 본항 +6.1 · +4.0, 
 ⚠️ D-190 §7 의 위험은 남는다 — train 의 어떤 선택도 바꾸지 않는 항이 처음 보는 형상을 지키고 있던 경우가
 있었다 (d190 실행 하나에서 holdout 형상 하나 1.23 -> 8.27, c2 에서 한 실행 1.1186 -> 1.2304). 지금 조건에서
 다시 재지 않고 넣었다 — 다음 실행의 holdout 과 regret > 1.2 형상 수로 본다.
+
+### 정정 — 기본값을 켬으로 (2026-10-07)
+
+사용자: "죽은항 삭제를 기본값을 true 로 해." `LoopConfig.prune_dead = True` — 파이프라인은 기본으로 지우고
+`--no-prune-dead` 로 끈다. `runset._OLD_DEFAULTS["prune_dead"]` 는 False 그대로다 — D-198 전의 실행은 지우지
+않았고, config.json 에 키가 없는 실행은 그 사실대로 읽힌다 (새 실행은 `loop.prune_dead: true` 를 적는다).
+LoopConfig 기본값을 그대로 쓰는 다른 스크립트 (rerun · new_axes · round_profile · seed_selection) 도 이제
+지운다 — D-190 §6 이 fit_space · fit_budget 의 기본값을 바꾼 것과 같은 방식. 위 표의 "기본 off" 는 이 정정으로
+바뀐다.

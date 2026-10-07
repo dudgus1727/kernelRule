@@ -3,7 +3,8 @@
 ★ 2026-10-07 (D-198): **the loop uses this when `LoopConfig.prune_dead`**
 (`--prune-dead`) — user decision, after the record below and D-190 §7's
 re-measurement on d190 rules (inner-CV +0.0012 against a +0.001 bar, one
-unseen shape 1.23 -> 8.27). Off by default; every run before it is unpruned.
+unseen shape 1.23 -> 8.27). **On by default** (user decision, the same day);
+every run before D-198 is unpruned (`runset._OLD_DEFAULTS`).
 
 History — why it stayed out until then. Pruning the dead weights of the c2 a6000
 elites before they enter the archive was measured first

@@ -67,7 +67,8 @@ _OLD_DEFAULTS = {"fit_method": "nelder-mead", "fit_restarts": 4,
                  "observed_ranges": False,
                  # ★ D-195
                  "term_cap": None,
-                 # ★ D-198
+                 # ★ D-198 — runs before it did not prune; the default is
+                 #   on since (LoopConfig.prune_dead)
                  "prune_dead": False}
 
 

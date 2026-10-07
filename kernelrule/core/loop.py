@@ -263,9 +263,10 @@ class LoopConfig:
     #: library with the time features (condition F4).
     term_cap: float | None = None
     #: ★ D-198: after each fit, remove the dead terms before the rule can
-    #: enter the archive (`_prune_fitted`, the D-190 §7 procedure). Off =
-    #: every run before it.
-    prune_dead: bool = False
+    #: enter the archive (`_prune_fitted`, the D-190 §7 procedure). **On by
+    #: default** (user decision, 2026-10-07); every run before D-198 did not
+    #: prune (`runset._OLD_DEFAULTS`).
+    prune_dead: bool = True
 
 
 class LLMUnreachable(RuntimeError):
