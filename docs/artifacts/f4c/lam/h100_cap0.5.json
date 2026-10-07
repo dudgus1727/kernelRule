@@ -1,0 +1,1006 @@
+{
+ "protocol": {
+  "fit": {
+   "method": "cma",
+   "n_restarts": 2,
+   "max_evals": 2000
+  },
+  "n_inner": 4,
+  "design": "nkband",
+  "gpu": "h100",
+  "library": "runs/f4c-h100-f* (fold 마다)",
+  "extra_features": [
+   "runs/f4c-h100-f0-s0/features.jsonl",
+   "runs/f4c-h100-f1-s0/features.jsonl",
+   "runs/f4c-h100-f2-s0/features.jsonl",
+   "runs/f4c-h100-f3-s0/features.jsonl"
+  ],
+  "ext_contract_features": [],
+  "dev_holdout_hidden": false,
+  "n_perm": 0,
+  "cap": 0.5,
+  "lib_gpu": null,
+  "no_fit": false
+ },
+ "aggregate": {
+  "n_folds_ok": 4,
+  "inner_cv_gm": 1.040398,
+  "inner_by_fold": {
+   "0": 1.030449,
+   "1": 1.023721,
+   "2": 1.051695,
+   "3": 1.055757
+  },
+  "inner_by_class": {
+   "big": 1.016272,
+   "hungry": 1.069437,
+   "mid": 1.04576,
+   "small": 1.021455
+  },
+  "holdout_gm_65": 1.085601,
+  "vendor_gm_65": 1.120733,
+  "folds_beating_vendor": 3,
+  "holdout_by_fold": {
+   "0": 1.045109,
+   "1": 1.149545,
+   "2": 1.075718,
+   "3": 1.073999
+  },
+  "holdout_by_class": {
+   "big": 1.052052,
+   "hungry": 1.088847,
+   "mid": 1.109175,
+   "small": 1.045139
+  },
+  "vendor_by_class": {
+   "big": 1.048442,
+   "hungry": 1.220675,
+   "mid": 1.107699,
+   "small": 1.202627
+  },
+  "sk_ge3_picked_on_hard": "9/11",
+  "hard_gm": 1.088847,
+  "easy_gm": 1.084916
+ },
+ "per_fold": {
+  "0": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 32,
+    "depth": 1,
+    "n_weights": 50,
+    "features": [
+     "a_refetch_bw_demand",
+     "accumulator_operand_storage_ratio",
+     "b_refetch_bw_demand",
+     "cp_async_alignment_deficit",
+     "cta_instruction_amortization",
+     "cta_wave_tail_idle",
+     "has_spill",
+     "log_roofline_time_mraster",
+     "mainloop_barrier_density",
+     "memory_transaction_alignment_ratio",
+     "occupancy_deficit",
+     "output_store_padding_ratio",
+     "pipeline_fill_drain_ratio",
+     "raster_band_l2_pressure",
+     "register_file_pressure",
+     "smem_capacity_pressure",
+     "splitk_excess_log",
+     "splitk_k_padding_ratio",
+     "splitk_partial_bytes_ratio",
+     "splitk_sm_latency_rounds_log",
+     "static_instruction_density",
+     "tile_edge_wave_time_ratio",
+     "tile_k_mainloop_iterations",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "train_gm": 1.025734,
+   "inner_cv_gm": 1.030449,
+   "w": [
+    0.01913083070911812,
+    -15.275397830749867,
+    -1.8669302910221717,
+    1004.7158343914543,
+    5.692944681919961,
+    -14.331105445486259,
+    -29.67529264702562,
+    3.796297863854693,
+    1.8561333874529256,
+    35.558577246992,
+    38.27006987089052,
+    22.933504220884448,
+    15.747241191228841,
+    -21.679172878022296,
+    0.0,
+    0.0,
+    -16.157723187801913,
+    6.225264948821944,
+    1.6684674332615692,
+    -0.5076142698128545,
+    -26.289818912491135,
+    0.5334849354994369,
+    0.7731647479696139,
+    -23.8141397723235,
+    11.676463101044593,
+    -9.138210093048432,
+    -243.25284950287357,
+    5.953316391085119,
+    -0.13184439690807215,
+    -0.13923354033874238,
+    -0.5081904546331375,
+    2.0786158067343674,
+    26.900257916378102,
+    0.816356609421548,
+    218.5336994267878,
+    11.057062199531721,
+    4.741248565743432,
+    0.2086697397545554,
+    2.8546460197303904,
+    -0.20007565625311802,
+    -0.07968981324301982,
+    0.7103768575198088,
+    3.7668651665232202,
+    0.6738991943592715,
+    0.4155577960347654,
+    0.08717267466817621,
+    70.84437536445435,
+    -2.968662419212572,
+    1.8774201636313923,
+    -6.504674029852657
+   ],
+   "moved": true,
+   "picks": {
+    "1024x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "256x4096x4096": {
+     "sk_pick": 4,
+     "sk_best": 2,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x64"
+    },
+    "8192x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "1152x4096x4096": {
+     "sk_pick": 4,
+     "sk_best": 3,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x64"
+    },
+    "2048x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "640x4096x4096": {
+     "sk_pick": 3,
+     "sk_best": 4,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x64"
+    },
+    "512x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x64"
+    },
+    "768x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x64"
+    },
+    "4096x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "3000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "1500x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x64"
+    },
+    "2432x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "3584x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "1664x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 3,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x64"
+    },
+    "384x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x64x64"
+    }
+   },
+   "holdout_gm": 1.045109,
+   "vendor_gm": 1.097242,
+   "static_top1": 1.085562,
+   "c2_native_median": 1.108488,
+   "beats_vendor": true,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 3,
+    "picked_ge3": 2,
+    "gm": 1.071652,
+    "vendor_gm": 1.18632
+   },
+   "hold_sk_lt3_gm": 1.039078,
+   "sk_picked_hold": {
+    "1": 9,
+    "4": 2,
+    "3": 1,
+    "2": 4
+   },
+   "regret": {
+    "1024x4096x4096": 1.02245202794463,
+    "256x4096x4096": 1.0428676818174074,
+    "8192x4096x4096": 1.0017278383266461,
+    "1152x4096x4096": 1.1420307779356362,
+    "2048x4096x4096": 1.0067318903557212,
+    "640x4096x4096": 1.0539112062014009,
+    "512x4096x4096": 1.0413347457774516,
+    "768x4096x4096": 1.106666725221367,
+    "4096x4096x4096": 1.0101654241870928,
+    "3000x4096x4096": 1.0052716064773344,
+    "1500x4096x4096": 1.0318282581941822,
+    "2432x4096x4096": 1.0661057082007594,
+    "3584x4096x4096": 1.0670911955383964,
+    "1000x4096x4096": 1.0,
+    "1664x4096x4096": 1.0225378482782357,
+    "384x4096x4096": 1.1142857248449274
+   }
+  },
+  "1": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 32,
+    "depth": 3,
+    "n_weights": 47,
+    "features": [
+     "cp_async_stage_depth",
+     "has_spill",
+     "k_step_granularity_time_ratio",
+     "launch_wave_tail_fraction",
+     "log_roofline_time_mraster",
+     "occupancy_deficit",
+     "padded_gemm_work_ratio",
+     "raster_l2_reuse_distance",
+     "register_file_pressure_ratio",
+     "shared_memory_pressure_ratio",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "splitk_roofline_log_time",
+     "splitk_sm_latency_rounds_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_log_inst",
+     "tm_regstaged"
+    ]
+   },
+   "train_gm": 1.019125,
+   "inner_cv_gm": 1.023721,
+   "w": [
+    3.239951900001909,
+    -7.378998816280107,
+    10.36264944721584,
+    1.3821200330912822,
+    -0.7252251349186939,
+    -5.9438319245234865,
+    -107.22605605287049,
+    -13.867620092200536,
+    28.68568384600632,
+    1.8134514131721062,
+    9.3312560836699,
+    8.805636987127658,
+    2.934770337370205,
+    20.923493715438756,
+    7.619934633890922,
+    3.313494444874182,
+    7.379735056934321,
+    0.9322711519050644,
+    5.361752142308778,
+    0.4308143118615837,
+    31.514182529207876,
+    6.964544146767742,
+    5.8513783371206705,
+    -17.420698431790075,
+    3.533229275701147,
+    -3.121607907732746,
+    1.9273928758528411,
+    -15.793579208078896,
+    -0.8318588199604332,
+    129.6036922902194,
+    -6.3695963722647715,
+    4.06038718668606,
+    57.91704094740818,
+    7.504670906821452,
+    0.2064755233366416,
+    -14.367638228363464,
+    32.614538778384876,
+    15.09012163810391,
+    -120.0714060900365,
+    -6.0007492169586625,
+    -0.5616771839193021,
+    -1.5388841485413123,
+    0.3266037498674099,
+    13.563870025960762,
+    4.462332381210562,
+    1.0541508397564614,
+    2.493168811725062
+   ],
+   "moved": true,
+   "picks": {
+    "1024x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x64",
+     "tile_best": "256x128x32"
+    },
+    "256x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "128x128x64",
+     "tile_best": "256x128x32"
+    },
+    "8192x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "8192x4096x2048": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "8192x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x64"
+    },
+    "8192x4096x8192": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "8192x8192x8192": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "2048x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x64",
+     "tile_best": "256x128x32"
+    },
+    "2048x2048x2048": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "8x4096x11008": {
+     "sk_pick": 4,
+     "sk_best": 4,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    },
+    "1x4096x11008": {
+     "sk_pick": 4,
+     "sk_best": 4,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    },
+    "512x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x64",
+     "tile_best": "256x128x32"
+    },
+    "128x4096x11008": {
+     "sk_pick": 4,
+     "sk_best": 4,
+     "tile_pick": "128x128x64",
+     "tile_best": "128x128x64"
+    },
+    "4096x4096x11008": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "4096x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x64"
+    },
+    "32x4096x11008": {
+     "sk_pick": 4,
+     "sk_best": 4,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    }
+   },
+   "holdout_gm": 1.149545,
+   "vendor_gm": 1.121705,
+   "static_top1": 1.337255,
+   "c2_native_median": 1.063365,
+   "beats_vendor": false,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 5,
+    "picked_ge3": 4,
+    "gm": 1.09244,
+    "vendor_gm": 1.268548
+   },
+   "hold_sk_lt3_gm": 1.17648,
+   "sk_picked_hold": {
+    "1": 11,
+    "2": 1,
+    "4": 4
+   },
+   "regret": {
+    "1024x4096x11008": 1.7688371105608833,
+    "256x4096x11008": 1.1001451389845172,
+    "8192x4096x11008": 1.0086307093063143,
+    "8192x4096x2048": 1.0195134876470386,
+    "8192x4096x256": 1.0623052844011291,
+    "8192x4096x8192": 1.0041007988331867,
+    "8192x8192x8192": 1.0078000357806836,
+    "2048x4096x11008": 1.7405265975184088,
+    "2048x2048x2048": 1.007814601812553,
+    "8x4096x11008": 1.0304498989120203,
+    "1x4096x11008": 1.026205488425339,
+    "512x4096x11008": 1.6429478548122967,
+    "128x4096x11008": 1.2248721563442548,
+    "4096x4096x11008": 1.0,
+    "4096x4096x256": 1.06054680335361,
+    "32x4096x11008": 1.0919067000688671
+   }
+  },
+  "2": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 4,
+    "depth": 1,
+    "n_weights": 12,
+    "features": [
+     "instruction_density",
+     "k_iteration_padding_ratio",
+     "occupancy_deficit",
+     "register_file_pressure",
+     "smem_capacity_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "train_gm": 1.039551,
+   "inner_cv_gm": 1.051695,
+   "w": [
+    -5167.895598049198,
+    -11.883140359147246,
+    -34.58241609379591,
+    -93.37752043210688,
+    12.584812031566214,
+    159.80923773531816,
+    8.450184604250595,
+    25.607347149944687,
+    119.91497690338343,
+    -12.630402845266621,
+    -16.434216546639064,
+    51.625588577152186
+   ],
+   "moved": true,
+   "picks": {
+    "1024x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "1024x4096x4098": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x64"
+    },
+    "1024x4098x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "256x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x64"
+    },
+    "8192x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "8192x4096x128": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x64x32",
+     "tile_best": "128x128x64"
+    },
+    "8192x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "2048x11008x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "128x128x32"
+    },
+    "16384x16384x16384": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "8x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    },
+    "1x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    },
+    "512x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "128x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x64"
+    },
+    "4096x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "4096x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "32x11008x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    }
+   },
+   "holdout_gm": 1.075718,
+   "vendor_gm": 1.136977,
+   "static_top1": 1.144809,
+   "c2_native_median": 1.068561,
+   "beats_vendor": true,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 3,
+    "picked_ge3": 3,
+    "gm": 1.100259,
+    "vendor_gm": 1.178025
+   },
+   "hold_sk_lt3_gm": 1.070133,
+   "sk_picked_hold": {
+    "1": 12,
+    "3": 3,
+    "2": 1
+   },
+   "regret": {
+    "1024x11008x4096": 1.0032028105754909,
+    "1024x4096x4098": 1.1856210878564397,
+    "1024x4098x4096": 1.0048921236975972,
+    "256x11008x4096": 1.0909713306160203,
+    "8192x11008x4096": 1.0044134779379594,
+    "8192x4096x128": 1.6396770875847613,
+    "8192x4096x1024": 1.016691976905265,
+    "2048x11008x4096": 1.0630889609272192,
+    "16384x16384x16384": 1.0582310886670085,
+    "8x11008x4096": 1.011194028554073,
+    "1x11008x4096": 1.01269605201635,
+    "512x11008x4096": 1.0142082844007385,
+    "128x11008x4096": 1.2037735633549427,
+    "4096x11008x4096": 1.0022628688484276,
+    "4096x4096x1024": 1.0169905831707828,
+    "32x11008x4096": 1.0270972431780363
+   }
+  },
+  "3": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 1,
+    "depth": 0,
+    "n_weights": 9,
+    "features": [
+     "cp_async_alignment_deficit",
+     "cta_epilogue_store_time_ratio",
+     "cta_wave_underfill_ratio",
+     "occupancy_deficit",
+     "output_tile_padding_ratio",
+     "partial_accumulator_precision_ratio",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged"
+    ]
+   },
+   "train_gm": 1.043571,
+   "inner_cv_gm": 1.055757,
+   "w": [
+    1.8364189206164085,
+    1.172198507984463,
+    7.185266908802927,
+    4.476426835615566,
+    -8.484950189655729,
+    6.580712397522143,
+    4.530470823592243,
+    0.6065929591682191,
+    -0.17804162732905013
+   ],
+   "moved": true,
+   "picks": {
+    "1024x4096x4100": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "256x128x64"
+    },
+    "1024x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "1024x4100x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "256x12288x4096": {
+     "sk_pick": 4,
+     "sk_best": 2,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x64"
+    },
+    "8192x4096x16384": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "256x128x32"
+    },
+    "8192x4096x512": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x64"
+    },
+    "8192x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "2048x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "8x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    },
+    "1x12288x4096": {
+     "sk_pick": 4,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    },
+    "512x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "128x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x64",
+     "tile_best": "128x64x64"
+    },
+    "4096x4096x16384": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "4096x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "256x128x32",
+     "tile_best": "256x128x32"
+    },
+    "32x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x64",
+     "tile_best": "32x128x64"
+    }
+   },
+   "holdout_gm": 1.073999,
+   "vendor_gm": 1.127839,
+   "static_top1": 1.130067,
+   "c2_native_median": 1.038124,
+   "beats_vendor": true,
+   "n_hold": 15,
+   "hold_sk_ge3": {
+    "n": 0,
+    "picked_ge3": 0,
+    "gm": null,
+    "vendor_gm": null
+   },
+   "hold_sk_lt3_gm": 1.073999,
+   "sk_picked_hold": {
+    "1": 12,
+    "4": 2,
+    "2": 1
+   },
+   "regret": {
+    "1024x4096x4100": 1.3933880024701641,
+    "1024x12288x4096": 1.020498069059139,
+    "1024x4100x4096": 1.0130321778289395,
+    "256x12288x4096": 1.19691244848787,
+    "8192x4096x16384": 1.0114926321529403,
+    "8192x4096x512": 1.0496486162648917,
+    "8192x12288x4096": 1.007361442155248,
+    "2048x12288x4096": 1.018878253764331,
+    "8x12288x4096": 1.0174581526741462,
+    "1x12288x4096": 1.197065032155361,
+    "512x12288x4096": 1.1027334600326177,
+    "128x12288x4096": 1.1147709473133496,
+    "4096x4096x16384": 1.001692803466571,
+    "4096x12288x4096": 1.017807680486153,
+    "32x12288x4096": 1.017385227689101
+   }
+  }
+ },
+ "rule_file": "docs/artifacts/f4c/h100/rules/f4c_evolved_s0.json",
+ "rule": {
+  "name": "f4c evolved s0 (h100)",
+  "per_fold": {
+   "0": {
+    "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    if p.log_flops < 30:\n        s = s + np.log2(1.0 + 100000.0 * f.static_instruction_density) * w[0]\n    else:\n        s = s + np.log2(1.0 + 100000.0 * f.static_instruction_density) * w[1]\n    s = s + np.log2(1.0 + 1000.0 * f.cta_instruction_amortization) * w[2]\n    s = s + np.log2(1.0 + f.memory_transaction_alignment_ratio) * w[3]\n    s = s + np.log2(f.output_store_padding_ratio) * w[4]\n    s = s + f.has_spill * w[5]\n    s = s + np.log2(1.0 + f.cp_async_alignment_deficit) * w[6]\n    if p.roofline_ratio < 1:\n        s = s + f.log_roofline_time_mraster * w[7]\n        s = s + np.log2(f.tile_edge_wave_time_ratio) * w[8]\n        s = s + f.cta_wave_tail_idle * w[9]\n        s = s + f.register_file_pressure * w[10]\n        s = s + f.smem_capacity_pressure * w[11]\n        s = s + f.tm_cta_warps * w[12]\n        s = s + np.log2(1.0 + f.raster_band_l2_pressure) * w[13]\n        s = s + f.a_refetch_bw_demand * w[14]\n        s = s + f.b_refetch_bw_demand * w[15]\n        s = s + f.occupancy_deficit * w[16]\n    else:\n        s = s + f.log_roofline_time_mraster * w[17]\n        s = s + np.log2(f.tile_edge_wave_time_ratio) * w[18]\n        s = s + f.cta_wave_tail_idle * w[19]\n        s = s + f.register_file_pressure * w[20]\n        s = s + f.smem_capacity_pressure * w[21]\n        s = s + f.tm_cta_warps * w[22]\n        s = s + f.occupancy_deficit * w[23]\n    s = s + f.splitk_excess_log * w[24]\n    multistage = 1.0 - f.tm_regstaged\n    twostage = f.tm_regstaged\n    if p.log_flops < 32:\n        s = s + multistage * np.log2(1.0 + 1000000.0 * f.mainloop_barrier_density) * w[25]\n        s = s + multistage * f.pipeline_fill_drain_ratio * w[26]\n        s = s + multistage * np.log2(f.accumulator_operand_storage_ratio) * w[27]\n        s = s + multistage * f.smem_capacity_pressure * w[28]\n    else:\n        s = s + multistage * np.log2(1.0 + 1000000.0 * f.mainloop_barrier_density) * w[29]\n        s = s + multistage * f.pipeline_fill_drain_ratio * w[30]\n        s = s + multistage * np.log2(f.accumulator_operand_storage_ratio) * w[31]\n        s = s + multistage * f.smem_capacity_pressure * w[32]\n    s = s + twostage * np.log2(1.0 + 1000000.0 * f.mainloop_barrier_density) * w[33]\n    s = s + twostage * f.pipeline_fill_drain_ratio * w[34]\n    s = s + twostage * np.log2(f.accumulator_operand_storage_ratio) * w[35]\n    if p.output_parallelism_deficit < 0.001:\n        s = s + f.splitk_sm_latency_rounds_log * w[36]\n        s = s + f.splitk_sm_latency_rounds_log * np.log2(f.tm_crit_ratio) * w[37]\n    else:\n        s = s + f.splitk_sm_latency_rounds_log * w[38]\n        s = s + f.splitk_sm_latency_rounds_log * np.log2(f.tm_crit_ratio) * w[39]\n    if p.output_parallelism_deficit < 0.001:\n        s = s + f.tile_k_mainloop_iterations * w[40]\n        s = s + (f.splitk_k_padding_ratio - 1.0) * w[41]\n        s = s + f.splitk_sm_latency_rounds_log * w[42]\n        s = s + f.splitk_partial_bytes_ratio * w[43]\n        s = s + f.splitk_sm_latency_rounds_log * np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[44]\n    else:\n        s = s + f.tile_k_mainloop_iterations * w[45]\n        s = s + (f.splitk_k_padding_ratio - 1.0) * w[46]\n        s = s + f.splitk_sm_latency_rounds_log * w[47]\n        s = s + f.splitk_partial_bytes_ratio * w[48]\n        s = s + f.splitk_sm_latency_rounds_log * np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[49]\n    return s",
+    "w0": [
+     6.084051725807893,
+     -169.239830328424,
+     27.958145436805555,
+     2547.9823297398852,
+     19.5447428152477,
+     49.26512901631952,
+     17.903772734221345,
+     -19.466195133003467,
+     7.978824809192737,
+     6.11684088755427,
+     74.01392127082333,
+     73.64189509272515,
+     25.461024619595257,
+     -45.04319223818862,
+     0.0,
+     0.0,
+     -215.47784054804134,
+     17.998782262369964,
+     8.915828654546074,
+     14.148931003323314,
+     -42.09395193791614,
+     50.95054508132897,
+     26.88311482812838,
+     -104.73728946508577,
+     24.39951939835191,
+     16.79678666864915,
+     594.368423168054,
+     12.526894664598098,
+     -64.35072772942107,
+     17.146723070920793,
+     -1.9160488938665363,
+     -16.128400032363942,
+     37.277454194366925,
+     16.83378893263314,
+     266.5989979230259,
+     -5.967237240688398,
+     12.31333410863612,
+     3.447909549645004,
+     6.683367473432569,
+     1.4034597626620329,
+     -0.1678123297976153,
+     285.8100983655426,
+     13.566288449724432,
+     3.377908566542063,
+     1.4050108964271202,
+     0.16025187662599688,
+     612.3735121299013,
+     7.918107185616723,
+     21.43503549831843,
+     -6.18807982052549
+    ],
+    "extra_features": [
+     "runs/f4c-h100-f0-s0/features.jsonl"
+    ]
+   },
+   "1": {
+    "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + np.log2(f.padded_gemm_work_ratio) * w[0]\n    s = s + f.launch_wave_tail_fraction * w[1]\n    s = s + f.has_spill * w[2]\n    s = s + f.splitk_excess_log * w[3]\n    s = s + f.tm_log_inst * w[4]\n    if p.roofline_ratio < 1:\n        s = s + np.log2(1.0 + f.raster_l2_reuse_distance) * w[5]\n    else:\n        s = s + f.occupancy_deficit * w[6]\n        s = s + f.register_file_pressure_ratio * w[7]\n        s = s + f.shared_memory_pressure_ratio * w[8]\n    if p.reduction_depth_per_output < 1:\n        s = s + np.log2(f.k_step_granularity_time_ratio) * w[9]\n        s = s + f.tm_regstaged * w[10]\n        s = s + np.log2(f.tm_crit_ratio) * w[11]\n        s = s + f.splitk_sm_latency_rounds_log * w[12]\n        s = s + (f.tm_cta_warps - 2.0) * f.launch_wave_tail_fraction * w[13]\n        s = s + (f.tm_cta_warps - 2.0) * f.shared_memory_pressure_ratio * w[14]\n    else:\n        if p.log_flops <= 35:\n            s = s + np.log2(f.k_step_granularity_time_ratio) * w[15]\n            s = s + f.tm_regstaged * w[16]\n            s = s + np.log2(f.tm_crit_ratio) * w[17]\n            s = s + f.splitk_sm_latency_rounds_log * w[18]\n            s = s + (f.tm_cta_warps - 2.0) * np.log2(f.tm_crit_ratio) * w[19]\n            s = s + (f.tm_cta_warps - 2.0) * f.launch_wave_tail_fraction * w[20]\n            s = s + (f.tm_cta_warps - 2.0) * f.shared_memory_pressure_ratio * w[21]\n        else:\n            if p.log_flops <= 38:\n                s = s + np.log2(f.k_step_granularity_time_ratio) * w[22]\n                s = s + np.log2(f.tm_crit_ratio) * w[23]\n                s = s + f.splitk_sm_latency_rounds_log * w[24]\n                s = s + (f.splitk_sm_latency_rounds_log - np.log2(f.cp_async_stage_depth)) * w[25]\n                s = s + np.log2(f.cp_async_stage_depth) * w[26]\n                s = s + f.shared_memory_pressure_ratio * w[27]\n                s = s + (f.tm_cta_warps - 2.0) * np.log2(f.tm_crit_ratio) * w[28]\n                s = s + (f.tm_cta_warps - 2.0) * f.launch_wave_tail_fraction * w[29]\n                s = s + (f.tm_cta_warps - 2.0) * f.shared_memory_pressure_ratio * w[30]\n            else:\n                s = s + np.log2(f.k_step_granularity_time_ratio) * w[31]\n                s = s + np.log2(f.tm_crit_ratio) * w[32]\n                s = s + f.splitk_sm_latency_rounds_log * w[33]\n                s = s + (f.splitk_sm_latency_rounds_log - np.log2(f.cp_async_stage_depth)) * w[34]\n                s = s + np.log2(f.cp_async_stage_depth) * w[35]\n                s = s + f.shared_memory_pressure_ratio * w[36]\n                s = s + (f.tm_cta_warps - 2.0) * np.log2(f.tm_crit_ratio) * w[37]\n                s = s + (f.tm_cta_warps - 2.0) * f.launch_wave_tail_fraction * w[38]\n                s = s + (f.tm_cta_warps - 2.0) * f.shared_memory_pressure_ratio * w[39]\n                s = s - np.log2(f.cp_async_stage_depth) * f.splitk_sm_latency_rounds_log * w[40]\n                s = s + np.log2(f.cp_async_stage_depth) * np.log2(f.k_step_granularity_time_ratio) * w[41]\n    if p.log_flops <= 35:\n        s = s + f.launch_wave_tail_fraction * f.log_roofline_time_mraster * (np.log2(f.padded_gemm_work_ratio) + np.log2(f.tm_crit_ratio)) * w[42]\n    if p.reduction_depth_per_output >= 1:\n        s = s + f.splitk_roofline_log_time * w[43]\n        s = s + f.launch_wave_tail_fraction * w[44]\n    else:\n        s = s + f.splitk_partial_bytes_ratio * w[45]\n        s = s + f.splitk_sm_latency_rounds_log * w[46]\n    return s",
+    "w0": [
+     9.592423297850525,
+     -25.201170424823044,
+     53.87895014207561,
+     1.3594784758882585,
+     -15.165861532144914,
+     -7.3903402062198,
+     125.11844551283569,
+     -65.75811251830334,
+     53.80222621021816,
+     2.1859919016434675,
+     35.44281282845501,
+     18.013860461725294,
+     0.9413460065434457,
+     194.9464917110312,
+     30.225261349055753,
+     8.816528681410356,
+     50.54938061160747,
+     2.9871265614602884,
+     13.736288452390722,
+     -2.9620507377599035,
+     83.50292246047357,
+     30.71197022499674,
+     10.910207767436306,
+     31.675686666052844,
+     13.58655328872974,
+     -3.1590252475256126,
+     28.711751817476546,
+     -34.25152960574509,
+     -11.82276558587308,
+     518.7649061539859,
+     -16.857540207167194,
+     10.506380619315097,
+     -104.26077219700468,
+     10.896053170666669,
+     8.708394246060363,
+     -28.67485112433538,
+     -64.037137338972,
+     76.89419661838429,
+     -947.3985348204116,
+     29.330137691142983,
+     2.4495472771103626,
+     -2.445600168295602,
+     5.183764451068971,
+     27.033487713854875,
+     40.32178796273828,
+     2.894671294306586,
+     13.428398543960496
+    ],
+    "extra_features": [
+     "runs/f4c-h100-f1-s0/features.jsonl"
+    ]
+   },
+   "2": {
+    "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.instruction_density * w[0]\n    s = s + f.tm_cta_warps * w[1]\n    if p.roofline_ratio < 1:\n        s = s + f.occupancy_deficit * w[2]\n        s = s + np.square(np.fmax(f.register_file_pressure - 0.5, 0.0)) * w[8]\n        s = s + np.square(np.fmax(f.smem_capacity_pressure - 0.5, 0.0)) * w[9]\n    else:\n        s = s + f.occupancy_deficit * w[3]\n        s = s + np.square(np.fmax(f.register_file_pressure - 0.5, 0.0)) * w[10]\n        s = s + np.square(np.fmax(f.smem_capacity_pressure - 0.5, 0.0)) * w[11]\n    s = s + f.splitk_excess_log * w[4]\n    s = s + (f.k_iteration_padding_ratio - 1.0) * w[5]\n    if p.cp_async_alignment_deficit > 0:\n        s = s + f.tm_regstaged * w[6]\n    else:\n        s = s + f.tm_regstaged * w[7]\n    return s",
+    "w0": [
+     -9679.287699840952,
+     -18.26282012411662,
+     -249.782282832847,
+     -130.91256223850533,
+     16.204234226710586,
+     67.34686834973145,
+     37.55116019141095,
+     13.785037887885885,
+     243.14917790396828,
+     -10.023531253938895,
+     -65.26121619023652,
+     46.23141565710181
+    ],
+    "extra_features": [
+     "runs/f4c-h100-f2-s0/features.jsonl"
+    ]
+   },
+   "3": {
+    "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + np.log2(np.fmax(f.output_tile_padding_ratio, 1.0)) * w[0]\n    s = s + f.cta_wave_underfill_ratio * w[1]\n    s = s + f.cp_async_alignment_deficit * w[2]\n    s = s + f.splitk_excess_log * w[3]\n    s = s + f.occupancy_deficit * w[4]\n    s = s + f.tm_regstaged * w[5]\n    s = s + np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[6]\n    s = s + np.log2(1.0 + f.partial_accumulator_precision_ratio) * w[7]\n    s = s + np.log2(f.cta_epilogue_store_time_ratio) * w[8]\n    return s",
+    "w0": [
+     2.1943926486259535,
+     2.186524878827516,
+     19.441774796689742,
+     4.679918914383463,
+     -5.088695398563797,
+     4.98012676340438,
+     4.688803621819869,
+     1.9766997596137592,
+     -0.6871661351622921
+    ],
+    "extra_features": [
+     "runs/f4c-h100-f3-s0/features.jsonl"
+    ]
+   }
+  }
+ }
+}
