@@ -9,7 +9,7 @@
            holdout 65 형상 (fold 마다 그 fold 의 규칙). 적합 없음
 보정의 합   점수(w) - 점수(0). 형상 안 폭 R_s (p1~p99, caps.shape_range) 를 본항의 R_s 와 견준다
 뒤집힘     규칙이 고른 config 가 본항만으로 고른 것과 다른 holdout 형상의 비율, 그리고 그때 본항이 본
-           고른 것의 손해 (단위: 본항 점수, 10 = 시간 2 배)
+           고른 것의 손해 (단위: 본항 점수, 10 = 시간 2 배) — 중앙 · 90% · 최대 · 10 단위 넘는 형상 수
 ```
 """
 
@@ -44,6 +44,10 @@ def _weights(g: str, lam: str) -> dict:
             for f, v in json.loads(p.read_text())["per_fold"].items()}
 
 
+def _q(v, k: float) -> float:
+    return float(np.percentile(v, k)) if np.size(v) else float("nan")
+
+
 def _gm(v) -> float:
     v = np.asarray(v, float)
     return float(np.exp(np.mean(np.log(v))))
@@ -62,8 +66,9 @@ def main() -> None:
     from kernelrule.rules.time_term import main_weight_indices
 
     print(f"{'GPU':6s} {'lam':>4s} {'본항만':>7s} {'규칙':>7s} {'보정 가중치':>10s} "
-          f"{'R(보정합)/R(본항) 중앙':>20s} {'90%':>6s} {'뒤집힌 형상':>10s} "
-          f"{'본항이 본 손해 중앙':>18s}")
+          f"{'R(보정합)/R(본항) 중앙':>20s} {'90%':>6s} {'R(보정합) 단위':>12s} "
+          f"{'뒤집힌 형상':>10s} {'본항이 본 손해 중앙':>18s} {'90%':>6s} "
+          f"{'최대':>6s} {'>10 단위':>8s}")
     for g in GPUS:
         P._G.clear()
         P._G.update(gpu=g, prefix="f4c")
@@ -72,7 +77,7 @@ def main() -> None:
         spec = json.loads((rules / "f4c_evolved_s0.json").read_text())["per_fold"]
         W = {lam: _weights(g, lam) for lam in LAMS}
         rows = {lam: {"main": [], "rule": [], "ratio": [], "flip": [], "loss": [],
-                      "ncorr": []} for lam in LAMS}
+                      "ncorr": [], "units": []} for lam in LAMS}
         for f in "0123":
             code = spec[f]["code"]
             fn = compile_rule(code)
@@ -100,6 +105,7 @@ def main() -> None:
                     r["rule"].append(tt[i1] / best)
                     rm = shape_range(s0)
                     r["ratio"].append(shape_range(s1 - s0) / rm if rm > 0 else np.nan)
+                    r["units"].append(shape_range(s1 - s0))
                     r["flip"].append(i1 != i0)
                     if i1 != i0:
                         r["loss"].append(float(s0[i1] - s0.min()))
@@ -111,8 +117,10 @@ def main() -> None:
             print(f"{g:6s} {lam:>4s} {_gm(r['main']):7.4f} {_gm(r['rule']):7.4f} "
                   f"{np.median(r['ncorr']):10.0f} {np.nanmedian(ratio):20.2f} "
                   f"{np.nanpercentile(ratio, 90):6.2f} "
+                  f"{np.median(r['units']):12.1f} "
                   f"{np.mean(r['flip']) * 100:9.0f}% "
-                  f"{(np.median(loss) if loss.size else float('nan')):18.1f}")
+                  f"{_q(loss, 50):18.1f} {_q(loss, 90):6.1f} {_q(loss, 100):6.1f} "
+                  f"{int(np.sum(loss > 10)):8d}")
 
 
 if __name__ == "__main__":
