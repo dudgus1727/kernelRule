@@ -1,13 +1,18 @@
 """★ Removing one weight's term(s) from a rule (D-190 §7).
 
-⛔ **The loop does not use this.** Pruning the dead weights of the c2 a6000
+★ 2026-10-07 (D-198): **the loop uses this when `LoopConfig.prune_dead`**
+(`--prune-dead`) — user decision, after the record below and D-190 §7's
+re-measurement on d190 rules (inner-CV +0.0012 against a +0.001 bar, one
+unseen shape 1.23 -> 8.27). Off by default; every run before it is unpruned.
+
+History — why it stayed out until then. Pruning the dead weights of the c2 a6000
 elites before they enter the archive was measured first
 (`experiments/d190_offline.py prune`, `docs/artifacts/d190/prune.json`): 42% of
 the weights went with the training regret unchanged, the holdout of all 134
 elites moved 1.1339 -> 1.1333, but the rule each run would report moved
 1.1217 -> 1.1263 — one run went 1.1186 -> 1.2304, because a weight that moves
 no training pick can still move holdout picks. The criterion set before the
-measurement (no worse than +0.001 on both) was not met, so it stays out.
+measurement (no worse than +0.001 on both) was not met, so it stayed out.
 
 ## What "removing a weight" means here
 

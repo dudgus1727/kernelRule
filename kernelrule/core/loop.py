@@ -262,6 +262,10 @@ class LoopConfig:
     #: the training shapes. `None` = uncapped, every run before it. Needs a
     #: library with the time features (condition F4).
     term_cap: float | None = None
+    #: ★ D-198: after each fit, remove the dead terms before the rule can
+    #: enter the archive (`_prune_fitted`, the D-190 §7 procedure). Off =
+    #: every run before it.
+    prune_dead: bool = False
 
 
 class LLMUnreachable(RuntimeError):
@@ -369,6 +373,85 @@ def _fit_rule(fn, code: str, w0, new, *, matrix, table, train, val,
                        caps=caps)
 
 
+def _prune_fitted(fn, code: str, fr, c: dict) -> dict | None:
+    """★ D-198 — a fitted rule without its dead terms (the D-190 §7
+    procedure, `rules/prune.prune_dead`). The worker and the sequential path
+    both come here.
+
+    ```
+    dead    FittedRule.dead_terms — |w| < 1e-3, or sensitivity < 1e-6 (the
+            term carries a weight and moves no training pick)
+    order   smallest effective contribution first (FittedRule.contrib)
+    kept    one removal at a time, only if the training regret does not get
+            worse — no refit
+    ```
+
+    `None` when nothing was removed. ⚠️ The static check of the pruned code
+    is the parent's (`RoundLoop._settle_prune`) — checks stay out of the
+    workers (D-95).
+    """
+    dead = list(fr.dead_terms)
+    if not dead:
+        return None
+    from kernelrule.core.weights import _Problem
+    from kernelrule.rules.prune import prune_dead
+
+    con = fr.contrib
+    order = sorted(dead, key=lambda k: (float(con[k]) if con is not None
+                                        else 0.0, k))
+    prob = _Problem(c["matrix"], c["table"], list(c["train"].shapes), 1)
+
+    def regret_of(code2: str, w2) -> float:
+        try:
+            return prob.regret(compile_rule(code2),
+                               np.asarray(w2, dtype=np.float64))
+        except Exception:                                   # noqa: BLE001
+            return float("inf")
+
+    code2, w2, _log = prune_dead(code, list(fr.w), order, regret_of,
+                                 fr.fit_regret)
+    if len(w2) == len(fr.w):
+        return None
+    fn2 = compile_rule(code2)
+    w2 = np.asarray(w2, dtype=np.float64)
+    val = float("nan")
+    if c.get("val") is not None:
+        val = float(_Problem(c["matrix"], c["table"], list(c["val"].shapes),
+                             1).regret(fn2, w2))
+    return {"code": code2, "fn": fn2, "w": w2,
+            "regret": float(prob.regret(fn2, w2)), "val_regret": val,
+            "n_pruned": len(fr.w) - len(w2)}
+
+
+def _scored(fn, w, regret: float, val_regret: float, c: dict) -> dict:
+    """The fields of one scored rule. The worker and the sequential path
+    both build them here, so they cannot drift apart (D-95)."""
+    ev = evaluate_scores(make_score_of(fn, c["matrix"], w), c["table"],
+                         list(c["train"].shapes), ks=(1, 3))
+    return {"w": [float(x) for x in w], "regret": regret,
+            "val_regret": val_regret, "rank_loss": _rank_loss_of(fn, c, w),
+            "mem": ev.at(1, mask=c["short_mask"]),
+            "comp": ev.at(1, mask=c["long_mask"]),
+            "all": ev.at(1)}
+
+
+def _scored_with_prune(fn, code: str, fr, c: dict) -> dict:
+    """`_scored` of the fitted rule — or, with `c["prune_dead"]` and a term
+    removed, of the pruned rule, the fitted one kept under `unpruned` for
+    the parent's check (D-198)."""
+    out = _scored(fn, fr.w, fr.fit_regret, fr.val_regret, c)
+    if not c.get("prune_dead"):
+        return out
+    try:
+        pr = _prune_fitted(fn, code, fr, c)
+    except Exception as e:                                  # noqa: BLE001
+        return {**out, "prune_refused": f"{type(e).__name__}: {e}"[:90]}
+    if pr is None:
+        return out
+    return {**_scored(pr["fn"], pr["w"], pr["regret"], pr["val_regret"], c),
+            "code": pr["code"], "n_pruned": pr["n_pruned"], "unpruned": out}
+
+
 def _fit_and_score(job: tuple) -> dict:
     """★ Fits and scores one candidate. **It runs in a worker** (D-95).
 
@@ -384,8 +467,6 @@ def _fit_and_score(job: tuple) -> dict:
     """
     idx, code, w0, new = job
     from kernelrule.core.sandbox import compile_rule
-    from kernelrule.core.scoring import evaluate_scores
-    from kernelrule.core.weights import make_score_of
 
     c = _WORKER
     try:
@@ -405,10 +486,9 @@ def _fit_and_score(job: tuple) -> dict:
         return {"i": idx, "err": ("fit", str(e)[:90])}
     except Exception as e:                                  # noqa: BLE001
         return {"i": idx, "err": ("run", f"{type(e).__name__}: {e}"[:90])}
-    ev = evaluate_scores(make_score_of(fn, c["matrix"], fr.w), c["table"],
-                         list(c["train"].shapes), ks=(1, 3))
-    return {"i": idx, "w": [float(x) for x in fr.w],
-            "regret": fr.fit_regret, "moved": bool(fr.moved),
+    # ★ D-198 — with `prune_dead` the dead terms go before the archive
+    return {"i": idx, **_scored_with_prune(fn, code, fr, c),
+            "moved": bool(fr.moved),
             # ★ D-167 §N. It has to come back from the worker too —
             #   otherwise the counter differs between the parallel and the
             #   sequential path and that **is** a condition change (D-95).
@@ -416,12 +496,7 @@ def _fit_and_score(job: tuple) -> dict:
             "n_dead_w": len(fr.dead_by_weight),
             "n_dead_s": len(fr.dead_by_sensitivity),
             "n_new": int(fr.n_new),
-            "n_at_cap": int(fr.n_at_cap),
-            "rank_loss": _rank_loss_of(fn, c, fr.w),
-            "val_regret": fr.val_regret,
-            "mem": ev.at(1, mask=c["short_mask"]),
-            "comp": ev.at(1, mask=c["long_mask"]),
-            "all": ev.at(1)}
+            "n_at_cap": int(fr.n_at_cap)}
 
 
 def _rank_loss_of(fn, c: dict, w) -> float:
@@ -540,6 +615,11 @@ class RoundResult:
     #: not recomputed.
     n_dead_by_weight: int = 0
     n_dead_by_sens: int = 0
+    #: ★ D-198 (`LoopConfig.prune_dead`): weights removed before the
+    #: archive, summed over the scored rules, and pruned codes the static
+    #: check refused (those rules went on as fitted).
+    n_pruned: int = 0
+    n_prune_refused: int = 0
     #: ★ Proposal / duplicate / scored counts per parent kind (exploit /
     #: explore / cross) (D-94).
     #: `{"exploit": {"n": 6, "dup": 1, "scored": 5}, ...}`
@@ -570,6 +650,10 @@ class RoundResult:
             if self.n_feature_over_cap else ""
         feat = (f"new axes {self.n_features_made}/{self.n_feature_requests} "
                 f"{over}| " if self.n_feature_requests else "")
+        refused = (f" refused {self.n_prune_refused}"
+                   if self.n_prune_refused else "")
+        pruned = (f"pruned {self.n_pruned}{refused} | "
+                  if self.n_pruned or self.n_prune_refused else "")
         return (
             f"r{self.round:<3d} proposed {self.n_proposed:2d} | {err}{feat}"
             f"refused schema {self.n_rejected_schema} static "
@@ -582,7 +666,7 @@ class RoundResult:
             f"| cells {self.n_cells:2d} blowups {self.n_val_blowups} "
             f"dead {self.n_dead_terms}"
             f"(w{self.n_dead_by_weight}/s{self.n_dead_by_sens}) | "
-            f"{self.seconds:.1f}s")
+            f"{pruned}{self.seconds:.1f}s")
 
 
 def _output_schemas() -> dict:
@@ -724,6 +808,8 @@ class RoundLoop:
         #: every round.
         self._pool_exec = None
         self._rule_seq = 0
+        #: ★ D-198 — rule id -> weights removed by pruning (for the trace)
+        self._pruned_of: dict[str, int] = {}
         self._seen_code: dict[str, float] = {}      # the cache (§15.4)
         self._feats = matrix.feature_names()
         #: ★ For the exponent-slot guard (D-112). It is refreshed together
@@ -1006,6 +1092,7 @@ class RoundLoop:
                 fit_space=self.cfg.fit_space,
                 fit_budget=self.cfg.fit_budget,
                 term_cap=self.cfg.term_cap,             # ★ D-195
+                prune_dead=self.cfg.prune_dead,         # ★ D-198
                 short_mask=self._short_mask, long_mask=self._long_mask)
             self._pool_exec = ProcessPoolExecutor(
                 max_workers=self.cfg.n_workers, mp_context=get_context("fork"))
@@ -1073,8 +1160,34 @@ class RoundLoop:
             res.n_dead_by_sens += int(d.get("n_dead_s", 0))
             res.n_at_cap += int(d.get("n_at_cap", 0))
             res.n_scored += 1
-            elites.append(self._elite_from(prop, rep, d))
+            elites.append(self._elite_from(
+                prop, rep, self._settle_prune(res, prop, d)))
         return elites
+
+    def _settle_prune(self, res: RoundResult, prop, out: dict) -> dict:
+        """★ D-198 — a pruned code passes the **parent's** static check
+        (the same as `_admit`; D-95 keeps checks out of the workers), or the
+        rule goes on as fitted. Counted and traced either way."""
+        why = out.get("prune_refused")
+        if why is None and "code" in out:
+            rep = check_rule(out["code"], limits=self._limits,
+                             feature_names=self._feats,
+                             feature_mins=self._fmins,
+                             shape_value_names=self._shape_vals,
+                             n_weights=len(out["w"]))
+            if rep.ok:
+                res.n_pruned += int(out["n_pruned"])
+                return {**out, "n_nodes": rep.n_nodes,
+                        "n_terms": rep.n_terms}
+            why = rep.violations[0][:90]
+        if why is None:
+            return out
+        res.n_prune_refused += 1
+        self.trace.ev("prune_refused", round=res.round, why=why,
+                      code_sha=_sha(prop.code))
+        kept = {k: v for k, v in out.items()
+                if k not in ("code", "n_pruned", "unpruned", "prune_refused")}
+        return {**kept, **out.get("unpruned", {})}
 
     def _score(self, score_fn, w, shapes):
         return evaluate_scores(make_score_of(score_fn, self.matrix, w),
@@ -1128,12 +1241,15 @@ class RoundLoop:
         """Worker result -> `Elite`. ★ The ids and order are decided by
         **the parent** (determinism)."""
         self._rule_seq += 1
+        # ★ D-198 — a pruned rule enters with its own code and size
+        self._pruned_of[f"r{self._rule_seq:04d}"] = int(out.get("n_pruned", 0))
         return Elite(
-            rule_id=f"r{self._rule_seq:04d}", code=prop.code,
+            rule_id=f"r{self._rule_seq:04d}", code=out.get("code", prop.code),
             w=out["w"], regret=out["regret"],
             mem_objective=out["mem"], comp_objective=out["comp"],
             all_objective=out["all"],
-            code_len=rep.n_nodes, code_terms=rep.n_terms,
+            code_len=out.get("n_nodes", rep.n_nodes),
+            code_terms=out.get("n_terms", rep.n_terms),
             round=len(self.rounds),
             changes=prop.changes, hypothesis_id=prop.hypothesis_id,
             parent_ids=list(getattr(prop, "parent_ids", []) or []),
@@ -1178,24 +1294,19 @@ class RoundLoop:
         res.n_at_cap += int(fr.n_at_cap)
         res.n_dead_by_weight += len(fr.dead_by_weight)
         res.n_dead_by_sens += len(fr.dead_by_sensitivity)
-        ev = self._score(fn, fr.w, self.splits.train.shapes)
+        # ★ D-198 — the same fields and pruning as the worker
+        #   (`_fit_and_score`), from the same functions
+        out = _scored_with_prune(fn, prop.code, fr, {
+            "matrix": self.matrix, "table": self.table,
+            "train": self.splits.train, "val": self.splits.val,
+            "objective": self._objective,
+            "rank_top_k": self.cfg.rank_top_k,
+            "rank_lambda": self.cfg.rank_lambda,
+            "short_mask": self._short_mask, "long_mask": self._long_mask,
+            "prune_dead": self.cfg.prune_dead})
+        out = self._settle_prune(res, prop, out)
         res.n_scored += 1
-        return self._elite_from(prop, rep, {
-            "w": [float(x) for x in fr.w], "regret": fr.fit_regret,
-            "n_dead": len(fr.dead_terms),
-            "n_dead_w": len(fr.dead_by_weight),
-            "n_dead_s": len(fr.dead_by_sensitivity),
-            "n_new": int(fr.n_new),
-            "rank_loss": _rank_loss_of(fn, {
-                "objective": self._objective,
-                "rank_top_k": self.cfg.rank_top_k,
-                "rank_lambda": self.cfg.rank_lambda,
-                "matrix": self.matrix, "table": self.table,
-                "train": self.splits.train}, fr.w),
-            "val_regret": fr.val_regret, "moved": fr.moved,
-            "mem": ev.at(1, mask=self._short_mask),
-            "comp": ev.at(1, mask=self._long_mask),
-            "all": ev.at(1)})
+        return self._elite_from(prop, rep, {**out, "moved": fr.moved})
 
     def score_only(self, code: str, w0) -> float:
         """Scores one rule **on the training split only**. It does not
@@ -1598,12 +1709,18 @@ class RoundLoop:
                               code_sha=_sha(prop.code))
                 continue
             bump(kind, "scored")
+            # ★ D-198 — `code_sha` stays the **proposal's** (the trace tools
+            #   join proposal and scored on it); a pruned rule's own code
+            #   is written next to it
+            n_pr = self._pruned_of.get(e2.rule_id, 0)
             self.trace.ev("scored", round=r, kind=kind, rule=e2.rule_id,
-                          code_sha=_sha(e2.code), fit=e2.regret,
+                          code_sha=_sha(prop.code), fit=e2.regret,
                           val=e2.val_regret,
                           # ★ Did the fitter fail to move — this is the
                           #   "silently did nothing" spot (D-54)
-                          moved=bool(getattr(e2, "moved", True)))
+                          moved=bool(getattr(e2, "moved", True)),
+                          n_pruned=n_pr,
+                          **({"pruned_code": e2.code} if n_pr else {}))
             self._seen_code[prop.code.strip()] = e2.regret
             elites.append(e2)
 

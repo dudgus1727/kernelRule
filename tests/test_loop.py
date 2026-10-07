@@ -351,6 +351,126 @@ def test_dead_terms_come_back_from_the_worker_too(synth_table, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# ★ D-198 — dead terms removed before the archive (`LoopConfig.prune_dead`)
+# ---------------------------------------------------------------------------
+_DEAD = ("def score(f, p, hw, w):\n"
+         "    s = f.waves * w[0]\n"
+         "    s = s + f.edge_waste * w[1] * 0.0\n"
+         "    return s\n")
+
+
+def _proposal(code, w0):
+    from kernelrule.agents.schemas import RuleProposal
+
+    return RuleProposal(code=code, w0=list(w0), changes="dead-term")
+
+
+def test_pruning_is_a_recorded_condition_that_defaults_off():
+    from kernelrule.core.runset import _OLD_DEFAULTS, KEYS
+
+    assert LoopConfig(run_id="x").prune_dead is False
+    assert "prune_dead" in KEYS and _OLD_DEFAULTS["prune_dead"] is False
+
+
+def test_a_dead_term_is_gone_before_the_archive(loop):
+    """★ With `prune_dead` a term that moves nothing leaves the rule that
+    enters the archive — its weight goes, the rest are renumbered, the size
+    axis shrinks, and the training regret is no worse than as fitted.
+
+    ⚠️ On the synthetic table **both** terms are dead (the fitter sets the
+    first weight to 0 — any other value is worse there), so which one goes
+    is the contribution order's choice; one weight always stays."""
+    import re
+
+    from kernelrule.core.loop import RoundResult
+
+    def run(on: bool):
+        loop.cfg.prune_dead = on
+        res = RoundResult(round=-1)
+        e = loop._evaluate_candidate(_proposal(_DEAD, [1.0, 1.0]), res)
+        assert e is not None, res.rejections
+        return e, res
+
+    e0, r0 = run(False)
+    e1, r1 = run(True)
+    assert e0.code == _DEAD and len(e0.w) == 2 and r0.n_pruned == 0
+    assert "pruned" not in r0.line()
+    assert len(e1.w) == 1 and e1.code_terms < e0.code_terms
+    assert {int(i) for i in re.findall(r"w\[(\d+)\]", e1.code)} == {0}
+    assert r1.n_pruned == 1 and "pruned 1" in r1.line()
+    assert e1.regret <= e0.regret + 1e-12
+
+
+def test_a_pruned_code_the_check_refuses_goes_on_as_fitted(loop,
+                                                           monkeypatch):
+    """★ The pruned code passes the parent's static check or the rule goes
+    on unpruned — counted, never silent."""
+    from types import SimpleNamespace
+
+    from kernelrule.core import loop as loop_mod
+    from kernelrule.core.loop import RoundResult
+
+    real = loop_mod.check_rule
+
+    def picky(code, **kw):
+        if code == _DEAD:                        # the proposal itself
+            return real(code, **kw)
+        return SimpleNamespace(ok=False, violations=["refused by the test"])
+
+    monkeypatch.setattr(loop_mod, "check_rule", picky)
+    loop.cfg.prune_dead = True
+    res = RoundResult(round=-1)
+    e = loop._evaluate_candidate(_proposal(_DEAD, [1.0, 1.0]), res)
+    assert e is not None, res.rejections
+    assert e.code == _DEAD and len(e.w) == 2
+    assert res.n_prune_refused == 1 and res.n_pruned == 0
+    assert "refused 1" in res.line()
+
+
+def _prune_batch(synth_table, tmp_path, workers: int):
+    """One batch with dead terms, fitted in the workers or in sequence."""
+    import kernelrule.features.physical  # noqa: F401
+    from kernelrule.core.loop import RoundResult
+    from kernelrule.core.matrix import FeatureMatrix
+    from kernelrule.features import REGISTRY
+
+    fm = FeatureMatrix(synth_table, REGISTRY)
+    sh = synth_table.shapes()
+    splits = SplitSet(train=Split("train", tuple(sh[:-2])),
+                      val=Split("val", tuple(sh[-2:])))
+    cfg = LoopConfig(run_id=f"prune{workers}", n_rules_per_round=2,
+                     max_rounds=1, max_evals=30, seed=0,
+                     sandbox_first_seen=False, out_dir=str(tmp_path),
+                     n_workers=workers, prune_dead=True)
+    lp = RoundLoop(cfg=cfg, table=synth_table, matrix=fm, splits=splits,
+                   llm=MockLLM("mutate", seed=3,
+                               feature_names=fm.feature_names()))
+    wide = _WIDE_SEED[0].replace(
+        "    return s\n", "    s = s + f.edge_waste * w[12] * 0.0\n"
+        "    return s\n")
+    res = RoundResult(round=0)
+    elites = lp._evaluate_batch([_proposal(_DEAD, [1.0, 1.0]),
+                                 _proposal(wide, [1.0] * 13)], res)
+    lp._restart_pool()
+    return res, [(e.code, tuple(e.w), e.regret, e.val_regret,
+                  e.mem_objective, e.comp_objective, e.code_terms)
+                 for e in elites]
+
+
+def test_pruning_in_the_workers_matches_the_sequential_path(synth_table,
+                                                            tmp_path):
+    """★ D-95 — the same pruned rules from the workers as in sequence, on
+    the Nelder-Mead and the CMA path (13 weights)."""
+    seq_r, seq = _prune_batch(synth_table, tmp_path / "pa", 0)
+    par_r, par = _prune_batch(synth_table, tmp_path / "pb", 3)
+    assert len(seq) == 2, seq_r.rejections
+    assert seq_r.n_pruned >= 2, "no pruning happened — the test is empty"
+    assert seq == par, "the parallel result differs from the sequential one"
+    assert (seq_r.n_pruned, seq_r.n_prune_refused) == \
+           (par_r.n_pruned, par_r.n_prune_refused)
+
+
+# ---------------------------------------------------------------------------
 # ★ Regime balance (§10.1) — it stops training sacrificing a minority
 # regime
 # ---------------------------------------------------------------------------
