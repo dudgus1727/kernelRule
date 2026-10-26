@@ -1,0 +1,17 @@
+gpu,gpu_name,class,class_label,current,vendor
+a6000,RTX A6000,big,큰 격자 (big),5.54,3.24
+a6000,RTX A6000,hungry,split-K 필요 (hungry),7.77,6.95
+a6000,RTX A6000,mid,중간 (mid),15.56,10.18
+a6000,RTX A6000,small,작은 M (small),3.49,12.95
+5090,RTX 5090,big,큰 격자 (big),0.81,3.46
+5090,RTX 5090,hungry,split-K 필요 (hungry),7.02,12.91
+5090,RTX 5090,mid,중간 (mid),11.08,20.96
+5090,RTX 5090,small,작은 M (small),5.62,29.66
+4090,RTX 4090,big,큰 격자 (big),4.56,5.34
+4090,RTX 4090,hungry,split-K 필요 (hungry),5.88,12.11
+4090,RTX 4090,mid,중간 (mid),6.61,8.3
+4090,RTX 4090,small,작은 M (small),2.62,7.34
+h100,H100 NVL,big,큰 격자 (big),2.31,4.84
+h100,H100 NVL,hungry,split-K 필요 (hungry),15.66,22.07
+h100,H100 NVL,mid,중간 (mid),6.37,10.77
+h100,H100 NVL,small,작은 M (small),1.56,20.26

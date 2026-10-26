@@ -1,0 +1,517 @@
+<style>
+/* layout: header + takeaway, a row of per-GPU tiles, a grid of chart cards, one table card */
+.kv { font-family: var(--font-anthropic-sans); display: flex; flex-direction: column; gap: var(--cds-gap-lg); }
+.kv-head { display: flex; flex-direction: column; gap: var(--cds-gap-xs); }
+.kv-head h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+.kv-take { margin: 0; font-size: var(--cds-font-size-body); color: var(--color-fg); max-width: 68ch; }
+.kv .kv-take b { font-weight: var(--cds-font-weight-medium); }
+.kv-def { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); max-width: 80ch; }
+.kv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: var(--cds-gap-md); }
+.kv-tile { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-xs); min-width: 0; }
+.kv-tile-gpu { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.kv-tile-big { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.1; }
+.kv-tile-sub { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+.kv-tile-delta { font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; color: var(--color-fg-muted); }
+.kv-tile-delta.good { color: var(--color-ok); }
+.kv-tile-delta.bad { color: var(--color-bad); }
+.kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--cds-gap-md); }
+.kv-card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
+.kv-card h2 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); text-wrap: balance; }
+.kv-note { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.kv-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs) var(--cds-gap-md); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+.kv-legend span { display: inline-flex; align-items: center; gap: var(--cds-gap-xs); }
+.kv-sw { width: 0.75rem; height: 0.75rem; border-radius: 2px; display: inline-block; flex: none; }
+.kv-sw.dot { border-radius: 50%; }
+.kv-chart { position: relative; min-height: 12rem; }
+.kv-chart svg { display: block; overflow: visible; }
+.kv-tick, .kv-val { fill: var(--color-fg-muted); font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.kv-ylabel { fill: var(--color-fg); font-size: var(--cds-font-size-caption); }
+.kv-mark { cursor: default; outline: none; }
+.kv-mark:focus-visible { stroke: var(--color-fg); stroke-width: 2px; }
+.kv-multi { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: var(--cds-gap-md); }
+.kv-panel { position: relative; min-width: 0; display: flex; flex-direction: column; gap: var(--cds-gap-xs); }
+.kv-panel-title { font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); }
+.kv-tip { position: absolute; z-index: 2; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); pointer-events: none; white-space: nowrap; display: flex; flex-direction: column; gap: 2px; }
+.kv-tip-head { color: var(--cds-text-secondary); }
+.kv-tip-row { display: flex; align-items: center; gap: var(--cds-gap-xs); font-variant-numeric: tabular-nums; }
+.kv-tip-row b { font-weight: var(--cds-font-weight-medium); margin-left: auto; padding-left: var(--cds-gap-sm); }
+.kv-fail { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--cds-gap-xs); color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+.kv-fail-dot { width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--color-bad); }
+.kv-table-wrap { overflow-x: auto; }
+.kv-table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-caption); font-variant-numeric: tabular-nums; }
+.kv-table th, .kv-table td { padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); text-align: right; white-space: nowrap; }
+.kv-table th { color: var(--color-fg-muted); font-weight: var(--cds-font-weight-medium); }
+.kv-table th:first-child, .kv-table td:first-child { text-align: left; }
+[data-dash-source-state=empty] { color: transparent; }
+[data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+</style>
+
+<div class="kv">
+  <header class="kv-head">
+    <h1 id="title">kernelRule vs 벤더</h1>
+    <p class="kv-take" id="takeaway">현재 규칙은 GPU <span data-source="verdict" data-field="total" class="dash-skeleton">—</span> 개 중 <b data-source="verdict" data-field="better" class="dash-skeleton">—</b> 개에서 벤더보다 평균 손해가 작습니다.<span id="similar-clause"> 벤더와 같은 수준인 GPU 는 <span data-source="verdict" data-field="similar" class="dash-skeleton">—</span> 입니다.</span></p>
+    <p class="kv-def">손해는 규칙이 고른 config 가 가장 빠른 config 보다 얼마나 느린지입니다 (시간 비의 기하평균 − 1, 0% 가 최적). 학습에 쓰지 않은 N·K 띠 (holdout) 의 형상에서 쟀습니다. 현재 규칙은 λ 0.1 상한과 죽은 항 정리로 키운 것 (D-199, seed 하나) 입니다.</p>
+  </header>
+
+  <section class="kv-tiles" id="tiles" aria-label="GPU 별 현재 규칙의 평균 손해">
+    <div class="kv-tile" data-gpu="a6000">
+      <div class="kv-tile-gpu">RTX A6000 · 현재 규칙</div>
+      <div class="kv-tile-big"><span data-source="summary" data-where="gpu=a6000" data-field="current" class="dash-skeleton">—</span>%</div>
+      <div class="kv-tile-sub">벤더 <span data-source="summary" data-where="gpu=a6000" data-field="vendor">—</span>%</div>
+      <div class="kv-tile-delta"><span class="kv-sign"></span><span data-source="gap" data-where="gpu=a6000" data-field="gap_pp">—</span>%p <span class="kv-word"></span></div>
+    </div>
+    <div class="kv-tile" data-gpu="5090">
+      <div class="kv-tile-gpu">RTX 5090 · 현재 규칙</div>
+      <div class="kv-tile-big"><span data-source="summary" data-where="gpu=5090" data-field="current" class="dash-skeleton">—</span>%</div>
+      <div class="kv-tile-sub">벤더 <span data-source="summary" data-where="gpu=5090" data-field="vendor">—</span>%</div>
+      <div class="kv-tile-delta"><span class="kv-sign"></span><span data-source="gap" data-where="gpu=5090" data-field="gap_pp">—</span>%p <span class="kv-word"></span></div>
+    </div>
+    <div class="kv-tile" data-gpu="4090">
+      <div class="kv-tile-gpu">RTX 4090 · 현재 규칙</div>
+      <div class="kv-tile-big"><span data-source="summary" data-where="gpu=4090" data-field="current" class="dash-skeleton">—</span>%</div>
+      <div class="kv-tile-sub">벤더 <span data-source="summary" data-where="gpu=4090" data-field="vendor">—</span>%</div>
+      <div class="kv-tile-delta"><span class="kv-sign"></span><span data-source="gap" data-where="gpu=4090" data-field="gap_pp">—</span>%p <span class="kv-word"></span></div>
+    </div>
+    <div class="kv-tile" data-gpu="h100">
+      <div class="kv-tile-gpu">H100 NVL · 현재 규칙</div>
+      <div class="kv-tile-big"><span data-source="summary" data-where="gpu=h100" data-field="current" class="dash-skeleton">—</span>%</div>
+      <div class="kv-tile-sub">벤더 <span data-source="summary" data-where="gpu=h100" data-field="vendor">—</span>%</div>
+      <div class="kv-tile-delta"><span class="kv-sign"></span><span data-source="gap" data-where="gpu=h100" data-field="gap_pp">—</span>%p <span class="kv-word"></span></div>
+    </div>
+  </section>
+
+  <section class="kv-grid">
+    <article class="kv-card" id="vs-vendor">
+      <h2>GPU 별 평균 손해: 현재 규칙과 벤더</h2>
+      <p class="kv-note">막대가 짧을수록 좋습니다.</p>
+      <div class="kv-legend"><span><i class="kv-sw" data-key="current"></i>현재 규칙</span><span><i class="kv-sw" data-key="vendor"></i>벤더</span></div>
+      <div class="kv-chart dash-skeleton" id="chart-vs" data-source="summary"></div>
+    </article>
+
+    <article class="kv-card" id="history">
+      <h2>지금까지의 규칙들과 견주면</h2>
+      <p class="kv-note">K1a 는 손으로 만든 규칙, 이전 규칙은 λ 1 상한으로 키운 것 (D-196) 입니다. 왼쪽일수록 좋습니다.</p>
+      <div class="kv-legend" id="history-legend"></div>
+      <div class="kv-chart dash-skeleton" id="chart-history" data-source="summary"></div>
+    </article>
+
+    <article class="kv-card" id="win-loss">
+      <h2>형상 하나하나를 벤더와 견주면</h2>
+      <p class="kv-note">이김은 벤더보다 1% 넘게 빠른 config, 짐은 1% 넘게 느린 config 를 고른 형상입니다.</p>
+      <div class="kv-legend"><span><i class="kv-sw" data-key="win"></i>이김</span><span><i class="kv-sw" data-key="tie"></i>비김 (1% 안)</span><span><i class="kv-sw" data-key="loss"></i>짐</span></div>
+      <div class="kv-chart dash-skeleton" id="chart-winloss" data-source="summary"></div>
+    </article>
+
+    <article class="kv-card" id="classes">
+      <h2>형상 분류별 평균 손해</h2>
+      <p class="kv-note">작은 M 은 M ≤ 32, split-K 필요는 가장 빠른 config 가 split-K 3 이상, 큰 격자는 M·N ÷ SM 수가 20만 넘는 형상입니다. 네 그림은 같은 눈금입니다.</p>
+      <div class="kv-legend"><span><i class="kv-sw" data-key="current"></i>현재 규칙</span><span><i class="kv-sw" data-key="vendor"></i>벤더</span></div>
+      <div class="kv-multi dash-skeleton" id="chart-classes" data-source="by_class"></div>
+    </article>
+  </section>
+
+  <article class="kv-card" id="numbers">
+    <h2>숫자로 보기</h2>
+    <p class="kv-note">평균 손해 (%) 와 형상별 승패. 쓸 수 있는 형상 수는 GPU 마다 다릅니다 (마지막 열).</p>
+    <div class="kv-table-wrap">
+      <table class="kv-table" data-source="summary" data-row-key="gpu">
+        <thead><tr>
+          <th data-field="gpu_name">GPU</th>
+          <th data-field="vendor">벤더</th>
+          <th data-field="k1a">K1a</th>
+          <th data-field="lam1">이전 (λ 1)</th>
+          <th data-field="current">현재</th>
+          <th data-field="wins">이김</th>
+          <th data-field="ties">비김</th>
+          <th data-field="losses">짐</th>
+          <th data-field="shapes">형상 수</th>
+        </tr></thead>
+        <tbody id="numbers-body"></tbody>
+      </table>
+    </div>
+  </article>
+</div>
+
+<script>
+dash.calc('gap', {
+  inputs: ['summary'],
+  title: '현재 규칙 − 벤더',
+  description: 'GPU 마다 현재 규칙의 평균 손해에서 벤더의 평균 손해를 뺀 값 (%p). 음수면 현재 규칙이 낫다.',
+  fn: (summary) => summary.map((r) => ({
+    gpu: r.gpu,
+    gap_pp: Math.round((Number(r.current) - Number(r.vendor)) * 100) / 100,
+  })),
+});
+
+dash.calc('verdict', {
+  inputs: ['summary'],
+  title: '벤더보다 나은 GPU 수',
+  description: '현재 규칙이 벤더보다 0.5%p 넘게 낮은 GPU 수, 그리고 차이가 0.5%p 안인 GPU 이름.',
+  fn: (summary) => {
+    const d = summary.map((r) => ({ name: r.gpu_name, g: Number(r.current) - Number(r.vendor) }));
+    return [{
+      total: d.length,
+      better: d.filter((x) => x.g < -0.5).length,
+      similar: d.filter((x) => Math.abs(x.g) <= 0.5).map((x) => x.name).join(' · ') || '없음',
+    }];
+  },
+});
+</script>
+
+<script>
+(() => {
+  const C = dash.colors;
+  const MUTED = 'var(--cds-chart-muted)';
+  const COLOR = {
+    current: C[0], lam1: C[1], k1a: C[2], vendor: MUTED,
+    win: C[0], tie: MUTED, loss: 'var(--cds-chart-status-critical)',
+  };
+  const LABEL = { current: '현재 규칙', lam1: '이전 규칙 (λ 1)', k1a: 'K1a', vendor: '벤더' };
+  const GPUS = ['a6000', '5090', '4090', 'h100'];
+  const fmt1 = (v) => `${Number(v).toFixed(1)}%`;
+  const root = document.querySelector('.kv');
+
+  // swatches and the dot-plot legend take their color from the same map as the marks
+  root.querySelectorAll('.kv-sw[data-key]').forEach((el) => { el.style.background = COLOR[el.dataset.key]; });
+  const hl = document.getElementById('history-legend');
+  ['current', 'lam1', 'k1a', 'vendor'].forEach((k) => {
+    const s = document.createElement('span');
+    const i = document.createElement('i');
+    i.className = 'kv-sw dot';
+    i.style.background = COLOR[k];
+    s.append(i, document.createTextNode(LABEL[k]));
+    hl.appendChild(s);
+  });
+
+  const rowsOf = (st) => GPUS.map((g) => st.data.find((r) => r.gpu === g)).filter(Boolean);
+
+  // ---- marks outside charts: fill with the data's own text
+  function fillMarks() {
+    root.querySelectorAll('[data-source][data-field]').forEach((el) => {
+      if (el.closest('table') || el.closest('.kv-chart') || el.closest('.kv-multi')) return;
+      const st = dash.data(el.dataset.source);
+      if (st.status !== 'ok') { el.textContent = '—'; el.classList.toggle('dash-skeleton', st.status === 'loading'); return; }
+      el.classList.remove('dash-skeleton');
+      let row = st.data[0];
+      if (el.dataset.where) {
+        const [k, v] = el.dataset.where.split('=');
+        row = st.data.find((r) => String(r[k]) === v);
+      }
+      el.textContent = row ? String(row[el.dataset.field]) : '—';
+    });
+    // tiles: sign and word follow the gap
+    const gap = dash.data('gap');
+    root.querySelectorAll('.kv-tile').forEach((tile) => {
+      const sign = tile.querySelector('.kv-sign');
+      const word = tile.querySelector('.kv-word');
+      const delta = tile.querySelector('.kv-tile-delta');
+      delta.classList.remove('good', 'bad');
+      sign.textContent = '';
+      word.textContent = '';
+      if (gap.status !== 'ok') return;
+      const r = gap.data.find((x) => x.gpu === tile.dataset.gpu);
+      if (!r) return;
+      const g = Number(r.gap_pp);
+      if (g > 0) sign.textContent = '+';
+      if (g < -0.5) { delta.classList.add('good'); word.textContent = '벤더보다 나음'; }
+      else if (g > 0.5) { delta.classList.add('bad'); word.textContent = '벤더보다 나쁨'; }
+      else { word.textContent = '벤더와 같은 수준'; }
+    });
+    const v = dash.data('verdict');
+    document.getElementById('similar-clause').hidden = v.status === 'ok' && v.data[0] && v.data[0].similar === '없음';
+  }
+
+  // ---- shared chart pieces
+  function ready(st, box) {
+    box.querySelectorAll('.kv-fail').forEach((n) => n.remove());
+    if (st.status === 'ok') { box.classList.remove('dash-skeleton'); return true; }
+    box.replaceChildren();
+    if (st.status === 'loading') { box.classList.add('dash-skeleton'); return false; }
+    box.classList.remove('dash-skeleton');
+    const f = document.createElement('div');
+    f.className = 'kv-fail';
+    const dot = document.createElement('span');
+    dot.className = 'kv-fail-dot';
+    f.append(dot, document.createTextNode('불러오지 못했습니다'));
+    box.appendChild(f);
+    return false;
+  }
+
+  function svgIn(box, w, h) {
+    const svg = d3.select(box).selectAll('svg').data([0]).join('svg')
+      .attr('width', '100%').attr('viewBox', `0 0 ${w} ${h}`).attr('role', 'img');
+    svg.selectAll('*').remove();
+    return svg;
+  }
+
+  function textWidth(svg, cls, strings) {
+    const t = svg.append('text').attr('class', cls);
+    let m = 0;
+    strings.forEach((s) => { t.text(s); m = Math.max(m, t.node().getComputedTextLength()); });
+    t.remove();
+    return m;
+  }
+
+  // a bar with a 4px rounded data end and a square baseline
+  const barPath = (x0, y, w, h, r = 4) => {
+    w = Math.max(0, w);
+    const rr = Math.min(r, h / 2, w);
+    return `M${x0},${y}H${x0 + w - rr}A${rr},${rr} 0 0 1 ${x0 + w},${y + rr}V${y + h - rr}A${rr},${rr} 0 0 1 ${x0 + w - rr},${y + h}H${x0}Z`;
+  };
+
+  function tipOf(box) {
+    let tip = box.querySelector(':scope > .kv-tip');
+    if (!tip) { tip = document.createElement('div'); tip.className = 'kv-tip'; tip.hidden = true; box.appendChild(tip); }
+    return {
+      show(event, head, lines) {
+        tip.replaceChildren();
+        const h = document.createElement('div');
+        h.className = 'kv-tip-head';
+        h.textContent = head;
+        tip.appendChild(h);
+        lines.forEach(([color, name, value]) => {
+          const row = document.createElement('div');
+          row.className = 'kv-tip-row';
+          if (color) { const sw = document.createElement('i'); sw.className = 'kv-sw'; sw.style.background = color; row.appendChild(sw); }
+          row.appendChild(document.createTextNode(name));
+          const b = document.createElement('b');
+          b.textContent = value;
+          row.appendChild(b);
+          tip.appendChild(row);
+        });
+        tip.hidden = false;
+        const [px, py] = event.type === 'focus'
+          ? [event.target.getBBox().x + event.target.getBBox().width, event.target.getBBox().y]
+          : d3.pointer(event, box);
+        const tw = tip.offsetWidth;
+        const left = Math.min(Math.max(0, px + 12), Math.max(0, box.clientWidth - tw));
+        tip.style.left = `${left}px`;
+        tip.style.top = `${Math.max(0, py + 12)}px`;
+      },
+      hide() { tip.hidden = true; },
+    };
+  }
+
+  function hover(sel, tip, content) {
+    sel.attr('tabindex', 0).classed('kv-mark', true)
+      .on('mouseenter mousemove focus', (event, d) => { const [h, l] = content(d); tip.show(event, h, l); })
+      .on('mouseleave blur', () => tip.hide());
+  }
+
+  // ---- 1. current vs vendor, grouped horizontal bars
+  function drawVs(st) {
+    const box = document.getElementById('chart-vs');
+    if (!ready(st, box)) return;
+    const rows = rowsOf(st);
+    const W = Math.max(280, box.clientWidth);
+    const barH = 14, inner = 2, pad = 18, top = 4, bottom = 24;
+    const groupH = barH * 2 + inner;
+    const H = top + rows.length * (groupH + pad) - pad + bottom;
+    const svg = svgIn(box, W, H);
+    const left = textWidth(svg, 'kv-ylabel', rows.map((r) => r.gpu_name)) + 12;
+    const right = textWidth(svg, 'kv-val', ['00.0%']) + 8;
+    const max = d3.max(rows, (r) => Math.max(+r.current, +r.vendor));
+    const x = d3.scaleLinear([0, Math.ceil(max / 5) * 5], [left, W - right]);
+    const ticks = x.ticks(Math.max(2, Math.floor((W - left - right) / 70)));
+    svg.append('g').selectAll('line').data(ticks).join('line')
+      .attr('x1', x).attr('x2', x).attr('y1', top).attr('y2', H - bottom).style('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('class', 'kv-tick')
+      .attr('x', x).attr('y', H - bottom + 16).attr('text-anchor', 'middle').text((t) => `${t}%`);
+    const tip = tipOf(box);
+    const marks = [];
+    rows.forEach((r, i) => {
+      const y0 = top + i * (groupH + pad);
+      svg.append('text').attr('class', 'kv-ylabel').attr('x', left - 8).attr('y', y0 + groupH / 2)
+        .attr('dy', '0.35em').attr('text-anchor', 'end').text(r.gpu_name);
+      ['current', 'vendor'].forEach((k, j) => {
+        const y = y0 + j * (barH + inner);
+        marks.push({ r, k, y });
+        svg.append('text').attr('class', 'kv-val').attr('x', x(+r[k]) + 4).attr('y', y + barH / 2)
+          .attr('dy', '0.35em').text(fmt1(r[k]));
+      });
+    });
+    const bars = svg.append('g').selectAll('path').data(marks).join('path')
+      .attr('d', (m) => barPath(x(0), m.y, x(+m.r[m.k]) - x(0), barH))
+      .style('fill', (m) => COLOR[m.k]);
+    hover(bars, tip, (m) => [m.r.gpu_name, [
+      [COLOR.current, LABEL.current, fmt1(m.r.current)],
+      [COLOR.vendor, LABEL.vendor, fmt1(m.r.vendor)]]]);
+    svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', top).attr('y2', H - bottom)
+      .style('stroke', 'var(--cds-chart-axis)');
+  }
+
+  // ---- 2. every rule so far, a dot plot per GPU
+  function drawHistory(st) {
+    const box = document.getElementById('chart-history');
+    if (!ready(st, box)) return;
+    const rows = rowsOf(st);
+    const keys = ['vendor', 'k1a', 'lam1', 'current'];          // drawn in this order: current on top
+    const W = Math.max(280, box.clientWidth);
+    const rowH = 40, top = 8, bottom = 24;
+    const H = top + rows.length * rowH + bottom;
+    const svg = svgIn(box, W, H);
+    const left = textWidth(svg, 'kv-ylabel', rows.map((r) => r.gpu_name)) + 16;
+    const right = 16;
+    const max = d3.max(rows, (r) => d3.max(keys, (k) => +r[k]));
+    const x = d3.scaleLinear([0, Math.ceil(max / 5) * 5], [left, W - right]);
+    const ticks = x.ticks(Math.max(2, Math.floor((W - left - right) / 70)));
+    svg.append('g').selectAll('line').data(ticks).join('line')
+      .attr('x1', x).attr('x2', x).attr('y1', top).attr('y2', H - bottom).style('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('class', 'kv-tick')
+      .attr('x', x).attr('y', H - bottom + 16).attr('text-anchor', 'middle').text((t) => `${t}%`);
+    const tip = tipOf(box);
+    const pts = [];
+    rows.forEach((r, i) => {
+      const y = top + i * rowH + rowH / 2;
+      svg.append('text').attr('class', 'kv-ylabel').attr('x', left - 10).attr('y', y)
+        .attr('dy', '0.35em').attr('text-anchor', 'end').text(r.gpu_name);
+      const vals = keys.map((k) => +r[k]);
+      svg.append('line').attr('x1', x(d3.min(vals))).attr('x2', x(d3.max(vals))).attr('y1', y).attr('y2', y)
+        .style('stroke', 'var(--cds-chart-reference)').style('stroke-width', '2px').style('stroke-linecap', 'round');
+      keys.forEach((k) => pts.push({ r, k, y }));
+    });
+    svg.append('g').selectAll('circle').data(pts).join('circle')
+      .attr('cx', (p) => x(+p.r[p.k])).attr('cy', (p) => p.y).attr('r', 5)
+      .style('fill', (p) => COLOR[p.k]).style('stroke', 'var(--color-panel)').style('stroke-width', '2px');
+    const hits = svg.append('g').selectAll('circle').data(pts).join('circle')
+      .attr('cx', (p) => x(+p.r[p.k])).attr('cy', (p) => p.y).attr('r', 12)
+      .style('fill', 'transparent');
+    hover(hits, tip, (p) => [p.r.gpu_name, ['current', 'lam1', 'k1a', 'vendor']
+      .map((k) => [COLOR[k], LABEL[k], fmt1(p.r[k])])]);
+  }
+
+  // ---- 3. per-shape wins, ties and losses against the vendor, 100% stacked bars
+  const lum = (color) => {
+    const el = document.createElement('span');
+    el.style.color = color;
+    root.appendChild(el);
+    const m = getComputedStyle(el).color.match(/[\d.]+/g) || ['0', '0', '0'];
+    el.remove();
+    const [r, g, b] = m.slice(0, 3).map(Number).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+
+  function drawWinLoss(st) {
+    const box = document.getElementById('chart-winloss');
+    if (!ready(st, box)) return;
+    const rows = rowsOf(st);
+    const W = Math.max(280, box.clientWidth);
+    const barH = 22, pad = 18, top = 4, bottom = 24;
+    const H = top + rows.length * (barH + pad) - pad + bottom;
+    const svg = svgIn(box, W, H);
+    const left = textWidth(svg, 'kv-ylabel', rows.map((r) => r.gpu_name)) + 12;
+    const right = 8;
+    const x = d3.scaleLinear([0, 1], [left, W - right]);
+    svg.append('g').selectAll('text').data([0, 0.5, 1]).join('text').attr('class', 'kv-tick')
+      .attr('x', x).attr('y', H - bottom + 16)
+      .attr('text-anchor', (t) => (t === 0 ? 'start' : t === 1 ? 'end' : 'middle'))
+      .text((t) => `${t * 100}%`);
+    const tip = tipOf(box);
+    const segs = [];
+    const LAB = { win: '이김', tie: '비김', loss: '짐' };
+    rows.forEach((r, i) => {
+      const y = top + i * (barH + pad);
+      svg.append('text').attr('class', 'kv-ylabel').attr('x', left - 8).attr('y', y + barH / 2)
+        .attr('dy', '0.35em').attr('text-anchor', 'end').text(r.gpu_name);
+      const n = +r.shapes;
+      let acc = 0;
+      [['win', +r.wins], ['tie', +r.ties], ['loss', +r.losses]].forEach(([k, c], j, all) => {
+        const x0 = x(acc / n) + (j ? 1 : 0);
+        acc += c;
+        const x1 = x(acc / n) - (j < all.length - 1 ? 1 : 0);   // a 2px surface gap between segments
+        segs.push({ r, k, c, n, y, x0, w: Math.max(0, x1 - x0) });
+      });
+    });
+    const rects = svg.append('g').selectAll('rect').data(segs).join('rect')
+      .attr('x', (s) => s.x0).attr('y', (s) => s.y).attr('width', (s) => s.w).attr('height', barH)
+      .attr('rx', 3).style('fill', (s) => COLOR[s.k]);
+    hover(rects, tip, (s) => [s.r.gpu_name, [[COLOR[s.k], LAB[s.k], `${s.c} / ${s.n} 형상 (${Math.round((100 * s.c) / s.n)}%)`]]]);
+    const ink = {};
+    ['win', 'tie', 'loss'].forEach((k) => { ink[k] = lum(COLOR[k]) > 0.4 ? '#1d1d1b' : '#ffffff'; });
+    segs.forEach((s) => {
+      const t = svg.append('text').attr('class', 'kv-val').attr('x', s.x0 + s.w / 2).attr('y', s.y + barH / 2)
+        .attr('dy', '0.35em').attr('text-anchor', 'middle').style('fill', ink[s.k]).style('pointer-events', 'none').text(s.c);
+      if (t.node().getComputedTextLength() + 10 > s.w) t.remove();      // no label that does not fit
+    });
+  }
+
+  // ---- 4. per class, small multiples on one shared scale
+  function drawClasses(st) {
+    const box = document.getElementById('chart-classes');
+    if (!ready(st, box)) return;
+    const order = ['small', 'hungry', 'mid', 'big'];
+    const max = d3.max(st.data, (r) => Math.max(+r.current, +r.vendor));
+    const domain = [0, Math.ceil(max / 5) * 5];
+    const panels = d3.select(box).selectAll('.kv-panel').data(GPUS).join((enter) => {
+      const p = enter.append('div').attr('class', 'kv-panel');
+      p.append('div').attr('class', 'kv-panel-title');
+      p.append('div').attr('class', 'kv-chart kv-panel-chart').style('min-height', '0');
+      return p;
+    });
+    panels.each(function (g) {
+      const rows = order.map((c) => st.data.find((r) => r.gpu === g && r.class === c)).filter(Boolean);
+      d3.select(this).select('.kv-panel-title').text(rows[0] ? rows[0].gpu_name : g);
+      const cbox = this.querySelector('.kv-panel-chart');
+      const W = Math.max(240, cbox.clientWidth);
+      const barH = 10, inner = 2, pad = 12, top = 2, bottom = 22;
+      const groupH = barH * 2 + inner;
+      const H = top + rows.length * (groupH + pad) - pad + bottom;
+      const svg = svgIn(cbox, W, H);
+      const left = textWidth(svg, 'kv-ylabel', rows.map((r) => r.class_label)) + 10;
+      const right = textWidth(svg, 'kv-val', ['00.0%']) + 6;
+      const x = d3.scaleLinear(domain, [left, W - right]);
+      const ticks = x.ticks(Math.max(2, Math.floor((W - left - right) / 60)));
+      svg.append('g').selectAll('line').data(ticks).join('line')
+        .attr('x1', x).attr('x2', x).attr('y1', top).attr('y2', H - bottom).style('stroke', 'var(--cds-chart-grid)');
+      svg.append('g').selectAll('text').data(ticks).join('text').attr('class', 'kv-tick')
+        .attr('x', x).attr('y', H - bottom + 15).attr('text-anchor', 'middle').text((t) => `${t}%`);
+      const tip = tipOf(cbox);
+      const marks = [];
+      rows.forEach((r, i) => {
+        const y0 = top + i * (groupH + pad);
+        svg.append('text').attr('class', 'kv-ylabel').attr('x', left - 6).attr('y', y0 + groupH / 2)
+          .attr('dy', '0.35em').attr('text-anchor', 'end').text(r.class_label);
+        ['current', 'vendor'].forEach((k, j) => {
+          const y = y0 + j * (barH + inner);
+          marks.push({ r, k, y });
+          svg.append('text').attr('class', 'kv-val').attr('x', x(+r[k]) + 3).attr('y', y + barH / 2)
+            .attr('dy', '0.35em').text(fmt1(r[k]));
+        });
+      });
+      const bars = svg.append('g').selectAll('path').data(marks).join('path')
+        .attr('d', (m) => barPath(x(0), m.y, x(+m.r[m.k]) - x(0), barH, 3))
+        .style('fill', (m) => COLOR[m.k]);
+      hover(bars, tip, (m) => [`${m.r.gpu_name} · ${m.r.class_label}`, [
+        [COLOR.current, LABEL.current, fmt1(m.r.current)],
+        [COLOR.vendor, LABEL.vendor, fmt1(m.r.vendor)]]]);
+      svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', top).attr('y2', H - bottom)
+        .style('stroke', 'var(--cds-chart-axis)');
+    });
+  }
+
+  // ---- 5. the table: words only, one row per GPU
+  function drawTable(st) {
+    const body = document.getElementById('numbers-body');
+    body.replaceChildren();
+    if (st.status !== 'ok') return;
+    const cols = ['gpu_name', 'vendor', 'k1a', 'lam1', 'current', 'wins', 'ties', 'losses', 'shapes'];
+    rowsOf(st).forEach((r) => {
+      const tr = document.createElement('tr');
+      tr.dataset.key = r.gpu;
+      cols.forEach((c) => { const td = document.createElement('td'); td.textContent = String(r[c]); tr.appendChild(td); });
+      body.appendChild(tr);
+    });
+  }
+
+  dash.onData(() => {
+    const s = dash.data('summary');
+    const b = dash.data('by_class');
+    fillMarks();
+    drawVs(s);
+    drawHistory(s);
+    drawWinLoss(s);
+    drawClasses(b);
+    drawTable(s);
+  });
+})();
+</script>
