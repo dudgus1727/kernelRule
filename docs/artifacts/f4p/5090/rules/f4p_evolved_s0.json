@@ -1,0 +1,74 @@
+{
+ "name": "f4p evolved s0 (5090)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.splitk_excess_log * w[0]\n    if p.roofline_ratio < 1:\n        s = s + f.occupancy_deficit * w[1]\n    else:\n        s = s + f.instruction_density * w[2]\n    return s",
+   "w0": [
+    2.4788563396161134,
+    -27.394769277513902,
+    -1636.908964059186
+   ],
+   "extra_features": [
+    "runs/f4p-5090-f0-s0/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    if p.roofline_ratio < 1:\n        s = s + np.log2(f.edge_padded_work_ratio) * w[0]\n        s = s + np.log2(f.cta_wave_tail_ratio) * w[1]\n        s = s + f.splitk_excess_log * w[2]\n    else:\n        s = s + np.log2(f.edge_padded_work_ratio) * w[3]\n        s = s + np.log2(f.cta_wave_tail_ratio) * w[4]\n        s = s + f.occupancy_deficit * w[5]\n        s = s + f.pipeline_residency_time * w[6]\n        s = s + f.splitk_excess_log * w[7]\n    return s",
+   "w0": [
+    2.092325282818985,
+    2.060172796598958,
+    2.683435704649625,
+    -7.901795739756543,
+    5.8412051305296595,
+    21.63427291124656,
+    459.74962181174203,
+    1.8100653614219249
+   ],
+   "extra_features": []
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.boundary_cta_fraction * w[0]\n    s = s + np.log2(1.0 + 1000000.0 * f.instruction_overhead_per_flop) * w[1]\n    s = s + f.splitk_excess_log * w[2]\n    if p.roofline_ratio < 1.0:\n        s = s + f.pipeline_stage_time_ratio * w[5]\n    else:\n        s = s + np.log2(1.0 + 10000.0 * f.mainloop_barrier_work_per_flop) * w[3]\n        s = s + f.occupancy_deficit * w[4]\n        s = s + f.pipeline_stage_time_ratio * w[6]\n    s = s + f.grid_parallelism_deficit * w[7]\n    s = s + f.final_wave_raggedness * w[8]\n    s = s + f.log_roofline_time_mraster * w[9]\n    if p.gemm_working_set_l2_pressure < 1.0:\n        s = s + np.log2(1.0 + f.dram_w1_hz_ratio) * w[10]\n        s = s + np.log2(1.0 + f.dram_w1_id_ratio) * w[11]\n        s = s + f.raster_ideal_reuse_traffic_ratio * w[12]\n        s = s + np.log2(1.0 + 1000.0 * f.raster_reuse_window_l2_pressure) * w[13]\n    else:\n        s = s + np.log2(1.0 + f.dram_w1_hz_ratio) * w[14]\n        s = s + np.log2(1.0 + f.dram_w1_id_ratio) * w[15]\n        s = s + f.raster_ideal_reuse_traffic_ratio * w[16]\n        s = s + np.log2(1.0 + 1000.0 * f.raster_reuse_window_l2_pressure) * w[17]\n    return s",
+   "w0": [
+    8.667230778262049,
+    3.972538196397848,
+    2.1754867081069134,
+    14.164079438807637,
+    18.94711207622294,
+    -2.2280160154421917,
+    462.08246988288766,
+    7.572347243734713,
+    5.840678870312484,
+    -0.38981872483682023,
+    -0.984504967041601,
+    -0.9845049670416035,
+    -2.588435502127316,
+    2.796323037579421,
+    0.9252895771940176,
+    -0.7640117076124521,
+    3.0638076054559242,
+    1.4514888760376137
+   ],
+   "extra_features": [
+    "runs/f4p-5090-f2-s0/features.jsonl"
+   ]
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.log_roofline_time_mraster * w[0]\n    s = s + f.coalescing_aspect_penalty * w[1]\n    s = s + f.splitk_excess_log * w[2]\n    s = s + np.log2(f.accumulator_tile_bytes) * w[7]\n    if p.roofline_ratio < 1.0:\n        s = s + f.occupancy_deficit * w[3]\n        s = s + f.raster_reuse_distance_l2_ratio * w[4]\n        s = s + f.register_file_pressure * w[8]\n        s = s + f.shared_memory_pressure * w[9]\n    else:\n        s = s + f.occupancy_deficit * w[5]\n        s = s + f.instruction_density * w[6]\n        s = s + f.register_file_pressure * w[10]\n        s = s + f.shared_memory_pressure * w[11]\n    return s",
+   "w0": [
+    2.289542551781726,
+    1.7714516870315495,
+    2.712490759323868,
+    -25.178974424832216,
+    -5321.615171765869,
+    22.54303994450535,
+    -1519.3144742646489,
+    0.30468567212392517,
+    -0.9501913145139552,
+    8.117595586272989,
+    6.482448862025379,
+    -1.5077284151178871
+   ],
+   "extra_features": []
+  }
+ }
+}

@@ -1,0 +1,84 @@
+{
+ "name": "f4p evolved s0 (4090)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + np.log2(f.pipeline_stage_service_time_ratio) * w[0]\n    s = s + np.log2(f.cta_wave_tail_ratio) * w[1]\n    if p.roofline_ratio < 1.0:\n        s = s + f.occupancy_deficit * w[2]\n    else:\n        pass\n    s = s + f.cta_register_file_pressure * w[3]\n    s = s + f.cta_smem_capacity_pressure * w[4]\n    s = s + f.tm_cta_warps * w[5]\n    s = s + f.tm_regstaged * w[6]\n    s = s + np.log2(f.tm_crit_ratio) * w[7]\n    if p.roofline_ratio < 1.0:\n        s = s + np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[8]\n        s = s + f.splitk_excess_log * w[9]\n        s = s + f.splitk_roofline_log_time * w[10]\n        s = s + f.splitk_sm_latency_rounds_log * w[11]\n    else:\n        s = s + np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[12]\n        s = s + f.splitk_excess_log * w[13]\n        s = s + f.splitk_roofline_log_time * w[14]\n        s = s + f.splitk_sm_latency_rounds_log * w[15]\n    return s",
+   "w0": [
+    3.5379715097621225,
+    4.2979242582832855,
+    25.16198042493334,
+    0.36433799028814756,
+    7.517749242481267,
+    2.0161858595481497,
+    5.595158750998557,
+    1.2084971300631806,
+    2.553113370020822,
+    3.859490688452137,
+    3.537547450465204,
+    1.7707157668205726,
+    1.2807805835114259,
+    1.8972031812208634,
+    1.1857498083964504,
+    1.498307110162972
+   ],
+   "extra_features": [
+    "runs/f4p-4090-f0-s0/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.launch_wave_tail_fraction * w[0]\n    s = s + f.splitk_excess_log * w[1]\n    s = s + np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[2]\n    s = s + np.log2(f.pipeline_depth_time_ratio) * w[3]\n    if p.roofline_ratio < 1.0:\n        s = s + np.log2(1.0 + f.input_load_coalescing_pressure) * w[4]\n        s = s + np.log2(1.0 + f.output_store_coalescing_pressure) * w[5]\n        s = s + (f.a_refetch_bw_demand + f.b_refetch_bw_demand) * w[6]\n        s = s + np.log2(1.0 + f.raster_band_l2_pressure) * w[7]\n        s = s + p.alignment_transaction_penalty * (np.log2(1.0 + f.input_load_coalescing_pressure) + np.log2(1.0 + f.output_store_coalescing_pressure)) * w[6]\n    else:\n        s = s + f.register_file_pressure * w[8]\n        s = s + f.shared_memory_pressure * w[9]\n    return s",
+   "w0": [
+    9.695510761751104,
+    0.9281443201315207,
+    1.4003863165956596,
+    1.7273436335020695,
+    3.340834428589124,
+    -0.7472121559731002,
+    28.644103766288804,
+    -40.07893969883488,
+    7.058134157520943,
+    -0.1338138194788628
+   ],
+   "extra_features": [
+    "runs/f4p-4090-f1-s0/features.jsonl"
+   ]
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.splitk_excess_log * w[0]\n    s = s + f.instruction_amortization_density * w[1]\n    s = s + np.where(f.tm_regstaged > 0.5,\n                     np.log2(1.0 + f.mainloop_barrier_count) * w[2],\n                     np.log2(1.0 + f.mainloop_barrier_count) * w[3])\n    if p.roofline_ratio < 1.0:\n        pass\n    else:\n        s = s + f.occupancy_deficit * w[4]\n    if p.alignment_traffic_deficit > 0.0:\n        pass\n    else:\n        pass\n    if p.pipeline_latency_occupancy_time_ratio < 4000.0:\n        s = s + np.where(f.tm_regstaged > 0.5,\n                         f.cta_register_file_pressure,\n                         f.multistage_stage_depth_exposure) * w[5]\n        s = s + np.where(f.tm_regstaged > 0.5,\n                         f.cta_shared_memory_pressure,\n                         f.cta_register_file_pressure) * w[6]\n    else:\n        s = s + np.where(f.tm_regstaged > 0.5,\n                         f.cta_register_file_pressure,\n                         f.multistage_stage_depth_exposure) * w[7]\n        s = s + np.where(f.tm_regstaged > 0.5,\n                         f.cta_shared_memory_pressure,\n                         f.cta_register_file_pressure) * w[8]\n    return s",
+   "w0": [
+    2.550283507851473,
+    -24.16110234172293,
+    0.45713796711581295,
+    0.23012236919858597,
+    2.7425812417605924,
+    5.969131884177755,
+    7.319937036847017,
+    2.2852741814785773,
+    6.653909931670803
+   ],
+   "extra_features": [
+    "runs/f4p-4090-f2-s0/features.jsonl"
+   ]
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + np.log2(f.operand_panel_transaction_amplification) * w[0]\n    s = s + np.log2(1.0 + f.barrier_arrival_density) * w[1]\n    if p.roofline_ratio < 1.0:\n        s = s + f.cta_wave_tail_deficit * w[2]\n    else:\n        s = s + f.tm_cta_warps * w[3]\n        s = s + f.register_file_pressure * w[4]\n    if p.output_parallelism_deficit > 0.0001:\n        s = s + f.splitk_excess_log * w[5]\n        s = s + f.splitk_sm_latency_rounds_log * w[6]\n        s = s + np.log2(1.0 + f.splitk_roofline_log_time) * w[7]\n    else:\n        s = s + f.splitk_excess_log * w[8]\n        s = s + np.log2(1.0 + f.splitk_roofline_log_time) * w[9]\n        s = s + np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[10]\n    if p.l2_working_set_pressure >= 1.0:\n        s = s + np.fmin(\n            np.log2(1.0 + f.dram_w1_hz_ratio + f.a_refetch_bw_demand),\n            np.log2(1.0 + f.dram_w1_id_ratio + f.b_refetch_bw_demand)\n        ) * w[11]\n        s = s + f.log_roofline_time_mraster * w[12]\n        s = s + np.log2(1.0 + f.raster_band_l2_pressure) * w[13]\n    return s",
+   "w0": [
+    0.8154368143015263,
+    -1.3811981980058883,
+    2.4585404226403047,
+    2.0868417589238004,
+    6.894613020858987,
+    3.897536076728471,
+    1.381784614128285,
+    5.198398210755959,
+    1.6762697867666911,
+    2.973790522929979,
+    -0.6461609857719367,
+    -0.9491268668826418,
+    2.9159600169992816,
+    -6.802413794794545
+   ],
+   "extra_features": []
+  }
+ }
+}

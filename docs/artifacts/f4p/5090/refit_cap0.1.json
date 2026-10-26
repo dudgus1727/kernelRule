@@ -1,0 +1,826 @@
+{
+ "protocol": {
+  "fit": {
+   "method": "cma",
+   "n_restarts": 2,
+   "max_evals": 2000
+  },
+  "design": "nkband",
+  "inner_cv": null,
+  "gpu": "5090",
+  "library": "runs/f4p-5090-f* (fold 마다)",
+  "extra_features": [
+   "runs/f4p-5090-f0-s0/features.jsonl",
+   "runs/f4p-5090-f2-s0/features.jsonl"
+  ],
+  "ext_contract_features": [],
+  "dev_holdout_hidden": false,
+  "n_perm": 0,
+  "cap": 0.1,
+  "lib_gpu": null,
+  "no_fit": false
+ },
+ "aggregate": {
+  "n_folds_ok": 4,
+  "train_gm": 1.05287,
+  "holdout_gm_65": 1.069265,
+  "vendor_gm_65": 1.145956,
+  "folds_beating_vendor": 4,
+  "holdout_by_fold": {
+   "0": 1.138767,
+   "1": 1.048371,
+   "2": 1.059382,
+   "3": 1.022608
+  },
+  "holdout_by_class": {
+   "big": 1.008132,
+   "hungry": 1.07022,
+   "mid": 1.110764,
+   "small": 1.056178
+  },
+  "vendor_by_class": {
+   "big": 1.034592,
+   "hungry": 1.129112,
+   "mid": 1.209619,
+   "small": 1.296646
+  },
+  "sk_ge3_picked_on_hard": "34/48",
+  "hard_gm": 1.07022,
+  "easy_gm": 1.066574
+ },
+ "per_fold": {
+  "0": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 2,
+    "depth": 1,
+    "n_weights": 3,
+    "features": [
+     "instruction_density",
+     "occupancy_deficit",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "train_gm": 1.120354,
+   "w": [
+    2.4788563396161134,
+    -27.394769277513902,
+    -1636.908964059186
+   ],
+   "moved": false,
+   "picks": {
+    "512x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 5,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x64x32"
+    },
+    "4096x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1500x4096x4096": {
+     "sk_pick": 4,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "8x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "384x4096x4096": {
+     "sk_pick": 3,
+     "sk_best": 3,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x64x32"
+    },
+    "1x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 3,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "8192x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "32x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "4608x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 5,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x64x32"
+    },
+    "1000x4096x4096": {
+     "sk_pick": 1,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x64x32"
+    },
+    "128x4096x4096": {
+     "sk_pick": 5,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "256x4096x4096": {
+     "sk_pick": 5,
+     "sk_best": 5,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x4096": {
+     "sk_pick": 3,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "3072x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x128x32"
+    },
+    "768x4096x4096": {
+     "sk_pick": 3,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x64x32"
+    },
+    "1536x4096x4096": {
+     "sk_pick": 4,
+     "sk_best": 7,
+     "tile_pick": "128x256x32",
+     "tile_best": "128x64x32"
+    },
+    "3000x4096x4096": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x256x32",
+     "tile_best": "64x128x32"
+    }
+   },
+   "holdout_gm": 1.138767,
+   "vendor_gm": 1.18811,
+   "static_top1": 1.030394,
+   "c2_native_median": 1.054384,
+   "beats_vendor": true,
+   "n_hold": 18,
+   "hold_sk_ge3": {
+    "n": 17,
+    "picked_ge3": 7,
+    "gm": 1.138122,
+    "vendor_gm": 1.192151
+   },
+   "hold_sk_lt3_gm": 1.149798,
+   "sk_picked_hold": {
+    "2": 9,
+    "4": 2,
+    "3": 3,
+    "1": 2,
+    "5": 2
+   },
+   "regret": {
+    "512x4096x4096": 1.2916666035073145,
+    "4096x4096x4096": 1.1701492513973315,
+    "1500x4096x4096": 1.1846153346739006,
+    "8x4096x4096": 1.0126582014225756,
+    "384x4096x4096": 1.1578947973071296,
+    "1x4096x4096": 1.0714285296660602,
+    "8192x4096x4096": 1.107412943445932,
+    "32x4096x4096": 1.0,
+    "4608x4096x4096": 1.0586666472123731,
+    "1024x4096x4096": 1.2584269690478314,
+    "1000x4096x4096": 1.2584269690478314,
+    "128x4096x4096": 1.1176469895886398,
+    "256x4096x4096": 1.0357142973149833,
+    "2048x4096x4096": 1.1286549239807129,
+    "3072x4096x4096": 1.1225296542718095,
+    "768x4096x4096": 1.2352940861766544,
+    "1536x4096x4096": 1.1921874797112721,
+    "3000x4096x4096": 1.1497976576717759
+   }
+  },
+  "1": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 2,
+    "depth": 1,
+    "n_weights": 8,
+    "features": [
+     "cta_wave_tail_ratio",
+     "edge_padded_work_ratio",
+     "occupancy_deficit",
+     "pipeline_residency_time",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "train_gm": 1.026112,
+   "w": [
+    1.4164366803764408,
+    0.006094687744440233,
+    3.2173462389090353,
+    -7.229953928023809,
+    5.843901284576417,
+    19.66937412365964,
+    376.8838334343248,
+    2.0991453293135343
+   ],
+   "moved": true,
+   "picks": {
+    "512x4096x11008": {
+     "sk_pick": 5,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x128x32"
+    },
+    "4096x4096x11008": {
+     "sk_pick": 8,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x2048": {
+     "sk_pick": 4,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "4096x4096x8192": {
+     "sk_pick": 8,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "4096x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x64x32"
+    },
+    "8x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "1x4096x11008": {
+     "sk_pick": 4,
+     "sk_best": 4,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "8192x4096x11008": {
+     "sk_pick": 8,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "8192x8192x8192": {
+     "sk_pick": 4,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "32x4096x11008": {
+     "sk_pick": 2,
+     "sk_best": 4,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "1024x4096x11008": {
+     "sk_pick": 5,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "128x4096x11008": {
+     "sk_pick": 5,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "256x4096x11008": {
+     "sk_pick": 5,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x128x32"
+    },
+    "2048x4096x11008": {
+     "sk_pick": 7,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x256": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x64x32"
+    },
+    "2048x2048x2048": {
+     "sk_pick": 5,
+     "sk_best": 6,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    }
+   },
+   "holdout_gm": 1.048371,
+   "vendor_gm": 1.111096,
+   "static_top1": 1.128539,
+   "c2_native_median": 1.066371,
+   "beats_vendor": true,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 14,
+    "picked_ge3": 12,
+    "gm": 1.039068,
+    "vendor_gm": 1.083131
+   },
+   "hold_sk_lt3_gm": 1.11587,
+   "sk_picked_hold": {
+    "5": 5,
+    "8": 3,
+    "4": 3,
+    "1": 2,
+    "2": 2,
+    "7": 1
+   },
+   "regret": {
+    "512x4096x11008": 1.0512820672276078,
+    "4096x4096x11008": 1.0101925375007648,
+    "4096x4096x2048": 1.0232558218236427,
+    "4096x4096x8192": 1.0121027899696844,
+    "4096x4096x256": 1.037637538771122,
+    "8x4096x11008": 1.0909091209750312,
+    "1x4096x11008": 1.0298295518748766,
+    "8192x4096x11008": 1.0017064976370935,
+    "8192x8192x8192": 1.0028785928682422,
+    "32x4096x11008": 1.1212121613000416,
+    "1024x4096x11008": 1.0440528789682577,
+    "128x4096x11008": 1.0833332575421109,
+    "256x4096x11008": 1.0156250053290705,
+    "2048x4096x11008": 1.0268456467603628,
+    "2048x4096x256": 1.2000000727595779,
+    "2048x2048x2048": 1.0416666035073145
+   }
+  },
+  "2": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 4,
+    "depth": 1,
+    "n_weights": 18,
+    "features": [
+     "boundary_cta_fraction",
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "final_wave_raggedness",
+     "grid_parallelism_deficit",
+     "instruction_overhead_per_flop",
+     "log_roofline_time_mraster",
+     "mainloop_barrier_work_per_flop",
+     "occupancy_deficit",
+     "pipeline_stage_time_ratio",
+     "raster_ideal_reuse_traffic_ratio",
+     "raster_reuse_window_l2_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "train_gm": 1.030612,
+   "w": [
+    4.74366967073478,
+    4.00073833830027,
+    2.6322885639131437,
+    4.871235268569642,
+    22.55689415698924,
+    -1.7079009347532135,
+    413.6956805414417,
+    -0.17815841984058198,
+    5.001337537403869,
+    -0.3511771132260105,
+    -0.9161103689514123,
+    -0.9510795617417724,
+    -0.8230074821633605,
+    2.297516623838253,
+    0.5065591391854364,
+    -1.00497020056292,
+    -7.408143346867899,
+    1.408757296257983
+   ],
+   "moved": true,
+   "picks": {
+    "512x11008x4096": {
+     "sk_pick": 4,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x128x32"
+    },
+    "4096x4096x1024": {
+     "sk_pick": 2,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x64x32"
+    },
+    "4096x4096x128": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x64x32"
+    },
+    "4096x11008x4096": {
+     "sk_pick": 8,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "8x11008x4096": {
+     "sk_pick": 7,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "64x128x32"
+    },
+    "1x11008x4096": {
+     "sk_pick": 7,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "8192x11008x4096": {
+     "sk_pick": 5,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "32x11008x4096": {
+     "sk_pick": 5,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "1024x4096x4098": {
+     "sk_pick": 5,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "256x128x32"
+    },
+    "1024x11008x4096": {
+     "sk_pick": 4,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4098x4096": {
+     "sk_pick": 5,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "128x11008x4096": {
+     "sk_pick": 3,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "256x11008x4096": {
+     "sk_pick": 5,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "2048x4096x1024": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x64x32"
+    },
+    "2048x11008x4096": {
+     "sk_pick": 16,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "16384x16384x16384": {
+     "sk_pick": 5,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x128x32"
+    }
+   },
+   "holdout_gm": 1.059382,
+   "vendor_gm": 1.146374,
+   "static_top1": 1.047373,
+   "c2_native_median": 1.079841,
+   "beats_vendor": true,
+   "n_hold": 16,
+   "hold_sk_ge3": {
+    "n": 7,
+    "picked_ge3": 7,
+    "gm": 1.045573,
+    "vendor_gm": 1.106214
+   },
+   "hold_sk_lt3_gm": 1.070249,
+   "sk_picked_hold": {
+    "4": 2,
+    "2": 1,
+    "1": 2,
+    "8": 1,
+    "7": 2,
+    "5": 6,
+    "3": 1,
+    "16": 1
+   },
+   "regret": {
+    "512x11008x4096": 1.0762712099553349,
+    "4096x4096x1024": 1.0449438349217675,
+    "4096x4096x128": 1.0635386411816872,
+    "4096x11008x4096": 1.0090600260095306,
+    "8x11008x4096": 1.1250000426325641,
+    "1x11008x4096": 1.1290323034919316,
+    "8192x11008x4096": 1.006278586789718,
+    "32x11008x4096": 1.062500021316282,
+    "1024x4096x4098": 1.0198019873306126,
+    "1024x11008x4096": 1.0307017322714436,
+    "1024x4098x4096": 1.0240881167037559,
+    "128x11008x4096": 1.0476190641178178,
+    "256x11008x4096": 1.093750031974423,
+    "2048x4096x1024": 1.2083333207014628,
+    "2048x11008x4096": 1.029082800267703,
+    "16384x16384x16384": 1.0011720838691525
+   }
+  },
+  "3": {
+   "check": {
+    "ok": true,
+    "violations": [],
+    "n_paths": 2,
+    "depth": 1,
+    "n_weights": 12,
+    "features": [
+     "accumulator_tile_bytes",
+     "coalescing_aspect_penalty",
+     "instruction_density",
+     "log_roofline_time_mraster",
+     "occupancy_deficit",
+     "raster_reuse_distance_l2_ratio",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "train_gm": 1.04007,
+   "w": [
+    2.1597624989864808,
+    0.1747735744952917,
+    2.7746180308966184,
+    -21.986670586094593,
+    32.56658370192781,
+    8.351397273877716,
+    0.0,
+    1.5541082055302196,
+    -1.5142714328120352,
+    -6.7610390593455785,
+    6.080300186240349,
+    -0.49819886970652894
+   ],
+   "moved": true,
+   "picks": {
+    "512x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x128x32"
+    },
+    "4096x4096x512": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "128x128x32",
+     "tile_best": "64x64x32"
+    },
+    "4096x4096x16384": {
+     "sk_pick": 8,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "4096x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 3,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "8x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "1x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x32"
+    },
+    "8192x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 2,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "32x12288x4096": {
+     "sk_pick": 1,
+     "sk_best": 1,
+     "tile_pick": "32x128x32",
+     "tile_best": "32x128x64"
+    },
+    "1024x4096x4100": {
+     "sk_pick": 5,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "1024x4100x4096": {
+     "sk_pick": 5,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "128x12288x4096": {
+     "sk_pick": 3,
+     "sk_best": 5,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "256x12288x4096": {
+     "sk_pick": 5,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    },
+    "2048x4096x16384": {
+     "sk_pick": 8,
+     "sk_best": 12,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x64x32"
+    },
+    "2048x12288x4096": {
+     "sk_pick": 2,
+     "sk_best": 7,
+     "tile_pick": "128x128x32",
+     "tile_best": "128x128x32"
+    }
+   },
+   "holdout_gm": 1.022608,
+   "vendor_gm": 1.133664,
+   "static_top1": 1.039504,
+   "c2_native_median": 1.024604,
+   "beats_vendor": true,
+   "n_hold": 15,
+   "hold_sk_ge3": {
+    "n": 10,
+    "picked_ge3": 8,
+    "gm": 1.021176,
+    "vendor_gm": 1.106966
+   },
+   "hold_sk_lt3_gm": 1.025478,
+   "sk_picked_hold": {
+    "3": 3,
+    "1": 5,
+    "8": 2,
+    "2": 2,
+    "5": 3
+   },
+   "regret": {
+    "512x12288x4096": 1.0,
+    "4096x4096x512": 1.0851063319251517,
+    "4096x4096x16384": 1.0099236510974055,
+    "4096x12288x4096": 1.0136779164133227,
+    "8x12288x4096": 1.0,
+    "1x12288x4096": 1.0,
+    "8192x12288x4096": 1.0160755932636787,
+    "32x12288x4096": 1.0285714374807642,
+    "1024x4096x4100": 1.0223641637794676,
+    "1024x12288x4096": 1.0158102816813592,
+    "1024x4100x4096": 1.0333333441125296,
+    "128x12288x4096": 1.0232558218236427,
+    "256x12288x4096": 1.0289855164158255,
+    "2048x4096x16384": 1.0288315170011413,
+    "2048x12288x4096": 1.0361445022689884
+   }
+  }
+ },
+ "rule_file": "docs/artifacts/f4p/5090/rules/f4p_evolved_s0.json",
+ "rule": {
+  "name": "f4p evolved s0 (5090)",
+  "per_fold": {
+   "0": {
+    "code": "def score(f, p, hw, w):\n    sm = np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.splitk_excess_log * w[0]\n    if p.roofline_ratio < 1:\n        s = s + f.occupancy_deficit * w[1]\n    else:\n        s = s + f.instruction_density * w[2]\n    return s",
+    "w0": [
+     2.4788563396161134,
+     -27.394769277513902,
+     -1636.908964059186
+    ],
+    "extra_features": [
+     "runs/f4p-5090-f0-s0/features.jsonl"
+    ]
+   },
+   "1": {
+    "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    if p.roofline_ratio < 1:\n        s = s + np.log2(f.edge_padded_work_ratio) * w[0]\n        s = s + np.log2(f.cta_wave_tail_ratio) * w[1]\n        s = s + f.splitk_excess_log * w[2]\n    else:\n        s = s + np.log2(f.edge_padded_work_ratio) * w[3]\n        s = s + np.log2(f.cta_wave_tail_ratio) * w[4]\n        s = s + f.occupancy_deficit * w[5]\n        s = s + f.pipeline_residency_time * w[6]\n        s = s + f.splitk_excess_log * w[7]\n    return s",
+    "w0": [
+     2.092325282818985,
+     2.060172796598958,
+     2.683435704649625,
+     -7.901795739756543,
+     5.8412051305296595,
+     21.63427291124656,
+     459.74962181174203,
+     1.8100653614219249
+    ],
+    "extra_features": []
+   },
+   "2": {
+    "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.boundary_cta_fraction * w[0]\n    s = s + np.log2(1.0 + 1000000.0 * f.instruction_overhead_per_flop) * w[1]\n    s = s + f.splitk_excess_log * w[2]\n    if p.roofline_ratio < 1.0:\n        s = s + f.pipeline_stage_time_ratio * w[5]\n    else:\n        s = s + np.log2(1.0 + 10000.0 * f.mainloop_barrier_work_per_flop) * w[3]\n        s = s + f.occupancy_deficit * w[4]\n        s = s + f.pipeline_stage_time_ratio * w[6]\n    s = s + f.grid_parallelism_deficit * w[7]\n    s = s + f.final_wave_raggedness * w[8]\n    s = s + f.log_roofline_time_mraster * w[9]\n    if p.gemm_working_set_l2_pressure < 1.0:\n        s = s + np.log2(1.0 + f.dram_w1_hz_ratio) * w[10]\n        s = s + np.log2(1.0 + f.dram_w1_id_ratio) * w[11]\n        s = s + f.raster_ideal_reuse_traffic_ratio * w[12]\n        s = s + np.log2(1.0 + 1000.0 * f.raster_reuse_window_l2_pressure) * w[13]\n    else:\n        s = s + np.log2(1.0 + f.dram_w1_hz_ratio) * w[14]\n        s = s + np.log2(1.0 + f.dram_w1_id_ratio) * w[15]\n        s = s + f.raster_ideal_reuse_traffic_ratio * w[16]\n        s = s + np.log2(1.0 + 1000.0 * f.raster_reuse_window_l2_pressure) * w[17]\n    return s",
+    "w0": [
+     8.667230778262049,
+     3.972538196397848,
+     2.1754867081069134,
+     14.164079438807637,
+     18.94711207622294,
+     -2.2280160154421917,
+     462.08246988288766,
+     7.572347243734713,
+     5.840678870312484,
+     -0.38981872483682023,
+     -0.984504967041601,
+     -0.9845049670416035,
+     -2.588435502127316,
+     2.796323037579421,
+     0.9252895771940176,
+     -0.7640117076124521,
+     3.0638076054559242,
+     1.4514888760376137
+    ],
+    "extra_features": [
+     "runs/f4p-5090-f2-s0/features.jsonl"
+    ]
+   },
+   "3": {
+    "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.log_roofline_time_mraster * w[0]\n    s = s + f.coalescing_aspect_penalty * w[1]\n    s = s + f.splitk_excess_log * w[2]\n    s = s + np.log2(f.accumulator_tile_bytes) * w[7]\n    if p.roofline_ratio < 1.0:\n        s = s + f.occupancy_deficit * w[3]\n        s = s + f.raster_reuse_distance_l2_ratio * w[4]\n        s = s + f.register_file_pressure * w[8]\n        s = s + f.shared_memory_pressure * w[9]\n    else:\n        s = s + f.occupancy_deficit * w[5]\n        s = s + f.instruction_density * w[6]\n        s = s + f.register_file_pressure * w[10]\n        s = s + f.shared_memory_pressure * w[11]\n    return s",
+    "w0": [
+     2.289542551781726,
+     1.7714516870315495,
+     2.712490759323868,
+     -25.178974424832216,
+     -5321.615171765869,
+     22.54303994450535,
+     -1519.3144742646489,
+     0.30468567212392517,
+     -0.9501913145139552,
+     8.117595586272989,
+     6.482448862025379,
+     -1.5077284151178871
+    ],
+    "extra_features": []
+   }
+  }
+ }
+}

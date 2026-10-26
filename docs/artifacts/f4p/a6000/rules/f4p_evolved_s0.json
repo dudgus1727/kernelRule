@@ -1,0 +1,83 @@
+{
+ "name": "f4p evolved s0 (a6000)",
+ "per_fold": {
+  "0": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + np.log2(f.cta_edge_balance_time_ratio) * w[0]\n    s = s + f.launch_wave_utilization_deficit * w[1]\n    s = s + f.splitk_excess_log * w[2]\n    s = s + 1000.0 * f.instruction_density * w[3]\n    s = s + np.log2(1.0 + f.mainloop_sync_count) * w[4]\n    if p.log_flops < 30.0:\n        s = s + f.tm_log_inst * w[5]\n    s = s + f.cta_shared_memory_fraction * w[6]\n    s = s + f.cta_register_file_fraction * w[7]\n    s = s + f.occupancy_deficit * w[8]\n    s = s + f.tm_cta_warps * w[9]\n    s = s + f.smem_staging_overhead_ratio * w[10]\n    if p.output_parallelism_deficit > 1e-4:\n        s = s + (1.0 - f.tm_regstaged) * w[11]\n    else:\n        s = s + (1.0 - f.tm_regstaged) * w[12]\n    return s",
+   "w0": [
+    1.4582992111992625,
+    8.952266860016268,
+    2.1584788282339407,
+    -1.3806831830555701,
+    -0.6214593176409124,
+    -2.273024090475069,
+    6.931204255604548,
+    1.1112002688432001,
+    22.424754771166743,
+    0.3980634779760341,
+    -0.7618463459378586,
+    -5.813904452541615,
+    -1.754400893557095
+   ],
+   "extra_features": [
+    "runs/f4p-a6000-f0-s0/features.jsonl"
+   ]
+  },
+  "1": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.wave_tail_occupancy_deficit * w[0]\n    if p.roofline_ratio < 1:\n        s = s + np.log2(f.operand_coalescing_aspect) * w[1]\n        s = s + np.log2(1.0 + f.raster_band_l2_pressure) * w[2]\n    else:\n        s = s + (1000.0 * f.cta_barrier_density) * w[3]\n        s = s + (f.tm_cta_warps - 1.0) * w[4]\n    if p.output_parallelism_deficit > 0.001:\n        s = s + f.splitk_excess_log * w[5]\n        s = s + f.splitk_sm_latency_rounds_log * w[6]\n        s = s + f.splitk_roofline_log_time * w[7]\n    else:\n        s = s + f.splitk_excess_log * w[8]\n        s = s + f.splitk_partial_bytes_ratio * w[9]\n        s = s + f.accumulator_reduction_work_ratio * w[10]\n        s = s + f.splitk_roofline_log_time * w[11]\n    if p.async_alignment_deficit < 1.0:\n        s = s + f.tm_regstaged * np.maximum(f.pipeline_stage_time_ratio - 1.0, 0.0) * w[12]\n    return s",
+   "w0": [
+    -0.9542907706578634,
+    1.436550746808337,
+    -0.5200687181018024,
+    -1471.2956766286081,
+    2.849290331759513,
+    5.068897939274753,
+    1.7112912584121822,
+    3.4318146073073303,
+    2.5743283370838395,
+    0.2816412625747527,
+    -820.6210895957984,
+    2.323080269464382,
+    0.06298996292579634
+   ],
+   "extra_features": []
+  },
+  "2": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.launch_tail_deficit * w[0]\n    s = s + f.splitk_excess_log * w[1]\n    if p.roofline_ratio < 1:\n        s = s + f.occupancy_deficit * w[2]\n    else:\n        s = s + np.log2(f.warp_output_work) * w[3]\n    s = s + f.tm_regstaged * w[4]\n    if p.vector_alignment_deficit > 0.05 or p.log_min_dim < 8:\n        s = s + f.register_file_pressure * w[5]\n        s = s + f.shared_memory_pressure * w[6]\n    else:\n        s = s + f.register_file_pressure * w[7]\n        s = s + f.shared_memory_pressure * w[8]\n    return s",
+   "w0": [
+    1.4432395196537369,
+    2.782439728646338,
+    -10.09364176252254,
+    0.8991691637671572,
+    3.907326857794828,
+    4.596086445633152,
+    4.359222481065379,
+    -6.540832204797972,
+    5.4672713433611175
+   ],
+   "extra_features": []
+  },
+  "3": {
+   "code": "def score(f, p, hw, w):\n    sm = np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)\n    t = np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))\n    s = 10.0 * np.log2(t)\n    s = s + f.instruction_work_density * w[0]\n    s = s + f.barrier_work_density * w[1]\n    if p.roofline_ratio < 1.0:\n        s = s + f.operand_stride_transaction_ratio * w[2]\n        s = s + f.contiguous_store_lane_deficit * w[3]\n    else:\n        s = s + f.operand_stride_transaction_ratio * w[4]\n        s = s + f.contiguous_store_lane_deficit * w[5]\n    s = s + f.splitk_excess_log * w[6]\n    s = s + f.splitk_roofline_log_time * w[7]\n    s = s + np.log2(1.0 + f.splitk_partial_bytes_ratio) * w[8]\n    s = s + f.splitk_sm_latency_rounds_log * w[9]\n    if p.output_parallelism_deficit < 0.001:\n        s = s + f.shared_memory_pressure * w[10]\n        s = s + f.register_file_pressure * w[11]\n        s = s + f.occupancy_deficit * w[12]\n    else:\n        s = s + f.shared_memory_pressure * w[13]\n        s = s + f.register_file_pressure * w[14]\n        s = s + f.occupancy_deficit * w[15]\n    s = s + np.log2(f.warp_instruction_issue_count) * w[16]\n    return s",
+   "w0": [
+    2144.2904168990444,
+    812.968780734027,
+    0.15105087317841187,
+    -500.61919430025574,
+    -0.2640319906463119,
+    217.7553417798441,
+    1.6799855394510548,
+    1.8013301874174346,
+    0.24860878957347282,
+    1.7664080176954327,
+    6.974036415428819,
+    6.1154140870771325,
+    -19.6722881287709,
+    -8.325372952561539,
+    3.206580672028167,
+    24.3221279127311,
+    -1.076515619177926
+   ],
+   "extra_features": []
+  }
+ }
+}

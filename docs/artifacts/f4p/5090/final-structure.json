@@ -1,0 +1,284 @@
+{
+ "prefix": "f4p",
+ "gpu": "5090",
+ "n_with_main_term": 4,
+ "folds": {
+  "0": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "fmax",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.fmax(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 3,
+    "branches": [
+     "p.roofline_ratio < 1"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "instruction_density",
+     "occupancy_deficit",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "rule_id": "r0001",
+   "last_best_round": 0,
+   "splitk_terms": [
+    "splitk_excess_log"
+   ],
+   "n_best_changes": 0
+  },
+  "1": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 8,
+    "branches": [
+     "p.roofline_ratio < 1"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "cta_wave_tail_ratio",
+     "edge_padded_work_ratio",
+     "occupancy_deficit",
+     "pipeline_residency_time",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "rule_id": "r0001",
+   "last_best_round": 0,
+   "splitk_terms": [
+    "splitk_excess_log"
+   ],
+   "n_best_changes": 0
+  },
+  "2": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 18,
+    "branches": [
+     "p.roofline_ratio < 1.0",
+     "p.gemm_working_set_l2_pressure < 1.0"
+    ],
+    "path_features_used": [
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "boundary_cta_fraction",
+     "dram_w1_hz_ratio",
+     "dram_w1_id_ratio",
+     "final_wave_raggedness",
+     "grid_parallelism_deficit",
+     "instruction_overhead_per_flop",
+     "log_roofline_time_mraster",
+     "mainloop_barrier_work_per_flop",
+     "occupancy_deficit",
+     "pipeline_stage_time_ratio",
+     "raster_ideal_reuse_traffic_ratio",
+     "raster_reuse_window_l2_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "rule_id": "r0019",
+   "last_best_round": 2,
+   "splitk_terms": [
+    "splitk_excess_log"
+   ],
+   "n_best_changes": 1
+  },
+  "3": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 12,
+    "branches": [
+     "p.roofline_ratio < 1.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "accumulator_tile_bytes",
+     "coalescing_aspect_penalty",
+     "instruction_density",
+     "log_roofline_time_mraster",
+     "occupancy_deficit",
+     "raster_reuse_distance_l2_ratio",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ]
+   },
+   "rule_id": "r0032",
+   "last_best_round": 5,
+   "splitk_terms": [
+    "splitk_excess_log"
+   ],
+   "n_best_changes": 2
+  }
+ }
+}

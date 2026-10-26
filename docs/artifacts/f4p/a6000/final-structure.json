@@ -1,0 +1,305 @@
+{
+ "prefix": "f4p",
+ "gpu": "a6000",
+ "n_with_main_term": 4,
+ "folds": {
+  "0": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 13,
+    "branches": [
+     "p.log_flops < 30.0",
+     "p.output_parallelism_deficit > 0.0001"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "cta_edge_balance_time_ratio",
+     "cta_register_file_fraction",
+     "cta_shared_memory_fraction",
+     "instruction_density",
+     "launch_wave_utilization_deficit",
+     "mainloop_sync_count",
+     "occupancy_deficit",
+     "smem_staging_overhead_ratio",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_log_inst",
+     "tm_regstaged"
+    ]
+   },
+   "rule_id": "r0006",
+   "last_best_round": 0,
+   "splitk_terms": [
+    "splitk_excess_log"
+   ],
+   "n_best_changes": 0
+  },
+  "1": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 13,
+    "branches": [
+     "p.roofline_ratio < 1",
+     "p.output_parallelism_deficit > 0.001",
+     "p.async_alignment_deficit < 1.0"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "accumulator_reduction_work_ratio",
+     "cta_barrier_density",
+     "operand_coalescing_aspect",
+     "pipeline_stage_time_ratio",
+     "raster_band_l2_pressure",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "splitk_roofline_log_time",
+     "splitk_sm_latency_rounds_log",
+     "tm_crit_ratio",
+     "tm_cta_warps",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged",
+     "wave_tail_occupancy_deficit"
+    ]
+   },
+   "rule_id": "r0050",
+   "last_best_round": 8,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_partial_bytes_ratio",
+    "splitk_roofline_log_time",
+    "splitk_sm_latency_rounds_log"
+   ],
+   "n_best_changes": 2
+  },
+  "2": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 9,
+    "branches": [
+     "p.roofline_ratio < 1",
+     "p.vector_alignment_deficit > 0.05 or p.log_min_dim < 8"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "launch_tail_deficit",
+     "occupancy_deficit",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "tm_regstaged",
+     "warp_output_work"
+    ]
+   },
+   "rule_id": "r0011",
+   "last_best_round": 1,
+   "splitk_terms": [
+    "splitk_excess_log"
+   ],
+   "n_best_changes": 1
+  },
+  "3": {
+   "final": {
+    "time_main_term": true,
+    "main_term_paths": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "combinations": [
+     {
+      "call": "maximum",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.maximum(f.tm_crit_ratio, f.tm_l2_ratio)"
+     },
+     {
+      "call": "sqrt",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.sqrt(np.square(sm) + np.square(f.tm_dram_ratio))"
+     },
+     {
+      "call": "log2",
+      "paths": [
+       "tm_crit_ratio",
+       "tm_dram_ratio",
+       "tm_l2_ratio"
+      ],
+      "weighted_inside": false,
+      "expr": "np.log2(t)"
+     }
+    ],
+    "n_weights": 17,
+    "branches": [
+     "p.roofline_ratio < 1.0",
+     "p.output_parallelism_deficit < 0.001"
+    ],
+    "path_features_used": [
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio"
+    ],
+    "features_used": [
+     "barrier_work_density",
+     "contiguous_store_lane_deficit",
+     "instruction_work_density",
+     "occupancy_deficit",
+     "operand_stride_transaction_ratio",
+     "register_file_pressure",
+     "shared_memory_pressure",
+     "splitk_excess_log",
+     "splitk_partial_bytes_ratio",
+     "splitk_roofline_log_time",
+     "splitk_sm_latency_rounds_log",
+     "tm_crit_ratio",
+     "tm_dram_ratio",
+     "tm_l2_ratio",
+     "warp_instruction_issue_count"
+    ]
+   },
+   "rule_id": "r0043",
+   "last_best_round": 7,
+   "splitk_terms": [
+    "splitk_excess_log",
+    "splitk_partial_bytes_ratio",
+    "splitk_roofline_log_time",
+    "splitk_sm_latency_rounds_log"
+   ],
+   "n_best_changes": 2
+  }
+ }
+}
