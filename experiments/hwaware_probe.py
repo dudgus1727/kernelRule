@@ -232,7 +232,7 @@ class _Data:
 
 def _ridge_design(X: pd.DataFrame, num: list[str], ref=None):
     """그들 build_X — 수치 표준화 (nan · inf -> 0), 범주 one-hot (고정 수준)."""
-    A = X[num].to_numpy(np.float64)
+    A = X[num].to_numpy(np.float64, copy=True)   # pandas 가 읽기 전용 뷰를 줄 수 있다
     A[~np.isfinite(A)] = 0.0
     if ref is None:
         mu, sd = A.mean(0), A.std(0)
@@ -359,20 +359,21 @@ def main() -> None:
         return
     plan = [("xgb_full", 42), ("xgb_struct", 42), ("ridge_full", 0),
             ("xgb_full", 0), ("xgb_full", 1)]
-    res = []
-    for arm, seed in plan:
-        res.append(run_arm(d, arm, seed, a.jobs))
-        r = res[-1]["aggregate"]
-        print(f"{a.gpu} {arm} seed {seed}: train {r['train_gm']:.4f}", flush=True)
     out = {"gpu": a.gpu, "source": SOURCE, "xgboost": xgboost.__version__,
            "xgb_params": XGB_PARAMS, "xgb_trees": XGB_TREES,
            "ridge_alpha": RIDGE_ALPHA, "feature_sets": FEATURE_SETS,
            "categorical": CATEGORICAL,
            "checks": {"threads_match": d.threads_match,
                       "smem_epi_larger": d.smem_epi_larger},
-           "arms": res}
+           "complete": False, "arms": []}
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    a.out.write_text(json.dumps(out, ensure_ascii=False, indent=1))
+    for arm, seed in plan:
+        out["arms"].append(run_arm(d, arm, seed, a.jobs))
+        out["complete"] = len(out["arms"]) == len(plan)
+        # 팔마다 쓴다 — 뒤에서 죽어도 앞의 적합을 잃지 않는다
+        a.out.write_text(json.dumps(out, ensure_ascii=False, indent=1))
+        r = out["arms"][-1]["aggregate"]
+        print(f"{a.gpu} {arm} seed {seed}: train {r['train_gm']:.4f}", flush=True)
     print(f"wrote {a.out}  ({math.ceil(time.perf_counter() - t0)}s)")
 
 
