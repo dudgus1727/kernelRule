@@ -30,6 +30,7 @@ message is one a new session cannot find.
 | `fitter_polish.py` | — | `fitter-sweep.md` · D-55 | valid — it reads only the committed rules |
 | `fitter_movement.py` | — | D-56 · D-57 | ★ **the fitter pass condition** — a reach rate of 90% |
 | `polish_ranking.py` | — | D-57 | ★ **the re-run decision** — does the ranking change |
+| `hwaware_probe.py` | — | `docs/artifacts/hwaware/` · D-200 | Chandran et al.'s features + XGBoost / Ridge on our tables, folds and scorer — CPU only, needs `xgboost-cpu` |
 
 ## ★ How to verify a number
 

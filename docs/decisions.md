@@ -139,6 +139,7 @@ Do not edit it by hand. Add the D and run that script.
 - [D-197](#d-197-상한을-좁힌다-lam-05-이하-2026-10-07)  상한을 좁힌다 — lam 0.5 이하 (2026-10-07)
 - [D-198](#d-198-죽은-항-정리를-루프에-넣는다-2026-10-07)  죽은 항 정리를 루프에 넣는다 (2026-10-07)
 - [D-199](#d-199-inner-cv-를-빼고-lam-01-죽은-항-정리로-네-gpu-를-다시-2026-10-07)  inner-CV 를 빼고, lam 0.1 · 죽은 항 정리로 네 GPU 를 다시 (2026-10-07)
+- [D-200](#d-200-chandran-외의-하드웨어-인지-피처-xgboost-를-우리-표-fold-채점으로-2026-10-29)  Chandran 외의 하드웨어 인지 피처 + XGBoost 를 우리 표 · fold · 채점으로 (2026-10-29)
 <!-- INDEX:END -->
 
 ## F-1. ✅ 해결 — 대표값은 "status 전체 + 합집합 덮개" 다
@@ -12269,3 +12270,77 @@ stage 3     12 라운드 · seed 0 · workers 1 · 16 실행 동시. docs/artifa
   나쁘다 (a6000 1.0645) — 상한 0.1 아래에서 루프가 train 을 충분히 맞추지 못했다. 4090 · H100 은 D-196 보다
   낫지만, lam 1 아래에서 자란 규칙을 lam 0.1 로 재적합한 D-197 보다는 나쁘다.
 - seed 하나. 이 holdout 은 판정에 썼다.
+
+## D-200  Chandran 외의 하드웨어 인지 피처 + XGBoost 를 우리 표 · fold · 채점으로 (2026-10-29)
+
+사용자: "응. 1,3을 진행해." — 3 은 앞서 권한 "그 피처와 XGBoost 를 우리 표와 fold 에 그대로 돌려 같은 절차로
+비교". 그 논문 (arXiv 2609.35587, `related-work.md` §3 · §5.1) 은 같은 종류의 피처에 XGBoost · MLP 를 올려
+nvMMH 를 크게 이기고 (6.4 · 6.2% 대 17.3%), 선형 회귀는 nvMMH 보다 못하다 (23.7%) 고 보고한다 — 물리 피처의
+가중합인 우리 규칙에 정면으로 걸리는 결과라 우리 표에서 잰다.
+
+### 무엇을 가져왔나 — `spcl/cutlass-selector` 8a243cb
+
+공식을 읽어 옮겼다. 그들 코드는 실행하지 않는다. 스크립트 `experiments/hwaware_probe.py`.
+
+```
+피처      src/model/features.py featurize() G0~G7 — 수치 40 개 + 범주
+XGBoost   src/model/train_xgb.py DEFAULT_PARAMS (eta 0.150 · depth 7 · min_child_weight 2.13 · subsample 0.80 ·
+          colsample 0.906 · lambda 0.033 · alpha 0.089 · gamma 0.019) · 916 트리 · hist · seed 42 · CPU
+          목적 MSE (y_norm = 형상 최고 대비 처리량) — 논문 표 12 의 XGBoost (full) 6.4% 가 이 팔이다
+Ridge     train_linear.py RidgeLinear — 닫힌 꼴, 수치 열 표준화 (nan · inf -> 0) + 범주 one-hot
+환경      xgboost-cpu 3.4.1 (그들 하한 >= 2.0)
+```
+
+### 우리 공간에 맞춘 것
+
+그들 공간은 CUTLASS 3.x SM90 (cluster · Stream-K · epilogue 스케줄), 우리는 2.x (warp 타일 · split-K · swizzle).
+
+```
+A1 split-K     그들 Stream-K 자리. 격자 = tiles_m·tiles_n·split_k, CTA 하나의 k 반복 = ceil(ceil(K/split_k)/tile_k)
+               — wave 효율 · 파이프라인 채움 · 단계 분할상환이 이것을 쓴다. streamk_applicability 는 쪼개지 않은
+               격자의 1 - 마지막 wave 효율, is_streamk 는 split_k > 1
+A2 스레드       32·(tm/wm)(tn/wn)(tk/wk) — 표의 threads 와 네 GPU 전 행에서 같다. 소비자 warpgroup = 1
+A3 smem        그들 smem_total 은 mainloop 와 epilogue 의 union — 2.x 도 union 이고 그 값이 표의 정적 열
+               smem_computed 다 (mainloop 공식과 96~98% 행에서 같고 나머지는 epilogue 가 크다)
+A4 cluster     2.x 에는 없다 — 1×1 로 그들 공식 그대로 (상수 열 넷이 된다)
+A5 손잡이       그들 구조 핵심은 "config 그대로" — 우리 손잡이를 더한다: warp_m·n·k · split_k · swizzle_n ·
+               align_a·b·c (수치), pipeline_kind · split_k_mode · swizzle_type (범주). full · structural 둘 다에
+A6 GPU 상수     우리 Hardware (실효 피크 · 실효 대역폭 · SM · smem/블록 · L2 · 레지스터). 블록 상한 32 는 그대로
+안 넣은 것      컴파일 결과 (레지스터 · spill · SASS) 와 kerneltab 파생 열 (waves · tail_waste · occupancy ...)
+```
+
+### 절차 — D-199 와 같은 자
+
+```
+표 · fold   네 GPU · nkband k=4 (f1_pipeline._splits) — holdout 은 a6000 · 5090 65, 4090 · H100 63 형상
+학습        fold 의 train 형상 전부의 유효 config 전부 (72만 ~ 170만 행). 그들은 그룹당 약 2,000 표본에 학습
+            형상 85% 로 적합했다 — 우리 쪽이 더 많이 준다. 하이퍼파라미터는 고정, 튜닝 · inner 분할 없음.
+            Ridge alpha = 1 (행이 수십만이라 그들 격자 0~100 에서 계수가 사실상 같다)
+채점        evaluate_scores — 규칙과 같은 함수 · 같은 동률 깨기. 점수 = -예측, 형상 regret = t_고른 것 / t_최고
+집계        4 fold holdout 을 모은 기하평균 (a6000_probe 의 holdout_gm_65 와 같은 정의)
+팔          xgb_full (seed 42 · 0 · 1), xgb_struct (seed 42), ridge_full
+비교        D-199 규칙 (f4p/<g>/refit_cap0.1.json) · K1a · D-196 · 벤더 (nearest) — 같은 holdout 형상
+배관 확인   a6000 fold 0 학습만 (holdout 을 읽지 않았다) — 916 트리 적합 5~30 초
+안 한 것    그들 MLP · 순위 목적 (ndcg · pairwise) · TPE 튜닝 · 편향-다양 표본 추출
+```
+
+### 실행 전 기준
+
+```
+주 비교    xgb_full (seed 42) 대 D-199 규칙, GPU 마다 holdout 기하평균
+           D-199: a6000 1.0816 · 5090 1.0693 · 4090 1.0554 · H100 1.0647
+읽기       차이가 0.01 을 넘으면 그쪽이 낫다, 0.01 안이면 비슷하다
+           (a) xgb_full 이 4 GPU 중 3 이상에서 낫다 -> 우리 표에서도 그 방법이 더 정확하다. 논문의 논거는
+               정확도가 아니라 읽힘 · 이식 · 비용이어야 한다
+           (b) 규칙이 3 이상에서 낫거나 비슷하다    -> 우리 표에서는 그 피처 위의 비선형 모델이 우리 규칙을
+               이기지 못한다
+           (c) 나머지                               -> 섞였다. 그대로 적는다
+부         xgb_struct 대 xgb_full — 하드웨어 인지 피처가 우리 표에서도 돕나 (그들 주장 1)
+           ridge_full 대 벤더 (1.0815 · 1.1460 · 1.0782 · 1.1207) — 선형 결합이 벤더보다 못한가 (그들 주장 2)
+참고       K1a 1.0479 · 1.0354 · 1.0380 · 1.0635 · D-196 (lam 1) 1.0274 · 1.0443 · 1.1050 · 1.0923
+관찰       seed 0 · 1 의 폭, 형상별 이김 · 비김 · 짐 (1%), 분류별, 그들 지표 (1 - 처리량 비의 평균 · 5% 안
+           비율), 학습 regret, 적합 시간, 피처 중요도 (gain)
+```
+
+⚠️ 비대칭이 규칙 쪽에 유리하다 — 규칙의 holdout 은 앞선 결정들에서 여러 번 봤고 그 숫자를 보고 조건을
+골랐다 (D-199 경고). XGBoost 는 holdout 을 보지 않고 고정 하이퍼파라미터로 한 번 돈다.
