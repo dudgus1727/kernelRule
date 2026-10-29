@@ -1,0 +1,2950 @@
+{
+ "gpu": "h100",
+ "source": "spcl/cutlass-selector 8a243cb",
+ "xgboost": "3.4.1",
+ "xgb_params": {
+  "eta": 0.14994338035621416,
+  "max_depth": 7,
+  "min_child_weight": 2.129510939594175,
+  "subsample": 0.8006253365599527,
+  "colsample_bytree": 0.905985078442277,
+  "reg_lambda": 0.0329689343120563,
+  "reg_alpha": 0.08879582214664276,
+  "gamma": 0.019394121795509252
+ },
+ "xgb_trees": 916,
+ "ridge_alpha": 1.0,
+ "feature_sets": {
+  "full": [
+   "log2_M",
+   "log2_N",
+   "log2_K",
+   "tile_m",
+   "tile_n",
+   "tile_k",
+   "stages",
+   "cluster_m_f",
+   "cluster_n_f",
+   "sm_subscription",
+   "last_wave_eff",
+   "tiles_m",
+   "tiles_n",
+   "k_iters",
+   "m_quant_waste",
+   "n_quant_waste",
+   "mainloop_compute_intensity",
+   "tile_aspect_ratio",
+   "problem_arith_intensity",
+   "restream_factor",
+   "working_set_vs_L2",
+   "fits_L2",
+   "resident_panel_vs_L2",
+   "smem_total",
+   "smem_frac",
+   "blocks_per_sm",
+   "reg_pressure_proxy",
+   "reg_limited_blocks_per_sm",
+   "true_blocks_per_sm",
+   "bytes_per_stage",
+   "producer_consumer_ratio",
+   "pipeline_fill_frac",
+   "stage_amortization",
+   "stages_vs_smem",
+   "streamk_applicability",
+   "is_streamk",
+   "cluster_size",
+   "cluster_fits_m",
+   "cluster_fits_n",
+   "cluster_overshoots",
+   "warp_m",
+   "warp_n",
+   "warp_k",
+   "split_k",
+   "swizzle_n",
+   "align_a",
+   "align_b",
+   "align_c"
+  ],
+  "structural": [
+   "log2_M",
+   "log2_N",
+   "log2_K",
+   "tile_m",
+   "tile_n",
+   "tile_k",
+   "stages",
+   "cluster_m_f",
+   "cluster_n_f",
+   "warp_m",
+   "warp_n",
+   "warp_k",
+   "split_k",
+   "swizzle_n",
+   "align_a",
+   "align_b",
+   "align_c"
+  ]
+ },
+ "categorical": {
+  "pipeline_kind": [
+   "multistage",
+   "pipelined"
+  ],
+  "split_k_mode": [
+   "parallel",
+   "serial"
+  ],
+  "swizzle_type": [
+   "horizontal",
+   "identity"
+  ]
+ },
+ "checks": {
+  "threads_match": 1.0,
+  "smem_epi_larger": 0.0205721803353747
+ },
+ "complete": true,
+ "arms": [
+  {
+   "arm": "xgb_full",
+   "model": "xgb",
+   "feature_set": "full",
+   "seed": 42,
+   "aggregate": {
+    "train_gm": 1.02172,
+    "holdout_gm": 1.046439,
+    "n_hold": 63,
+    "their_regret_mean": 0.04288,
+    "their_within5": 0.777778,
+    "hit_rate": 0.206349
+   },
+   "per_fold": {
+    "0": {
+     "train_gm": 1.017317,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 25.5,
+     "importance_gain_top15": {
+      "warp_m": 65.5859603881836,
+      "k_iters": 26.427021026611328,
+      "pipeline_fill_frac": 25.087657928466797,
+      "fits_L2": 24.658567428588867,
+      "m_quant_waste": 14.831626892089844,
+      "stage_amortization": 14.05002212524414,
+      "stages": 12.917256355285645,
+      "restream_factor": 12.761344909667969,
+      "tile_aspect_ratio": 12.15451431274414,
+      "pipeline_kind": 11.610091209411621,
+      "log2_M": 11.29457950592041,
+      "tile_m": 10.90822982788086,
+      "is_streamk": 9.923803329467773,
+      "reg_pressure_proxy": 8.477487564086914,
+      "sm_subscription": 8.110617637634277
+     },
+     "holdout_gm": 1.065929,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x4096": 1.028065000539259,
+      "256x4096x4096": 1.0243901704516416,
+      "8192x4096x4096": 1.0184370414246715,
+      "1152x4096x4096": 1.2406811882223212,
+      "2048x4096x4096": 1.00872092515838,
+      "640x4096x4096": 1.1934460880144149,
+      "512x4096x4096": 1.0298804748539416,
+      "768x4096x4096": 1.1039024764398095,
+      "4096x4096x4096": 1.0248269914526018,
+      "3000x4096x4096": 1.0220683361386764,
+      "1500x4096x4096": 1.2129903122808596,
+      "2432x4096x4096": 1.0084721317641927,
+      "3584x4096x4096": 1.0031215023802469,
+      "1000x4096x4096": 1.0512295584778437,
+      "1664x4096x4096": 1.0091077827614605,
+      "384x4096x4096": 1.1185185614071742
+     },
+     "hit": {
+      "1024x4096x4096": false,
+      "256x4096x4096": false,
+      "8192x4096x4096": false,
+      "1152x4096x4096": false,
+      "2048x4096x4096": false,
+      "640x4096x4096": false,
+      "512x4096x4096": false,
+      "768x4096x4096": false,
+      "4096x4096x4096": false,
+      "3000x4096x4096": false,
+      "1500x4096x4096": false,
+      "2432x4096x4096": false,
+      "3584x4096x4096": true,
+      "1000x4096x4096": false,
+      "1664x4096x4096": false,
+      "384x4096x4096": false
+     },
+     "picks": {
+      "1024x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1152x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "640x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "768x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3000x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1500x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2432x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3584x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1000x4096x4096": {
+       "kernel_id": "sm90_tb128x256x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1664x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "384x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "1": {
+     "train_gm": 1.023179,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 26.3,
+     "importance_gain_top15": {
+      "warp_m": 64.28857421875,
+      "k_iters": 22.9217529296875,
+      "pipeline_fill_frac": 19.6651611328125,
+      "m_quant_waste": 15.314030647277832,
+      "producer_consumer_ratio": 15.110675811767578,
+      "tile_aspect_ratio": 12.419178009033203,
+      "stage_amortization": 12.35477352142334,
+      "stages": 12.112838745117188,
+      "pipeline_kind": 8.678485870361328,
+      "reg_pressure_proxy": 8.587251663208008,
+      "align_b": 8.156270027160645,
+      "sm_subscription": 7.401892185211182,
+      "restream_factor": 7.336820602416992,
+      "tiles_m": 7.277434349060059,
+      "tile_m": 7.195508003234863
+     },
+     "holdout_gm": 1.05353,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x11008": 1.0101178370834005,
+      "256x4096x11008": 1.190130633534202,
+      "8192x4096x11008": 1.0194421515924648,
+      "8192x4096x2048": 1.0027194263720904,
+      "8192x4096x256": 1.1966077809596443,
+      "8192x4096x8192": 1.0037548199928235,
+      "8192x8192x8192": 1.0053628119173428,
+      "2048x4096x11008": 1.006416485537017,
+      "2048x2048x2048": 1.055780097453833,
+      "8x4096x11008": 1.031833911985985,
+      "1x4096x11008": 1.0321453546624215,
+      "512x4096x11008": 1.0543201966625044,
+      "128x4096x11008": 1.0982396562409618,
+      "4096x4096x11008": 1.0204247331972667,
+      "4096x4096x256": 1.1432291153496932,
+      "32x4096x11008": 1.0154320561316659
+     },
+     "hit": {
+      "1024x4096x11008": false,
+      "256x4096x11008": false,
+      "8192x4096x11008": false,
+      "8192x4096x2048": true,
+      "8192x4096x256": false,
+      "8192x4096x8192": true,
+      "8192x8192x8192": false,
+      "2048x4096x11008": false,
+      "2048x2048x2048": false,
+      "8x4096x11008": false,
+      "1x4096x11008": false,
+      "512x4096x11008": false,
+      "128x4096x11008": false,
+      "4096x4096x11008": false,
+      "4096x4096x256": false,
+      "32x4096x11008": true
+     },
+     "picks": {
+      "1024x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x11008": {
+       "kernel_id": "sm90_tb64x128x64_w32x64x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x11008": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x2048": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x256": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x8192": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st6_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x8192x8192": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st6_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x2048x2048": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st7_swhz1_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "1x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st7_swhz1_a888",
+       "split_k": 3,
+       "split_k_mode": "parallel"
+      },
+      "512x4096x11008": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid4_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "128x4096x11008": {
+       "kernel_id": "sm90_tb64x128x64_w32x64x64_st8_swid1_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x11008": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x256": {
+       "kernel_id": "sm90_tb64x128x64_w32x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st6_swhz1_a888",
+       "split_k": 4,
+       "split_k_mode": "parallel"
+      }
+     }
+    },
+    "2": {
+     "train_gm": 1.02411,
+     "n_train_rows": 1697195,
+     "n_train_shapes": 47,
+     "fit_seconds": 27.0,
+     "importance_gain_top15": {
+      "warp_m": 62.76194763183594,
+      "k_iters": 21.44831657409668,
+      "stages": 14.541556358337402,
+      "pipeline_kind": 14.27393627166748,
+      "stage_amortization": 13.046504020690918,
+      "pipeline_fill_frac": 13.027060508728027,
+      "m_quant_waste": 11.093358993530273,
+      "tile_aspect_ratio": 10.070592880249023,
+      "reg_pressure_proxy": 9.773929595947266,
+      "log2_M": 9.312463760375977,
+      "sm_subscription": 8.980226516723633,
+      "tile_m": 8.73308277130127,
+      "restream_factor": 8.641611099243164,
+      "producer_consumer_ratio": 8.090584754943848,
+      "blocks_per_sm": 7.029036045074463
+     },
+     "holdout_gm": 1.040329,
+     "n_hold": 16,
+     "regret": {
+      "1024x11008x4096": 1.0705651739621873,
+      "1024x4096x4098": 1.002067737532062,
+      "1024x4098x4096": 1.0279136812696485,
+      "256x11008x4096": 1.2865937480988947,
+      "8192x11008x4096": 1.0220828178870238,
+      "8192x4096x128": 1.0141878612990014,
+      "8192x4096x1024": 1.028831551785424,
+      "2048x11008x4096": 1.0398570364836777,
+      "16384x16384x16384": 1.0143438343252684,
+      "8x11008x4096": 1.0,
+      "1x11008x4096": 1.0029873268137273,
+      "512x11008x4096": 1.0228080011212783,
+      "128x11008x4096": 1.0501347750507724,
+      "4096x11008x4096": 1.0195007803662557,
+      "4096x4096x1024": 1.0498133204122166,
+      "32x11008x4096": 1.0230141076009438
+     },
+     "hit": {
+      "1024x11008x4096": false,
+      "1024x4096x4098": true,
+      "1024x4098x4096": false,
+      "256x11008x4096": false,
+      "8192x11008x4096": false,
+      "8192x4096x128": true,
+      "8192x4096x1024": false,
+      "2048x11008x4096": false,
+      "16384x16384x16384": false,
+      "8x11008x4096": true,
+      "1x11008x4096": true,
+      "512x11008x4096": false,
+      "128x11008x4096": false,
+      "4096x11008x4096": false,
+      "4096x4096x1024": false,
+      "32x11008x4096": true
+     },
+     "picks": {
+      "1024x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4096x4098": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid1_a228",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4098x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid1_a882",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x11008x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x128": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x1024": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x11008x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st6_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "16384x16384x16384": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x11008x4096": {
+       "kernel_id": "sm90_tb128x64x64_w32x64x64_st3_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x11008x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x1024": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "3": {
+     "train_gm": 1.022276,
+     "n_train_rows": 1699320,
+     "n_train_shapes": 48,
+     "fit_seconds": 29.6,
+     "importance_gain_top15": {
+      "warp_m": 59.947669982910156,
+      "pipeline_fill_frac": 27.125572204589844,
+      "k_iters": 20.431272506713867,
+      "stage_amortization": 15.61994743347168,
+      "pipeline_kind": 14.252558708190918,
+      "m_quant_waste": 13.150839805603027,
+      "stages": 13.091951370239258,
+      "tile_aspect_ratio": 11.574902534484863,
+      "reg_pressure_proxy": 8.37233829498291,
+      "reg_limited_blocks_per_sm": 8.160398483276367,
+      "log2_M": 8.048068046569824,
+      "restream_factor": 7.840810775756836,
+      "blocks_per_sm": 7.439543724060059,
+      "is_streamk": 7.412843227386475,
+      "producer_consumer_ratio": 7.394104957580566
+     },
+     "holdout_gm": 1.025061,
+     "n_hold": 15,
+     "regret": {
+      "1024x4096x4100": 1.0,
+      "1024x12288x4096": 1.0167572201362307,
+      "1024x4100x4096": 1.0289603427310245,
+      "256x12288x4096": 1.0453685993762134,
+      "8192x4096x16384": 1.0183100794092534,
+      "8192x4096x512": 1.0893221994077624,
+      "8192x12288x4096": 1.0166992009251437,
+      "2048x12288x4096": 1.0236699122822503,
+      "8x12288x4096": 1.011173188445031,
+      "1x12288x4096": 1.0125786311900655,
+      "512x12288x4096": 1.0357733125586828,
+      "128x12288x4096": 1.0231600582448082,
+      "4096x4096x16384": 1.0146983282642923,
+      "4096x12288x4096": 1.0249095874361767,
+      "32x12288x4096": 1.017385227689101
+     },
+     "hit": {
+      "1024x4096x4100": true,
+      "1024x12288x4096": false,
+      "1024x4100x4096": false,
+      "256x12288x4096": false,
+      "8192x4096x16384": false,
+      "8192x4096x512": false,
+      "8192x12288x4096": false,
+      "2048x12288x4096": false,
+      "8x12288x4096": true,
+      "1x12288x4096": true,
+      "512x12288x4096": false,
+      "128x12288x4096": false,
+      "4096x4096x16384": false,
+      "4096x12288x4096": false,
+      "32x12288x4096": true
+     },
+     "picks": {
+      "1024x4096x4100": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid2_a448",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4100x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid2_a884",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x12288x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x512": {
+       "kernel_id": "sm90_tb128x256x64_w64x64x64_st4_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x12288x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x12288x4096": {
+       "kernel_id": "sm90_tb128x64x64_w64x32x64_st3_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    }
+   }
+  },
+  {
+   "arm": "xgb_struct",
+   "model": "xgb",
+   "feature_set": "structural",
+   "seed": 42,
+   "aggregate": {
+    "train_gm": 1.03232,
+    "holdout_gm": 1.09295,
+    "n_hold": 63,
+    "their_regret_mean": 0.077264,
+    "their_within5": 0.619048,
+    "hit_rate": 0.301587
+   },
+   "per_fold": {
+    "0": {
+     "train_gm": 1.03369,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 18.7,
+     "importance_gain_top15": {
+      "warp_m": 44.2889404296875,
+      "log2_K": 22.200326919555664,
+      "log2_M": 12.453168869018555,
+      "split_k": 8.882728576660156,
+      "warp_n": 7.36976957321167,
+      "tile_m": 7.247294902801514,
+      "stages": 5.898190021514893,
+      "align_a": 4.943837642669678,
+      "tile_n": 3.883101224899292,
+      "pipeline_kind": 3.5989739894866943,
+      "warp_k": 2.3760132789611816,
+      "tile_k": 2.2422802448272705,
+      "log2_N": 2.2336883544921875,
+      "split_k_mode": 1.636670708656311,
+      "align_b": 1.0445351600646973
+     },
+     "holdout_gm": 1.130843,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x4096": 1.0478582194102486,
+      "256x4096x4096": 1.3037693782458406,
+      "8192x4096x4096": 1.0017278383266461,
+      "1152x4096x4096": 1.41538122674811,
+      "2048x4096x4096": 1.0102509245275,
+      "640x4096x4096": 1.3128964140716675,
+      "512x4096x4096": 1.0443227005016296,
+      "768x4096x4096": 1.2191870023102858,
+      "4096x4096x4096": 1.0107127769362039,
+      "3000x4096x4096": 1.0078040684776493,
+      "1500x4096x4096": 1.227239081906233,
+      "2432x4096x4096": 1.1171690884847176,
+      "3584x4096x4096": 1.0698797366311101,
+      "1000x4096x4096": 1.1024590487968327,
+      "1664x4096x4096": 1.0267057971667695,
+      "384x4096x4096": 1.2928571622157001
+     },
+     "hit": {
+      "1024x4096x4096": false,
+      "256x4096x4096": false,
+      "8192x4096x4096": true,
+      "1152x4096x4096": false,
+      "2048x4096x4096": false,
+      "640x4096x4096": false,
+      "512x4096x4096": false,
+      "768x4096x4096": false,
+      "4096x4096x4096": false,
+      "3000x4096x4096": false,
+      "1500x4096x4096": false,
+      "2432x4096x4096": false,
+      "3584x4096x4096": false,
+      "1000x4096x4096": false,
+      "1664x4096x4096": false,
+      "384x4096x4096": false
+     },
+     "picks": {
+      "1024x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x4096": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1152x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "640x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "512x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "768x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3000x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1500x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2432x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3584x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1000x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "1664x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "384x4096x4096": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "1": {
+     "train_gm": 1.035122,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 19.2,
+     "importance_gain_top15": {
+      "warp_m": 38.02909851074219,
+      "log2_K": 16.43134307861328,
+      "split_k": 10.960726737976074,
+      "log2_M": 10.256482124328613,
+      "warp_n": 7.405307292938232,
+      "align_a": 6.107771396636963,
+      "stages": 5.94559383392334,
+      "tile_m": 5.914927959442139,
+      "pipeline_kind": 3.0250651836395264,
+      "tile_n": 2.964853286743164,
+      "warp_k": 2.8998665809631348,
+      "tile_k": 2.6224966049194336,
+      "align_c": 2.330521583557129,
+      "split_k_mode": 1.7472758293151855,
+      "log2_N": 1.4213212728500366
+     },
+     "holdout_gm": 1.162485,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x11008": 1.012081917808371,
+      "256x4096x11008": 1.157837462923241,
+      "8192x4096x11008": 1.0054056639330176,
+      "8192x4096x2048": 1.007312963201395,
+      "8192x4096x256": 1.066978136405548,
+      "8192x4096x8192": 1.0017603715752852,
+      "8192x8192x8192": 1.0,
+      "2048x4096x11008": 1.0079298283395484,
+      "2048x2048x2048": 1.007814601812553,
+      "8x4096x11008": 1.717647153604988,
+      "1x4096x11008": 1.7421383453371553,
+      "512x4096x11008": 1.1556543329870623,
+      "128x4096x11008": 1.350936925174565,
+      "4096x4096x11008": 1.007164724993205,
+      "4096x4096x256": 1.06054680335361,
+      "32x4096x11008": 1.729766830018065
+     },
+     "hit": {
+      "1024x4096x11008": false,
+      "256x4096x11008": false,
+      "8192x4096x11008": false,
+      "8192x4096x2048": false,
+      "8192x4096x256": false,
+      "8192x4096x8192": true,
+      "8192x8192x8192": true,
+      "2048x4096x11008": false,
+      "2048x2048x2048": true,
+      "8x4096x11008": false,
+      "1x4096x11008": false,
+      "512x4096x11008": false,
+      "128x4096x11008": false,
+      "4096x4096x11008": false,
+      "4096x4096x256": false,
+      "32x4096x11008": false
+     },
+     "picks": {
+      "1024x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x11008": {
+       "kernel_id": "sm90_tb128x64x64_w64x32x64_st3_swid4_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x2048": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x256": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x8192": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x8192x8192": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x2048x2048": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x4096x11008": {
+       "kernel_id": "sm90_tb128x128x64_w64x32x64_st7_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x4096x11008": {
+       "kernel_id": "sm90_tb128x64x64_w32x64x64_st3_swid4_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x256": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "2": {
+     "train_gm": 1.028462,
+     "n_train_rows": 1697195,
+     "n_train_shapes": 47,
+     "fit_seconds": 19.7,
+     "importance_gain_top15": {
+      "warp_m": 41.83551025390625,
+      "log2_K": 15.457873344421387,
+      "log2_M": 8.980536460876465,
+      "warp_n": 7.9308552742004395,
+      "split_k": 7.862461566925049,
+      "stages": 6.670892715454102,
+      "tile_m": 4.936514377593994,
+      "pipeline_kind": 4.400607109069824,
+      "align_a": 3.6802425384521484,
+      "tile_n": 3.2391693592071533,
+      "warp_k": 2.560859203338623,
+      "tile_k": 2.418213367462158,
+      "log2_N": 2.135767698287964,
+      "split_k_mode": 1.5871835947036743,
+      "align_c": 0.5395644903182983
+     },
+     "holdout_gm": 1.030769,
+     "n_hold": 16,
+     "regret": {
+      "1024x11008x4096": 1.0032028105754909,
+      "1024x4096x4098": 1.0019086409164202,
+      "1024x4098x4096": 1.0048921236975972,
+      "256x11008x4096": 1.0800274141369293,
+      "8192x11008x4096": 1.0044134779379594,
+      "8192x4096x128": 1.1306261948375613,
+      "8192x4096x1024": 1.0265883774851834,
+      "2048x11008x4096": 1.0368785794591773,
+      "16384x16384x16384": 1.0582310886670085,
+      "8x11008x4096": 1.0,
+      "1x11008x4096": 1.0,
+      "512x11008x4096": 1.0273883096294993,
+      "128x11008x4096": 1.0840969833119425,
+      "4096x11008x4096": 1.0022628688484276,
+      "4096x4096x1024": 1.0272879371819388,
+      "32x11008x4096": 1.014847836446759
+     },
+     "hit": {
+      "1024x11008x4096": true,
+      "1024x4096x4098": true,
+      "1024x4098x4096": true,
+      "256x11008x4096": false,
+      "8192x11008x4096": false,
+      "8192x4096x128": false,
+      "8192x4096x1024": false,
+      "2048x11008x4096": false,
+      "16384x16384x16384": false,
+      "8x11008x4096": true,
+      "1x11008x4096": true,
+      "512x11008x4096": false,
+      "128x11008x4096": false,
+      "4096x11008x4096": true,
+      "4096x4096x1024": false,
+      "32x11008x4096": true
+     },
+     "picks": {
+      "1024x11008x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4096x4098": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid2_a228",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4098x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a882",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "8192x11008x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x128": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x1024": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x11008x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "16384x16384x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "4096x11008x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x1024": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "3": {
+     "train_gm": 1.032025,
+     "n_train_rows": 1699320,
+     "n_train_shapes": 48,
+     "fit_seconds": 15.5,
+     "importance_gain_top15": {
+      "warp_m": 43.283817291259766,
+      "log2_K": 17.41067886352539,
+      "log2_M": 9.031414031982422,
+      "split_k": 8.817154884338379,
+      "warp_n": 8.673519134521484,
+      "stages": 6.995203971862793,
+      "tile_m": 6.0858049392700195,
+      "align_a": 4.860595703125,
+      "tile_n": 3.388957977294922,
+      "pipeline_kind": 2.9669251441955566,
+      "tile_k": 2.484347343444824,
+      "align_c": 2.333716869354248,
+      "warp_k": 2.2326271533966064,
+      "split_k_mode": 1.9547755718231201,
+      "log2_N": 1.6367210149765015
+     },
+     "holdout_gm": 1.050446,
+     "n_hold": 15,
+     "regret": {
+      "1024x4096x4100": 1.3601064976744315,
+      "1024x12288x4096": 1.0,
+      "1024x4100x4096": 1.0040544763023176,
+      "256x12288x4096": 1.125708890096159,
+      "8192x4096x16384": 1.0070259029055681,
+      "8192x4096x512": 1.0416005721796138,
+      "8192x12288x4096": 1.0002188440704622,
+      "2048x12288x4096": 1.0066767868825148,
+      "8x12288x4096": 1.0118715178038216,
+      "1x12288x4096": 1.0125786311900655,
+      "512x12288x4096": 1.0077050671655134,
+      "128x12288x4096": 1.2094698681139633,
+      "4096x4096x16384": 1.000908347635172,
+      "4096x12288x4096": 1.0085196031970773,
+      "32x12288x4096": 1.0222531367776402
+     },
+     "hit": {
+      "1024x4096x4100": false,
+      "1024x12288x4096": true,
+      "1024x4100x4096": true,
+      "256x12288x4096": false,
+      "8192x4096x16384": false,
+      "8192x4096x512": false,
+      "8192x12288x4096": true,
+      "2048x12288x4096": false,
+      "8x12288x4096": true,
+      "1x12288x4096": true,
+      "512x12288x4096": true,
+      "128x12288x4096": false,
+      "4096x4096x16384": true,
+      "4096x12288x4096": false,
+      "32x12288x4096": true
+     },
+     "picks": {
+      "1024x4096x4100": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st2_swid2_a448",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4100x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swhz1_a884",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x12288x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x512": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x12288x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x12288x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    }
+   }
+  },
+  {
+   "arm": "ridge_full",
+   "model": "ridge",
+   "feature_set": "full",
+   "seed": 0,
+   "aggregate": {
+    "train_gm": 1.647983,
+    "holdout_gm": 1.673306,
+    "n_hold": 63,
+    "their_regret_mean": 0.395673,
+    "their_within5": 0.0,
+    "hit_rate": 0.0
+   },
+   "per_fold": {
+    "0": {
+     "train_gm": 1.6111,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 3.9,
+     "importance_gain_top15": null,
+     "holdout_gm": 1.659828,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x4096": 1.7899556651926916,
+      "256x4096x4096": 1.3702882126609273,
+      "8192x4096x4096": 1.685195346964009,
+      "1152x4096x4096": 1.6842329766788295,
+      "2048x4096x4096": 1.7911566891412116,
+      "640x4096x4096": 1.6502818867027038,
+      "512x4096x4096": 1.5976096130303536,
+      "768x4096x4096": 1.5105692243763622,
+      "4096x4096x4096": 1.7935645561275797,
+      "3000x4096x4096": 1.7963719379683025,
+      "1500x4096x4096": 1.6417467226632103,
+      "2432x4096x4096": 1.6729872004467514,
+      "3584x4096x4096": 1.6756149269762406,
+      "1000x4096x4096": 1.7713701183946573,
+      "1664x4096x4096": 1.6727384499574773,
+      "384x4096x4096": 1.5211640596204146
+     },
+     "hit": {
+      "1024x4096x4096": false,
+      "256x4096x4096": false,
+      "8192x4096x4096": false,
+      "1152x4096x4096": false,
+      "2048x4096x4096": false,
+      "640x4096x4096": false,
+      "512x4096x4096": false,
+      "768x4096x4096": false,
+      "4096x4096x4096": false,
+      "3000x4096x4096": false,
+      "1500x4096x4096": false,
+      "2432x4096x4096": false,
+      "3584x4096x4096": false,
+      "1000x4096x4096": false,
+      "1664x4096x4096": false,
+      "384x4096x4096": false
+     },
+     "picks": {
+      "1024x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1152x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st5_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "640x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "768x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3000x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1500x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2432x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3584x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1000x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1664x4096x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st5_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "384x4096x4096": {
+       "kernel_id": "sm90_tb64x128x32_w16x64x32_st3_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "1": {
+     "train_gm": 1.706148,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 4.0,
+     "importance_gain_top15": null,
+     "holdout_gm": 1.668575,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x11008": 1.967503814919453,
+      "256x4096x11008": 1.5691218922473986,
+      "8192x4096x11008": 1.9986791341875634,
+      "8192x4096x2048": 1.6759517598718243,
+      "8192x4096x256": 1.7639321411126112,
+      "8192x4096x8192": 1.9838817908534976,
+      "8192x8192x8192": 2.0014087016017412,
+      "2048x4096x11008": 1.9884079655140046,
+      "2048x2048x2048": 1.7466989622190723,
+      "8x4096x11008": 1.119723213498055,
+      "1x4096x11008": 1.1278826012862144,
+      "512x4096x11008": 1.9202667976803323,
+      "128x4096x11008": 1.3696762880634632,
+      "4096x4096x11008": 2.0200428140933213,
+      "4096x4096x256": 1.8808593815133081,
+      "32x4096x11008": 1.1371742137674288
+     },
+     "hit": {
+      "1024x4096x11008": false,
+      "256x4096x11008": false,
+      "8192x4096x11008": false,
+      "8192x4096x2048": false,
+      "8192x4096x256": false,
+      "8192x4096x8192": false,
+      "8192x8192x8192": false,
+      "2048x4096x11008": false,
+      "2048x2048x2048": false,
+      "8x4096x11008": false,
+      "1x4096x11008": false,
+      "512x4096x11008": false,
+      "128x4096x11008": false,
+      "4096x4096x11008": false,
+      "4096x4096x256": false,
+      "32x4096x11008": false
+     },
+     "picks": {
+      "1024x4096x11008": {
+       "kernel_id": "sm90_tb128x128x32_w16x64x32_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x11008": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x11008": {
+       "kernel_id": "sm90_tb128x128x32_w16x64x32_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x2048": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x256": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x8192": {
+       "kernel_id": "sm90_tb128x128x32_w16x64x32_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x8192x8192": {
+       "kernel_id": "sm90_tb128x128x32_w16x64x32_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x11008": {
+       "kernel_id": "sm90_tb128x128x32_w16x64x32_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x2048x2048": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x4096x11008": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st5_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "1x4096x11008": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st5_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "512x4096x11008": {
+       "kernel_id": "sm90_tb64x128x32_w16x64x32_st8_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x4096x11008": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x11008": {
+       "kernel_id": "sm90_tb128x128x32_w16x64x32_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x256": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x4096x11008": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st5_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "2": {
+     "train_gm": 1.642432,
+     "n_train_rows": 1697195,
+     "n_train_shapes": 47,
+     "fit_seconds": 4.0,
+     "importance_gain_top15": null,
+     "holdout_gm": 1.669055,
+     "n_hold": 16,
+     "regret": {
+      "1024x11008x4096": 1.9012295786667375,
+      "1024x4096x4098": 2.140130343679798,
+      "1024x4098x4096": 1.7641727031222958,
+      "256x11008x4096": 1.6063612455133915,
+      "8192x11008x4096": 1.6970752304798113,
+      "8192x4096x128": 1.892367995901087,
+      "8192x4096x1024": 1.68371051886962,
+      "2048x11008x4096": 1.8046410388367475,
+      "16384x16384x16384": 1.6875275961005616,
+      "8x11008x4096": 1.304477680923316,
+      "1x11008x4096": 1.3114264728973124,
+      "512x11008x4096": 1.7446252205775454,
+      "128x11008x4096": 1.448517474441503,
+      "4096x11008x4096": 1.8288894229499197,
+      "4096x4096x1024": 1.8374308060084992,
+      "32x11008x4096": 1.3147735449770204
+     },
+     "hit": {
+      "1024x11008x4096": false,
+      "1024x4096x4098": false,
+      "1024x4098x4096": false,
+      "256x11008x4096": false,
+      "8192x11008x4096": false,
+      "8192x4096x128": false,
+      "8192x4096x1024": false,
+      "2048x11008x4096": false,
+      "16384x16384x16384": false,
+      "8x11008x4096": false,
+      "1x11008x4096": false,
+      "512x11008x4096": false,
+      "128x11008x4096": false,
+      "4096x11008x4096": false,
+      "4096x4096x1024": false,
+      "32x11008x4096": false
+     },
+     "picks": {
+      "1024x11008x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4096x4098": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a228",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4098x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a882",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x11008x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x128": {
+       "kernel_id": "sm90_tb128x128x32_w16x64x32_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x1024": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x11008x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "16384x16384x16384": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st6_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x11008x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st3_swid8_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "1x11008x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st3_swid8_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "512x11008x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x11008x4096": {
+       "kernel_id": "sm90_tb64x128x32_w16x64x32_st4_swid8_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "4096x11008x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x1024": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x11008x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st3_swid8_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "3": {
+     "train_gm": 1.634043,
+     "n_train_rows": 1699320,
+     "n_train_shapes": 48,
+     "fit_seconds": 4.0,
+     "importance_gain_top15": null,
+     "holdout_gm": 1.697506,
+     "n_hold": 15,
+     "regret": {
+      "1024x4096x4100": 2.0942977002408067,
+      "1024x12288x4096": 1.8823921044616145,
+      "1024x4100x4096": 1.757022847880877,
+      "256x12288x4096": 1.475110227779381,
+      "8192x4096x16384": 1.6986897079022982,
+      "8192x4096x512": 1.7404217449366854,
+      "8192x12288x4096": 1.663569612129644,
+      "2048x12288x4096": 1.9008168775781946,
+      "8x12288x4096": 1.4385475854957561,
+      "1x12288x4096": 1.4308176504832821,
+      "512x12288x4096": 1.7128966994770942,
+      "128x12288x4096": 1.5962429666242726,
+      "4096x4096x16384": 1.8914143326051966,
+      "4096x12288x4096": 1.9140089880224362,
+      "32x12288x4096": 1.4388038333832835
+     },
+     "hit": {
+      "1024x4096x4100": false,
+      "1024x12288x4096": false,
+      "1024x4100x4096": false,
+      "256x12288x4096": false,
+      "8192x4096x16384": false,
+      "8192x4096x512": false,
+      "8192x12288x4096": false,
+      "2048x12288x4096": false,
+      "8x12288x4096": false,
+      "1x12288x4096": false,
+      "512x12288x4096": false,
+      "128x12288x4096": false,
+      "4096x4096x16384": false,
+      "4096x12288x4096": false,
+      "32x12288x4096": false
+     },
+     "picks": {
+      "1024x4096x4100": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a448",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x12288x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4100x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st4_swid8_a884",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x12288x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x16384": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st6_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x512": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x12288x4096": {
+       "kernel_id": "sm90_tb128x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x12288x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x12288x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "1x12288x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "512x12288x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x12288x4096": {
+       "kernel_id": "sm90_tb64x128x32_w16x64x32_st3_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x16384": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st7_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x12288x4096": {
+       "kernel_id": "sm90_tb64x256x64_w16x64x64_st4_swid8_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x12288x4096": {
+       "kernel_id": "sm90_tb64x128x64_w16x64x64_st3_swid8_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      }
+     }
+    }
+   }
+  },
+  {
+   "arm": "xgb_full",
+   "model": "xgb",
+   "feature_set": "full",
+   "seed": 0,
+   "aggregate": {
+    "train_gm": 1.021296,
+    "holdout_gm": 1.049048,
+    "n_hold": 63,
+    "their_regret_mean": 0.045204,
+    "their_within5": 0.68254,
+    "hit_rate": 0.190476
+   },
+   "per_fold": {
+    "0": {
+     "train_gm": 1.019489,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 19.6,
+     "importance_gain_top15": {
+      "warp_m": 68.13044738769531,
+      "producer_consumer_ratio": 66.48274993896484,
+      "k_iters": 23.65094757080078,
+      "pipeline_fill_frac": 22.12653350830078,
+      "stage_amortization": 16.292306900024414,
+      "m_quant_waste": 15.884710311889648,
+      "tile_m": 15.010068893432617,
+      "stages": 13.081501007080078,
+      "sm_subscription": 12.03730583190918,
+      "log2_M": 11.138188362121582,
+      "reg_pressure_proxy": 9.134294509887695,
+      "tile_aspect_ratio": 8.588006019592285,
+      "is_streamk": 8.242898941040039,
+      "working_set_vs_L2": 8.123361587524414,
+      "align_b": 8.082428932189941
+     },
+     "holdout_gm": 1.069916,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x4096": 1.028065000539259,
+      "256x4096x4096": 1.049519530841971,
+      "8192x4096x4096": 1.0038287542667483,
+      "1152x4096x4096": 1.1799485538065215,
+      "2048x4096x4096": 1.0171358148201333,
+      "640x4096x4096": 1.3210006926670734,
+      "512x4096x4096": 1.0323705337503568,
+      "768x4096x4096": 1.2110569345524018,
+      "4096x4096x4096": 1.0251788818841752,
+      "3000x4096x4096": 1.019484275718467,
+      "1500x4096x4096": 1.0432086956986306,
+      "2432x4096x4096": 1.0070889156240301,
+      "3584x4096x4096": 1.0047446789665953,
+      "1000x4096x4096": 1.023126503925132,
+      "1664x4096x4096": 1.0877585712263733,
+      "384x4096x4096": 1.1185185614071742
+     },
+     "hit": {
+      "1024x4096x4096": false,
+      "256x4096x4096": false,
+      "8192x4096x4096": true,
+      "1152x4096x4096": false,
+      "2048x4096x4096": false,
+      "640x4096x4096": false,
+      "512x4096x4096": false,
+      "768x4096x4096": false,
+      "4096x4096x4096": false,
+      "3000x4096x4096": false,
+      "1500x4096x4096": false,
+      "2432x4096x4096": true,
+      "3584x4096x4096": true,
+      "1000x4096x4096": false,
+      "1664x4096x4096": false,
+      "384x4096x4096": false
+     },
+     "picks": {
+      "1024x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st6_swid1_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1152x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "640x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "768x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st6_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3000x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1500x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2432x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3584x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1000x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1664x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "384x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "1": {
+     "train_gm": 1.022019,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 14.6,
+     "importance_gain_top15": {
+      "producer_consumer_ratio": 86.47931671142578,
+      "warp_m": 54.411766052246094,
+      "k_iters": 18.936260223388672,
+      "pipeline_fill_frac": 17.32654571533203,
+      "m_quant_waste": 14.204632759094238,
+      "stages": 12.709159851074219,
+      "stage_amortization": 12.487480163574219,
+      "tile_m": 12.15616226196289,
+      "sm_subscription": 9.484789848327637,
+      "align_b": 8.768013954162598,
+      "reg_pressure_proxy": 8.082889556884766,
+      "tiles_m": 7.5866498947143555,
+      "tile_aspect_ratio": 7.221268653869629,
+      "resident_panel_vs_L2": 7.168152332305908,
+      "log2_M": 6.502860069274902
+     },
+     "holdout_gm": 1.056084,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x11008": 1.0583264462466349,
+      "256x4096x11008": 1.1694484972032444,
+      "8192x4096x11008": 1.0194421515924648,
+      "8192x4096x2048": 1.0161693235645082,
+      "8192x4096x256": 1.006576639358564,
+      "8192x4096x8192": 1.008038748417091,
+      "8192x8192x8192": 1.0169677824442498,
+      "2048x4096x11008": 1.064285667977302,
+      "2048x2048x2048": 1.0126650205187098,
+      "8x4096x11008": 1.0449827209846885,
+      "1x4096x11008": 1.0482180726698467,
+      "512x4096x11008": 1.0518847447905995,
+      "128x4096x11008": 1.330493971821675,
+      "4096x4096x11008": 1.0204247331972667,
+      "4096x4096x256": 1.0175781066443133,
+      "32x4096x11008": 1.0548696216302536
+     },
+     "hit": {
+      "1024x4096x11008": false,
+      "256x4096x11008": false,
+      "8192x4096x11008": false,
+      "8192x4096x2048": false,
+      "8192x4096x256": true,
+      "8192x4096x8192": false,
+      "8192x8192x8192": false,
+      "2048x4096x11008": false,
+      "2048x2048x2048": true,
+      "8x4096x11008": false,
+      "1x4096x11008": false,
+      "512x4096x11008": false,
+      "128x4096x11008": false,
+      "4096x4096x11008": false,
+      "4096x4096x256": true,
+      "32x4096x11008": false
+     },
+     "picks": {
+      "1024x4096x11008": {
+       "kernel_id": "sm90_tb128x256x64_w64x64x64_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x11008": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st4_swid4_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x11008": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x2048": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x256": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x8192": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x8192x8192": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st4_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x11008": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st5_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "2048x2048x2048": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st4_swid4_a888",
+       "split_k": 4,
+       "split_k_mode": "parallel"
+      },
+      "1x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st4_swid4_a888",
+       "split_k": 4,
+       "split_k_mode": "parallel"
+      },
+      "512x4096x11008": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st4_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "128x4096x11008": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x11008": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x256": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st8_swid1_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "2": {
+     "train_gm": 1.019031,
+     "n_train_rows": 1697195,
+     "n_train_shapes": 47,
+     "fit_seconds": 21.9,
+     "importance_gain_top15": {
+      "warp_m": 69.20816040039062,
+      "k_iters": 19.424318313598633,
+      "pipeline_fill_frac": 17.390052795410156,
+      "stages": 14.930703163146973,
+      "stage_amortization": 13.10669231414795,
+      "tile_m": 11.811935424804688,
+      "m_quant_waste": 11.02865982055664,
+      "sm_subscription": 10.212024688720703,
+      "reg_pressure_proxy": 8.61380672454834,
+      "cluster_fits_m": 8.555935859680176,
+      "log2_M": 7.470721244812012,
+      "bytes_per_stage": 6.629422664642334,
+      "resident_panel_vs_L2": 6.594744682312012,
+      "tile_aspect_ratio": 6.363460063934326,
+      "tiles_m": 6.070618152618408
+     },
+     "holdout_gm": 1.040862,
+     "n_hold": 16,
+     "regret": {
+      "1024x11008x4096": 1.0677756323713066,
+      "1024x4096x4098": 1.0128836780056336,
+      "1024x4098x4096": 1.0,
+      "256x11008x4096": 1.0800274141369293,
+      "8192x11008x4096": 1.0251964983623025,
+      "8192x4096x128": 1.143346448472607,
+      "8192x4096x1024": 1.0095005408700188,
+      "2048x11008x4096": 1.0041969029614908,
+      "16384x16384x16384": 1.00655344771177,
+      "8x11008x4096": 1.0537314065612373,
+      "1x11008x4096": 1.0537715348791272,
+      "512x11008x4096": 1.0588894818353793,
+      "128x11008x4096": 1.0501347750507724,
+      "4096x11008x4096": 1.0230319188805679,
+      "4096x4096x1024": 1.0202085549992042,
+      "32x11008x4096": 1.0541944863560726
+     },
+     "hit": {
+      "1024x11008x4096": false,
+      "1024x4096x4098": false,
+      "1024x4098x4096": true,
+      "256x11008x4096": false,
+      "8192x11008x4096": false,
+      "8192x4096x128": false,
+      "8192x4096x1024": false,
+      "2048x11008x4096": true,
+      "16384x16384x16384": false,
+      "8x11008x4096": false,
+      "1x11008x4096": false,
+      "512x11008x4096": false,
+      "128x11008x4096": false,
+      "4096x11008x4096": false,
+      "4096x4096x1024": false,
+      "32x11008x4096": false
+     },
+     "picks": {
+      "1024x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4096x4098": {
+       "kernel_id": "sm90_tb128x256x64_w64x64x64_st3_swid2_a228",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4098x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st6_swid1_a882",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "8192x11008x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x128": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x1024": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "16384x16384x16384": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x11008x4096": {
+       "kernel_id": "sm90_tb128x64x64_w32x64x64_st3_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x11008x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x1024": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "3": {
+     "train_gm": 1.024583,
+     "n_train_rows": 1699320,
+     "n_train_shapes": 48,
+     "fit_seconds": 14.5,
+     "importance_gain_top15": {
+      "cluster_fits_m": 59.960792541503906,
+      "warp_m": 58.21431350708008,
+      "producer_consumer_ratio": 48.36003875732422,
+      "pipeline_fill_frac": 28.176408767700195,
+      "k_iters": 19.774229049682617,
+      "stage_amortization": 15.962553024291992,
+      "stages": 13.787177085876465,
+      "m_quant_waste": 12.240548133850098,
+      "tile_aspect_ratio": 9.571918487548828,
+      "sm_subscription": 9.556547164916992,
+      "tile_m": 9.090705871582031,
+      "reg_pressure_proxy": 8.273367881774902,
+      "align_c": 8.197940826416016,
+      "log2_M": 6.521668434143066,
+      "bytes_per_stage": 6.080656051635742
+     },
+     "holdout_gm": 1.028497,
+     "n_hold": 15,
+     "regret": {
+      "1024x4096x4100": 1.0,
+      "1024x12288x4096": 1.0034846564677762,
+      "1024x4100x4096": 1.03446277885566,
+      "256x12288x4096": 1.088846898518261,
+      "8192x4096x16384": 1.0235377805088608,
+      "8192x4096x512": 1.0844480103034557,
+      "8192x12288x4096": 1.0160227558303985,
+      "2048x12288x4096": 1.0060483782472778,
+      "8x12288x4096": 1.0069832935879057,
+      "1x12288x4096": 1.008385808361663,
+      "512x12288x4096": 1.0550357669055512,
+      "128x12288x4096": 1.0231600582448082,
+      "4096x4096x16384": 1.0147911894393735,
+      "4096x12288x4096": 1.0298385029656763,
+      "32x12288x4096": 1.0375521177145097
+     },
+     "hit": {
+      "1024x4096x4100": true,
+      "1024x12288x4096": true,
+      "1024x4100x4096": false,
+      "256x12288x4096": false,
+      "8192x4096x16384": false,
+      "8192x4096x512": false,
+      "8192x12288x4096": false,
+      "2048x12288x4096": false,
+      "8x12288x4096": true,
+      "1x12288x4096": true,
+      "512x12288x4096": false,
+      "128x12288x4096": false,
+      "4096x4096x16384": false,
+      "4096x12288x4096": false,
+      "32x12288x4096": false
+     },
+     "picks": {
+      "1024x4096x4100": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid2_a448",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st6_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4100x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid4_a884",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x12288x4096": {
+       "kernel_id": "sm90_tb128x64x64_w64x32x64_st3_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x512": {
+       "kernel_id": "sm90_tb128x256x64_w64x64x64_st4_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x12288x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st6_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid4_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "128x12288x4096": {
+       "kernel_id": "sm90_tb128x64x64_w64x32x64_st3_swid4_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x12288x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    }
+   }
+  },
+  {
+   "arm": "xgb_full",
+   "model": "xgb",
+   "feature_set": "full",
+   "seed": 1,
+   "aggregate": {
+    "train_gm": 1.023831,
+    "holdout_gm": 1.045105,
+    "n_hold": 63,
+    "their_regret_mean": 0.041771,
+    "their_within5": 0.746032,
+    "hit_rate": 0.206349
+   },
+   "per_fold": {
+    "0": {
+     "train_gm": 1.017538,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 14.3,
+     "importance_gain_top15": {
+      "warp_m": 58.938968658447266,
+      "k_iters": 27.83686065673828,
+      "pipeline_fill_frac": 17.21750259399414,
+      "m_quant_waste": 15.607804298400879,
+      "stage_amortization": 14.211785316467285,
+      "stages": 12.811468124389648,
+      "log2_M": 12.765294075012207,
+      "tile_aspect_ratio": 11.409100532531738,
+      "tile_m": 11.333646774291992,
+      "is_streamk": 11.313633918762207,
+      "cluster_fits_m": 10.360078811645508,
+      "restream_factor": 9.635316848754883,
+      "sm_subscription": 8.839461326599121,
+      "reg_pressure_proxy": 8.393527030944824,
+      "align_b": 7.1781392097473145
+     },
+     "holdout_gm": 1.068991,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x4096": 1.0298375399216864,
+      "256x4096x4096": 1.2017738149342352,
+      "8192x4096x4096": 1.0524641262523025,
+      "1152x4096x4096": 1.2149742519642466,
+      "2048x4096x4096": 1.018512849875144,
+      "640x4096x4096": 1.187103626948531,
+      "512x4096x4096": 1.0323705337503568,
+      "768x4096x4096": 1.1983739864484233,
+      "4096x4096x4096": 1.0206044519237345,
+      "3000x4096x4096": 1.0192774969760534,
+      "1500x4096x4096": 1.0119355860516008,
+      "2432x4096x4096": 1.0059362891826702,
+      "3584x4096x4096": 1.0015399556452151,
+      "1000x4096x4096": 1.0163934314493681,
+      "1664x4096x4096": 1.0097252619955763,
+      "384x4096x4096": 1.128571425051691
+     },
+     "hit": {
+      "1024x4096x4096": false,
+      "256x4096x4096": false,
+      "8192x4096x4096": false,
+      "1152x4096x4096": false,
+      "2048x4096x4096": false,
+      "640x4096x4096": false,
+      "512x4096x4096": false,
+      "768x4096x4096": false,
+      "4096x4096x4096": false,
+      "3000x4096x4096": false,
+      "1500x4096x4096": false,
+      "2432x4096x4096": true,
+      "3584x4096x4096": true,
+      "1000x4096x4096": false,
+      "1664x4096x4096": false,
+      "384x4096x4096": false
+     },
+     "picks": {
+      "1024x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1152x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st4_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "640x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "768x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3000x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1500x4096x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2432x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "3584x4096x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1000x4096x4096": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1664x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "384x4096x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "1": {
+     "train_gm": 1.024507,
+     "n_train_rows": 1662515,
+     "n_train_shapes": 47,
+     "fit_seconds": 17.4,
+     "importance_gain_top15": {
+      "warp_m": 63.11697769165039,
+      "k_iters": 24.832704544067383,
+      "m_quant_waste": 15.718441009521484,
+      "pipeline_fill_frac": 13.461403846740723,
+      "stages": 12.879417419433594,
+      "stage_amortization": 12.406803131103516,
+      "tile_m": 11.376809120178223,
+      "tiles_m": 9.268479347229004,
+      "align_c": 8.337175369262695,
+      "reg_pressure_proxy": 7.916947841644287,
+      "sm_subscription": 7.592643737792969,
+      "tile_aspect_ratio": 7.063477039337158,
+      "log2_M": 6.531705856323242,
+      "restream_factor": 6.222778797149658,
+      "align_a": 5.9931440353393555
+     },
+     "holdout_gm": 1.039061,
+     "n_hold": 16,
+     "regret": {
+      "1024x4096x11008": 1.0,
+      "256x4096x11008": 1.1796081416380768,
+      "8192x4096x11008": 1.0257693551350946,
+      "8192x4096x2048": 1.0335146421146868,
+      "8192x4096x256": 1.0,
+      "8192x4096x8192": 1.0155280322465774,
+      "8192x8192x8192": 1.0316783554063884,
+      "2048x4096x11008": 1.006416485537017,
+      "2048x2048x2048": 1.0654809348661465,
+      "8x4096x11008": 1.034602099262394,
+      "1x4096x11008": 1.0593990691329687,
+      "512x4096x11008": 1.0298602089184095,
+      "128x4096x11008": 1.0545144982027022,
+      "4096x4096x11008": 1.0204247331972667,
+      "4096x4096x256": 1.0136718270383671,
+      "32x4096x11008": 1.0672153144431247
+     },
+     "hit": {
+      "1024x4096x11008": true,
+      "256x4096x11008": false,
+      "8192x4096x11008": false,
+      "8192x4096x2048": false,
+      "8192x4096x256": true,
+      "8192x4096x8192": false,
+      "8192x8192x8192": false,
+      "2048x4096x11008": false,
+      "2048x2048x2048": false,
+      "8x4096x11008": false,
+      "1x4096x11008": false,
+      "512x4096x11008": false,
+      "128x4096x11008": false,
+      "4096x4096x11008": false,
+      "4096x4096x256": true,
+      "32x4096x11008": false
+     },
+     "picks": {
+      "1024x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x4096x11008": {
+       "kernel_id": "sm90_tb128x256x64_w64x64x64_st4_swid2_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x2048": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x256": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x8192": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x8192x8192": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x2048x2048": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st8_swhz1_a888",
+       "split_k": 3,
+       "split_k_mode": "serial"
+      },
+      "1x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st5_swhz1_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      },
+      "512x4096x11008": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid4_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "128x4096x11008": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st4_swhz1_a888",
+       "split_k": 4,
+       "split_k_mode": "parallel"
+      },
+      "4096x4096x11008": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x256": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x4096x11008": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st5_swid1_a888",
+       "split_k": 4,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "2": {
+     "train_gm": 1.02877,
+     "n_train_rows": 1697195,
+     "n_train_shapes": 47,
+     "fit_seconds": 14.6,
+     "importance_gain_top15": {
+      "warp_m": 70.86351013183594,
+      "cluster_fits_m": 32.73112487792969,
+      "k_iters": 25.648988723754883,
+      "stages": 14.595723152160645,
+      "stage_amortization": 11.50936222076416,
+      "m_quant_waste": 10.732617378234863,
+      "tile_aspect_ratio": 10.489263534545898,
+      "align_b": 10.382506370544434,
+      "pipeline_fill_frac": 9.501119613647461,
+      "tile_m": 9.419147491455078,
+      "sm_subscription": 8.81906509399414,
+      "reg_pressure_proxy": 8.659407615661621,
+      "log2_M": 7.891789436340332,
+      "problem_arith_intensity": 7.197028636932373,
+      "bytes_per_stage": 6.800476551055908
+     },
+     "holdout_gm": 1.048293,
+     "n_hold": 16,
+     "regret": {
+      "1024x11008x4096": 1.0699968930254917,
+      "1024x4096x4098": 1.0128836780056336,
+      "1024x4098x4096": 1.0307914010917647,
+      "256x11008x4096": 1.2816347498631204,
+      "8192x11008x4096": 1.0470828038102016,
+      "8192x4096x128": 1.1330723974596855,
+      "8192x4096x1024": 1.0198587931394147,
+      "2048x11008x4096": 1.0046572182090967,
+      "16384x16384x16384": 1.0107815168159302,
+      "8x11008x4096": 1.0,
+      "1x11008x4096": 1.0,
+      "512x11008x4096": 1.0231819056332916,
+      "128x11008x4096": 1.092183298085536,
+      "4096x11008x4096": 1.0087342603229665,
+      "4096x4096x1024": 1.0513579325046472,
+      "32x11008x4096": 1.0200445230264665
+     },
+     "hit": {
+      "1024x11008x4096": false,
+      "1024x4096x4098": false,
+      "1024x4098x4096": false,
+      "256x11008x4096": false,
+      "8192x11008x4096": false,
+      "8192x4096x128": false,
+      "8192x4096x1024": false,
+      "2048x11008x4096": true,
+      "16384x16384x16384": false,
+      "8x11008x4096": true,
+      "1x11008x4096": true,
+      "512x11008x4096": false,
+      "128x11008x4096": false,
+      "4096x11008x4096": false,
+      "4096x4096x1024": false,
+      "32x11008x4096": true
+     },
+     "picks": {
+      "1024x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4096x4098": {
+       "kernel_id": "sm90_tb128x256x64_w64x64x64_st3_swid2_a228",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4098x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st8_swid2_a882",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x128": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st3_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x1024": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st3_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "16384x16384x16384": {
+       "kernel_id": "sm90_tb128x256x32_w64x64x32_st8_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "128x11008x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x32_st7_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x11008x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st7_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x1024": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st5_swid4_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x11008x4096": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    },
+    "3": {
+     "train_gm": 1.024527,
+     "n_train_rows": 1699320,
+     "n_train_shapes": 48,
+     "fit_seconds": 14.8,
+     "importance_gain_top15": {
+      "warp_m": 62.05904006958008,
+      "k_iters": 24.23258399963379,
+      "pipeline_fill_frac": 17.480043411254883,
+      "stages": 12.576828002929688,
+      "stage_amortization": 12.219268798828125,
+      "m_quant_waste": 10.263364791870117,
+      "tile_m": 9.03965950012207,
+      "tile_aspect_ratio": 8.621994018554688,
+      "align_b": 8.612842559814453,
+      "sm_subscription": 8.435073852539062,
+      "log2_M": 8.40698528289795,
+      "is_streamk": 6.87510871887207,
+      "reg_pressure_proxy": 6.868285179138184,
+      "restream_factor": 6.327752590179443,
+      "bytes_per_stage": 5.9139885902404785
+     },
+     "holdout_gm": 1.023217,
+     "n_hold": 15,
+     "regret": {
+      "1024x4096x4100": 1.0,
+      "1024x12288x4096": 1.0623654906090287,
+      "1024x4100x4096": 1.0240370500782103,
+      "256x12288x4096": 1.0453685993762134,
+      "8192x4096x16384": 1.0070259029055681,
+      "8192x4096x512": 1.0312854511192868,
+      "8192x12288x4096": 1.0002188440704622,
+      "2048x12288x4096": 1.059279442322329,
+      "8x12288x4096": 1.0076816229466963,
+      "1x12288x4096": 1.0139762659170095,
+      "512x12288x4096": 1.0361402205189454,
+      "128x12288x4096": 1.0231600582448082,
+      "4096x4096x16384": 1.004789367976076,
+      "4096x12288x4096": 1.0120308224795231,
+      "32x12288x4096": 1.0236439679457943
+     },
+     "hit": {
+      "1024x4096x4100": true,
+      "1024x12288x4096": false,
+      "1024x4100x4096": false,
+      "256x12288x4096": false,
+      "8192x4096x16384": false,
+      "8192x4096x512": false,
+      "8192x12288x4096": true,
+      "2048x12288x4096": false,
+      "8x12288x4096": true,
+      "1x12288x4096": true,
+      "512x12288x4096": false,
+      "128x12288x4096": false,
+      "4096x4096x16384": false,
+      "4096x12288x4096": false,
+      "32x12288x4096": false
+     },
+     "picks": {
+      "1024x4096x4100": {
+       "kernel_id": "sm90_tb256x128x64_w64x64x64_st3_swid2_a448",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x12288x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1024x4100x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st7_swhz1_a884",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "256x12288x4096": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x4096x512": {
+       "kernel_id": "sm90_tb128x128x32_w64x64x32_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8192x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "2048x12288x4096": {
+       "kernel_id": "sm90_tb128x128x64_w64x64x64_st3_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "8x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "1x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w32x32x64_st8_swhz1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "512x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st5_swhz1_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "128x12288x4096": {
+       "kernel_id": "sm90_tb128x64x64_w64x32x64_st3_swid2_a888",
+       "split_k": 2,
+       "split_k_mode": "serial"
+      },
+      "4096x4096x16384": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st4_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "4096x12288x4096": {
+       "kernel_id": "sm90_tb256x128x32_w64x64x32_st6_swid2_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      },
+      "32x12288x4096": {
+       "kernel_id": "sm90_tb32x128x64_w16x64x64_st8_swid1_a888",
+       "split_k": 1,
+       "split_k_mode": "serial"
+      }
+     }
+    }
+   }
+  }
+ ]
+}
